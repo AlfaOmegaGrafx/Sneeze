@@ -49,11 +49,7 @@ Rust is a programming language with its own compiler and package manager (Cargo)
 
 **Install if missing (all platforms):**
 
-Visit [rustup.rs](https://rustup.rs/) and follow the instructions. On Windows, this downloads `rustup-init.exe`. Run it and accept the defaults. On Linux/macOS, it's a one-line command:
-
-```
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
+Visit [rust-lang.org/tools/install](https://rust-lang.org/tools/install/) and follow the instructions. On Windows, this downloads `rustup-init.exe`. Run it and accept the defaults. On Linux/macOS, the page provides a one-line install command.
 
 After installation, **restart your terminal** so that `rustc` and `cargo` are on your PATH.
 
@@ -279,7 +275,7 @@ All dependencies are built from source by the SuperBuild. No pre-built binaries.
 | Problem | Likely cause | Fix |
 |---------|-------------|-----|
 | `cmake` command not found | CMake not installed or not on PATH | Install CMake and ensure its `bin/` directory is on your system PATH |
-| `rustc` command not found | Rust not installed | Install from [rustup.rs](https://rustup.rs/) and restart your terminal |
+| `rustc` command not found | Rust not installed | Install from [rust-lang.org/tools/install](https://rust-lang.org/tools/install/) and restart your terminal |
 | Wasmtime build fails with "cmake not found" | Cargo's build system needs cmake on PATH (not just installed) | Add cmake's directory to your system PATH |
 | ANARI "failed to load helide library" | `anari_library_helide.dll` not next to the executable | The post-build step should copy it automatically. If not, copy from `libs/ANARI-SDK/install/bin/` |
 | OpenXR test prints "failed to find active runtime" | No VR runtime installed (SteamVR, Oculus, etc.) | Expected on machines without a headset. The test handles this gracefully. |
