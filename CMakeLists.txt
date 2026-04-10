@@ -196,10 +196,6 @@ ExternalProject_Add (rmlui
 # ---------------------------------------------------------------------------
 
 if (WIN32)
-   set (WASMTIME_LIB_FILES
-      wasmtime.dll
-      wasmtime.dll.lib
-   )
    set (WASMTIME_COPY_CMDS
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
          "<SOURCE_DIR>/target/release/wasmtime.dll"
@@ -216,6 +212,22 @@ else ()
    )
 endif ()
 
+# Cargo generates conf.h (from conf.h.in) inside a hashed build dir.
+# This script copies source headers first, then overlays the generated
+# headers so conf.h replaces the template.
+file (WRITE "${CMAKE_BINARY_DIR}/wasmtime-install.cmake" [=[
+cmake_minimum_required (VERSION 3.20)
+file (MAKE_DIRECTORY "${DST}/include")
+file (MAKE_DIRECTORY "${DST}/lib")
+file (COPY "${SRC}/crates/c-api/include/" DESTINATION "${DST}/include")
+file (GLOB _gen_dirs "${SRC}/target/release/build/wasmtime-c-api-impl-*/out/include")
+list (LENGTH _gen_dirs _n)
+if (_n GREATER 0)
+   list (GET _gen_dirs 0 _gen)
+   file (COPY "${_gen}/" DESTINATION "${DST}/include")
+endif ()
+]=])
+
 ExternalProject_Add (wasmtime
    GIT_REPOSITORY   https://github.com/bytecodealliance/wasmtime.git
    GIT_TAG          v43.0.0
@@ -227,11 +239,10 @@ ExternalProject_Add (wasmtime
    CONFIGURE_COMMAND ""
    BUILD_COMMAND     cargo build --release -p wasmtime-c-api --manifest-path <SOURCE_DIR>/Cargo.toml
    INSTALL_COMMAND
-      ${CMAKE_COMMAND} -E make_directory "<INSTALL_DIR>/include"
-      COMMAND ${CMAKE_COMMAND} -E make_directory "<INSTALL_DIR>/lib"
-      COMMAND ${CMAKE_COMMAND} -E copy_directory
-         "<SOURCE_DIR>/crates/c-api/include"
-         "<INSTALL_DIR>/include"
+      ${CMAKE_COMMAND}
+         -DSRC=<SOURCE_DIR>
+         -DDST=<INSTALL_DIR>
+         -P "${CMAKE_BINARY_DIR}/wasmtime-install.cmake"
       ${WASMTIME_COPY_CMDS}
    BUILD_IN_SOURCE   OFF
 )

@@ -8,74 +8,62 @@ This repository is set up so that a new developer can go from a fresh clone to a
 
 ## Prerequisites
 
-You need five tools installed before building Sneeze. If any are missing, follow the installation steps below.
+You need five tools installed before building. Open a terminal and check each one:
+
+| Tool | Purpose | Check command | Minimum version |
+|------|---------|---------------|-----------------|
+| **Git** | Clones this repo and all dependencies | `git --version` | any |
+| **CMake** | Generates build files, orchestrates dependency builds | `cmake --version` | 3.20 |
+| **C/C++ compiler** | Compiles all C/C++ code | Windows: `cl` ¹ / Linux: `g++ --version` / macOS: `clang++ --version` | C++17 support |
+| **Rust / Cargo** | Builds Wasmtime (WebAssembly runtime) from source | `rustc --version` | any |
+| **Python 3** | Used by glslang's build to generate source tables | `python --version` (Win) or `python3 --version` | 3.x |
+
+¹ Run `cl` from a "Developer Command Prompt for VS 2022" (search in Start menu), not a regular terminal.
+
+If all five print a version number, skip ahead to [Quick Start](#quick-start--build-everything-from-source-recommended). Otherwise, install what's missing:
+
+---
 
 ### Git
 
-Git is the version control system used to clone this repository and all of its dependencies.
-
-**Check:** `git --version`
-
-**Install if missing:**
-- **Windows:** Download the installer from [git-scm.com](https://git-scm.com/). Run it and accept the defaults. When it asks about adjusting your PATH, choose "Git from the command line and also from 3rd-party software."
+- **Windows:** Download from [git-scm.com](https://git-scm.com/). Accept defaults. When asked about PATH, choose "Git from the command line and also from 3rd-party software."
 - **Linux:** `sudo apt install git` (Debian/Ubuntu) or `sudo dnf install git` (Fedora)
-- **macOS:** `xcode-select --install` (installs Git as part of the Xcode command-line tools)
+- **macOS:** `xcode-select --install`
 
-### CMake (3.20 or newer)
+---
 
-CMake is a build system generator. It reads our `CMakeLists.txt` files and produces Visual Studio solutions (Windows), Makefiles (Linux), or Xcode projects (macOS). It also orchestrates downloading and building all nine dependencies automatically.
+### CMake
 
-**Check:** `cmake --version`
-
-**Install if missing:**
-- **Windows:** Download the `.msi` installer from [cmake.org/download](https://cmake.org/download/). During installation, select **"Add CMake to the system PATH for all users"** — this is important, because several dependencies (including Wasmtime) expect `cmake` to be on PATH.
+- **Windows:** Download the `.msi` installer from [cmake.org/download](https://cmake.org/download/). During installation, select **"Add CMake to the system PATH for all users"** — this is important, because several dependencies expect `cmake` to be on PATH.
 - **Linux:** `sudo apt install cmake` (Debian/Ubuntu) or `sudo dnf install cmake` (Fedora). If your distro's version is older than 3.20, download a newer release from [cmake.org/download](https://cmake.org/download/).
 - **macOS:** `brew install cmake` (requires [Homebrew](https://brew.sh/))
 
-### C++ Compiler
+---
 
-You need a C++ compiler that supports C++17.
+### C/C++ Compiler
 
-**Install if missing:**
-- **Windows:** Install [Visual Studio 2022](https://visualstudio.microsoft.com/) (Community edition is free). During installation, select the **"Desktop development with C++"** workload. This includes the MSVC compiler, linker, and Windows SDK.
-- **Linux:** `sudo apt install build-essential` (Debian/Ubuntu) or `sudo dnf install gcc-c++` (Fedora). This gives you `g++`.
-- **macOS:** `xcode-select --install` (installs `clang++` as part of the Xcode command-line tools)
+- **Windows:** Install [Visual Studio 2022](https://visualstudio.microsoft.com/) (Community edition is free). Select the **"Desktop development with C++"** workload. This includes the MSVC compiler, linker, and Windows SDK.
+- **Linux:** `sudo apt install build-essential` (Debian/Ubuntu) or `sudo dnf install gcc-c++` (Fedora)
+- **macOS:** `xcode-select --install`
+
+---
 
 ### Rust / Cargo
 
-Rust is a programming language with its own compiler and package manager (Cargo). We aren't writing Rust code — we just need its compiler to build Wasmtime (the WebAssembly sandbox runtime) from source.
+We aren't writing Rust code — we just need its compiler to build Wasmtime from source. Pick whichever install method you prefer:
 
-**Check:** `rustc --version`
+- **Option A — Official website (all platforms):** Visit [rust-lang.org/tools/install](https://rust-lang.org/tools/install/). On Windows, download and run `rustup-init.exe`. On Linux/macOS, follow the one-line install command. Accept the defaults. Installs to your home directory only — no system-wide changes.
+- **Option B — winget (Windows only):** `winget install Rustlang.Rustup`. You can inspect the package first with `winget show Rustlang.Rustup`.
 
-**Install if missing (all platforms):**
+After installing, close and reopen your terminal so `rustc` and `cargo` are on your PATH. To uninstall later: `rustup self uninstall`.
 
-Visit [rust-lang.org/tools/install](https://rust-lang.org/tools/install/) and follow the instructions. On Windows, this downloads `rustup-init.exe`. Run it and accept the defaults. On Linux/macOS, the page provides a one-line install command.
-
-After installation, **restart your terminal** so that `rustc` and `cargo` are on your PATH.
+---
 
 ### Python 3
 
-Python is required by the glslang build system to generate internal source tables. It's a build-time-only dependency — no Python code runs in Sneeze.
-
-**Check:** `python3 --version` (or `python --version` on Windows)
-
-**Install if missing:**
-- **Windows:** Download the installer from [python.org](https://www.python.org/downloads/). During installation, check **"Add python.exe to PATH"** at the bottom of the first screen. After installing, you may also need to disable the Windows Store alias that intercepts the `python` command: go to **Settings > Apps > Advanced app settings > App execution aliases** and turn off the entries for `python.exe` and `python3.exe`. Without this, Windows redirects `python` to the Microsoft Store instead of your actual installation.
-- **Linux:** `sudo apt install python3` (Debian/Ubuntu) or `sudo dnf install python3` (Fedora). Most distros include Python 3 by default.
+- **Windows:** Download from [python.org](https://www.python.org/downloads/). During installation, check **"Add python.exe to PATH"**. You may also need to disable the Windows Store alias: **Settings > Apps > Advanced app settings > App execution aliases** — turn off `python.exe` and `python3.exe`.
+- **Linux:** `sudo apt install python3` (Debian/Ubuntu) or `sudo dnf install python3` (Fedora). Usually pre-installed.
 - **macOS:** `brew install python3` or download from [python.org](https://www.python.org/downloads/)
-
-### Verify everything
-
-Once all five are installed, open a fresh terminal and run:
-
-```
-git --version
-cmake --version
-rustc --version
-python3 --version
-```
-
-All four commands should print a version number. If any fail, revisit the installation steps above. Make sure you opened a **new** terminal after installing (PATH changes don't affect terminals that were already open).
 
 ---
 
@@ -275,7 +263,7 @@ All dependencies are built from source by the SuperBuild. No pre-built binaries.
 | Problem | Likely cause | Fix |
 |---------|-------------|-----|
 | `cmake` command not found | CMake not installed or not on PATH | Install CMake and ensure its `bin/` directory is on your system PATH |
-| `rustc` command not found | Rust not installed | Install from [rust-lang.org/tools/install](https://rust-lang.org/tools/install/) and restart your terminal |
+| `rustc` command not found | Rust not installed | Install from [rust-lang.org/tools/install](https://rust-lang.org/tools/install/) or `winget install Rustlang.Rustup` (Windows), then restart your terminal |
 | Wasmtime build fails with "cmake not found" | Cargo's build system needs cmake on PATH (not just installed) | Add cmake's directory to your system PATH |
 | ANARI "failed to load helide library" | `anari_library_helide.dll` not next to the executable | The post-build step should copy it automatically. If not, copy from `libs/ANARI-SDK/install/bin/` |
 | OpenXR test prints "failed to find active runtime" | No VR runtime installed (SteamVR, Oculus, etc.) | Expected on machines without a headset. The test handles this gracefully. |
