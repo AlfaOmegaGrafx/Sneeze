@@ -1,0 +1,261 @@
+# Copyright 2026 Open Metaverse Browser Initiative (OMBI)
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+cmake_minimum_required (VERSION 3.20)
+project (Sneeze-SuperBuild LANGUAGES NONE)
+
+include (ExternalProject)
+
+set (LIBS_DIR "${CMAKE_SOURCE_DIR}/libs")
+
+# ---------------------------------------------------------------------------
+# SPIRV-Headers (header-only, required by SPIRV-Tools)
+# ---------------------------------------------------------------------------
+
+ExternalProject_Add (spirv-headers
+   GIT_REPOSITORY   https://github.com/KhronosGroup/SPIRV-Headers.git
+   GIT_TAG          vulkan-sdk-1.4.341.0
+   GIT_SHALLOW      ON
+   SOURCE_DIR       "${LIBS_DIR}/SPIRV-Headers/src"
+   BINARY_DIR       "${LIBS_DIR}/SPIRV-Headers/build"
+   INSTALL_DIR      "${LIBS_DIR}/SPIRV-Headers/install"
+   CMAKE_ARGS
+      -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+      -DCMAKE_BUILD_TYPE=Release
+)
+
+# ---------------------------------------------------------------------------
+# SPIRV-Tools (depends on SPIRV-Headers)
+# ---------------------------------------------------------------------------
+
+ExternalProject_Add (spirv-tools
+   GIT_REPOSITORY   https://github.com/KhronosGroup/SPIRV-Tools.git
+   GIT_TAG          vulkan-sdk-1.4.341.0
+   GIT_SHALLOW      ON
+   SOURCE_DIR       "${LIBS_DIR}/SPIRV-Tools/src"
+   BINARY_DIR       "${LIBS_DIR}/SPIRV-Tools/build"
+   INSTALL_DIR      "${LIBS_DIR}/SPIRV-Tools/install"
+   CMAKE_ARGS
+      -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+      -DCMAKE_BUILD_TYPE=Release
+      -DSPIRV-Headers_SOURCE_DIR=${LIBS_DIR}/SPIRV-Headers/src
+      -DSPIRV_SKIP_TESTS=ON
+   DEPENDS spirv-headers
+)
+
+# ---------------------------------------------------------------------------
+# SPIRV-Cross
+# ---------------------------------------------------------------------------
+
+ExternalProject_Add (spirv-cross
+   GIT_REPOSITORY   https://github.com/KhronosGroup/SPIRV-Cross.git
+   GIT_TAG          vulkan-sdk-1.4.341.0
+   GIT_SHALLOW      ON
+   SOURCE_DIR       "${LIBS_DIR}/SPIRV-Cross/src"
+   BINARY_DIR       "${LIBS_DIR}/SPIRV-Cross/build"
+   INSTALL_DIR      "${LIBS_DIR}/SPIRV-Cross/install"
+   CMAKE_ARGS
+      -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+      -DCMAKE_BUILD_TYPE=Release
+      -DSPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS=OFF
+)
+
+# ---------------------------------------------------------------------------
+# glslang (depends on SPIRV-Tools for optimizer integration)
+# ---------------------------------------------------------------------------
+
+ExternalProject_Add (glslang
+   GIT_REPOSITORY   https://github.com/KhronosGroup/glslang.git
+   GIT_TAG          vulkan-sdk-1.4.341.0
+   GIT_SHALLOW      ON
+   SOURCE_DIR       "${LIBS_DIR}/glslang/src"
+   BINARY_DIR       "${LIBS_DIR}/glslang/build"
+   INSTALL_DIR      "${LIBS_DIR}/glslang/install"
+   CMAKE_ARGS
+      -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+      -DCMAKE_BUILD_TYPE=Release
+      -DENABLE_CTEST=OFF
+      -DENABLE_OPT=OFF
+      -DENABLE_HLSL=OFF
+   DEPENDS spirv-tools
+)
+
+# ---------------------------------------------------------------------------
+# ANARI-SDK (with helide device)
+# ---------------------------------------------------------------------------
+
+ExternalProject_Add (anari-sdk
+   GIT_REPOSITORY   https://github.com/KhronosGroup/ANARI-SDK.git
+   GIT_TAG          v0.16.0
+   GIT_SHALLOW      ON
+   SOURCE_DIR       "${LIBS_DIR}/ANARI-SDK/src"
+   BINARY_DIR       "${LIBS_DIR}/ANARI-SDK/build"
+   INSTALL_DIR      "${LIBS_DIR}/ANARI-SDK/install"
+   CMAKE_ARGS
+      -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+      -DCMAKE_BUILD_TYPE=Release
+      -DBUILD_HELIDE_DEVICE=ON
+      -DBUILD_TESTING=OFF
+      -DBUILD_EXAMPLES=OFF
+)
+
+# ---------------------------------------------------------------------------
+# SDL3
+# ---------------------------------------------------------------------------
+
+ExternalProject_Add (sdl3
+   GIT_REPOSITORY   https://github.com/libsdl-org/SDL.git
+   GIT_TAG          release-3.4.2
+   GIT_SHALLOW      ON
+   SOURCE_DIR       "${LIBS_DIR}/SDL3/src"
+   BINARY_DIR       "${LIBS_DIR}/SDL3/build"
+   INSTALL_DIR      "${LIBS_DIR}/SDL3/install"
+   CMAKE_ARGS
+      -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+      -DCMAKE_BUILD_TYPE=Release
+      -DSDL_SHARED=ON
+      -DSDL_STATIC=OFF
+      -DSDL_TEST=OFF
+)
+
+# ---------------------------------------------------------------------------
+# OpenXR-SDK
+# ---------------------------------------------------------------------------
+
+ExternalProject_Add (openxr-sdk
+   GIT_REPOSITORY   https://github.com/KhronosGroup/OpenXR-SDK.git
+   GIT_TAG          release-1.1.58
+   GIT_SHALLOW      ON
+   SOURCE_DIR       "${LIBS_DIR}/OpenXR-SDK/src"
+   BINARY_DIR       "${LIBS_DIR}/OpenXR-SDK/build"
+   INSTALL_DIR      "${LIBS_DIR}/OpenXR-SDK/install"
+   CMAKE_ARGS
+      -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+      -DCMAKE_BUILD_TYPE=Release
+      -DDYNAMIC_LOADER=OFF
+)
+
+# ---------------------------------------------------------------------------
+# curl
+# ---------------------------------------------------------------------------
+
+if (WIN32)
+   set (CURL_SSL_ARGS -DCURL_USE_SCHANNEL=ON -DCURL_USE_OPENSSL=OFF)
+else ()
+   set (CURL_SSL_ARGS -DCURL_USE_SCHANNEL=OFF -DCURL_USE_OPENSSL=ON)
+endif ()
+
+ExternalProject_Add (curl
+   GIT_REPOSITORY   https://github.com/curl/curl.git
+   GIT_TAG          curl-8_9_1
+   GIT_SHALLOW      ON
+   SOURCE_DIR       "${LIBS_DIR}/curl/src"
+   BINARY_DIR       "${LIBS_DIR}/curl/build"
+   INSTALL_DIR      "${LIBS_DIR}/curl/install"
+   CMAKE_ARGS
+      -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+      -DCMAKE_BUILD_TYPE=Release
+      -DBUILD_SHARED_LIBS=OFF
+      -DBUILD_CURL_EXE=OFF
+      ${CURL_SSL_ARGS}
+)
+
+# ---------------------------------------------------------------------------
+# RmlUi
+# ---------------------------------------------------------------------------
+
+ExternalProject_Add (rmlui
+   GIT_REPOSITORY   https://github.com/mikke89/RmlUi.git
+   GIT_TAG          6.2
+   GIT_SHALLOW      ON
+   SOURCE_DIR       "${LIBS_DIR}/RmlUi/src"
+   BINARY_DIR       "${LIBS_DIR}/RmlUi/build"
+   INSTALL_DIR      "${LIBS_DIR}/RmlUi/install"
+   CMAKE_ARGS
+      -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+      -DCMAKE_BUILD_TYPE=Release
+      -DBUILD_SHARED_LIBS=OFF
+      -DBUILD_SAMPLES=OFF
+      -DRMLUI_FONT_ENGINE=none
+)
+
+# ---------------------------------------------------------------------------
+# Wasmtime (Rust/Cargo — custom build, not CMake)
+# ---------------------------------------------------------------------------
+
+if (WIN32)
+   set (WASMTIME_LIB_FILES
+      wasmtime.dll
+      wasmtime.dll.lib
+   )
+   set (WASMTIME_COPY_CMDS
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+         "<SOURCE_DIR>/target/release/wasmtime.dll"
+         "<INSTALL_DIR>/lib/wasmtime.dll"
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+         "<SOURCE_DIR>/target/release/wasmtime.dll.lib"
+         "<INSTALL_DIR>/lib/wasmtime.dll.lib"
+   )
+else ()
+   set (WASMTIME_COPY_CMDS
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+         "<SOURCE_DIR>/target/release/libwasmtime.so"
+         "<INSTALL_DIR>/lib/libwasmtime.so"
+   )
+endif ()
+
+ExternalProject_Add (wasmtime
+   GIT_REPOSITORY   https://github.com/bytecodealliance/wasmtime.git
+   GIT_TAG          v43.0.0
+   GIT_SHALLOW      ON
+   SOURCE_DIR       "${LIBS_DIR}/Wasmtime/src"
+   BINARY_DIR       "${LIBS_DIR}/Wasmtime/build"
+   INSTALL_DIR      "${LIBS_DIR}/Wasmtime/install"
+   CONFIGURE_COMMAND ""
+   BUILD_COMMAND     cargo build --release -p wasmtime-c-api --manifest-path <SOURCE_DIR>/Cargo.toml
+   INSTALL_COMMAND
+      ${CMAKE_COMMAND} -E make_directory "<INSTALL_DIR>/include"
+      COMMAND ${CMAKE_COMMAND} -E make_directory "<INSTALL_DIR>/lib"
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+         "<SOURCE_DIR>/crates/c-api/include"
+         "<INSTALL_DIR>/include"
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+         "<SOURCE_DIR>/crates/c-api/wasm-c-api/include"
+         "<INSTALL_DIR>/include"
+      ${WASMTIME_COPY_CMDS}
+   BUILD_IN_SOURCE   OFF
+)
+
+# ---------------------------------------------------------------------------
+# Sneeze (the actual project — depends on all libs)
+# ---------------------------------------------------------------------------
+
+ExternalProject_Add (sneeze
+   SOURCE_DIR       "${CMAKE_SOURCE_DIR}/src"
+   BINARY_DIR       "${CMAKE_SOURCE_DIR}/build/sneeze"
+   INSTALL_COMMAND   ""
+   CMAKE_ARGS
+      -DCMAKE_BUILD_TYPE=Release
+      -DLIBS_DIR=${LIBS_DIR}
+   DEPENDS
+      anari-sdk
+      sdl3
+      wasmtime
+      spirv-tools
+      spirv-cross
+      glslang
+      openxr-sdk
+      curl
+      rmlui
+)

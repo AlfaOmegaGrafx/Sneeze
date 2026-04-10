@@ -1,0 +1,18 @@
+# Dependencies (cloned and built by SuperBuild)
+libs/
+
+# Build output (CMake-generated project files and binaries)
+build/
+
+# IDE and editor files
+.vs/
+.vscode/
+*.user
+*.suo
+*.ncb
+*.sdf
+*.opensdf
+
+# OS files
+Thumbs.db
+.DS_Store

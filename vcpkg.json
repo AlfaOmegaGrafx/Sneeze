@@ -1,0 +1,15 @@
+{
+   "name": "sneeze",
+   "version-string": "0.1.0",
+   "description": "Sneeze — Open Metaverse Browser Engine",
+   "dependencies": [
+      "anari",
+      "sdl3",
+      "curl",
+      "openxr-loader",
+      "spirv-tools",
+      "spirv-cross",
+      "rmlui",
+      "glslang"
+   ]
+}
