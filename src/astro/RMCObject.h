@@ -1,4 +1,4 @@
-// Copyright 2026 Open Metaverse Browser Initiative (OMBI)
+// Copyright 2026 Metaversal Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@
 #include <optional>
 #include <cstdint>
 
-namespace rubidium { namespace astro {
+namespace sneeze { namespace astro {
 
 enum RMCOBJECT_TYPE
 {
@@ -115,4 +115,4 @@ private:
    static RMCOBJECT*                         s_pRoot;
 };
 
-}} // namespace rubidium::astro
+}} // namespace sneeze::astro

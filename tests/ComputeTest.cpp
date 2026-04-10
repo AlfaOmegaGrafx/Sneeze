@@ -1,4 +1,4 @@
-// Copyright 2026 Open Metaverse Browser Initiative (OMBI)
+// Copyright 2026 Metaversal Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ static void TestEmbeddedKernelRetrieval ()
 {
    std::printf ("\n--- Embedded kernel retrieval ---\n");
 
-   auto pKernel = rubidium::compute::GetEmbeddedKernel ("TEST_PROXIMITY");
+   auto pKernel = sneeze::compute::GetEmbeddedKernel ("TEST_PROXIMITY");
    Check (pKernel.pBytes != nullptr, "Kernel pointer is non-null");
    Check (pKernel.nSize > 0, "Kernel size is non-zero");
 
@@ -61,7 +61,7 @@ static void TestUnknownKernel ()
 {
    std::printf ("\n--- Unknown kernel lookup ---\n");
 
-   auto pKernel = rubidium::compute::GetEmbeddedKernel ("DOES_NOT_EXIST");
+   auto pKernel = sneeze::compute::GetEmbeddedKernel ("DOES_NOT_EXIST");
    Check (pKernel.pBytes == nullptr, "Unknown kernel returns null pointer");
    Check (pKernel.nSize == 0, "Unknown kernel returns zero size");
 }
@@ -70,8 +70,8 @@ static void TestMultipleRetrievals ()
 {
    std::printf ("\n--- Multiple retrievals return same data ---\n");
 
-   auto pKernel1 = rubidium::compute::GetEmbeddedKernel ("TEST_PROXIMITY");
-   auto pKernel2 = rubidium::compute::GetEmbeddedKernel ("TEST_PROXIMITY");
+   auto pKernel1 = sneeze::compute::GetEmbeddedKernel ("TEST_PROXIMITY");
+   auto pKernel2 = sneeze::compute::GetEmbeddedKernel ("TEST_PROXIMITY");
    Check (pKernel1.pBytes == pKernel2.pBytes, "Same pointer on repeated retrieval");
    Check (pKernel1.nSize == pKernel2.nSize, "Same size on repeated retrieval");
 }
@@ -80,7 +80,7 @@ static void TestSpvStructure ()
 {
    std::printf ("\n--- SPIR-V structure validation ---\n");
 
-   auto pKernel = rubidium::compute::GetEmbeddedKernel ("TEST_PROXIMITY");
+   auto pKernel = sneeze::compute::GetEmbeddedKernel ("TEST_PROXIMITY");
    if (!pKernel.pBytes  ||  pKernel.nSize < 20)
    {
       Check (false, "Kernel too small for SPIR-V header");

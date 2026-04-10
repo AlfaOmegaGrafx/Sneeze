@@ -1,4 +1,4 @@
-// Copyright 2026 Open Metaverse Browser Initiative (OMBI)
+// Copyright 2026 Metaversal Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef RUBIDIUM_COMPUTE_EMBEDDED_KERNELS_H
-#define RUBIDIUM_COMPUTE_EMBEDDED_KERNELS_H
+#ifndef SNEEZE_COMPUTE_EMBEDDED_KERNELS_H
+#define SNEEZE_COMPUTE_EMBEDDED_KERNELS_H
 
 #include <cstdint>
 #include <cstddef>
 
-namespace rubidium
+namespace sneeze
 {
 namespace compute
 {
@@ -32,6 +32,6 @@ struct KERNEL_DATA
 KERNEL_DATA GetEmbeddedKernel (const char* szName);
 
 } // namespace compute
-} // namespace rubidium
+} // namespace sneeze
 
-#endif // RUBIDIUM_COMPUTE_EMBEDDED_KERNELS_H
+#endif // SNEEZE_COMPUTE_EMBEDDED_KERNELS_H

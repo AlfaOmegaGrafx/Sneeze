@@ -1,4 +1,4 @@
-// Copyright 2026 Open Metaverse Browser Initiative (OMBI)
+// Copyright 2026 Metaversal Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 #include "BodyData.h"
 #include "RMCObject.h"
 
-namespace rubidium { namespace astro {
+namespace sneeze { namespace astro {
 
 static RMCOBJECT_COLOR MakeColor (uint8_t r, uint8_t g, uint8_t b)
 {
@@ -377,4 +377,4 @@ void CreateSolarSystem ()
    }
 }
 
-}} // namespace rubidium::astro
+}} // namespace sneeze::astro

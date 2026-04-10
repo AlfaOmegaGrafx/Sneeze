@@ -1,4 +1,4 @@
-// Copyright 2026 Open Metaverse Browser Initiative (OMBI)
+// Copyright 2026 Metaversal Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 #include <windows.h>
 #endif
 
-namespace rubidium
+namespace sneeze
 {
 namespace compute
 {
@@ -49,4 +49,4 @@ KERNEL_DATA GetEmbeddedKernel (const char* szName)
 }
 
 } // namespace compute
-} // namespace rubidium
+} // namespace sneeze

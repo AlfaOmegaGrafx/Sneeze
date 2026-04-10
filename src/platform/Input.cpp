@@ -1,4 +1,4 @@
-// Copyright 2026 Open Metaverse Browser Initiative (OMBI)
+// Copyright 2026 Metaversal Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 #include <cmath>
 #include <algorithm>
 
-namespace rubidium { namespace platform {
+namespace sneeze { namespace platform {
 
 static constexpr float MOUSE_SENSITIVITY = 0.005f;
 static constexpr float SCROLL_FACTOR     = 1.1f;
@@ -42,4 +42,4 @@ void UpdateCameraOrbit (CAMERA_ORBIT& pOrbit, const WINDOW& pWindow)
    }
 }
 
-}} // namespace rubidium::platform
+}} // namespace sneeze::platform

@@ -1,4 +1,4 @@
-// Copyright 2026 Open Metaverse Browser Initiative (OMBI)
+// Copyright 2026 Metaversal Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
 
 #include <cstdio>
 
-namespace rubidium
+namespace sneeze
 {
 namespace net
 {
@@ -94,4 +94,4 @@ bool HTTP_CLIENT::Get (const std::string& sUrl, std::string& sResponse, long& nH
 }
 
 } // namespace net
-} // namespace rubidium
+} // namespace sneeze

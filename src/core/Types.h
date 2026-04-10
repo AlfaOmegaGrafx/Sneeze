@@ -1,4 +1,4 @@
-// Copyright 2026 Open Metaverse Browser Initiative (OMBI)
+// Copyright 2026 Metaversal Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 #include <cmath>
 #include <cstdint>
 
-namespace rubidium { namespace core {
+namespace sneeze { namespace core {
 
 struct VEC3
 {
@@ -48,4 +48,4 @@ constexpr int64_t TICKS_PER_CY = 36525LL * 86400LL * TICKS_PER_S;
 
 constexpr double OBLIQUITY_J2000 = 23.4392911;
 
-}} // namespace rubidium::core
+}} // namespace sneeze::core

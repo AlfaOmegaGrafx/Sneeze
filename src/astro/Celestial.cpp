@@ -1,4 +1,4 @@
-// Copyright 2026 Open Metaverse Browser Initiative (OMBI)
+// Copyright 2026 Metaversal Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 #include <cmath>
 #include <algorithm>
 
-namespace rubidium { namespace astro {
+namespace sneeze { namespace astro {
 
 using core::DEG_TO_RAD;
 using core::OBLIQUITY_J2000;
@@ -243,4 +243,4 @@ void CELESTIAL::ConvertFrameYUp ()
    dPrecZ /= static_cast<double> (TICKS_PER_CY);
 }
 
-}} // namespace rubidium::astro
+}} // namespace sneeze::astro

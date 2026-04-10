@@ -1,4 +1,4 @@
-// Copyright 2026 Open Metaverse Browser Initiative (OMBI)
+// Copyright 2026 Metaversal Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 #include <cstdlib>
 #include <cstring>
 
-namespace rubidium
+namespace sneeze
 {
 namespace xr
 {
@@ -42,7 +42,7 @@ bool XR_RUNTIME::Initialize ()
    _putenv_s ("XR_LOADER_DEBUG", "none");
 
    XrApplicationInfo pAppInfo = {};
-   std::strncpy (pAppInfo.applicationName, "Rubidium", XR_MAX_APPLICATION_NAME_SIZE);
+   std::strncpy (pAppInfo.applicationName, "Sneeze", XR_MAX_APPLICATION_NAME_SIZE);
    pAppInfo.applicationVersion = 1;
    std::strncpy (pAppInfo.engineName, "MBE", XR_MAX_ENGINE_NAME_SIZE);
    pAppInfo.engineVersion = 1;
@@ -103,4 +103,4 @@ std::string XR_RUNTIME::GetRuntimeName () const
 }
 
 } // namespace xr
-} // namespace rubidium
+} // namespace sneeze

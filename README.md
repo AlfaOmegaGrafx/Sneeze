@@ -1,6 +1,6 @@
 # Sneeze — Open Metaverse Browser Engine
 
-Sneeze is the engine behind the Open Metaverse Browser, developed by the Open Metaverse Browser Initiative (OMBI) under the Metaverse Standards Forum. It handles rendering (via ANARI), sandboxed code execution (via WebAssembly/Wasmtime), shader cross-compilation (via SPIR-V tools), XR device access (via OpenXR), networking (via curl), and UI (via RmlUi).
+Sneeze is the engine behind the Open Metaverse Browser, developed by the Open Metaverse Browser Initiative (OMBI), a project under the Metaverse Standards Forum. It handles rendering (via ANARI), sandboxed code execution (via WebAssembly/Wasmtime), shader cross-compilation (via SPIR-V tools), XR device access (via OpenXR), networking (via curl), and UI (via RmlUi).
 
 This repository is set up so that a new developer can go from a fresh clone to a fully built project with just two commands. CMake automatically clones and builds all nine third-party dependencies from source — no pre-installed libraries required.
 

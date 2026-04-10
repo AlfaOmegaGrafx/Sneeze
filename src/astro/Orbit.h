@@ -1,4 +1,4 @@
-// Copyright 2026 Open Metaverse Browser Initiative (OMBI)
+// Copyright 2026 Metaversal Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 #include <string>
 #include <optional>
 
-namespace rubidium { namespace astro {
+namespace sneeze { namespace astro {
 
 struct ORBIT_PROPS
 {
@@ -130,4 +130,4 @@ public:
    core::VEC3      PointOnOrbit (double dE, int64_t tmElapsed) const;
 };
 
-}} // namespace rubidium::astro
+}} // namespace sneeze::astro

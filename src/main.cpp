@@ -1,4 +1,4 @@
-// Copyright 2026 Open Metaverse Browser Initiative (OMBI)
+// Copyright 2026 Metaversal Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -58,13 +58,13 @@ static void ColorFromU32 (uint32_t nColor, float& r, float& g, float& b)
 
 int main (int argc, char* argv[])
 {
-   std::printf ("Rubidium - Phase 1: Solar System\n");
+   std::printf ("Sneeze - Phase 1: Solar System\n");
    std::printf ("Initializing...\n");
 
    // --- Create solar system data ---
 
-   rubidium::astro::CreateSolarSystem ();
-   auto& aBodies = rubidium::astro::RMCOBJECT::All ();
+   sneeze::astro::CreateSolarSystem ();
+   auto& aBodies = sneeze::astro::RMCOBJECT::All ();
 
    std::printf ("Created %zu bodies\n", aBodies.size ());
 
@@ -83,13 +83,13 @@ int main (int argc, char* argv[])
 
    // --- Initialize renderer ---
 
-   rubidium::renderer::HELIDE_RENDERER pRenderer;
-   rubidium::platform::WINDOW pWindow;
-   rubidium::wasm::WASM_RUNTIME pWasmRuntime;
-   rubidium::spirv::SPV_PIPELINE pSpvPipeline;
-   rubidium::xr::XR_RUNTIME pXrRuntime;
-   rubidium::net::HTTP_CLIENT pHttpClient;
-   rubidium::ui::UI_CONTEXT pUiContext;
+   sneeze::renderer::HELIDE_RENDERER pRenderer;
+   sneeze::platform::WINDOW pWindow;
+   sneeze::wasm::WASM_RUNTIME pWasmRuntime;
+   sneeze::spirv::SPV_PIPELINE pSpvPipeline;
+   sneeze::xr::XR_RUNTIME pXrRuntime;
+   sneeze::net::HTTP_CLIENT pHttpClient;
+   sneeze::ui::UI_CONTEXT pUiContext;
 
    bool bOk = pRenderer.Initialize (WINDOW_WIDTH, WINDOW_HEIGHT);
    if (!bOk)
@@ -99,7 +99,7 @@ int main (int argc, char* argv[])
 
    if (bOk)
    {
-      bOk = pWindow.Initialize (WINDOW_WIDTH, WINDOW_HEIGHT, "Rubidium");
+      bOk = pWindow.Initialize (WINDOW_WIDTH, WINDOW_HEIGHT, "Sneeze");
       if (!bOk)
          std::fprintf (stderr, "Failed to initialize window\n");
       else
@@ -155,7 +155,7 @@ int main (int argc, char* argv[])
 
    // --- Camera setup ---
 
-   rubidium::platform::CAMERA_ORBIT pCamOrbit;
+   sneeze::platform::CAMERA_ORBIT pCamOrbit;
    pCamOrbit.dTheta    = 0.3f;
    pCamOrbit.dPhi      = 0.4f;
    pCamOrbit.dDistance  = 10.0f;
@@ -168,10 +168,10 @@ int main (int argc, char* argv[])
    if (bOk)
    {
 
-   double dJD_Now = rubidium::core::EPOCH::NowTT ();
+   double dJD_Now = sneeze::core::EPOCH::NowTT ();
    double dJD_J2000 = 2451545.0;
    double dElapsedSeconds = (dJD_Now - dJD_J2000) * 86400.0;
-   int64_t tmNow = static_cast<int64_t> (dElapsedSeconds * rubidium::core::TICKS_PER_S);
+   int64_t tmNow = static_cast<int64_t> (dElapsedSeconds * sneeze::core::TICKS_PER_S);
 
    double dTimeScale = 1.0;
    bool   bPaused    = false;
@@ -197,18 +197,18 @@ int main (int argc, char* argv[])
 
       if (!bPaused)
       {
-         int64_t tmDelta = static_cast<int64_t> (dDeltaS * rubidium::core::TICKS_PER_S * dTimeScale);
+         int64_t tmDelta = static_cast<int64_t> (dDeltaS * sneeze::core::TICKS_PER_S * dTimeScale);
          tmNow += tmDelta;
       }
 
       // Camera
-      rubidium::platform::UpdateCameraOrbit (pCamOrbit, pWindow);
+      sneeze::platform::UpdateCameraOrbit (pCamOrbit, pWindow);
 
       float dCamX = pCamOrbit.dTargetX + pCamOrbit.dDistance * std::cos (pCamOrbit.dPhi) * std::cos (pCamOrbit.dTheta);
       float dCamY = pCamOrbit.dTargetY + pCamOrbit.dDistance * std::sin (pCamOrbit.dPhi);
       float dCamZ = pCamOrbit.dTargetZ + pCamOrbit.dDistance * std::cos (pCamOrbit.dPhi) * std::sin (pCamOrbit.dTheta);
 
-      rubidium::renderer::CAMERA_DATA pCamera;
+      sneeze::renderer::CAMERA_DATA pCamera;
       pCamera.dPosX = dCamX;
       pCamera.dPosY = dCamY;
       pCamera.dPosZ = dCamZ;
@@ -225,16 +225,16 @@ int main (int argc, char* argv[])
 
       // --- Build sphere and curve data ---
 
-      std::vector<rubidium::renderer::SPHERE_DATA> aSpheres;
-      std::vector<rubidium::renderer::CURVE_DATA>  aCurves;
+      std::vector<sneeze::renderer::SPHERE_DATA> aSpheres;
+      std::vector<sneeze::renderer::CURVE_DATA>  aCurves;
 
-      rubidium::astro::ORBIT_POSITION pos;
+      sneeze::astro::ORBIT_POSITION pos;
 
       for (auto* pBody : aBodies)
       {
          if (!pBody->pOrbit) continue;
 
-         rubidium::astro::ORBIT_POSITION* pPos = pBody->pOrbit->PositionAtTick (tmNow, pos);
+         sneeze::astro::ORBIT_POSITION* pPos = pBody->pOrbit->PositionAtTick (tmNow, pos);
          if (!pPos) continue;
 
          // Position of the orbiting system (in AU for rendering)
@@ -243,11 +243,11 @@ int main (int argc, char* argv[])
          float dBodyZ = static_cast<float> (pPos->z * METERS_TO_AU);
 
          // Find the child body for radius/color
-         rubidium::astro::RMCOBJECT* pChildBody = nullptr;
+         sneeze::astro::RMCOBJECT* pChildBody = nullptr;
          for (auto* pChild : pBody->aChildren)
          {
-            if (pChild->bType == rubidium::astro::RMCOBJECT_TYPE_PLANET  ||
-                pChild->bType == rubidium::astro::RMCOBJECT_TYPE_STAR)
+            if (pChild->bType == sneeze::astro::RMCOBJECT_TYPE_PLANET  ||
+                pChild->bType == sneeze::astro::RMCOBJECT_TYPE_STAR)
             {
                pChildBody = pChild;
                break;
@@ -265,7 +265,7 @@ int main (int argc, char* argv[])
             nColor = pChildBody->GetColor ();
          }
 
-         rubidium::renderer::SPHERE_DATA sphere;
+         sneeze::renderer::SPHERE_DATA sphere;
          sphere.x = dBodyX;
          sphere.y = dBodyY;
          sphere.z = dBodyZ;
@@ -275,7 +275,7 @@ int main (int argc, char* argv[])
 
          // --- Orbit trail (partial arc behind the planet) ---
 
-         rubidium::renderer::CURVE_DATA curve;
+         sneeze::renderer::CURVE_DATA curve;
          ColorFromU32 (nColor, curve.r, curve.g, curve.b);
          curve.r *= 0.4f;
          curve.g *= 0.4f;
@@ -283,7 +283,7 @@ int main (int argc, char* argv[])
 
          int nTrailPoints = static_cast<int> (TRAIL_SEGMENTS * TRAIL_FRACTION);
 
-         rubidium::renderer::CURVE_POINT cpHead;
+         sneeze::renderer::CURVE_POINT cpHead;
          cpHead.x = dBodyX;
          cpHead.y = dBodyY;
          cpHead.z = dBodyZ;
@@ -293,10 +293,10 @@ int main (int argc, char* argv[])
          double dE_planet = pPos->dE;
          for (int i = 1; i <= nTrailPoints; i++)
          {
-            double dE = dE_planet - (static_cast<double> (i) / TRAIL_SEGMENTS) * rubidium::core::TWO_PI;
-            rubidium::core::VEC3 vPt = pBody->pOrbit->PointOnOrbit (dE, tmNow);
+            double dE = dE_planet - (static_cast<double> (i) / TRAIL_SEGMENTS) * sneeze::core::TWO_PI;
+            sneeze::core::VEC3 vPt = pBody->pOrbit->PointOnOrbit (dE, tmNow);
 
-            rubidium::renderer::CURVE_POINT cp;
+            sneeze::renderer::CURVE_POINT cp;
             cp.x = static_cast<float> (vPt.x * METERS_TO_AU);
             cp.y = static_cast<float> (vPt.y * METERS_TO_AU);
             cp.z = static_cast<float> (vPt.z * METERS_TO_AU);
@@ -308,7 +308,7 @@ int main (int argc, char* argv[])
 
       // --- Sun sphere at origin ---
       {
-         rubidium::renderer::SPHERE_DATA sun;
+         sneeze::renderer::SPHERE_DATA sun;
          sun.x = 0.0f;
          sun.y = 0.0f;
          sun.z = 0.0f;

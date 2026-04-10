@@ -1,4 +1,4 @@
-// Copyright 2026 Open Metaverse Browser Initiative (OMBI)
+// Copyright 2026 Metaversal Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace rubidium { namespace renderer {
+namespace sneeze { namespace renderer {
 
 struct SPHERE_DATA
 {
@@ -67,4 +67,4 @@ public:
    virtual int GetHeight () const = 0;
 };
 
-}} // namespace rubidium::renderer
+}} // namespace sneeze::renderer

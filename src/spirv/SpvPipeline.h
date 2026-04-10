@@ -1,4 +1,4 @@
-// Copyright 2026 Open Metaverse Browser Initiative (OMBI)
+// Copyright 2026 Metaversal Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef RUBIDIUM_SPV_PIPELINE_H
-#define RUBIDIUM_SPV_PIPELINE_H
+#ifndef SNEEZE_SPV_PIPELINE_H
+#define SNEEZE_SPV_PIPELINE_H
 
 #include <string>
 #include <vector>
 #include <cstdint>
 
-namespace rubidium
+namespace sneeze
 {
 namespace spirv
 {
@@ -42,6 +42,6 @@ private:
 };
 
 } // namespace spirv
-} // namespace rubidium
+} // namespace sneeze
 
-#endif // RUBIDIUM_SPV_PIPELINE_H
+#endif // SNEEZE_SPV_PIPELINE_H

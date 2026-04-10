@@ -1,4 +1,4 @@
-// Copyright 2026 Open Metaverse Browser Initiative (OMBI)
+// Copyright 2026 Metaversal Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef RUBIDIUM_XR_RUNTIME_H
-#define RUBIDIUM_XR_RUNTIME_H
+#ifndef SNEEZE_XR_RUNTIME_H
+#define SNEEZE_XR_RUNTIME_H
 
 #include <openxr/openxr.h>
 #include <string>
 
-namespace rubidium
+namespace sneeze
 {
 namespace xr
 {
@@ -42,6 +42,6 @@ private:
 };
 
 } // namespace xr
-} // namespace rubidium
+} // namespace sneeze
 
-#endif // RUBIDIUM_XR_RUNTIME_H
+#endif // SNEEZE_XR_RUNTIME_H

@@ -1,4 +1,4 @@
-// Copyright 2026 Open Metaverse Browser Initiative (OMBI)
+// Copyright 2026 Metaversal Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef RUBIDIUM_NET_HTTP_CLIENT_H
-#define RUBIDIUM_NET_HTTP_CLIENT_H
+#ifndef SNEEZE_NET_HTTP_CLIENT_H
+#define SNEEZE_NET_HTTP_CLIENT_H
 
 #include <string>
 
-namespace rubidium
+namespace sneeze
 {
 namespace net
 {
@@ -38,6 +38,6 @@ private:
 };
 
 } // namespace net
-} // namespace rubidium
+} // namespace sneeze
 
-#endif // RUBIDIUM_NET_HTTP_CLIENT_H
+#endif // SNEEZE_NET_HTTP_CLIENT_H

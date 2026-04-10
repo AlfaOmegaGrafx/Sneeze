@@ -1,4 +1,4 @@
-// Copyright 2026 Open Metaverse Browser Initiative (OMBI)
+// Copyright 2026 Metaversal Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 #include "Orbit.h"
 #include <cmath>
 
-namespace rubidium { namespace astro {
+namespace sneeze { namespace astro {
 
 using core::AU_M;
 using core::GM_SUN_M3S2;
@@ -343,4 +343,4 @@ VEC3 ORBIT::PointOnOrbit (double dE, int64_t tmElapsed) const
    return CELESTIAL::RotateByQuat (dRx, dRy, dRz, dRw, dLX, 0.0, -dLY);
 }
 
-}} // namespace rubidium::astro
+}} // namespace sneeze::astro

@@ -1,4 +1,4 @@
-// Copyright 2026 Open Metaverse Browser Initiative (OMBI)
+// Copyright 2026 Metaversal Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 #include <chrono>
 #include <regex>
 
-namespace rubidium { namespace core {
+namespace sneeze { namespace core {
 
 // Leap-second offset: TAI - UTC.  As of 2017-01-01, DeltaAT = 37 s.
 // TT = UTC + DeltaAT + 32.184 s
@@ -110,4 +110,4 @@ double EPOCH::CalendarToJD (int dwY, int dwM, int dwD)
 
 const EPOCH EPOCH_J2000;
 
-}} // namespace rubidium::core
+}} // namespace sneeze::core

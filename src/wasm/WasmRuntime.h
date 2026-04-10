@@ -1,4 +1,4 @@
-// Copyright 2026 Open Metaverse Browser Initiative (OMBI)
+// Copyright 2026 Metaversal Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef RUBIDIUM_WASM_RUNTIME_H
-#define RUBIDIUM_WASM_RUNTIME_H
+#ifndef SNEEZE_WASM_RUNTIME_H
+#define SNEEZE_WASM_RUNTIME_H
 
 #include <wasmtime.h>
 
-namespace rubidium
+namespace sneeze
 {
 namespace wasm
 {
@@ -37,6 +37,6 @@ private:
 };
 
 } // namespace wasm
-} // namespace rubidium
+} // namespace sneeze
 
-#endif // RUBIDIUM_WASM_RUNTIME_H
+#endif // SNEEZE_WASM_RUNTIME_H

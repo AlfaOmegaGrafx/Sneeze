@@ -1,4 +1,4 @@
-// Copyright 2026 Open Metaverse Browser Initiative (OMBI)
+// Copyright 2026 Metaversal Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -116,7 +116,7 @@ static STUB_FONT_ENGINE pStubFontEngine;
 
 } // anonymous namespace
 
-namespace rubidium
+namespace sneeze
 {
 namespace ui
 {
@@ -163,4 +163,4 @@ void UI_CONTEXT::Shutdown ()
 }
 
 } // namespace ui
-} // namespace rubidium
+} // namespace sneeze
