@@ -64,7 +64,7 @@ Python is required by the glslang build system to generate internal source table
 **Check:** `python3 --version` (or `python --version` on Windows)
 
 **Install if missing:**
-- **Windows:** Download the installer from [python.org](https://www.python.org/downloads/). During installation, check **"Add python.exe to PATH"** at the bottom of the first screen.
+- **Windows:** Download the installer from [python.org](https://www.python.org/downloads/). During installation, check **"Add python.exe to PATH"** at the bottom of the first screen. After installing, you may also need to disable the Windows Store alias that intercepts the `python` command: go to **Settings > Apps > Advanced app settings > App execution aliases** and turn off the entries for `python.exe` and `python3.exe`. Without this, Windows redirects `python` to the Microsoft Store instead of your actual installation.
 - **Linux:** `sudo apt install python3` (Debian/Ubuntu) or `sudo dnf install python3` (Fedora). Most distros include Python 3 by default.
 - **macOS:** `brew install python3` or download from [python.org](https://www.python.org/downloads/)
 
@@ -261,7 +261,7 @@ All dependencies are built from source by the SuperBuild. No pre-built binaries.
 
 | Dependency | Version | Repository | Purpose |
 |------------|---------|------------|---------|
-| ANARI-SDK | v0.16.0 | [KhronosGroup/ANARI-SDK](https://github.com/KhronosGroup/ANARI-SDK) | Rendering abstraction API + helide CPU ray tracer |
+| ANARI-SDK | v0.15.0 | [KhronosGroup/ANARI-SDK](https://github.com/KhronosGroup/ANARI-SDK) | Rendering abstraction API + helide CPU ray tracer |
 | SDL3 | release-3.4.2 | [libsdl-org/SDL](https://github.com/libsdl-org/SDL) | Windowing, input, pixel buffer presentation |
 | Wasmtime | v43.0.0 | [bytecodealliance/wasmtime](https://github.com/bytecodealliance/wasmtime) | WebAssembly sandbox runtime |
 | SPIRV-Tools | vulkan-sdk-1.4.341.0 | [KhronosGroup/SPIRV-Tools](https://github.com/KhronosGroup/SPIRV-Tools) | SPIR-V assembler, validator, optimizer |
@@ -284,6 +284,7 @@ All dependencies are built from source by the SuperBuild. No pre-built binaries.
 | ANARI "failed to load helide library" | `anari_library_helide.dll` not next to the executable | The post-build step should copy it automatically. If not, copy from `libs/ANARI-SDK/install/bin/` |
 | OpenXR test prints "failed to find active runtime" | No VR runtime installed (SteamVR, Oculus, etc.) | Expected on machines without a headset. The test handles this gracefully. |
 | NetTest fails with connection errors | No internet connection | The HTTP tests make live requests. Expected to fail offline. |
+| `python` opens the Microsoft Store | Windows Store alias is intercepting | Settings > Apps > Advanced app settings > App execution aliases — turn off `python.exe` and `python3.exe` |
 | Build takes extremely long | Wasmtime Rust compilation | Normal for the first build (~15-20 minutes for Wasmtime alone). Subsequent builds skip it. |
 
 ---

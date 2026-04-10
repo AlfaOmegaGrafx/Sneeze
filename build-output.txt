@@ -1,0 +1,2520 @@
+E:\Dev\Sneeze>cmake --build build --config Release --parallel
+MSBuild version 17.6.3+07e294721 for .NET Framework
+
+  1>Checking Build System
+  Creating directories for 'rmlui'
+  Creating directories for 'anari-sdk'
+  Creating directories for 'openxr-sdk'
+  Creating directories for 'curl'
+  Creating directories for 'spirv-headers'
+  Creating directories for 'wasmtime'
+  Creating directories for 'spirv-cross'
+  Creating directories for 'sdl3'
+  Building Custom Rule E:/Dev/Sneeze/CMakeLists.txt
+  Building Custom Rule E:/Dev/Sneeze/CMakeLists.txt
+  Building Custom Rule E:/Dev/Sneeze/CMakeLists.txt
+  Building Custom Rule E:/Dev/Sneeze/CMakeLists.txt
+  Building Custom Rule E:/Dev/Sneeze/CMakeLists.txt
+  Building Custom Rule E:/Dev/Sneeze/CMakeLists.txt
+  Building Custom Rule E:/Dev/Sneeze/CMakeLists.txt
+  Building Custom Rule E:/Dev/Sneeze/CMakeLists.txt
+  Performing download step (git clone) for 'rmlui'
+  Performing download step (git clone) for 'curl'
+  Performing download step (git clone) for 'wasmtime'
+  Performing download step (git clone) for 'spirv-cross'
+  Performing download step (git clone) for 'sdl3'
+  Cloning into 'src'...
+  Cloning into 'src'...
+  Cloning into 'src'...
+  Cloning into 'src'...
+  Cloning into 'src'...
+  Performing download step (git clone) for 'spirv-headers'
+  Cloning into 'src'...
+  Performing download step (git clone) for 'openxr-sdk'
+  Cloning into 'src'...
+  Performing download step (git clone) for 'anari-sdk'
+  Cloning into 'src'...
+  HEAD is now at 04f10f6 SPIR-V header changes for SPV_NV_push_constant_bank (#565)
+  HEAD is now at 472d817 OpenXR SDK 1.1.58 (2026-03-31)
+  Performing update step for 'spirv-headers'
+  -- Already at requested tag: vulkan-sdk-1.4.341.0
+  No patch step for 'spirv-headers'
+  Performing configure step for 'spirv-headers'
+  -- Selecting Windows SDK version 10.0.22000.0 to target Windows 10.0.26200.
+  Performing update step for 'openxr-sdk'
+  -- Already at requested tag: release-1.1.58
+  No patch step for 'openxr-sdk'
+  Performing configure step for 'openxr-sdk'
+  -- Selecting Windows SDK version 10.0.22000.0 to target Windows 10.0.26200.
+  -- The C compiler identification is MSVC 19.36.32532.0
+  fatal: invalid reference: v0.16.0
+  CMake Error at E:/Dev/Sneeze/build/anari-sdk-prefix/tmp/anari-sdk-gitclone.cmake:61 (message):
+    Failed to checkout tag: 'v0.16.0'
+
+
+C:\Program Files\Microsoft Visual Studio\2022\Professional\MSBuild\Microsoft\VC\v170\Microsoft.CppCommon.targets(248,5)
+: error MSB8066: Custom build for 'E:\Dev\Sneeze\build\CMakeFiles\57205e88612efb690ede27cb42ffb638\anari-sdk-mkdir.rule
+;E:\Dev\Sneeze\build\CMakeFiles\57205e88612efb690ede27cb42ffb638\anari-sdk-download.rule;E:\Dev\Sneeze\build\CMakeFiles
+\57205e88612efb690ede27cb42ffb638\anari-sdk-update.rule;E:\Dev\Sneeze\build\CMakeFiles\57205e88612efb690ede27cb42ffb638
+\anari-sdk-patch.rule;E:\Dev\Sneeze\build\CMakeFiles\57205e88612efb690ede27cb42ffb638\anari-sdk-configure.rule;E:\Dev\S
+neeze\build\CMakeFiles\57205e88612efb690ede27cb42ffb638\anari-sdk-build.rule;E:\Dev\Sneeze\build\CMakeFiles\57205e88612
+efb690ede27cb42ffb638\anari-sdk-install.rule;E:\Dev\Sneeze\build\CMakeFiles\61827abc5b48821637dc79f9d5f5406b\anari-sdk-
+complete.rule;E:\Dev\Sneeze\build\CMakeFiles\36b34af331c296d0fed19382180ab588\anari-sdk.rule;E:\Dev\Sneeze\CMakeLists.t
+xt' exited with code 1. [E:\Dev\Sneeze\build\anari-sdk.vcxproj]
+  -- The C compiler identification is MSVC 19.36.32532.0
+  -- The CXX compiler identification is MSVC 19.36.32532.0
+  -- Detecting C compiler ABI info
+  -- The CXX compiler identification is MSVC 19.36.32532.0
+  -- Detecting C compiler ABI info
+  -- Detecting C compiler ABI info - done
+  -- Check for working C compiler: C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.36.32532
+  /bin/Hostx64/x64/cl.exe - skipped
+  -- Detecting C compile features
+  -- Detecting C compile features - done
+  -- Detecting CXX compiler ABI info
+  -- Detecting C compiler ABI info - done
+  -- Check for working C compiler: C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.36.32532
+  /bin/Hostx64/x64/cl.exe - skipped
+  -- Detecting C compile features
+  -- Detecting C compile features - done
+  -- Detecting CXX compiler ABI info
+  -- Detecting CXX compiler ABI info - done
+  -- Check for working CXX compiler: C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.36.325
+  32/bin/Hostx64/x64/cl.exe - skipped
+  -- Detecting CXX compile features
+  -- Detecting CXX compile features - done
+  -- Configuring done (3.5s)
+  -- Generating done (0.0s)
+CUSTOMBUILD : CMake warning :  [E:\Dev\Sneeze\build\spirv-headers.vcxproj]
+    Manually-specified variables were not used by the project:
+
+      CMAKE_BUILD_TYPE
+
+
+  -- Build files have been written to: E:/Dev/Sneeze/libs/SPIRV-Headers/build
+  Performing build step for 'spirv-headers'
+  MSBuild version 17.6.3+07e294721 for .NET Framework
+
+    1>Checking Build System
+  -- Detecting CXX compiler ABI info - done
+  -- Check for working CXX compiler: C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.36.325
+  32/bin/Hostx64/x64/cl.exe - skipped
+  -- Detecting CXX compile features
+  -- Detecting CXX compile features - done
+    Building Custom Rule E:/Dev/Sneeze/libs/SPIRV-Headers/src/tests/CMakeLists.txt
+    example.cpp
+    spirv_headers_simple_test.vcxproj -> E:\Dev\Sneeze\libs\SPIRV-Headers\build\tests\Release\spirv_headers_simple_test
+  .exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SPIRV-Headers/src/tests/CMakeLists.txt
+    example.c
+    spirv_headers_simple_test_c.vcxproj -> E:\Dev\Sneeze\libs\SPIRV-Headers\build\tests\Release\spirv_headers_simple_te
+  st_c.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SPIRV-Headers/src/tests/CMakeLists.txt
+    example11.cpp
+    spirv_headers_simple_test_cpp11.vcxproj -> E:\Dev\Sneeze\libs\SPIRV-Headers\build\tests\Release\spirv_headers_simpl
+  e_test_cpp11.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SPIRV-Headers/src/CMakeLists.txt
+  Performing install step for 'spirv-headers'
+  MSBuild version 17.6.3+07e294721 for .NET Framework
+
+    spirv_headers_simple_test.vcxproj -> E:\Dev\Sneeze\libs\SPIRV-Headers\build\tests\Release\spirv_headers_simple_test
+  .exe
+    spirv_headers_simple_test_c.vcxproj -> E:\Dev\Sneeze\libs\SPIRV-Headers\build\tests\Release\spirv_headers_simple_te
+  st_c.exe
+    spirv_headers_simple_test_cpp11.vcxproj -> E:\Dev\Sneeze\libs\SPIRV-Headers\build\tests\Release\spirv_headers_simpl
+  e_test_cpp11.exe
+    1>
+    -- Install configuration: "Release"
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.0
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.0/extinst.glsl.std.450.grammar.json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.0/extinst.opencl.std.100.grammar.json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.0/GLSL.std.450.h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.0/OpenCL.std.h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.0/spirv.core.grammar.json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.0/spirv.cs
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.0/spirv.h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.0/spirv.hpp
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.0/spirv.hpp11
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.0/spirv.json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.0/spirv.lua
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.0/spirv.py
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.1
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.1/extinst.glsl.std.450.grammar.json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.1/extinst.opencl.std.100.grammar.json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.1/GLSL.std.450.h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.1/OpenCL.std.h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.1/spirv.core.grammar.json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.1/spirv.cs
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.1/spirv.h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.1/spirv.hpp
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.1/spirv.hpp11
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.1/spirv.json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.1/spirv.lua
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.1/spirv.py
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.2
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.2/extinst.glsl.std.450.grammar.json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.2/extinst.opencl.std.100.grammar.json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.2/GLSL.std.450.h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.2/OpenCL.std.h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.2/spirv.core.grammar.json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.2/spirv.cs
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.2/spirv.h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.2/spirv.hpp
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.2/spirv.hpp11
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.2/spirv.json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.2/spirv.lua
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/1.2/spirv.py
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/spir-v.xml
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/AMD_gcn_shader.h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/AMD_shader_ballot.h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/AMD_shader_explicit_vertex_parameter
+  .h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/AMD_shader_trinary_minmax.h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/ArmMotionEngine.100.h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/DebugInfo.h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/extinst.arm.motion-engine.100.gramma
+  r.json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/extinst.debuginfo.grammar.json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/extinst.glsl.std.450.grammar.json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/extinst.nonsemantic.clspvreflection.
+  grammar.json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/extinst.nonsemantic.debugbreak.gramm
+  ar.json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/extinst.nonsemantic.debugprintf.gram
+  mar.json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/extinst.nonsemantic.shader.debuginfo
+  .100.grammar.json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/extinst.nonsemantic.vkspreflection.g
+  rammar.json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/extinst.opencl.debuginfo.100.grammar
+  .json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/extinst.opencl.std.100.grammar.json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/extinst.spv-amd-gcn-shader.grammar.j
+  son
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/extinst.spv-amd-shader-ballot.gramma
+  r.json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/extinst.spv-amd-shader-explicit-vert
+  ex-parameter.grammar.json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/extinst.spv-amd-shader-trinary-minma
+  x.grammar.json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/extinst.tosa.001000.1.grammar.json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/GLSL.std.450.h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/NonSemanticClspvReflection.h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/NonSemanticDebugBreak.h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/NonSemanticDebugPrintf.h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/NonSemanticShaderDebugInfo100.h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/NonSemanticVkspReflection.h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/OpenCL.std.h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/OpenCLDebugInfo100.h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/spirv.bf
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/spirv.core.grammar.json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/spirv.cs
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/spirv.h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/spirv.hpp
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/spirv.hpp11
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/spirv.json
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/spirv.lua
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/spirv.py
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/spv.d
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/include/spirv/unified1/TOSA.001000.1.h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/share/cmake/SPIRV-Headers/SPIRV-HeadersConfigVersion.cmake
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/share/cmake/SPIRV-Headers/SPIRV-HeadersConfig.cmake
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Headers/install/share/pkgconfig/SPIRV-Headers.pc
+  Completed 'spirv-headers'
+  Creating directories for 'spirv-tools'
+  Building Custom Rule E:/Dev/Sneeze/CMakeLists.txt
+  Performing download step (git clone) for 'spirv-tools'
+  Cloning into 'src'...
+  -- Could NOT find Python3 (missing: Python3_EXECUTABLE Interpreter)
+  -- EGL disabled
+  -- Found OpenGL: opengl32
+  -- Enabling OpenGL support
+  -- Could NOT find Vulkan (missing: Vulkan_LIBRARY Vulkan_INCLUDE_DIR) (found version "")
+  -- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+  -- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Failed
+  -- Looking for pthread_create in pthreads
+  -- Looking for pthread_create in pthreads - not found
+  -- Looking for pthread_create in pthread
+  HEAD is now at a0fba56 Merge pull request #2591 from KhronosGroup/fix-2588
+  -- Looking for pthread_create in pthread - not found
+  -- Found Threads: TRUE
+  -- Could NOT find JsonCpp (missing: JsonCpp_INCLUDE_DIR JsonCpp_LIBRARY)
+  HEAD is now at 2230d1a Release RmlUi 6.2
+  -- Could NOT find glslc, using precompiled .spv files
+  -- Looking for secure_getenv
+  Performing update step for 'spirv-cross'
+  -- Already at requested tag: vulkan-sdk-1.4.341.0
+  No patch step for 'spirv-cross'
+  -- Looking for secure_getenv - not found
+  -- Looking for __secure_getenv
+  Performing configure step for 'spirv-cross'
+  -- Selecting Windows SDK version 10.0.22000.0 to target Windows 10.0.26200.
+  Performing update step for 'rmlui'
+  -- Already at requested tag: 6.2
+  No patch step for 'rmlui'
+  Performing configure step for 'rmlui'
+  -- Selecting Windows SDK version 10.0.22000.0 to target Windows 10.0.26200.
+  -- Looking for __secure_getenv - not found
+  -- Looking for timespec_get
+  -- The CXX compiler identification is MSVC 19.36.32532.0
+  -- Looking for timespec_get - found
+  -- The C compiler identification is MSVC 19.36.32532.0
+  -- OpenXR 1.1.58
+  -- Found and will use pre-generated xr_generated_dispatch_table.h in source tree
+  -- Found and will use pre-generated xr_generated_dispatch_table.c in source tree
+  -- Found and will use pre-generated xr_generated_dispatch_table_core.h in source tree
+  -- Found and will use pre-generated xr_generated_dispatch_table_core.c in source tree
+  -- Found and will use pre-generated xr_generated_loader.hpp in source tree
+  -- Found and will use pre-generated xr_generated_loader.cpp in source tree
+  -- Performing Test HAVE_MISSING_PROTOTYPES
+  -- The C compiler identification is MSVC 19.36.32532.0
+  -- Detecting CXX compiler ABI info
+  -- Performing Test HAVE_MISSING_PROTOTYPES - Failed
+  -- Performing Test HAVE_UNDEF
+  -- The CXX compiler identification is MSVC 19.36.32532.0
+  -- Detecting C compiler ABI info
+  -- Performing Test HAVE_UNDEF - Failed
+  -- Performing Test HAVE_TAUTOLOGICAL_TYPE_LIMIT
+  -- Detecting CXX compiler ABI info - done
+  -- Check for working CXX compiler: C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.36.325
+  32/bin/Hostx64/x64/cl.exe - skipped
+  -- Detecting CXX compile features
+  -- Detecting CXX compile features - done
+  -- Detecting C compiler ABI info
+  -- Detecting C compiler ABI info - done
+  -- Performing Test HAVE_TAUTOLOGICAL_TYPE_LIMIT - Failed
+  -- Performing Test HAVE_MISSING_BRACES
+  -- Check for working C compiler: C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.36.32532
+  /bin/Hostx64/x64/cl.exe - skipped
+  -- Detecting C compile features
+  -- Detecting C compile features - done
+  -- Detecting CXX compiler ABI info
+  -- Detecting C compiler ABI info - done
+  -- Check for working C compiler: C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.36.32532
+  /bin/Hostx64/x64/cl.exe - skipped
+  -- Detecting C compile features
+  -- Detecting C compile features - done
+  -- SPIRV-Cross: Finding Git version for SPIRV-Cross.
+  -- Found Git: C:/Program Files/Git/cmd/git.exe (found version "2.53.0.windows.2")
+  -- Performing Test HAVE_MISSING_BRACES - Failed
+  -- Performing Test HAVE_UNREACHABLE_CODE
+  -- SPIRV-Cross: Git hash: vulkan-sdk-1.4.341.0
+  -- Detecting CXX compiler ABI info - done
+  -- Check for working CXX compiler: C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.36.325
+  32/bin/Hostx64/x64/cl.exe - skipped
+  -- Detecting CXX compile features
+  -- Detecting CXX compile features - done
+  -- Configuring done (3.6s)
+  -- Performing Test HAVE_UNREACHABLE_CODE - Failed
+  -- Configuring done (13.7s)
+  -- Generating done (0.1s)
+CUSTOMBUILD : CMake warning :  [E:\Dev\Sneeze\build\openxr-sdk.vcxproj]
+    Manually-specified variables were not used by the project:
+
+      CMAKE_BUILD_TYPE
+
+
+  -- Build files have been written to: E:/Dev/Sneeze/libs/OpenXR-SDK/build
+  -- Generating done (0.1s)
+CUSTOMBUILD : CMake warning :  [E:\Dev\Sneeze\build\rmlui.vcxproj]
+    Manually-specified variables were not used by the project:
+
+      BUILD_SAMPLES
+      CMAKE_BUILD_TYPE
+
+
+  -- Build files have been written to: E:/Dev/Sneeze/libs/RmlUi/build
+  Performing build step for 'openxr-sdk'
+  Performing build step for 'rmlui'
+  MSBuild version 17.6.3+07e294721 for .NET Framework
+  MSBuild version 17.6.3+07e294721 for .NET Framework
+
+
+    1>Checking Build System
+    1>Checking Build System
+    Building Custom Rule E:/Dev/Sneeze/libs/OpenXR-SDK/src/include/openxr/CMakeLists.txt
+    Building Custom Rule E:/Dev/Sneeze/libs/RmlUi/src/Source/Core/CMakeLists.txt
+    Building Custom Rule E:/Dev/Sneeze/libs/OpenXR-SDK/src/src/CMakeLists.txt
+    Building Custom Rule E:/Dev/Sneeze/libs/OpenXR-SDK/src/src/loader/CMakeLists.txt
+    cmake_pch.cxx
+    android_utilities.cpp
+    api_layer_interface.cpp
+    BaseXMLParser.cpp
+    Box.cpp
+    BoxShadowCache.cpp
+    CallbackTexture.cpp
+    Clock.cpp
+    CompiledFilterShader.cpp
+    ComputedValues.cpp
+    ComputeProperty.cpp
+    Context.cpp
+    ContextInstancer.cpp
+    ContextInstancerDefault.cpp
+    ConvolutionFilter.cpp
+    Core.cpp
+    DataController.cpp
+    DataControllerDefault.cpp
+    DataExpression.cpp
+    DataModel.cpp
+    DataModelHandle.cpp
+    DataTypeRegister.cpp
+    DataVariable.cpp
+    DataView.cpp
+    DataViewDefault.cpp
+    Decorator.cpp
+    loader_core.cpp
+    DecoratorGradient.cpp
+    DecoratorNinePatch.cpp
+    DecoratorShader.cpp
+    DecoratorText.cpp
+  -- Could NOT find Python3 (missing: Python3_EXECUTABLE Interpreter)
+  SPIRV-Cross:  Testing will be disabled for SPIRV-Cross. Could not find glslang or SPIRV-Tools build under external/.
+  To enable testing, run ./checkout_glslang_spirv_tools.sh and ./build_glslang_spirv_tools.sh first.
+    DecoratorTiled.cpp
+    DecoratorTiledBox.cpp
+  CMake Warning at CMakeLists.txt:655 (message):
+    SPIRV-Cross: Testing disabled.  Could not find python3.  If you have
+    DecoratorTiledHorizontal.cpp
+    python3 installed try running cmake with
+    -DPYTHON_EXECUTABLE:FILEPATH=/path/to/python3 to help it find the
+    executable
+
+
+  -- Configuring done (6.8s)
+  -- Generating done (0.2s)
+    DecoratorTiledImage.cpp
+CUSTOMBUILD : CMake warning :  [E:\Dev\Sneeze\build\spirv-cross.vcxproj]
+    Manually-specified variables were not used by the project:
+    DecoratorTiledVertical.cpp
+
+      CMAKE_BUILD_TYPE
+
+
+    DecoratorUtilities.cpp
+  -- Build files have been written to: E:/Dev/Sneeze/libs/SPIRV-Cross/build
+    DocumentHeader.cpp
+    EffectSpecification.cpp
+    Element.cpp
+    ElementAnimation.cpp
+    ElementBackgroundBorder.cpp
+    ElementDefinition.cpp
+    ElementDocument.cpp
+    ElementEffects.cpp
+    ElementHandle.cpp
+    ElementInstancer.cpp
+    ElementMeta.cpp
+    ElementScroll.cpp
+    loader_init_data.cpp
+    ElementStyle.cpp
+    ElementText.cpp
+    ElementUtilities.cpp
+    Event.cpp
+    EventDispatcher.cpp
+    EventInstancer.cpp
+    EventInstancerDefault.cpp
+    EventListenerInstancer.cpp
+    EventSpecification.cpp
+    Factory.cpp
+  Performing build step for 'spirv-cross'
+    FileInterface.cpp
+    FileInterfaceDefault.cpp
+    Filter.cpp
+    FilterBasic.cpp
+    FilterBlur.cpp
+    FilterDropShadow.cpp
+    FontEffect.cpp
+    FontEffectBlur.cpp
+    FontEffectGlow.cpp
+    FontEffectInstancer.cpp
+    FontEffectOutline.cpp
+    FontEffectShadow.cpp
+    FontEngineInterface.cpp
+    Geometry.cpp
+    GeometryBackgroundBorder.cpp
+    GeometryBoxShadow.cpp
+    Log.cpp
+    LogDefault.cpp
+    Math.cpp
+    Memory.cpp
+    MeshUtilities.cpp
+    ObserverPtr.cpp
+    Plugin.cpp
+    PluginRegistry.cpp
+    Profiling.cpp
+    PropertiesIteratorView.cpp
+    Property.cpp
+    PropertyDefinition.cpp
+    PropertyDictionary.cpp
+    PropertyParserAnimation.cpp
+    PropertyParserBoxShadow.cpp
+    PropertyParserColorStopList.cpp
+    PropertyParserColour.cpp
+    PropertyParserDecorator.cpp
+  MSBuild version 17.6.3+07e294721 for .NET Framework
+    PropertyParserFilter.cpp
+    PropertyParserFontEffect.cpp
+    PropertyParserKeyword.cpp
+    PropertyParserNumber.cpp
+    PropertyParserRatio.cpp
+    loader_instance.cpp
+
+    PropertyParserString.cpp
+    PropertyParserTransform.cpp
+    PropertySpecification.cpp
+    RenderInterface.cpp
+    RenderInterfaceCompatibility.cpp
+    RenderManager.cpp
+    RenderManagerAccess.cpp
+    ScrollController.cpp
+    Spritesheet.cpp
+    Stream.cpp
+    StreamFile.cpp
+    StreamMemory.cpp
+    StringUtilities.cpp
+    StyleSheet.cpp
+    StyleSheetContainer.cpp
+    StyleSheetFactory.cpp
+    StyleSheetNode.cpp
+    StyleSheetParser.cpp
+    StyleSheetSelector.cpp
+    StyleSheetSpecification.cpp
+    SystemInterface.cpp
+    Template.cpp
+    TemplateCache.cpp
+    Texture.cpp
+    TextureDatabase.cpp
+    TextureLayout.cpp
+    TextureLayoutRectangle.cpp
+    TextureLayoutRow.cpp
+    TextureLayoutTexture.cpp
+    Traits.cpp
+    Transform.cpp
+    TransformPrimitive.cpp
+    TransformState.cpp
+    TransformUtilities.cpp
+    Tween.cpp
+    TypeConverter.cpp
+    URL.cpp
+    Variant.cpp
+    WidgetScroll.cpp
+    XMLNodeHandler.cpp
+    XMLNodeHandlerBody.cpp
+    XMLNodeHandlerDefault.cpp
+    XMLNodeHandlerHead.cpp
+    loader_logger.cpp
+    1>Checking Build System
+    XMLNodeHandlerTemplate.cpp
+    XMLParser.cpp
+    XMLParseTools.cpp
+    ElementFormControl.cpp
+    ElementFormControlInput.cpp
+    ElementFormControlSelect.cpp
+    ElementFormControlTextArea.cpp
+    ElementForm.cpp
+    ElementImage.cpp
+    ElementLabel.cpp
+    ElementProgress.cpp
+    ElementTabSet.cpp
+    ElementTextSelection.cpp
+    InputTypeButton.cpp
+    InputTypeCheckbox.cpp
+    InputType.cpp
+    InputTypeRadio.cpp
+    InputTypeRange.cpp
+    InputTypeSubmit.cpp
+    InputTypeText.cpp
+    WidgetDropDown.cpp
+    WidgetSlider.cpp
+    WidgetTextInput.cpp
+    WidgetTextInputMultiLine.cpp
+    WidgetTextInputSingleLine.cpp
+    WidgetTextInputSingleLinePassword.cpp
+    XMLNodeHandlerSelect.cpp
+    XMLNodeHandlerTabSet.cpp
+    XMLNodeHandlerTextArea.cpp
+    BlockContainer.cpp
+    BlockFormattingContext.cpp
+    ContainerBox.cpp
+    FlexFormattingContext.cpp
+    FloatedBoxSpace.cpp
+    FormattingContext.cpp
+    InlineBox.cpp
+    InlineContainer.cpp
+    InlineLevelBox.cpp
+    LayoutBox.cpp
+    LayoutDetails.cpp
+    LayoutEngine.cpp
+    LayoutPools.cpp
+    LineBox.cpp
+    ReplacedFormattingContext.cpp
+    TableFormattingContext.cpp
+    TableFormattingDetails.cpp
+    Building Custom Rule E:/Dev/Sneeze/libs/SPIRV-Cross/src/CMakeLists.txt
+    loader_logger_recorders.cpp
+    spirv_cross.cpp
+    loader_properties.cpp
+    rmlui_core.vcxproj -> E:\Dev\Sneeze\libs\RmlUi\build\Release\rmlui.lib
+    Building Custom Rule E:/Dev/Sneeze/libs/RmlUi/src/Source/Debugger/CMakeLists.txt
+    spirv_parser.cpp
+    Debugger.cpp
+    DebuggerPlugin.cpp
+    DebuggerSystemInterface.cpp
+    ElementContextHook.cpp
+    ElementDataModels.cpp
+    ElementDebugDocument.cpp
+    ElementInfo.cpp
+    ElementLog.cpp
+    Geometry.cpp
+  HEAD is now at fbe4f3a [OPT] Process debug scope instructions of debug value instructions (#6510)
+    manifest_file.cpp
+    spirv_cross_parsed_ir.cpp
+  Performing update step for 'spirv-tools'
+    spirv_cfg.cpp
+  -- Already at requested tag: vulkan-sdk-1.4.341.0
+  No patch step for 'spirv-tools'
+  Performing configure step for 'spirv-tools'
+  -- Selecting Windows SDK version 10.0.22000.0 to target Windows 10.0.26200.
+    runtime_interface.cpp
+    rmlui_debugger.vcxproj -> E:\Dev\Sneeze\libs\RmlUi\build\Release\rmlui_debugger.lib
+    Building Custom Rule E:/Dev/Sneeze/libs/RmlUi/src/CMakeLists.txt
+  Performing install step for 'rmlui'
+  MSBuild version 17.6.3+07e294721 for .NET Framework
+
+    Generating Code...
+    rmlui_core.vcxproj -> E:\Dev\Sneeze\libs\RmlUi\build\Release\rmlui.lib
+    rmlui_debugger.vcxproj -> E:\Dev\Sneeze\libs\RmlUi\build\Release\rmlui_debugger.lib
+    object_info.cpp
+    1>
+  -- The C compiler identification is MSVC 19.36.32532.0
+    -- Install configuration: "Release"
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/lib/rmlui.lib
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/lib/rmlui_debugger.lib
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/lib/cmake/RmlUi/RmlUiTargets.cmake
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/lib/cmake/RmlUi/RmlUiTargets-release.cmake
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Config
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Config/Config.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Animation.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/BaseXMLParser.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Box.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/CallbackTexture.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Colour.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Colour.inl
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/CompiledFilterShader.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/ComputedValues.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Containers
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Containers/itlib
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Containers/itlib/flat_map.hpp
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Containers/itlib/flat_set.hpp
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Containers/LICENSE.txt
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Containers/robin_hood.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Context.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/ContextInstancer.h
+    xr_generated_loader.cpp
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/ConvolutionFilter.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Core.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/DataModelHandle.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/DataStructHandle.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/DataTypeRegister.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/DataTypes.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/DataVariable.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Debug.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/DecorationTypes.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Decorator.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Dictionary.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/EffectSpecification.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Element.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Element.inl
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/ElementDocument.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/ElementInstancer.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Elements
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Elements/ElementForm.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Elements/ElementFormControl.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Elements/ElementFormControlInput.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Elements/ElementFormControlSelect.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Elements/ElementFormControlTextArea.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Elements/ElementProgress.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Elements/ElementTabSet.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/ElementScroll.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/ElementText.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/ElementUtilities.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Event.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/EventInstancer.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/EventListener.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/EventListenerInstancer.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Factory.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/FileInterface.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Filter.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/FontEffect.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/FontEffectInstancer.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/FontEngineInterface.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/FontGlyph.h
+  -- The CXX compiler identification is MSVC 19.36.32532.0
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/FontMetrics.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Geometry.h
+  -- Detecting C compiler ABI info
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Header.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/ID.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Input.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Log.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Math.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Matrix4.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Matrix4.inl
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Mesh.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/MeshUtilities.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/NumericValue.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/ObserverPtr.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Platform.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Plugin.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Profiling.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/PropertiesIteratorView.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Property.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/PropertyDefinition.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/PropertyDictionary.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/PropertyIdSet.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/PropertyParser.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/PropertySpecification.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Rectangle.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/RenderBox.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/RenderInterface.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/RenderInterfaceCompatibility.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/RenderManager.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/ScriptInterface.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/ScrollTypes.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Span.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Spritesheet.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/StableVector.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Stream.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/StreamMemory.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/StringUtilities.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/StyleSheet.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/StyleSheetContainer.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/StyleSheetSpecification.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/StyleSheetTypes.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/StyleTypes.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/SystemInterface.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/TextInputContext.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/TextInputHandler.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/TextShapingContext.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Texture.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Traits.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Transform.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/TransformPrimitive.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Tween.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/TypeConverter.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/TypeConverter.inl
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Types.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/UniqueRenderResource.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Unit.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/URL.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Utilities.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Variant.h
+    filesystem_utils.cpp
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Variant.inl
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Vector2.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Vector2.inl
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Vector3.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Vector3.inl
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Vector4.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Vector4.inl
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/Vertex.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/XMLNodeHandler.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core/XMLParser.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Core.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Debugger
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Debugger/Debugger.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Debugger/Header.h
+  -- Detecting C compiler ABI info - done
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Debugger.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Lottie
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Lottie/ElementLottie.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Lua
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Lua/Header.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Lua/IncludeLua.h
+  -- Check for working C compiler: C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.36.32532
+  /bin/Hostx64/x64/cl.exe - skipped
+  -- Detecting C compile features
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Lua/Interpreter.h
+  -- Detecting C compile features - done
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Lua/Lua.h
+  -- Detecting CXX compiler ABI info
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Lua/LuaType.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Lua/LuaType.inl
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Lua/Utilities.h
+    spirv-cross-core.vcxproj -> E:\Dev\Sneeze\libs\SPIRV-Cross\build\Release\spirv-cross-core.lib
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/Lua.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/SVG
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/include/RmlUi/SVG/ElementSVG.h
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/lib/cmake/RmlUi/RmlUiConfig.cmake
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/lib/cmake/RmlUi/RmlUiConfigVersion.cmake
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/lib/cmake/RmlUi/Dependencies.cmake
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/lib/cmake/RmlUi/Modules
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/lib/cmake/RmlUi/Modules/Emscripten
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/lib/cmake/RmlUi/Modules/Emscripten/FindFreetype.cmake
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/lib/cmake/RmlUi/Modules/Emscripten/Findglfw3.cmake
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/lib/cmake/RmlUi/Modules/Emscripten/FindOpenGL.cmake
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/lib/cmake/RmlUi/Modules/Emscripten/FindSDL2.cmake
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/lib/cmake/RmlUi/Modules/Emscripten/FindSDL2_image.cmake
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/lib/cmake/RmlUi/Modules/FindHarfBuzz.cmake
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/lib/cmake/RmlUi/Modules/FindLuaJIT.cmake
+    Building Custom Rule E:/Dev/Sneeze/libs/SPIRV-Cross/src/CMakeLists.txt
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/lib/cmake/RmlUi/Modules/Findlunasvg.cmake
+    -- Installing: E:/Dev/Sneeze/libs/RmlUi/install/lib/cmake/RmlUi/Modules/FindSDL2_image.cmake
+  Completed 'rmlui'
+    spirv_glsl.cpp
+    json_reader.cpp
+  -- Detecting CXX compiler ABI info - done
+  -- Check for working CXX compiler: C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.36.325
+  32/bin/Hostx64/x64/cl.exe - skipped
+  -- Detecting CXX compile features
+  -- Detecting CXX compile features - done
+    json_value.cpp
+    json_writer.cpp
+    Generating Code...
+  HEAD is now at 83bedbd73 RELEASE-NOTES: synced
+  Performing update step for 'curl'
+  CMake Error at E:/Dev/vcpkg/downloads/tools/cmake-3.31.10-windows/cmake-3.31.10-windows-x86_64/share/cmake-3.31/Modul
+  es/FindPackageHandleStandardArgs.cmake:233 (message):
+    Could NOT find Python3 (missing: Python3_EXECUTABLE Interpreter)
+  Call Stack (most recent call first):
+    E:/Dev/vcpkg/downloads/tools/cmake-3.31.10-windows/cmake-3.31.10-windows-x86_64/share/cmake-3.31/Modules/FindPackag
+  eHandleStandardArgs.cmake:603 (_FPHSA_FAILURE_MESSAGE)
+    E:/Dev/vcpkg/downloads/tools/cmake-3.31.10-windows/cmake-3.31.10-windows-x86_64/share/cmake-3.31/Modules/FindPython
+  /Support.cmake:4000 (find_package_handle_standard_args)
+    E:/Dev/vcpkg/downloads/tools/cmake-3.31.10-windows/cmake-3.31.10-windows-x86_64/share/cmake-3.31/Modules/FindPython
+  3.cmake:602 (include)
+    CMakeLists.txt:237 (find_package)
+    CMakeLists.txt:247 (find_host_package)
+
+
+  -- Configuring incomplete, errors occurred!
+  -- Already at requested tag: curl-8_9_1
+C:\Program Files\Microsoft Visual Studio\2022\Professional\MSBuild\Microsoft\VC\v170\Microsoft.CppCommon.targets(248,5)
+: error MSB8066: Custom build for 'E:\Dev\Sneeze\build\CMakeFiles\ea3e6e9806d4a5be4510896688f37bd2\spirv-tools-mkdir.ru
+le;E:\Dev\Sneeze\build\CMakeFiles\ea3e6e9806d4a5be4510896688f37bd2\spirv-tools-download.rule;E:\Dev\Sneeze\build\CMakeF
+iles\ea3e6e9806d4a5be4510896688f37bd2\spirv-tools-update.rule;E:\Dev\Sneeze\build\CMakeFiles\ea3e6e9806d4a5be4510896688
+f37bd2\spirv-tools-patch.rule;E:\Dev\Sneeze\build\CMakeFiles\ea3e6e9806d4a5be4510896688f37bd2\spirv-tools-configure.rul
+e;E:\Dev\Sneeze\build\CMakeFiles\ea3e6e9806d4a5be4510896688f37bd2\spirv-tools-build.rule;E:\Dev\Sneeze\build\CMakeFiles
+\ea3e6e9806d4a5be4510896688f37bd2\spirv-tools-install.rule;E:\Dev\Sneeze\build\CMakeFiles\61827abc5b48821637dc79f9d5f54
+06b\spirv-tools-complete.rule;E:\Dev\Sneeze\build\CMakeFiles\36b34af331c296d0fed19382180ab588\spirv-tools.rule;E:\Dev\S
+neeze\CMakeLists.txt' exited with code 1. [E:\Dev\Sneeze\build\spirv-tools.vcxproj]
+  No patch step for 'curl'
+  Performing configure step for 'curl'
+  -- Using CMake version 3.31.10
+  -- Selecting Windows SDK version 10.0.22000.0 to target Windows 10.0.26200.
+  -- The C compiler identification is MSVC 19.36.32532.0
+  -- Detecting C compiler ABI info
+  -- Detecting C compiler ABI info - done
+  -- Check for working C compiler: C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.36.32532
+  /bin/Hostx64/x64/cl.exe - skipped
+  -- Detecting C compile features
+  -- Detecting C compile features - done
+  -- curl version=[8.9.1-DEV]
+  -- Could NOT find Perl (missing: PERL_EXECUTABLE)
+  CMake Warning at CMakeLists.txt:326 (message):
+    Perl not found.  Will not build manuals.
+
+
+  -- Could NOT find ZLIB (missing: ZLIB_LIBRARY ZLIB_INCLUDE_DIR)
+  -- Looking for idn2_lookup_ul in idn2
+    xr_generated_dispatch_table_core.c
+  -- Looking for idn2_lookup_ul in idn2 - not found
+  -- Could NOT find LibPSL (missing: LIBPSL_LIBRARY LIBPSL_INCLUDE_DIR)
+    openxr_loader.vcxproj -> E:\Dev\Sneeze\libs\OpenXR-SDK\build\src\loader\Release\openxr_loader.lib
+  -- Could NOT find LibSSH2 (missing: LIBSSH2_LIBRARY LIBSSH2_INCLUDE_DIR)
+  -- Performing Test HAVE_WIN32_WINNT
+    Building Custom Rule E:/Dev/Sneeze/libs/OpenXR-SDK/src/CMakeLists.txt
+  Performing install step for 'openxr-sdk'
+  MSBuild version 17.6.3+07e294721 for .NET Framework
+
+    openxr_loader.vcxproj -> E:\Dev\Sneeze\libs\OpenXR-SDK\build\src\loader\Release\openxr_loader.lib
+  -- Performing Test HAVE_WIN32_WINNT - Success
+  -- Found _WIN32_WINNT=0x0a00
+  -- Looking for stdint.h
+    1>
+    -- Install configuration: "Release"
+    -- Installing: E:/Dev/Sneeze/libs/OpenXR-SDK/install/include/openxr/openxr_platform_defines.h
+    -- Installing: E:/Dev/Sneeze/libs/OpenXR-SDK/install/include/openxr/openxr.h
+    -- Installing: E:/Dev/Sneeze/libs/OpenXR-SDK/install/include/openxr/openxr_loader_negotiation.h
+    -- Installing: E:/Dev/Sneeze/libs/OpenXR-SDK/install/include/openxr/openxr_platform.h
+    -- Installing: E:/Dev/Sneeze/libs/OpenXR-SDK/install/include/openxr/openxr_reflection.h
+    -- Installing: E:/Dev/Sneeze/libs/OpenXR-SDK/install/include/openxr/openxr_reflection_structs.h
+    -- Installing: E:/Dev/Sneeze/libs/OpenXR-SDK/install/include/openxr/openxr_reflection_parent_structs.h
+    -- Installing: E:/Dev/Sneeze/libs/OpenXR-SDK/install/lib/openxr_loader.lib
+    -- Installing: E:/Dev/Sneeze/libs/OpenXR-SDK/install/cmake/OpenXRTargets.cmake
+    -- Installing: E:/Dev/Sneeze/libs/OpenXR-SDK/install/cmake/OpenXRTargets-release.cmake
+    -- Installing: E:/Dev/Sneeze/libs/OpenXR-SDK/install/cmake/OpenXRConfig.cmake
+    -- Installing: E:/Dev/Sneeze/libs/OpenXR-SDK/install/cmake/OpenXRConfigVersion.cmake
+    -- Installing: E:/Dev/Sneeze/libs/OpenXR-SDK/install/share/doc/openxr/LICENSE
+  Completed 'openxr-sdk'
+  -- Looking for stdint.h - found
+  -- Check size of size_t
+  -- Check size of size_t - done
+  -- Check size of ssize_t
+    spirv-cross-glsl.vcxproj -> E:\Dev\Sneeze\libs\SPIRV-Cross\build\Release\spirv-cross-glsl.lib
+    Building Custom Rule E:/Dev/Sneeze/libs/SPIRV-Cross/src/CMakeLists.txt
+    spirv_cpp.cpp
+  -- Check size of ssize_t - failed
+  -- Check size of long long
+    spirv-cross-cpp.vcxproj -> E:\Dev\Sneeze\libs\SPIRV-Cross\build\Release\spirv-cross-cpp.lib
+  -- Check size of long long - done
+  -- Check size of long
+    Building Custom Rule E:/Dev/Sneeze/libs/SPIRV-Cross/src/CMakeLists.txt
+    spirv_hlsl.cpp
+  -- Check size of long - done
+  -- Check size of int
+  -- Check size of int - done
+  -- Check size of __int64
+  -- Check size of __int64 - done
+  -- Check size of time_t
+  -- Check size of time_t - done
+  -- Check size of ADDRESS_FAMILY
+    spirv-cross-hlsl.vcxproj -> E:\Dev\Sneeze\libs\SPIRV-Cross\build\Release\spirv-cross-hlsl.lib
+    Building Custom Rule E:/Dev/Sneeze/libs/SPIRV-Cross/src/CMakeLists.txt
+    spirv_msl.cpp
+  -- Check size of ADDRESS_FAMILY - done
+  -- Check size of off_t
+E:\Dev\Sneeze\libs\SPIRV-Cross\src\spirv_msl.cpp(10019,5): warning C5051: attribute 'fallthrough' requires at least '/s
+td:c++17'; ignored [E:\Dev\Sneeze\libs\SPIRV-Cross\build\spirv-cross-msl.vcxproj] [E:\Dev\Sneeze\build\spirv-cross.vcxp
+roj]
+  -- Check size of off_t - done
+  -- Check size of curl_off_t
+  -- Check size of curl_off_t - done
+  -- Check size of curl_socket_t
+  -- Check size of curl_socket_t - done
+  -- Protocols: dict file ftp ftps gopher gophers http https imap imaps ipfs ipns ldap ldaps mqtt pop3 pop3s rtsp smb s
+  mbs smtp smtps telnet tftp
+  -- Features: alt-svc AsynchDNS HSTS HTTPS-proxy IPv6 Kerberos Largefile NTLM SPNEGO SSL SSPI threadsafe UnixSockets
+  -- Enabled SSL backends: Schannel
+  -- Configuring done (15.2s)
+  -- Generating done (0.1s)
+  -- Build files have been written to: E:/Dev/Sneeze/libs/curl/build
+  Performing build step for 'curl'
+  MSBuild version 17.6.3+07e294721 for .NET Framework
+
+    1>Checking Build System
+    Building Custom Rule E:/Dev/Sneeze/libs/curl/src/lib/CMakeLists.txt
+    altsvc.c
+    amigaos.c
+    asyn-ares.c
+    asyn-thread.c
+    base64.c
+    bufq.c
+    bufref.c
+    c-hyper.c
+    cf-h1-proxy.c
+    cf-h2-proxy.c
+    cf-haproxy.c
+    cf-https-connect.c
+    cf-socket.c
+    cfilters.c
+    conncache.c
+    connect.c
+    content_encoding.c
+    cookie.c
+    curl_addrinfo.c
+    curl_des.c
+    curl_endian.c
+    curl_fnmatch.c
+    curl_get_line.c
+    curl_gethostname.c
+    curl_gssapi.c
+    curl_memrchr.c
+    curl_multibyte.c
+    curl_ntlm_core.c
+    curl_path.c
+    curl_range.c
+    curl_rtmp.c
+    curl_sasl.c
+    curl_sha512_256.c
+    curl_sspi.c
+    curl_threads.c
+    curl_trc.c
+    cw-out.c
+    dict.c
+    doh.c
+    dynbuf.c
+    dynhds.c
+    easy.c
+    easygetopt.c
+    easyoptions.c
+    escape.c
+    file.c
+    fileinfo.c
+    fopen.c
+    formdata.c
+    ftp.c
+    ftplistparser.c
+    getenv.c
+    getinfo.c
+    gopher.c
+    hash.c
+    headers.c
+    hmac.c
+    hostasyn.c
+    hostip.c
+    hostip4.c
+    hostip6.c
+    hostsyn.c
+    hsts.c
+    http.c
+    http1.c
+    http2.c
+    http_aws_sigv4.c
+    http_chunks.c
+    http_digest.c
+    http_negotiate.c
+    http_ntlm.c
+    http_proxy.c
+    idn.c
+    if2ip.c
+    inet_ntop.c
+    imap.c
+    inet_pton.c
+    krb5.c
+    ldap.c
+    llist.c
+    macos.c
+    md4.c
+    md5.c
+    memdebug.c
+    mime.c
+    mprintf.c
+    mqtt.c
+    multi.c
+    netrc.c
+    nonblock.c
+    noproxy.c
+    openldap.c
+    parsedate.c
+    pingpong.c
+    pop3.c
+    progress.c
+    psl.c
+    rand.c
+    rename.c
+    request.c
+    rtsp.c
+    select.c
+    sendf.c
+    setopt.c
+    sha256.c
+    share.c
+    slist.c
+    smb.c
+    smtp.c
+    socketpair.c
+    socks.c
+    socks_gssapi.c
+    socks_sspi.c
+    speedcheck.c
+    splay.c
+    strcase.c
+    strdup.c
+    strerror.c
+    strtok.c
+    strtoofft.c
+    system_win32.c
+    telnet.c
+    tftp.c
+    timediff.c
+    timeval.c
+    transfer.c
+    url.c
+    urlapi.c
+    version.c
+    version_win32.c
+    warnless.c
+    ws.c
+    cleartext.c
+    cram.c
+    digest.c
+    digest_sspi.c
+    gsasl.c
+    krb5_gssapi.c
+    krb5_sspi.c
+    ntlm.c
+    ntlm_sspi.c
+    oauth2.c
+    spnego_gssapi.c
+    spnego_sspi.c
+    vauth.c
+    bearssl.c
+    cipher_suite.c
+    gtls.c
+    hostcheck.c
+    keylog.c
+    mbedtls.c
+    mbedtls_threadlock.c
+    openssl.c
+    rustls.c
+    schannel.c
+    schannel_verify.c
+    sectransp.c
+    vtls.c
+    wolfssl.c
+    x509asn1.c
+    curl_msh3.c
+    curl_ngtcp2.c
+    curl_osslq.c
+    curl_quiche.c
+    vquic.c
+    vquic-tls.c
+    libssh.c
+    libssh2.c
+    wolfssh.c
+    libcurl_object.vcxproj -> E:\Dev\Sneeze\libs\curl\build\lib\libcurl_object.dir\Release\libcurl_object.lib
+    Building Custom Rule E:/Dev/Sneeze/libs/curl/src/lib/CMakeLists.txt
+    libcurl_static.vcxproj -> E:\Dev\Sneeze\libs\curl\build\lib\Release\libcurl.lib
+    Building Custom Rule E:/Dev/Sneeze/libs/curl/src/CMakeLists.txt
+  Performing install step for 'curl'
+  MSBuild version 17.6.3+07e294721 for .NET Framework
+
+    libcurl_object.vcxproj -> E:\Dev\Sneeze\libs\curl\build\lib\libcurl_object.dir\Release\libcurl_object.lib
+    libcurl_static.vcxproj -> E:\Dev\Sneeze\libs\curl\build\lib\Release\libcurl.lib
+    1>
+    spirv-cross-msl.vcxproj -> E:\Dev\Sneeze\libs\SPIRV-Cross\build\Release\spirv-cross-msl.lib
+    -- Install configuration: "Release"
+    -- Installing: E:/Dev/Sneeze/libs/curl/install/lib/libcurl.lib
+    -- Installing: E:/Dev/Sneeze/libs/curl/install/bin/mk-ca-bundle.pl
+    Building Custom Rule E:/Dev/Sneeze/libs/SPIRV-Cross/src/CMakeLists.txt
+    -- Installing: E:/Dev/Sneeze/libs/curl/install/bin/curl-config
+    -- Installing: E:/Dev/Sneeze/libs/curl/install/lib/pkgconfig/libcurl.pc
+    -- Installing: E:/Dev/Sneeze/libs/curl/install/include/curl
+    -- Installing: E:/Dev/Sneeze/libs/curl/install/include/curl/curl.h
+    -- Installing: E:/Dev/Sneeze/libs/curl/install/include/curl/curlver.h
+    -- Installing: E:/Dev/Sneeze/libs/curl/install/include/curl/easy.h
+    -- Installing: E:/Dev/Sneeze/libs/curl/install/include/curl/header.h
+    -- Installing: E:/Dev/Sneeze/libs/curl/install/include/curl/mprintf.h
+    -- Installing: E:/Dev/Sneeze/libs/curl/install/include/curl/multi.h
+    spirv_reflect.cpp
+    -- Installing: E:/Dev/Sneeze/libs/curl/install/include/curl/options.h
+    -- Installing: E:/Dev/Sneeze/libs/curl/install/include/curl/stdcheaders.h
+    -- Installing: E:/Dev/Sneeze/libs/curl/install/include/curl/system.h
+    -- Installing: E:/Dev/Sneeze/libs/curl/install/include/curl/typecheck-gcc.h
+    -- Installing: E:/Dev/Sneeze/libs/curl/install/include/curl/urlapi.h
+    -- Installing: E:/Dev/Sneeze/libs/curl/install/include/curl/websockets.h
+    -- Installing: E:/Dev/Sneeze/libs/curl/install/lib/cmake/CURL/CURLTargets.cmake
+    -- Installing: E:/Dev/Sneeze/libs/curl/install/lib/cmake/CURL/CURLTargets-release.cmake
+    -- Installing: E:/Dev/Sneeze/libs/curl/install/lib/cmake/CURL/CURLConfigVersion.cmake
+    -- Installing: E:/Dev/Sneeze/libs/curl/install/lib/cmake/CURL/CURLConfig.cmake
+  Completed 'curl'
+    spirv-cross-reflect.vcxproj -> E:\Dev\Sneeze\libs\SPIRV-Cross\build\Release\spirv-cross-reflect.lib
+    Building Custom Rule E:/Dev/Sneeze/libs/SPIRV-Cross/src/CMakeLists.txt
+    spirv_cross_util.cpp
+  HEAD is now at 683181b4 Updated to version 3.4.2 for release
+    spirv-cross-util.vcxproj -> E:\Dev\Sneeze\libs\SPIRV-Cross\build\Release\spirv-cross-util.lib
+    Building Custom Rule E:/Dev/Sneeze/libs/SPIRV-Cross/src/CMakeLists.txt
+    main.cpp
+  Performing update step for 'sdl3'
+  -- Already at requested tag: release-3.4.2
+  No patch step for 'sdl3'
+  Performing configure step for 'sdl3'
+  -- Selecting Windows SDK version 10.0.22000.0 to target Windows 10.0.26200.
+  -- The C compiler identification is MSVC 19.36.32532.0
+  -- Detecting C compiler ABI info
+  -- Detecting C compiler ABI info - done
+  -- Check for working C compiler: C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.36.32532
+  /bin/Hostx64/x64/cl.exe - skipped
+  -- Detecting C compile features
+  -- Detecting C compile features - done
+  -- Could NOT find PkgConfig (missing: PKG_CONFIG_EXECUTABLE)
+  -- Detecting Target CPU Architecture
+    spirv-cross.vcxproj -> E:\Dev\Sneeze\libs\SPIRV-Cross\build\Release\spirv-cross.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SPIRV-Cross/src/CMakeLists.txt
+    spirv_cross_c.cpp
+  -- Detecting Target CPU Architecture - X64
+  -- Performing Test CAN_PRESEED
+  -- Performing Test CAN_PRESEED - Success
+  -- Performing Test COMPILER_SUPPORTS_MMX
+  -- Performing Test COMPILER_SUPPORTS_MMX - Failed
+  -- Performing Test COMPILER_SUPPORTS_SSE
+    spirv-cross-c.vcxproj -> E:\Dev\Sneeze\libs\SPIRV-Cross\build\Release\spirv-cross-c.lib
+    Building Custom Rule E:/Dev/Sneeze/libs/SPIRV-Cross/src/CMakeLists.txt
+  Performing install step for 'spirv-cross'
+  MSBuild version 17.6.3+07e294721 for .NET Framework
+
+    spirv-cross-core.vcxproj -> E:\Dev\Sneeze\libs\SPIRV-Cross\build\Release\spirv-cross-core.lib
+  -- Performing Test COMPILER_SUPPORTS_SSE - Success
+  -- Performing Test COMPILER_SUPPORTS_SSE2
+    spirv-cross-glsl.vcxproj -> E:\Dev\Sneeze\libs\SPIRV-Cross\build\Release\spirv-cross-glsl.lib
+    spirv-cross-cpp.vcxproj -> E:\Dev\Sneeze\libs\SPIRV-Cross\build\Release\spirv-cross-cpp.lib
+    spirv-cross-hlsl.vcxproj -> E:\Dev\Sneeze\libs\SPIRV-Cross\build\Release\spirv-cross-hlsl.lib
+    spirv-cross-msl.vcxproj -> E:\Dev\Sneeze\libs\SPIRV-Cross\build\Release\spirv-cross-msl.lib
+    spirv-cross-reflect.vcxproj -> E:\Dev\Sneeze\libs\SPIRV-Cross\build\Release\spirv-cross-reflect.lib
+    spirv-cross-util.vcxproj -> E:\Dev\Sneeze\libs\SPIRV-Cross\build\Release\spirv-cross-util.lib
+    spirv-cross.vcxproj -> E:\Dev\Sneeze\libs\SPIRV-Cross\build\Release\spirv-cross.exe
+    spirv-cross-c.vcxproj -> E:\Dev\Sneeze\libs\SPIRV-Cross\build\Release\spirv-cross-c.lib
+    1>
+    -- Install configuration: "Release"
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/lib/pkgconfig/spirv-cross-c.pc
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/lib/spirv-cross-core.lib
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/include/spirv_cross/GLSL.std.450.h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/include/spirv_cross/spirv_common.hpp
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/include/spirv_cross/spirv_cross_containers.hpp
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/include/spirv_cross/spirv_cross_error_handling.hpp
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/include/spirv_cross/spirv.hpp
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/include/spirv_cross/spirv_cross.hpp
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/include/spirv_cross/spirv_parser.hpp
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/include/spirv_cross/spirv_cross_parsed_ir.hpp
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/include/spirv_cross/spirv_cfg.hpp
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/share/spirv_cross_core/cmake/spirv_cross_coreConfig.cmake
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/share/spirv_cross_core/cmake/spirv_cross_coreConfig-release.c
+  make
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/lib/spirv-cross-glsl.lib
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/include/spirv_cross/spirv_glsl.hpp
+  -- Performing Test COMPILER_SUPPORTS_SSE2 - Success
+  -- Performing Test COMPILER_SUPPORTS_SSE3
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/share/spirv_cross_glsl/cmake/spirv_cross_glslConfig.cmake
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/share/spirv_cross_glsl/cmake/spirv_cross_glslConfig-release.c
+  make
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/lib/spirv-cross-cpp.lib
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/include/spirv_cross/spirv_cpp.hpp
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/share/spirv_cross_cpp/cmake/spirv_cross_cppConfig.cmake
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/share/spirv_cross_cpp/cmake/spirv_cross_cppConfig-release.cma
+  ke
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/lib/spirv-cross-reflect.lib
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/include/spirv_cross/spirv_reflect.hpp
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/share/spirv_cross_reflect/cmake/spirv_cross_reflectConfig.cma
+  ke
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/share/spirv_cross_reflect/cmake/spirv_cross_reflectConfig-rel
+  ease.cmake
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/lib/spirv-cross-msl.lib
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/include/spirv_cross/spirv_msl.hpp
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/share/spirv_cross_msl/cmake/spirv_cross_mslConfig.cmake
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/share/spirv_cross_msl/cmake/spirv_cross_mslConfig-release.cma
+  ke
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/lib/spirv-cross-hlsl.lib
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/include/spirv_cross/spirv_hlsl.hpp
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/share/spirv_cross_hlsl/cmake/spirv_cross_hlslConfig.cmake
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/share/spirv_cross_hlsl/cmake/spirv_cross_hlslConfig-release.c
+  make
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/lib/spirv-cross-util.lib
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/include/spirv_cross/spirv_cross_util.hpp
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/share/spirv_cross_util/cmake/spirv_cross_utilConfig.cmake
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/share/spirv_cross_util/cmake/spirv_cross_utilConfig-release.c
+  make
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/lib/spirv-cross-c.lib
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/include/spirv_cross/spirv.h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/include/spirv_cross/spirv_cross_c.h
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/share/spirv_cross_c/cmake/spirv_cross_cConfig.cmake
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/share/spirv_cross_c/cmake/spirv_cross_cConfig-release.cmake
+    -- Installing: E:/Dev/Sneeze/libs/SPIRV-Cross/install/bin/spirv-cross.exe
+  Completed 'spirv-cross'
+  -- Performing Test COMPILER_SUPPORTS_SSE3 - Success
+  -- Performing Test COMPILER_SUPPORTS_SSE4_1
+  -- Performing Test COMPILER_SUPPORTS_SSE4_1 - Success
+  -- Performing Test COMPILER_SUPPORTS_SSE4_2
+  -- Performing Test COMPILER_SUPPORTS_SSE4_2 - Success
+  -- Performing Test COMPILER_SUPPORTS_AVX
+  -- Performing Test COMPILER_SUPPORTS_AVX - Success
+  -- Performing Test COMPILER_SUPPORTS_AVX2
+  -- Performing Test COMPILER_SUPPORTS_AVX2 - Success
+  -- Performing Test COMPILER_SUPPORTS_AVX512F
+  -- Performing Test COMPILER_SUPPORTS_AVX512F - Success
+  -- Looking for _copysign
+  -- Looking for _copysign - found
+  -- Looking for _fseeki64
+  -- Looking for _fseeki64 - found
+  -- The CXX compiler identification is MSVC 19.36.32532.0
+  -- Detecting CXX compiler ABI info
+  -- Detecting CXX compiler ABI info - done
+  -- Check for working CXX compiler: C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.36.325
+  32/bin/Hostx64/x64/cl.exe - skipped
+  -- Detecting CXX compile features
+  -- Detecting CXX compile features - done
+  -- Performing Test HAVE_GAMEINPUT_H
+  -- Performing Test HAVE_GAMEINPUT_H - Failed
+  -- Looking for dxgi1_5.h
+  -- Looking for dxgi1_5.h - found
+  -- Looking for dxgi1_6.h
+  -- Looking for dxgi1_6.h - found
+  -- Performing Test HAVE_MFAPI_H
+  -- Performing Test HAVE_MFAPI_H - Success
+  -- Could NOT find LibUSB (missing: LibUSB_LIBRARY LibUSB_INCLUDE_PATH) (found version "LibUSB_VERSION-NOTFOUND")
+  HEAD is now at be23469ec Release Wasmtime 43.0.0 (#12806)
+  Submodule 'tests/component-model' (https://github.com/WebAssembly/component-model) registered for path 'tests/compone
+  nt-model'
+  Submodule 'tests/spec_testsuite' (https://github.com/WebAssembly/testsuite) registered for path 'tests/spec_testsuite
+  '
+  Submodule 'tests/wasi_testsuite/wasi-common' (https://github.com/WebAssembly/wasi-testsuite.git) registered for path
+  'tests/wasi_testsuite/wasi-common'
+  Submodule 'tests/wasi_testsuite/wasi-threads' (https://github.com/WebAssembly/wasi-threads) registered for path 'test
+  s/wasi_testsuite/wasi-threads'
+  Cloning into 'E:/Dev/Sneeze/libs/Wasmtime/src/tests/component-model'...
+  -- Could NOT find Python3 (missing: Python3_EXECUTABLE Interpreter)
+  -- Found OpenGL: opengl32
+  -- Looking for libudev.h
+  -- Looking for libudev.h - not found
+  -- Could NOT find FFmpeg (missing: FFmpeg_AVCODEC_INCLUDE_DIRS FFmpeg_AVCODEC_LIBRARY FFmpeg_AVFORMAT_INCLUDE_DIRS FF
+  mpeg_AVFORMAT_LIBRARY FFmpeg_AVUTIL_INCLUDE_DIRS FFmpeg_AVUTIL_LIBRARY FFmpeg_SWSCALE_INCLUDE_DIRS FFmpeg_SWSCALE_LIB
+  RARY)
+  -- Can't find ffmpeg 5.1.3 or newer, skipping testffmpeg
+  -- Performing Test HAVE_WFORMAT_OVERFLOW
+  Cloning into 'E:/Dev/Sneeze/libs/Wasmtime/src/tests/spec_testsuite'...
+  -- Performing Test HAVE_WFORMAT_OVERFLOW - Failed
+  -- Performing Test HAVE_WFORMAT
+  -- Performing Test HAVE_WFORMAT - Failed
+  -- Performing Test HAVE_WFORMAT_EXTRA_ARGS
+  -- Performing Test HAVE_WFORMAT_EXTRA_ARGS - Failed
+  --
+  -- SDL3 was configured with the following options:
+  --
+  -- Platform: Windows-10.0.26200
+  -- 64-bit:   TRUE
+  -- Compiler: C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.36.32532/bin/Hostx64/x64/cl.
+  exe
+  -- Revision: SDL-3.4.2-release-3.4.2
+  -- Vendor:
+  --
+  -- Subsystems:
+  --   Audio:    ON
+  --   Video:    ON
+  --   GPU:      ON
+  --   Render:   ON
+  --   Camera:   ON
+  --   Joystick: ON
+  --   Haptic:   ON
+  --   Hidapi:   ON
+  --   Power:    ON
+  --   Sensor:   ON
+  --   Dialog:   ON
+  --   Tray:     ON
+  --
+  -- Options:
+  --   SDL_ALSA                    (Wanted: OFF): OFF
+  --   SDL_ALSA_SHARED             (Wanted: OFF): OFF
+  --   SDL_ALTIVEC                 (Wanted: OFF): OFF
+  --   SDL_ARMNEON                 (Wanted: OFF): OFF
+  --   SDL_ASAN                    (Wanted: OFF): OFF
+  --   SDL_ASSEMBLY                (Wanted: ON): ON
+  --   SDL_ASSERTIONS              (Wanted: auto): auto
+  --   SDL_AVX                     (Wanted: ON): ON
+  --   SDL_AVX2                    (Wanted: ON): ON
+  --   SDL_AVX512F                 (Wanted: ON): ON
+  --   SDL_BACKGROUNDING_SIGNAL    (Wanted: OFF): OFF
+  --   SDL_CCACHE                  (Wanted: OFF): OFF
+  --   SDL_CLANG_TIDY              (Wanted: OFF): OFF
+  --   SDL_CLOCK_GETTIME           (Wanted: OFF): OFF
+  --   SDL_COCOA                   (Wanted: OFF): OFF
+  --   SDL_DBUS                    (Wanted: OFF): OFF
+  --   SDL_DEPS_SHARED             (Wanted: ON): OFF
+  --   SDL_DIRECTX                 (Wanted: ON): ON
+  --   SDL_DISKAUDIO               (Wanted: ON): ON
+  --   SDL_DLOPEN_NOTES            (Wanted: OFF): OFF
+  --   SDL_DUMMYAUDIO              (Wanted: ON): ON
+  --   SDL_DUMMYCAMERA             (Wanted: ON): ON
+  --   SDL_DUMMYVIDEO              (Wanted: ON): ON
+  --   SDL_EXAMPLES                (Wanted: OFF): OFF
+  --   SDL_EXAMPLES_LINK_SHARED    (Wanted: ON): OFF
+  --   SDL_FOREGROUNDING_SIGNAL    (Wanted: OFF): OFF
+  --   SDL_FRIBIDI                 (Wanted: OFF): OFF
+  --   SDL_FRIBIDI_SHARED          (Wanted: OFF): OFF
+  --   SDL_GCC_ATOMICS             (Wanted: OFF): OFF
+  --   SDL_HIDAPI                  (Wanted: ON): ON
+  --   SDL_HIDAPI_JOYSTICK         (Wanted: ON): ON
+  --   SDL_HIDAPI_LIBUSB           (Wanted: ON): OFF
+  --   SDL_HIDAPI_LIBUSB_SHARED    (Wanted: ON): OFF
+  --   SDL_IBUS                    (Wanted: OFF): OFF
+  --   SDL_INSTALL                 (Wanted: ON): OFF
+  --   SDL_INSTALL_TESTS           (Wanted: OFF): OFF
+  --   SDL_JACK                    (Wanted: OFF): OFF
+  --   SDL_JACK_SHARED             (Wanted: OFF): OFF
+  --   SDL_KMSDRM                  (Wanted: OFF): OFF
+  --   SDL_KMSDRM_SHARED           (Wanted: OFF): OFF
+  --   SDL_LASX                    (Wanted: OFF): OFF
+  --   SDL_LIBC                    (Wanted: ON): ON
+  --   SDL_LIBICONV                (Wanted: OFF): OFF
+  --   SDL_LIBTHAI                 (Wanted: OFF): OFF
+  --   SDL_LIBTHAI_SHARED          (Wanted: OFF): OFF
+  --   SDL_LIBUDEV                 (Wanted: ON): OFF
+  --   SDL_LIBURING                (Wanted: OFF): OFF
+  --   SDL_LSX                     (Wanted: OFF): OFF
+  --   SDL_METAL                   (Wanted: OFF): OFF
+  --   SDL_MMX                     (Wanted: ON): OFF
+  --   SDL_OFFSCREEN               (Wanted: ON): ON
+  --   SDL_OPENGL                  (Wanted: ON): ON
+  --   SDL_OPENGLES                (Wanted: ON): ON
+  --   SDL_OPENVR                  (Wanted: OFF): OFF
+  --   SDL_OSS                     (Wanted: OFF): OFF
+  --   SDL_PIPEWIRE                (Wanted: OFF): OFF
+  --   SDL_PIPEWIRE_SHARED         (Wanted: OFF): OFF
+  --   SDL_PTHREADS                (Wanted: OFF): OFF
+  --   SDL_PTHREADS_SEM            (Wanted: OFF): OFF
+  --   SDL_PULSEAUDIO              (Wanted: OFF): OFF
+  --   SDL_PULSEAUDIO_SHARED       (Wanted: OFF): OFF
+  --   SDL_RENDER_D3D              (Wanted: ON): ON
+  --   SDL_RENDER_D3D11            (Wanted: ON): ON
+  --   SDL_RENDER_D3D12            (Wanted: ON): ON
+  --   SDL_RENDER_GPU              (Wanted: ON): ON
+  --   SDL_RENDER_METAL            (Wanted: OFF): OFF
+  --   SDL_RENDER_VULKAN           (Wanted: ON): ON
+  --   SDL_ROCKCHIP                (Wanted: OFF): OFF
+  --   SDL_RPATH                   (Wanted: OFF): OFF
+  --   SDL_RPI                     (Wanted: OFF): OFF
+  --   SDL_SNDIO                   (Wanted: OFF): OFF
+  --   SDL_SNDIO_SHARED            (Wanted: OFF): OFF
+  --   SDL_SSE                     (Wanted: ON): ON
+  --   SDL_SSE2                    (Wanted: ON): ON
+  --   SDL_SSE3                    (Wanted: ON): ON
+  --   SDL_SSE4_1                  (Wanted: ON): ON
+  --   SDL_SSE4_2                  (Wanted: ON): ON
+  --   SDL_SYSTEM_ICONV            (Wanted: OFF): OFF
+  --   SDL_TESTS                   (Wanted: ON): ON
+  --   SDL_TESTS_LINK_SHARED       (Wanted: ON): ON
+  --   SDL_UNINSTALL               (Wanted: ON): ON
+  --   SDL_VIRTUAL_JOYSTICK        (Wanted: ON): ON
+  --   SDL_VIVANTE                 (Wanted: OFF): OFF
+  --   SDL_VULKAN                  (Wanted: ON): ON
+  --   SDL_WASAPI                  (Wanted: ON): ON
+  --   SDL_WAYLAND                 (Wanted: OFF): OFF
+  --   SDL_WAYLAND_LIBDECOR        (Wanted: OFF): OFF
+  --   SDL_WAYLAND_LIBDECOR_SHARED (Wanted: OFF): OFF
+  --   SDL_WAYLAND_SHARED          (Wanted: OFF): OFF
+  --   SDL_X11                     (Wanted: OFF): OFF
+  --   SDL_X11_SHARED              (Wanted: OFF): OFF
+  --   SDL_X11_XCURSOR             (Wanted: OFF): OFF
+  --   SDL_X11_XDBE                (Wanted: OFF): OFF
+  --   SDL_X11_XFIXES              (Wanted: OFF): OFF
+  --   SDL_X11_XINPUT              (Wanted: OFF): OFF
+  --   SDL_X11_XRANDR              (Wanted: OFF): OFF
+  --   SDL_X11_XSCRNSAVER          (Wanted: OFF): OFF
+  --   SDL_X11_XSHAPE              (Wanted: OFF): OFF
+  --   SDL_X11_XSYNC               (Wanted: OFF): OFF
+  --   SDL_X11_XTEST               (Wanted: OFF): OFF
+  --   SDL_XINPUT                  (Wanted: ON): ON
+  --
+  --  Build Shared Library: ON
+  --  Build Static Library: OFF
+  --
+  -- Enabled backends:
+  --   Video drivers: dummy offscreen windows
+  --   Render drivers: d3d d3d11 d3d12 gpu ogl ogl_es2 vulkan
+  --   GPU drivers: d3d12 vulkan
+  --   Audio drivers: disk dsound dummy wasapi
+  --   Joystick drivers: dinput hidapi rawinput virtual wgi xinput
+  --   Camera drivers: dummy mediafoundation
+  --
+  -- Configuring done (23.1s)
+  Cloning into 'E:/Dev/Sneeze/libs/Wasmtime/src/tests/wasi_testsuite/wasi-common'...
+  -- Generating done (1.0s)
+CUSTOMBUILD : CMake warning :  [E:\Dev\Sneeze\build\sdl3.vcxproj]
+    Manually-specified variables were not used by the project:
+
+      CMAKE_BUILD_TYPE
+      SDL_TEST
+
+
+  -- Build files have been written to: E:/Dev/Sneeze/libs/SDL3/build
+  Performing build step for 'sdl3'
+  MSBuild version 17.6.3+07e294721 for .NET Framework
+
+    Checking File Globs
+    1>Checking Build System
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testutils.c
+    sdltests_utils.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\sdltests_utils.dir\Release\sdltests_utils.lib
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/CMakeLists.txt
+    e_atan2.c
+    e_exp.c
+    e_fmod.c
+    e_log.c
+    e_log10.c
+    e_pow.c
+    e_rem_pio2.c
+    e_sqrt.c
+    k_cos.c
+    k_rem_pio2.c
+    k_sin.c
+    k_tan.c
+    s_atan.c
+    s_copysign.c
+    s_cos.c
+    s_fabs.c
+    s_floor.c
+    s_isinf.c
+    s_isinff.c
+    s_isnan.c
+    Generating Code...
+    Compiling...
+    s_isnanf.c
+    s_modf.c
+    s_scalbn.c
+    s_sin.c
+    s_tan.c
+    Generating Code...
+    SDL_uclibc.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\Release\SDL_uclibc.lib
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/CMakeLists.txt
+    cmake_pch.cxx
+    cmake_pch.c
+    SDL.c
+    SDL_assert.c
+    SDL_error.c
+    SDL_guid.c
+    SDL_hashtable.c
+    SDL_hints.c
+    SDL_list.c
+    SDL_log.c
+    SDL_properties.c
+    SDL_utils.c
+    SDL_atomic.c
+    SDL_spinlock.c
+    SDL_audio.c
+    SDL_audiocvt.c
+    SDL_audiodev.c
+    SDL_audioqueue.c
+    SDL_audioresample.c
+    SDL_audiotypecvt.c
+    SDL_mixer.c
+    SDL_wave.c
+    Generating Code...
+    Compiling...
+    SDL_camera.c
+    SDL_core_unsupported.c
+    SDL_cpuinfo.c
+    SDL_categories.c
+    SDL_clipboardevents.c
+    SDL_displayevents.c
+    SDL_dropevents.c
+    SDL_events.c
+    SDL_eventwatch.c
+    SDL_keyboard.c
+    SDL_keymap.c
+    SDL_keysym_to_keycode.c
+    SDL_keysym_to_scancode.c
+    SDL_mouse.c
+    SDL_pen.c
+    SDL_quit.c
+    SDL_scancode_tables.c
+    SDL_touch.c
+    SDL_windowevents.c
+    imKStoUCS.c
+    Generating Code...
+    Compiling...
+    SDL_filesystem.c
+    SDL_gpu.c
+    SDL_haptic.c
+    SDL_hidapi.c
+    SDL_asyncio.c
+    SDL_iostream.c
+    SDL_asyncio_generic.c
+    SDL_gamepad.c
+    SDL_joystick.c
+    SDL_steam_virtual_gamepad.c
+    controller_type.c
+    SDL_locale.c
+    SDL_main_callbacks.c
+    SDL_runapp.c
+    SDL_libusb.c
+    SDL_url.c
+    SDL_power.c
+    SDL_render.c
+    SDL_render_unsupported.c
+    SDL_yuv_sw.c
+    Generating Code...
+    Compiling...
+    SDL_render_d3d.c
+    SDL_shaders_d3d.c
+    SDL_render_d3d11.c
+    SDL_shaders_d3d11.c
+    SDL_render_d3d12.c
+    SDL_shaders_d3d12.c
+    SDL_pipeline_gpu.c
+    SDL_render_gpu.c
+    SDL_shaders_gpu.c
+    SDL_render_ngage.c
+    SDL_render_gl.c
+    SDL_shaders_gl.c
+    SDL_render_gles2.c
+    SDL_shaders_gles2.c
+    SDL_render_ps2.c
+    SDL_render_psp.c
+    SDL_blendfillrect.c
+    SDL_blendline.c
+    SDL_blendpoint.c
+    SDL_drawline.c
+    Generating Code...
+    Compiling...
+    SDL_drawpoint.c
+    SDL_render_sw.c
+    SDL_triangle.c
+    SDL_render_vita_gxm.c
+    SDL_render_vita_gxm_memory.c
+    SDL_render_vita_gxm_tools.c
+    SDL_render_vulkan.c
+    SDL_shaders_vulkan.c
+    SDL_sensor.c
+    SDL_crc16.c
+    SDL_crc32.c
+    SDL_getenv.c
+    SDL_iconv.c
+    SDL_malloc.c
+    SDL_memcpy.c
+    SDL_memmove.c
+    SDL_memset.c
+    SDL_murmur3.c
+    SDL_qsort.c
+    SDL_random.c
+    Generating Code...
+    Compiling...
+    SDL_stdlib.c
+    SDL_string.c
+    SDL_strtokr.c
+    SDL_storage.c
+    SDL_thread.c
+    SDL_time.c
+    SDL_timer.c
+    SDL_RLEaccel.c
+    SDL_blit.c
+    SDL_blit_0.c
+    SDL_blit_1.c
+    SDL_blit_A.c
+    SDL_blit_N.c
+    SDL_blit_auto.c
+    SDL_blit_copy.c
+    SDL_blit_slow.c
+    SDL_bmp.c
+    SDL_clipboard.c
+    SDL_egl.c
+    SDL_fillrect.c
+    Generating Code...
+    Compiling...
+    SDL_pixels.c
+    SDL_rect.c
+    SDL_rotate.c
+    SDL_stb.c
+    SDL_stretch.c
+    SDL_surface.c
+    SDL_video.c
+    SDL_video_unsupported.c
+    SDL_vulkan_utils.c
+    SDL_yuv.c
+    yuv_rgb_lsx.c
+    yuv_rgb_sse.c
+    yuv_rgb_std.c
+    SDL_dummyaudio.c
+    SDL_diskaudio.c
+    SDL_camera_dummy.c
+    SDL_virtualjoystick.c
+    SDL_nullevents.c
+    SDL_nullframebuffer.c
+    SDL_nullvideo.c
+    Generating Code...
+    Compiling...
+    SDL_hid.c
+    SDL_immdevice.c
+    SDL_windows.c
+    SDL_xinput.c
+    pch.c
+    SDL_sysmain_runapp.c
+    SDL_asyncio_windows_ioring.c
+    SDL_sysurl.c
+    SDL_directsound.c
+    SDL_wasapi.c
+    SDL_windowsclipboard.c
+    SDL_windowsevents.c
+    SDL_windowsframebuffer.c
+    SDL_windowskeyboard.c
+    SDL_windowsmessagebox.c
+    SDL_windowsmodes.c
+    SDL_windowsmouse.c
+    SDL_windowsopengl.c
+    SDL_windowsopengles.c
+    SDL_windowsrawinput.c
+    Generating Code...
+    Compiling...
+    SDL_windowsshape.c
+    SDL_windowsvideo.c
+    SDL_windowsvulkan.c
+    SDL_windowswindow.c
+    SDL_syscond.c
+    SDL_sysrwlock.c
+    SDL_syscond_cv.c
+    SDL_sysmutex.c
+    SDL_sysrwlock_srw.c
+    SDL_syssem.c
+    SDL_systhread.c
+    SDL_systls.c
+    SDL_windowssensor.c
+    SDL_syspower.c
+    SDL_syslocale.c
+    SDL_sysfilesystem.c
+    SDL_sysfsops.c
+    SDL_genericstorage.c
+    SDL_steamstorage.c
+    SDL_systime.c
+    Generating Code...
+    Compiling...
+    SDL_systimer.c
+    SDL_sysloadso.c
+    SDL_tray.c
+    SDL_hidapi_8bitdo.c
+    SDL_hidapi_combined.c
+    SDL_hidapi_flydigi.c
+    SDL_hidapi_gamecube.c
+    SDL_hidapi_gip.c
+    SDL_hidapi_lg4ff.c
+    SDL_hidapi_luna.c
+    SDL_hidapi_ps3.c
+    SDL_hidapi_ps4.c
+    SDL_hidapi_ps5.c
+    SDL_hidapi_rumble.c
+    SDL_hidapi_shield.c
+    SDL_hidapi_sinput.c
+    SDL_hidapi_stadia.c
+    SDL_hidapi_steam.c
+    SDL_hidapi_steam_hori.c
+    SDL_hidapi_steam_triton.c
+    Generating Code...
+    Compiling...
+    SDL_hidapi_steamdeck.c
+    SDL_hidapi_switch.c
+    SDL_hidapi_switch2.c
+    SDL_hidapi_wii.c
+    SDL_hidapi_xbox360.c
+    SDL_hidapi_xbox360w.c
+    SDL_hidapi_xboxone.c
+    SDL_hidapi_zuiki.c
+    SDL_hidapijoystick.c
+    SDL_report_descriptor.c
+    SDL_hidapihaptic.c
+    SDL_hidapihaptic_lg4ff.c
+    SDL_dinputjoystick.c
+    SDL_rawinputjoystick.c
+    SDL_windows_gaming_input.c
+    SDL_windowsjoystick.c
+    SDL_xinputjoystick.c
+    SDL_dinputhaptic.c
+    SDL_windowshaptic.c
+    SDL_camera_mediafoundation.c
+    Generating Code...
+    Compiling...
+    SDL_dialog.c
+    SDL_dialog_utils.c
+    SDL_windowsdialog.c
+    SDL_process.c
+    SDL_windowsprocess.c
+    SDL_offscreenevents.c
+    SDL_offscreenframebuffer.c
+    SDL_offscreenopengles.c
+    SDL_offscreenvideo.c
+    SDL_offscreenvulkan.c
+    SDL_offscreenwindow.c
+    SDL_tray_utils.c
+    SDL_gpu_d3d12.c
+    SDL_gpu_vulkan.c
+    SDL_sysmain_callbacks.c
+    Generating Code...
+    SDL_dynapi.c
+    SDL_mslibc.c
+    SDL_gameinput.cpp
+    pch_cpp.cpp
+    SDL_windowsgameinput.cpp
+    Generating Code...
+       Creating library E:/Dev/Sneeze/libs/SDL3/build/Release/SDL3.lib and object E:/Dev/Sneeze/libs/SDL3/build/Release
+  /SDL3.exp
+    SDL3-shared.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\Release\SDL3.dll
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/CMakeLists.txt
+    SDL_test_assert.c
+    SDL_test_common.c
+    SDL_test_compare.c
+    SDL_test_crc32.c
+    SDL_test_font.c
+    SDL_test_fuzzer.c
+    SDL_test_harness.c
+    SDL_test_log.c
+    SDL_test_md5.c
+    SDL_test_memory.c
+    Generating Code...
+    SDL3_test.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\Release\SDL3_test.lib
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    checkkeys.c
+    checkkeys.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\checkkeys.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    childprocess.c
+    childprocess.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\childprocess.exe
+    Generating Release/audiofile.png
+    Generating Release/gamepad_axis.png
+    Generating Release/gamepad_axis_arrow.png
+    Generating Release/gamepad_back.png
+    Generating Release/gamepad_battery.png
+    Generating Release/gamepad_battery_unknown.png
+    Generating Release/gamepad_battery_wired.png
+    Generating Release/gamepad_button.png
+    Generating Release/gamepad_button_background.png
+    Generating Release/gamepad_button_small.png
+    Generating Release/gamepad_face_abxy.png
+    Generating Release/gamepad_face_axby.png
+    Generating Release/gamepad_face_bayx.png
+    Generating Release/gamepad_face_sony.png
+    Generating Release/gamepad_front.png
+    Generating Release/gamepad_touchpad.png
+    Generating Release/gamepad_wired.png
+    Generating Release/gamepad_wireless.png
+    Generating Release/glass.png
+    Generating Release/icon.png
+    Generating Release/icon2x.png
+    Generating Release/logaudiodev.png
+    Generating Release/moose.dat
+    Generating Release/msdf_font.csv
+    Generating Release/msdf_font.png
+    Generating Release/physaudiodev.png
+    Generating Release/sample.png
+    Generating Release/sample.wav
+    Generating Release/sdl-test_round.png
+    Generating Release/soundboard.png
+    Generating Release/soundboard_levels.png
+    Generating Release/speaker.png
+    Generating Release/sword.wav
+    Generating Release/testyuv.png
+    Generating Release/trashcan.png
+    Generating Release/unifont-15.1.05.hex
+    Generating Release/utf8.txt
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    loopwave.c
+    loopwave.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\loopwave.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testasyncio.c
+    testasyncio.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testasyncio.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testatomic.c
+    testatomic.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testatomic.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testaudio.c
+    testaudio.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testaudio.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testaudiohotplug.c
+    testaudiohotplug.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testaudiohotplug.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testaudioinfo.c
+    testaudioinfo.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testaudioinfo.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testaudiorecording.c
+    testaudiorecording.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testaudiorecording.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testaudiostreamdynamicresample.c
+    testaudiostreamdynamicresample.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testaudiostreamdynamicresample
+  .exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testautomation.c
+    testautomation_audio.c
+    testautomation_blit.c
+    testautomation_clipboard.c
+    testautomation_events.c
+    testautomation_guid.c
+    testautomation_hints.c
+    testautomation_images.c
+    testautomation_intrinsics.c
+    testautomation_iostream.c
+    testautomation_joystick.c
+    testautomation_keyboard.c
+    testautomation_log.c
+    testautomation_main.c
+    testautomation_math.c
+    testautomation_mouse.c
+    testautomation_pixels.c
+    testautomation_platform.c
+    testautomation_properties.c
+    testautomation_rect.c
+    Generating Code...
+    Compiling...
+    testautomation_render.c
+    testautomation_sdltest.c
+    testautomation_stdlib.c
+    testautomation_subsystems.c
+    testautomation_surface.c
+    testautomation_time.c
+    testautomation_timer.c
+    testautomation_video.c
+    Generating Code...
+    testautomation.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testautomation.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testbounds.c
+    testbounds.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testbounds.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testcamera.c
+    testcamera.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testcamera.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testclipboard.c
+    testclipboard.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testclipboard.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testcolorspace.c
+    testcolorspace.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testcolorspace.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testcontroller.c
+    gamepadutils.c
+    Generating Code...
+    testcontroller.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testcontroller.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testcustomcursor.c
+    testcustomcursor.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testcustomcursor.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testdialog.c
+    testdialog.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testdialog.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testdisplayinfo.c
+    testdisplayinfo.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testdisplayinfo.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testdlopennote.c
+    testdlopennote.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testdlopennote.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testdraw.c
+    testdraw.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testdraw.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testdrawchessboard.c
+    testdrawchessboard.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testdrawchessboard.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testdropfile.c
+    testdropfile.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testdropfile.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testerror.c
+    testerror.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testerror.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testevdev.c
+    testevdev.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testevdev.exe
+  Cloning into 'E:/Dev/Sneeze/libs/Wasmtime/src/tests/wasi_testsuite/wasi-threads'...
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testfile.c
+    testfile.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testfile.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testfilesystem.c
+  Submodule path 'tests/component-model': checked out 'dac78059d47dadf3221a71548463fadb294412e3'
+    testfilesystem.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testfilesystem.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testgeometry.c
+  Submodule path 'tests/spec_testsuite': checked out '345367358f065375524498749470720d9cdd1418'
+    testgeometry.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testgeometry.exe
+  Submodule path 'tests/wasi_testsuite/wasi-common': checked out '26ea2ff9ddc2aad1b61b40c73786869af156995a'
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+  Submodule path 'tests/wasi_testsuite/wasi-threads': checked out 'e1893c00458de3e846f02c9cd2a435992ea8b32c'
+    testgl.c
+  Performing update step for 'wasmtime'
+  -- Already at requested tag: v43.0.0
+  No patch step for 'wasmtime'
+  No configure step for 'wasmtime'
+  Performing build step for 'wasmtime'
+    testgl.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testgl.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testgles.c
+    testgles.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testgles.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testgles2.c
+    testgles2.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testgles2.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testgpu_simple_clear.c
+    testgpu_simple_clear.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testgpu_simple_clear.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testgpu_spinning_cube.c
+    testgpu_spinning_cube.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testgpu_spinning_cube.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testgpurender_effects.c
+    testgpurender_effects.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testgpurender_effects.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testgpurender_msdf.c
+    testgpurender_msdf.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testgpurender_msdf.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testhaptic.c
+    testhaptic.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testhaptic.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testhittesting.c
+    testhittesting.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testhittesting.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testhotplug.c
+    testhotplug.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testhotplug.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testiconv.c
+    testiconv.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testiconv.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testime.c
+    testime.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testime.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testintersections.c
+    testintersections.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testintersections.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testkeys.c
+    testkeys.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testkeys.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testloadso.c
+    testloadso.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testloadso.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testlocale.c
+    testlocale.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testlocale.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testlock.c
+    testlock.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testlock.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testmanymouse.c
+    testmanymouse.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testmanymouse.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testmessage.c
+    testmessage.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testmessage.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testmodal.c
+    testmodal.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testmodal.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testmouse.c
+    testmouse.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testmouse.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testmultiaudio.c
+    testmultiaudio.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testmultiaudio.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testnative.c
+    testnativew32.c
+    Generating Code...
+    testnative.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testnative.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testoffscreen.c
+    testoffscreen.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testoffscreen.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testoverlay.c
+    testoverlay.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testoverlay.exe
+     Compiling proc-macro2 v1.0.101
+     Compiling unicode-ident v1.0.19
+     Compiling quote v1.0.41
+     Compiling serde_core v1.0.228
+     Compiling libm v0.2.16
+     Compiling serde v1.0.228
+     Compiling cfg-if v1.0.0
+     Compiling typenum v1.15.0
+     Compiling version_check v0.9.4
+     Compiling foldhash v0.2.0
+     Compiling jobserver v0.1.32
+     Compiling find-msvc-tools v0.1.4
+     Compiling shlex v1.3.0
+     Compiling anyhow v1.0.100
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testpalette.c
+     Compiling wasmtime-internal-core v43.0.0 (E:\Dev\Sneeze\libs\Wasmtime\src\crates\core)
+     Compiling bitflags v2.9.4
+     Compiling hashbrown v0.16.1
+     Compiling log v0.4.28
+     Compiling generic-array v0.14.5
+    testpalette.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testpalette.exe
+     Compiling equivalent v1.0.1
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+     Compiling cranelift-srcgen v0.130.0 (E:\Dev\Sneeze\libs\Wasmtime\src\cranelift\srcgen)
+     Compiling winapi v0.3.9
+    testpen.c
+     Compiling heck v0.5.0
+     Compiling cc v1.2.41
+     Compiling memchr v2.7.6
+     Compiling windows_x86_64_msvc v0.52.6
+    testpen.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testpen.exe
+     Compiling cranelift-assembler-x64-meta v0.130.0 (E:\Dev\Sneeze\libs\Wasmtime\src\cranelift\assembler-x64\meta)
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+     Compiling target-lexicon v0.13.0
+     Compiling fnv v1.0.7
+    testplatform.c
+     Compiling crc32fast v1.3.2
+     Compiling cranelift-isle v0.130.0 (E:\Dev\Sneeze\libs\Wasmtime\src\cranelift\isle\isle)
+     Compiling allocator-api2 v0.2.20
+     Compiling thiserror v2.0.17
+    testplatform.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testplatform.exe
+     Compiling syn v2.0.106
+     Compiling windows-targets v0.52.6
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+     Compiling leb128fmt v0.1.0
+     Compiling cranelift-codegen-shared v0.130.0 (E:\Dev\Sneeze\libs\Wasmtime\src\cranelift\codegen\shared)
+     Compiling object v0.38.1
+    testpopup.c
+     Compiling bumpalo v3.20.0
+     Compiling wasm-encoder v0.245.0
+    testpopup.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testpopup.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+     Compiling cpp_demangle v0.4.3
+    testpower.c
+     Compiling block-buffer v0.10.2
+     Compiling crypto-common v0.1.6
+     Compiling rustc-hash v2.1.1
+     Compiling windows-link v0.2.1
+     Compiling stable_deref_trait v1.2.0
+    testpower.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testpower.exe
+     Compiling digest v0.10.7
+     Compiling windows-sys v0.61.2
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+     Compiling hashbrown v0.15.2
+     Compiling serde_json v1.0.140
+     Compiling cpufeatures v0.2.7
+     Compiling arbitrary v1.4.2
+    testprocess.c
+     Compiling indexmap v2.13.0
+     Compiling semver v1.0.27
+     Compiling sha2 v0.10.2
+     Compiling windows-sys v0.52.0
+    testprocess.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testprocess.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+     Compiling rustc-demangle v0.1.24
+     Compiling wasmtime-internal-component-util v43.0.0 (E:\Dev\Sneeze\libs\Wasmtime\src\crates\component-util)
+    testqsort.c
+     Compiling cranelift-assembler-x64 v0.130.0 (E:\Dev\Sneeze\libs\Wasmtime\src\cranelift\assembler-x64)
+     Compiling pkg-config v0.3.32
+     Compiling winapi-util v0.1.5
+     Compiling io-lifetimes v2.0.3
+     Compiling termcolor v1.4.1
+    testqsort.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testqsort.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+     Compiling gimli v0.33.0
+     Compiling cranelift-control v0.130.0 (E:\Dev\Sneeze\libs\Wasmtime\src\cranelift\control)
+    testrelative.c
+     Compiling zstd-sys v2.0.9+zstd.1.5.5
+     Compiling crossbeam-utils v0.8.20
+    testrelative.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testrelative.exe
+     Compiling io-extras v0.18.4
+     Compiling windows_x86_64_msvc v0.53.1
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+     Compiling wasmtime-internal-unwinder v43.0.0 (E:\Dev\Sneeze\libs\Wasmtime\src\crates\unwinder)
+     Compiling either v1.13.0
+     Compiling writeable v0.5.5
+    testrendercopyex.c
+     Compiling litemap v0.7.4
+    testrendercopyex.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testrendercopyex.exe
+     Compiling ambient-authority v0.0.2
+     Compiling zstd-safe v7.0.0
+     Compiling itoa v1.0.14
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+     Compiling synstructure v0.13.1
+     Compiling rayon-core v1.12.0
+     Compiling cap-primitives v3.4.5
+     Compiling ryu v1.0.9
+    testrendertarget.c
+     Compiling crossbeam-epoch v0.9.18
+     Compiling itertools v0.14.0
+     Compiling winx v0.36.4
+     Compiling fs-set-times v0.20.3
+    testrendertarget.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testrendertarget.exe
+     Compiling ittapi-sys v0.4.0
+     Compiling pin-project-lite v0.2.14
+     Compiling once_cell v1.19.0
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+     Compiling winnow v0.7.13
+     Compiling winch-codegen v43.0.0 (E:\Dev\Sneeze\libs\Wasmtime\src\winch\codegen)
+    testresample.c
+     Compiling thiserror v1.0.65
+     Compiling autocfg v1.1.0
+     Compiling id-arena v2.3.0
+     Compiling ipnet v2.5.0
+     Compiling unicode-xid v0.2.3
+     Compiling icu_locid_transform_data v1.5.0
+     Compiling maybe-owned v0.3.4
+    testresample.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testresample.exe
+     Compiling rayon v1.5.3
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+     Compiling crossbeam-deque v0.8.1
+    testrotate.c
+     Compiling windows-targets v0.53.5
+     Compiling dirs-sys-next v0.1.2
+    testrotate.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testrotate.exe
+     Compiling serde_spanned v1.0.3
+     Compiling toml_datetime v0.7.3
+     Compiling icu_properties_data v1.5.0
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+     Compiling cap-std v3.4.5
+     Compiling encoding_rs v0.8.31
+    testrumble.c
+     Compiling wasmtime-internal-cache v43.0.0 (E:\Dev\Sneeze\libs\Wasmtime\src\crates\cache)
+     Compiling wasmtime-internal-component-macro v43.0.0 (E:\Dev\Sneeze\libs\Wasmtime\src\crates\component-macro)
+     Compiling unicode-width v0.2.0
+    testrumble.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testrumble.exe
+     Compiling libc v0.2.177
+     Compiling uuid v1.0.0
+     Compiling leb128 v0.2.5
+     Compiling toml_writer v1.0.4
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testrwlock.c
+     Compiling debugid v0.8.0
+     Compiling wast v35.0.2
+     Compiling wast v245.0.0
+    testrwlock.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testrwlock.exe
+     Compiling directories-next v2.0.0
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+     Compiling windows-sys v0.60.2
+    testscale.c
+    testscale.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testscale.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+     Compiling toml_parser v1.0.4
+    testsem.c
+     Compiling getrandom v0.2.15
+    testsem.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testsem.exe
+     Compiling utf8_iter v1.0.4
+     Compiling toml v0.9.8
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+     Compiling futures-core v0.3.31
+     Compiling write16 v1.0.0
+     Compiling futures-sink v0.3.31
+    testsensor.c
+     Compiling serde_derive v1.0.228
+     Compiling thiserror-impl v2.0.17
+     Compiling pulley-macros v43.0.0 (E:\Dev\Sneeze\libs\Wasmtime\src\pulley\macros)
+     Compiling wasmtime-internal-versioned-export-macros v43.0.0 (E:\Dev\Sneeze\libs\Wasmtime\src\crates\versioned-expo
+  rt-macros)
+    testsensor.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testsensor.exe
+     Compiling zerofrom-derive v0.1.5
+     Compiling yoke-derive v0.7.5
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+     Compiling zerovec-derive v0.10.3
+    testshader.c
+     Compiling displaydoc v0.2.5
+    testshader.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testshader.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+     Compiling icu_provider_macros v1.5.0
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testshape.c
+     Compiling wasmtime-internal-jit-debug v43.0.0 (E:\Dev\Sneeze\libs\Wasmtime\src\crates\jit-debug)
+     Compiling wasmtime-internal-fiber v43.0.0 (E:\Dev\Sneeze\libs\Wasmtime\src\crates\fiber)
+     Compiling cobs v0.3.0
+     Compiling thiserror-impl v1.0.65
+     Compiling zerofrom v0.1.5
+     Compiling wasmtime v43.0.0 (E:\Dev\Sneeze\libs\Wasmtime\src\crates\wasmtime)
+    testshape.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testshape.exe
+     Compiling icu_normalizer_data v1.5.0
+     Compiling utf16_iter v1.0.5
+     Compiling base64 v0.22.1
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testsoftwaretransparent.c
+     Compiling yoke v0.7.5
+     Compiling addr2line v0.26.0
+     Compiling tracing-attributes v0.1.30
+    testsoftwaretransparent.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testsoftwaretransparent.exe
+     Compiling async-trait v0.1.89
+     Compiling rand_core v0.6.3
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+     Compiling zerovec v0.10.4
+    testsprite.c
+     Compiling ittapi v0.4.0
+    testsprite.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testsprite.exe
+     Compiling witx v0.9.1
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+     Compiling tracing-core v0.1.34
+    testspriteminimal.c
+     Compiling wiggle-macro v43.0.0 (E:\Dev\Sneeze\libs\Wasmtime\src\crates\wiggle\macro)
+     Compiling rustix v1.0.8
+     Compiling ppv-lite86 v0.2.16
+     Compiling futures-task v0.3.31
+    testspriteminimal.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testspriteminimal.exe
+     Compiling pin-utils v0.1.0
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+     Compiling cap-fs-ext v3.4.5
+     Compiling futures-util v0.3.31
+    testspritesurface.c
+     Compiling rand_chacha v0.3.1
+     Compiling tracing v0.1.41
+    testspritesurface.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testspritesurface.exe
+     Compiling zstd v0.13.0
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testsurround.c
+     Compiling futures-channel v0.3.31
+     Compiling errno v0.3.14
+     Compiling windows-core v0.52.0
+     Compiling tinystr v0.7.6
+    testsurround.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testsurround.exe
+     Compiling icu_collections v1.5.0
+     Compiling system-interface v0.27.3
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+     Compiling icu_locid v1.5.0
+    testsymbols.c
+     Compiling percent-encoding v2.3.2
+     Compiling futures-io v0.3.31
+     Compiling bytes v1.11.1
+    testsymbols.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testsymbols.exe
+     Compiling form_urlencoded v1.2.2
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testthread.c
+     Compiling iana-time-zone v0.1.61
+    testthread.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testthread.exe
+     Compiling icu_provider v1.5.0
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+     Compiling rand v0.8.5
+    testtime.c
+    testtime.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testtime.exe
+     Compiling icu_locid_transform v1.5.0
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testtimer.c
+     Compiling smallvec v1.15.1
+    testtimer.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testtimer.exe
+     Compiling wasmparser v0.245.0
+     Compiling regalloc2 v0.15.0
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testtray.c
+     Compiling cranelift-bitset v0.130.0 (E:\Dev\Sneeze\libs\Wasmtime\src\cranelift\bitset)
+    testtray.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testtray.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+     Compiling pulley-interpreter v43.0.0 (E:\Dev\Sneeze\libs\Wasmtime\src\pulley)
+    testurl.c
+     Compiling cranelift-entity v0.130.0 (E:\Dev\Sneeze\libs\Wasmtime\src\cranelift\entity)
+    testurl.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testurl.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testver.c
+     Compiling cranelift-bforest v0.130.0 (E:\Dev\Sneeze\libs\Wasmtime\src\cranelift\bforest)
+     Compiling postcard v1.1.3
+    testver.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testver.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+     Compiling cranelift-codegen-meta v0.130.0 (E:\Dev\Sneeze\libs\Wasmtime\src\cranelift\codegen\meta)
+    testviewport.c
+    testviewport.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testviewport.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testvulkan.c
+     Compiling icu_properties v1.5.1
+    testvulkan.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testvulkan.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testwm.c
+    testwm.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testwm.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    testyuv.c
+     Compiling fxprof-processed-profile v0.8.1
+    testyuv_cvt.c
+    Generating Code...
+     Compiling wasmtime-internal-jit-icache-coherence v43.0.0 (E:\Dev\Sneeze\libs\Wasmtime\src\crates\jit-icache-cohere
+  nce)
+     Compiling futures v0.3.31
+    testyuv.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testyuv.exe
+     Compiling socket2 v0.6.1
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/test/CMakeLists.txt
+    torturethread.c
+    torturethread.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\torturethread.exe
+    Building Custom Rule E:/Dev/Sneeze/libs/SDL3/src/CMakeLists.txt
+     Compiling icu_normalizer v1.5.0
+  Performing install step for 'sdl3'
+  MSBuild version 17.6.3+07e294721 for .NET Framework
+
+    Checking File Globs
+    sdltests_utils.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\sdltests_utils.dir\Release\sdltests_utils.lib
+    SDL_uclibc.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\Release\SDL_uclibc.lib
+    SDL3-shared.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\Release\SDL3.dll
+     Compiling wat v1.245.0
+    SDL3_test.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\Release\SDL3_test.lib
+    checkkeys.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\checkkeys.exe
+    childprocess.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\childprocess.exe
+    loopwave.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\loopwave.exe
+    testasyncio.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testasyncio.exe
+    testatomic.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testatomic.exe
+    testaudio.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testaudio.exe
+    testaudiohotplug.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testaudiohotplug.exe
+    testaudioinfo.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testaudioinfo.exe
+    testaudiorecording.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testaudiorecording.exe
+    testaudiostreamdynamicresample.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testaudiostreamdynamicresample
+  .exe
+    testautomation.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testautomation.exe
+     Compiling idna_adapter v1.2.0
+    testbounds.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testbounds.exe
+     Compiling idna v1.1.0
+    testcamera.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testcamera.exe
+    testclipboard.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testclipboard.exe
+    testcolorspace.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testcolorspace.exe
+     Compiling mio v1.1.0
+    testcontroller.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testcontroller.exe
+     Compiling fd-lock v4.0.4
+     Compiling url v2.5.7
+    testcustomcursor.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testcustomcursor.exe
+     Compiling cap-net-ext v3.4.5
+    testdialog.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testdialog.exe
+    testdisplayinfo.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testdisplayinfo.exe
+     Compiling tokio v1.48.0
+    testdlopennote.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testdlopennote.exe
+     Compiling cap-rand v3.4.5
+     Compiling cap-time-ext v3.4.5
+    testdraw.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testdraw.exe
+     Compiling wasmtime-c-api-impl v43.0.0 (E:\Dev\Sneeze\libs\Wasmtime\src\crates\c-api)
+     Compiling wasmtime-internal-c-api-macros v43.0.0 (E:\Dev\Sneeze\libs\Wasmtime\src\crates\c-api-macros)
+    testdrawchessboard.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testdrawchessboard.exe
+    testdropfile.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testdropfile.exe
+     Compiling cranelift-codegen v0.130.0 (E:\Dev\Sneeze\libs\Wasmtime\src\cranelift\codegen)
+    testerror.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testerror.exe
+    testevdev.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testevdev.exe
+    testfile.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testfile.exe
+    testfilesystem.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testfilesystem.exe
+    testgeometry.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testgeometry.exe
+    testgl.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testgl.exe
+    testgles.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testgles.exe
+    testgles2.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testgles2.exe
+    testgpu_simple_clear.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testgpu_simple_clear.exe
+    testgpu_spinning_cube.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testgpu_spinning_cube.exe
+    testgpurender_effects.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testgpurender_effects.exe
+    testgpurender_msdf.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testgpurender_msdf.exe
+    testhaptic.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testhaptic.exe
+    testhittesting.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testhittesting.exe
+    testhotplug.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testhotplug.exe
+    testiconv.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testiconv.exe
+    testime.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testime.exe
+    testintersections.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testintersections.exe
+    testkeys.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testkeys.exe
+    testloadso.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testloadso.exe
+    testlocale.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testlocale.exe
+    testlock.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testlock.exe
+    testmanymouse.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testmanymouse.exe
+    testmessage.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testmessage.exe
+     Compiling wit-parser v0.245.0
+     Compiling wasmtime-environ v43.0.0 (E:\Dev\Sneeze\libs\Wasmtime\src\crates\environ)
+    testmodal.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testmodal.exe
+    testmouse.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testmouse.exe
+    testmultiaudio.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testmultiaudio.exe
+    testnative.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testnative.exe
+    testoffscreen.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testoffscreen.exe
+    testoverlay.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testoverlay.exe
+    testpalette.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testpalette.exe
+    testpen.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testpen.exe
+    testplatform.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testplatform.exe
+    testpopup.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testpopup.exe
+    testpower.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testpower.exe
+    testprocess.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testprocess.exe
+    testqsort.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testqsort.exe
+    testrelative.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testrelative.exe
+    testrendercopyex.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testrendercopyex.exe
+    testrendertarget.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testrendertarget.exe
+    testresample.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testresample.exe
+    testrotate.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testrotate.exe
+    testrumble.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testrumble.exe
+    testrwlock.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testrwlock.exe
+    testscale.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testscale.exe
+    testsem.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testsem.exe
+     Compiling wasmtime-internal-wit-bindgen v43.0.0 (E:\Dev\Sneeze\libs\Wasmtime\src\crates\wit-bindgen)
+    testsensor.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testsensor.exe
+    testshader.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testshader.exe
+    testshape.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testshape.exe
+    testsoftwaretransparent.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testsoftwaretransparent.exe
+     Compiling wasmprinter v0.245.0
+    testsprite.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testsprite.exe
+    testspriteminimal.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testspriteminimal.exe
+    testspritesurface.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testspritesurface.exe
+    testsurround.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testsurround.exe
+    testsymbols.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testsymbols.exe
+    testthread.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testthread.exe
+    testtime.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testtime.exe
+    testtimer.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testtimer.exe
+    testtray.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testtray.exe
+    testurl.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testurl.exe
+    testver.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testver.exe
+    testviewport.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testviewport.exe
+    testvulkan.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testvulkan.exe
+    testwm.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testwm.exe
+    testyuv.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\testyuv.exe
+    torturethread.vcxproj -> E:\Dev\Sneeze\libs\SDL3\build\test\Release\torturethread.exe
+    1>
+    -- Install configuration: "Release"
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/lib/pkgconfig/sdl3.pc
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/lib/SDL3.lib
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/bin/SDL3.dll
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/lib/SDL3_test.lib
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/cmake/SDL3headersTargets.cmake
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/cmake/SDL3sharedTargets.cmake
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/cmake/SDL3sharedTargets-release.cmake
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/cmake/SDL3testTargets.cmake
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/cmake/SDL3testTargets-release.cmake
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/cmake/SDL3Config.cmake
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/cmake/SDL3ConfigVersion.cmake
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_assert.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_asyncio.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_atomic.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_audio.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_begin_code.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_bits.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_blendmode.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_camera.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_clipboard.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_close_code.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_copying.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_cpuinfo.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_dialog.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_dlopennote.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_egl.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_endian.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_error.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_events.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_filesystem.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_gamepad.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_gpu.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_guid.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_haptic.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_hidapi.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_hints.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_init.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_intrin.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_iostream.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_joystick.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_keyboard.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_keycode.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_loadso.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_locale.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_log.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_main.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_main_impl.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_messagebox.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_metal.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_misc.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_mouse.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_mutex.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_oldnames.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_opengl.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_opengl_glext.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_opengles.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_opengles2.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_opengles2_gl2.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_opengles2_gl2ext.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_opengles2_gl2platform.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_opengles2_khrplatform.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_pen.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_pixels.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_platform.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_platform_defines.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_power.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_process.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_properties.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_rect.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_render.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_scancode.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_sensor.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_stdinc.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_storage.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_surface.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_system.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_thread.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_time.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_timer.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_touch.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_tray.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_version.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_video.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_vulkan.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_revision.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_test.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_test_assert.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_test_common.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_test_compare.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_test_crc32.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_test_font.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_test_fuzzer.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_test_harness.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_test_log.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_test_md5.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/include/SDL3/SDL_test_memory.h
+    -- Installing: E:/Dev/Sneeze/libs/SDL3/install/licenses/SDL3/LICENSE.txt
+  Completed 'sdl3'
+     Compiling wiggle-generate v43.0.0 (E:\Dev\Sneeze\libs\Wasmtime\src\crates\wiggle\generate)
+     Compiling cranelift-frontend v0.130.0 (E:\Dev\Sneeze\libs\Wasmtime\src\cranelift\frontend)
+     Compiling cranelift-native v0.130.0 (E:\Dev\Sneeze\libs\Wasmtime\src\cranelift\native)
+     Compiling wasmtime-internal-cranelift v43.0.0 (E:\Dev\Sneeze\libs\Wasmtime\src\crates\cranelift)
+     Compiling wasmtime-internal-winch v43.0.0 (E:\Dev\Sneeze\libs\Wasmtime\src\crates\winch)
+     Compiling wiggle v43.0.0 (E:\Dev\Sneeze\libs\Wasmtime\src\crates\wiggle)
+     Compiling wasmtime-wasi-io v43.0.0 (E:\Dev\Sneeze\libs\Wasmtime\src\crates\wasi-io)
+     Compiling wasmtime-wasi v43.0.0 (E:\Dev\Sneeze\libs\Wasmtime\src\crates\wasi)
+     Compiling wasmtime-c-api v43.0.0 (E:\Dev\Sneeze\libs\Wasmtime\src\crates\c-api\artifact)
+      Finished `release` profile [optimized] target(s) in 4m 04s
+  Performing install step for 'wasmtime'
+  Error copying directory from "E:/Dev/Sneeze/libs/Wasmtime/src/crates/c-api/wasm-c-api/include" to "E:/Dev/Sneeze/libs
+  /Wasmtime/install/include".
+C:\Program Files\Microsoft Visual Studio\2022\Professional\MSBuild\Microsoft\VC\v170\Microsoft.CppCommon.targets(248,5)
+: error MSB8066: Custom build for 'E:\Dev\Sneeze\build\CMakeFiles\20b8f07dd8adc2489101cc2244b5dbd8\wasmtime-mkdir.rule;
+E:\Dev\Sneeze\build\CMakeFiles\20b8f07dd8adc2489101cc2244b5dbd8\wasmtime-download.rule;E:\Dev\Sneeze\build\CMakeFiles\2
+0b8f07dd8adc2489101cc2244b5dbd8\wasmtime-update.rule;E:\Dev\Sneeze\build\CMakeFiles\20b8f07dd8adc2489101cc2244b5dbd8\wa
+smtime-patch.rule;E:\Dev\Sneeze\build\CMakeFiles\20b8f07dd8adc2489101cc2244b5dbd8\wasmtime-configure.rule;E:\Dev\Sneeze
+\build\CMakeFiles\20b8f07dd8adc2489101cc2244b5dbd8\wasmtime-build.rule;E:\Dev\Sneeze\build\CMakeFiles\20b8f07dd8adc2489
+101cc2244b5dbd8\wasmtime-install.rule;E:\Dev\Sneeze\build\CMakeFiles\61827abc5b48821637dc79f9d5f5406b\wasmtime-complete
+.rule;E:\Dev\Sneeze\build\CMakeFiles\36b34af331c296d0fed19382180ab588\wasmtime.rule;E:\Dev\Sneeze\CMakeLists.txt' exite
+d with code 1. [E:\Dev\Sneeze\build\wasmtime.vcxproj]
+

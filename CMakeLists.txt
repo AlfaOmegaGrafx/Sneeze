@@ -51,6 +51,7 @@ ExternalProject_Add (spirv-tools
       -DCMAKE_BUILD_TYPE=Release
       -DSPIRV-Headers_SOURCE_DIR=${LIBS_DIR}/SPIRV-Headers/src
       -DSPIRV_SKIP_TESTS=ON
+      -DSPIRV_SKIP_EXECUTABLES=ON
    DEPENDS spirv-headers
 )
 
@@ -97,7 +98,7 @@ ExternalProject_Add (glslang
 
 ExternalProject_Add (anari-sdk
    GIT_REPOSITORY   https://github.com/KhronosGroup/ANARI-SDK.git
-   GIT_TAG          v0.16.0
+   GIT_TAG          v0.15.0
    GIT_SHALLOW      ON
    SOURCE_DIR       "${LIBS_DIR}/ANARI-SDK/src"
    BINARY_DIR       "${LIBS_DIR}/ANARI-SDK/build"
@@ -229,9 +230,6 @@ ExternalProject_Add (wasmtime
       COMMAND ${CMAKE_COMMAND} -E make_directory "<INSTALL_DIR>/lib"
       COMMAND ${CMAKE_COMMAND} -E copy_directory
          "<SOURCE_DIR>/crates/c-api/include"
-         "<INSTALL_DIR>/include"
-      COMMAND ${CMAKE_COMMAND} -E copy_directory
-         "<SOURCE_DIR>/crates/c-api/wasm-c-api/include"
          "<INSTALL_DIR>/include"
       ${WASMTIME_COPY_CMDS}
    BUILD_IN_SOURCE   OFF
