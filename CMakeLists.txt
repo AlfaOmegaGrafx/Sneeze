@@ -220,6 +220,7 @@ ExternalProject_Add (wasmtime
    GIT_REPOSITORY   https://github.com/bytecodealliance/wasmtime.git
    GIT_TAG          v43.0.0
    GIT_SHALLOW      ON
+   GIT_SUBMODULES   ""
    SOURCE_DIR       "${LIBS_DIR}/Wasmtime/src"
    BINARY_DIR       "${LIBS_DIR}/Wasmtime/build"
    INSTALL_DIR      "${LIBS_DIR}/Wasmtime/install"
