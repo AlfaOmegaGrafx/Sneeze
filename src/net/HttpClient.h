@@ -32,6 +32,7 @@ public:
    void Shutdown ();
 
    bool Get (const std::string& sUrl, std::string& sResponse, long& nHttpCode);
+   bool DownloadToFile (const std::string& sUrl, const std::string& sFilePath, long& nHttpCode);
 
 private:
    bool bInitialized;

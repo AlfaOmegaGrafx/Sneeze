@@ -34,8 +34,6 @@ public:
    void Shutdown ();
 
    bool Validate (const std::vector<uint32_t>& aBinary, std::string& sError);
-   bool CrossCompileToHLSL (const std::vector<uint32_t>& aBinary, std::string& sHLSL, std::string& sError);
-   bool CrossCompileToGLSL (const std::vector<uint32_t>& aBinary, std::string& sGLSL, std::string& sError);
 
 private:
    bool bInitialized;

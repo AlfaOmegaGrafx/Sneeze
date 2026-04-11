@@ -1,10 +1,10 @@
 # Sneeze — Open Metaverse Browser Engine
 
-Sneeze is the engine behind the Open Metaverse Browser, developed by the Open Metaverse Browser Initiative (OMBI), a project under the Metaverse Standards Forum. It handles rendering (via ANARI), sandboxed code execution (via WebAssembly/Wasmtime), shader cross-compilation (via SPIR-V tools), XR device access (via OpenXR), networking (via curl), and UI (via RmlUi).
+Sneeze is the engine behind the Open Metaverse Browser, developed by the Open Metaverse Browser Initiative (OMBI), a project under the Metaverse Standards Forum. It handles rendering (via ANARI), sandboxed code execution (via WebAssembly/Wasmtime), SPIR-V shader validation (via SPIRV-Tools), XR device access (via OpenXR), networking (via curl), and UI (via RmlUi).
 
 Sneeze builds as a **static library** (`Sneeze.lib`). It is consumed by an application (such as [Artemis](../Artemis)) via CMake's `add_subdirectory`. The application provides windowing and input; the engine renders into a surface the application supplies.
 
-This repository is set up so that a new developer can go from a fresh clone to a fully built project with just two commands. CMake automatically clones and builds all eight third-party dependencies from source — no pre-installed libraries required.
+This repository is set up so that a new developer can go from a fresh clone to a fully built project with just two commands. CMake automatically clones and builds all dependencies from source — no pre-installed libraries required.
 
 ---
 
@@ -102,7 +102,7 @@ This step takes a few seconds. It generates the SuperBuild project files that wi
 cmake --build build --config Release --parallel
 ```
 
-This is the big step. CMake clones all nine dependencies, compiles them from source, and then compiles Sneeze and its test suite. Expect this to take **20-30 minutes** the first time (Wasmtime's Rust build is the slowest). You'll see a continuous stream of "Cloning into..." and compilation messages — that's normal.
+This is the big step. CMake clones all eight dependencies, compiles them from source, and then compiles Sneeze and its test suite. Expect this to take **20-30 minutes** the first time (Wasmtime's Rust build is the slowest). You'll see a continuous stream of "Cloning into..." and compilation messages — that's normal.
 
 **If the build fails**, the most common cause is a missing prerequisite (Rust, Python, or a C++ compiler). Check the error message and verify the Prerequisites section above.
 
@@ -198,7 +198,6 @@ Sneeze/
 │   ├── ANARI-SDK/         Each dependency has src/, build/, install/
 │   ├── Wasmtime/
 │   ├── SPIRV-Tools/
-│   ├── SPIRV-Cross/
 │   ├── SPIRV-Headers/
 │   ├── OpenXR-SDK/
 │   ├── curl/
@@ -215,7 +214,7 @@ Sneeze/
 │   ├── renderer/          ANARI rendering abstraction
 │   ├── view/              Camera orbit controller (decoupled from windowing)
 │   ├── wasm/              Wasmtime WebAssembly sandbox
-│   ├── spirv/             SPIR-V validation and cross-compilation
+│   ├── spirv/             SPIR-V validation
 │   ├── xr/                OpenXR device abstraction
 │   ├── net/               HTTP client (libcurl)
 │   ├── ui/                RmlUi HTML/CSS UI toolkit
@@ -245,7 +244,6 @@ All dependencies are built from source by the SuperBuild. No pre-built binaries.
 | ANARI-SDK | v0.15.0 | [KhronosGroup/ANARI-SDK](https://github.com/KhronosGroup/ANARI-SDK) | Rendering abstraction API + helide CPU ray tracer |
 | Wasmtime | v43.0.0 | [bytecodealliance/wasmtime](https://github.com/bytecodealliance/wasmtime) | WebAssembly sandbox runtime |
 | SPIRV-Tools | vulkan-sdk-1.4.341.0 | [KhronosGroup/SPIRV-Tools](https://github.com/KhronosGroup/SPIRV-Tools) | SPIR-V assembler, validator, optimizer |
-| SPIRV-Cross | vulkan-sdk-1.4.341.0 | [KhronosGroup/SPIRV-Cross](https://github.com/KhronosGroup/SPIRV-Cross) | SPIR-V cross-compiler (HLSL, GLSL, MSL) |
 | SPIRV-Headers | vulkan-sdk-1.4.341.0 | [KhronosGroup/SPIRV-Headers](https://github.com/KhronosGroup/SPIRV-Headers) | SPIR-V specification headers (build dep of SPIRV-Tools) |
 | OpenXR-SDK | release-1.1.58 | [KhronosGroup/OpenXR-SDK](https://github.com/KhronosGroup/OpenXR-SDK) | XR device abstraction |
 | curl | curl-8_9_1 | [curl/curl](https://github.com/curl/curl) | HTTP/HTTPS client (static, Schannel SSL on Windows) |

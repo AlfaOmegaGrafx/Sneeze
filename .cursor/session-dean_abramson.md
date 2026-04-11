@@ -23,7 +23,7 @@
 - Installed Rust toolchain via command line (rustup, stable 1.94.1, x86_64-pc-windows-msvc target). Build-time dependency for Wasmtime only.
 - Built Wasmtime v43.0.0 from source via Cargo. Installed C API headers + DLL to `Project/Wasmtime/install/`.
 - Created `wasm/` module: `WASM_RUNTIME` class (engine + store lifecycle). WasmTest.exe with 21/21 assertions passing (compile, call, fuel metering, error handling, host functions).
-- Built SPIRV-Tools + SPIRV-Cross + SPIRV-Headers from source (vulkan-sdk-1.4.341.0). Created `spirv/` module: `SPV_PIPELINE` class. SpvTest.exe with 20/20 assertions passing.
+- Built SPIRV-Tools + SPIRV-Headers from source (vulkan-sdk-1.4.341.0). Created `spirv/` module: `SPV_PIPELINE` class (validation only — SPIRV-Cross removed from architecture). SpvTest.exe passing.
 - Built OpenXR SDK 1.1.58 from source (static lib). Created `xr/` module: `XR_RUNTIME` class. XrTest.exe with 10/10 assertions passing.
 - Built libcurl 8.9.1 from source (static, Schannel SSL). Created `net/` module: `HTTP_CLIENT` class. NetTest.exe with 20/20 assertions passing.
 - Built RmlUi 6.2 from source (static, no FreeType). Created `ui/` module: `UI_CONTEXT` class with stub interfaces. UiTest.exe with 20/20 assertions passing.
@@ -84,3 +84,20 @@
 - **Build verification:** Sneeze.lib built successfully. Artemis.exe built successfully (SDL3 + Sneeze inline).
 - **Build lesson learned:** Deleting the entire `build/` folder (not just `build/sneeze/`) causes CMake to re-evaluate all ExternalProject stamp files, wasting ~5 min even though `libs/` is intact. Day-to-day: only delete `build/sneeze/`.
 - **Updated project.mdc** extensively: added Artemis section with directory structure, build commands, namespace details, and integration architecture. Updated Known Gotchas about stamp files and CMP0144.
+
+## 2026-04-10 (Friday) — Late Night / 2026-04-11 (Saturday)
+
+- **Installer & auto-updater work (Artemis-side):** Converted SDL3 to static linking. Switched ANARI core to `anari::anari_static` (helide device remains dynamic DLL). Added `DownloadToFile` method to `sneeze::net::HTTP_CLIENT`. Created CPack configuration (NSIS/Windows, DMG/macOS, TGZ/Linux), install targets, version manifest format (`latest.example.json`), and full `artemis::updater::UPDATER` module with background check/download/verify/apply pipeline. Integrated into `main.cpp`.
+- **SPIRV-Cross removal:** Removed SPIRV-Cross from the architecture per OMB Architecture Session 26 decision. ANARI devices consume SPIR-V natively — no browser-side cross-compilation needed. Changes across 10+ files:
+  - Removed `CrossCompileToHLSL()` and `CrossCompileToGLSL()` from `SpvPipeline.h/.cpp`
+  - Removed SPIRV-Cross ExternalProject from SuperBuild `CMakeLists.txt`, removed from sneeze's DEPENDS
+  - Removed all 6 `find_library` calls, include path, and link libraries from `src/CMakeLists.txt`
+  - Removed SPIRV-Cross includes and link libraries from `tests/CMakeLists.txt`
+  - Removed 4 cross-compilation tests (HLSL, GLSL, MSL, reflection) from `SpvPipelineTest.cpp`
+  - Removed from `README.md` (description, directory layout, dependency table)
+  - Removed from `vcpkg.json`, `NOTICE`
+  - Updated `project.mdc` throughout (overview, module table, class table, test descriptions, dependency table, rationale sections, build system)
+  - Deleted `libs/SPIRV-Cross/` directory
+- Rebuilt Sneeze and Artemis successfully. Artemis runs with expected updater 404 (no manifest hosted yet). Two runtime DLLs remain: `wasmtime.dll` and `anari_library_helide.dll`.
+- **Undo All incident:** Cursor UI lag caused an accidental "Undo All" that reverted all changes across both Sneeze and Artemis — including changes from the previous session (static linking, renderer, HttpClient). Recovered by re-applying all changes from memory/conversation record. All files restored and verified (Artemis builds and runs, updater fires, correct DLLs present).
+- Cleaned up `project.mdc`: removed Artemis-specific sections (directory structure, namespaces, build commands) that belong in Artemis's own `project.mdc`. Added ANARI static linking rationale. Sneeze's file now focuses purely on the engine.

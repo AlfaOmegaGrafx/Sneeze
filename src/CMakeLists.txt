@@ -13,7 +13,9 @@
 # limitations under the License.
 
 cmake_minimum_required (VERSION 3.20)
-cmake_policy (SET CMP0144 NEW)
+if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.27")
+   cmake_policy (SET CMP0144 NEW)
+endif ()
 project (Sneeze VERSION 0.1.0 LANGUAGES CXX)
 
 set (CMAKE_CXX_STANDARD 17)
@@ -40,7 +42,7 @@ endif ()
 
 # Wasmtime — always from libs/ (not available in vcpkg)
 set (WASMTIME_ROOT "${LIBS_DIR}/Wasmtime/install")
-find_library (WASMTIME_LIB wasmtime PATHS "${WASMTIME_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
+find_library (WASMTIME_LIB NAMES wasmtime wasmtime.dll PATHS "${WASMTIME_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
 find_path (WASMTIME_INCLUDE wasmtime.h PATHS "${WASMTIME_ROOT}/include" NO_DEFAULT_PATH REQUIRED)
 
 if (USE_LOCAL_DEPS)
@@ -49,16 +51,6 @@ if (USE_LOCAL_DEPS)
    find_library (SPIRV_TOOLS_LIB SPIRV-Tools PATHS "${SPIRV_TOOLS_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
    find_library (SPIRV_TOOLS_OPT_LIB SPIRV-Tools-opt PATHS "${SPIRV_TOOLS_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
    find_path (SPIRV_TOOLS_INCLUDE spirv-tools/libspirv.h PATHS "${SPIRV_TOOLS_ROOT}/include" NO_DEFAULT_PATH REQUIRED)
-
-   # SPIRV-Cross
-   set (SPIRV_CROSS_ROOT "${LIBS_DIR}/SPIRV-Cross/install")
-   find_library (SPIRV_CROSS_CORE_LIB spirv-cross-core PATHS "${SPIRV_CROSS_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
-   find_library (SPIRV_CROSS_GLSL_LIB spirv-cross-glsl PATHS "${SPIRV_CROSS_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
-   find_library (SPIRV_CROSS_HLSL_LIB spirv-cross-hlsl PATHS "${SPIRV_CROSS_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
-   find_library (SPIRV_CROSS_MSL_LIB spirv-cross-msl PATHS "${SPIRV_CROSS_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
-   find_library (SPIRV_CROSS_CPP_LIB spirv-cross-cpp PATHS "${SPIRV_CROSS_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
-   find_library (SPIRV_CROSS_REFLECT_LIB spirv-cross-reflect PATHS "${SPIRV_CROSS_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
-   find_path (SPIRV_CROSS_INCLUDE spirv_cross/spirv_cross.hpp PATHS "${SPIRV_CROSS_ROOT}/include" NO_DEFAULT_PATH REQUIRED)
 
    # OpenXR
    set (OPENXR_ROOT "${LIBS_DIR}/OpenXR-SDK/install")
@@ -81,12 +73,6 @@ if (USE_LOCAL_DEPS)
    find_program (GLSLANG_VALIDATOR glslang PATHS "${GLSLANG_ROOT}/bin" NO_DEFAULT_PATH REQUIRED)
 else ()
    find_package (spirv_tools REQUIRED CONFIG)
-   find_package (spirv_cross_core REQUIRED CONFIG)
-   find_package (spirv_cross_glsl REQUIRED CONFIG)
-   find_package (spirv_cross_hlsl REQUIRED CONFIG)
-   find_package (spirv_cross_msl REQUIRED CONFIG)
-   find_package (spirv_cross_cpp REQUIRED CONFIG)
-   find_package (spirv_cross_reflect REQUIRED CONFIG)
    find_package (OpenXR REQUIRED CONFIG)
    find_package (CURL REQUIRED)
    find_package (RmlUi REQUIRED)
@@ -188,7 +174,6 @@ target_include_directories (Sneeze PUBLIC
    ${CMAKE_CURRENT_SOURCE_DIR}
    ${WASMTIME_INCLUDE}
    ${SPIRV_TOOLS_INCLUDE}
-   ${SPIRV_CROSS_INCLUDE}
    ${OPENXR_INCLUDE}
    ${CURL_INCLUDE}
    ${RMLUI_INCLUDE}
@@ -202,17 +187,12 @@ target_compile_definitions (Sneeze PUBLIC
 )
 
 target_link_libraries (Sneeze PUBLIC
-   anari::anari
+   anari::anari_static
+   anari::anari_library_helide
    ${WASMTIME_LIB}
    ws2_32 advapi32 userenv ntdll shell32 ole32 bcrypt
    ${SPIRV_TOOLS_LIB}
    ${SPIRV_TOOLS_OPT_LIB}
-   ${SPIRV_CROSS_HLSL_LIB}
-   ${SPIRV_CROSS_GLSL_LIB}
-   ${SPIRV_CROSS_MSL_LIB}
-   ${SPIRV_CROSS_CPP_LIB}
-   ${SPIRV_CROSS_REFLECT_LIB}
-   ${SPIRV_CROSS_CORE_LIB}
    ${OPENXR_LOADER_LIB}
    ${CURL_LIB}
    wldap32 crypt32 normaliz

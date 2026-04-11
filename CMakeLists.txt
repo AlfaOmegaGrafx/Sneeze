@@ -56,23 +56,6 @@ ExternalProject_Add (spirv-tools
 )
 
 # ---------------------------------------------------------------------------
-# SPIRV-Cross
-# ---------------------------------------------------------------------------
-
-ExternalProject_Add (spirv-cross
-   GIT_REPOSITORY   https://github.com/KhronosGroup/SPIRV-Cross.git
-   GIT_TAG          vulkan-sdk-1.4.341.0
-   GIT_SHALLOW      ON
-   SOURCE_DIR       "${LIBS_DIR}/SPIRV-Cross/src"
-   BINARY_DIR       "${LIBS_DIR}/SPIRV-Cross/build"
-   INSTALL_DIR      "${LIBS_DIR}/SPIRV-Cross/install"
-   CMAKE_ARGS
-      -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-      -DCMAKE_BUILD_TYPE=Release
-      -DSPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS=OFF
-)
-
-# ---------------------------------------------------------------------------
 # glslang (depends on SPIRV-Tools for optimizer integration)
 # ---------------------------------------------------------------------------
 
@@ -243,7 +226,6 @@ ExternalProject_Add (sneeze
       anari-sdk
       wasmtime
       spirv-tools
-      spirv-cross
       glslang
       openxr-sdk
       curl

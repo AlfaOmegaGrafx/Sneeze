@@ -7,7 +7,6 @@
       "curl",
       "openxr-loader",
       "spirv-tools",
-      "spirv-cross",
       "rmlui",
       "glslang"
    ]

@@ -15,8 +15,6 @@
 #include "spirv/SpvPipeline.h"
 
 #include <spirv-tools/libspirv.hpp>
-#include <spirv_cross/spirv_hlsl.hpp>
-#include <spirv_cross/spirv_glsl.hpp>
 
 #include <cstdio>
 
@@ -38,7 +36,7 @@ SPV_PIPELINE::~SPV_PIPELINE ()
 bool SPV_PIPELINE::Initialize ()
 {
    bInitialized = true;
-   std::printf ("SPV_PIPELINE: SPIR-V pipeline initialized (SPIRV-Tools + SPIRV-Cross)\n");
+   std::printf ("SPV_PIPELINE: SPIR-V validation pipeline initialized (SPIRV-Tools)\n");
    return true;
 }
 
@@ -64,45 +62,6 @@ bool SPV_PIPELINE::Validate (const std::vector<uint32_t>& aBinary, std::string& 
       sError = sMessages;
 
    return bValid;
-}
-
-bool SPV_PIPELINE::CrossCompileToHLSL (const std::vector<uint32_t>& aBinary, std::string& sHLSL, std::string& sError)
-{
-   bool bOk = false;
-   try
-   {
-      spirv_cross::CompilerHLSL pCompiler (aBinary);
-      spirv_cross::CompilerHLSL::Options pOptions;
-      pOptions.shader_model = 50;
-      pCompiler.set_hlsl_options (pOptions);
-      sHLSL = pCompiler.compile ();
-      bOk = true;
-   }
-   catch (const spirv_cross::CompilerError& e)
-   {
-      sError = e.what ();
-   }
-   return bOk;
-}
-
-bool SPV_PIPELINE::CrossCompileToGLSL (const std::vector<uint32_t>& aBinary, std::string& sGLSL, std::string& sError)
-{
-   bool bOk = false;
-   try
-   {
-      spirv_cross::CompilerGLSL pCompiler (aBinary);
-      spirv_cross::CompilerGLSL::Options pOptions;
-      pOptions.version = 450;
-      pOptions.es = false;
-      pCompiler.set_common_options (pOptions);
-      sGLSL = pCompiler.compile ();
-      bOk = true;
-   }
-   catch (const spirv_cross::CompilerError& e)
-   {
-      sError = e.what ();
-   }
-   return bOk;
 }
 
 } // namespace spirv

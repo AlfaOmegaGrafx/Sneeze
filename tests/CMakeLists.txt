@@ -33,17 +33,10 @@ add_executable (SpvTest SpvPipelineTest.cpp)
 
 target_include_directories (SpvTest PRIVATE
    ${SPIRV_TOOLS_INCLUDE}
-   ${SPIRV_CROSS_INCLUDE}
 )
 target_link_libraries (SpvTest PRIVATE
    ${SPIRV_TOOLS_LIB}
    ${SPIRV_TOOLS_OPT_LIB}
-   ${SPIRV_CROSS_HLSL_LIB}
-   ${SPIRV_CROSS_GLSL_LIB}
-   ${SPIRV_CROSS_MSL_LIB}
-   ${SPIRV_CROSS_CPP_LIB}
-   ${SPIRV_CROSS_REFLECT_LIB}
-   ${SPIRV_CROSS_CORE_LIB}
 )
 
 # ---------------------------------------------------------------------------

@@ -14,6 +14,7 @@
 
 #include "AnariRenderer.h"
 #include <anari/anari.h>
+#include <anari/ext/helide/anariNewHelideDevice.h>
 #include <cstring>
 #include <cstdio>
 
@@ -22,8 +23,7 @@ namespace sneeze { namespace renderer {
 // ---------------------------------------------------------------------------
 
 HELIDE_RENDERER::HELIDE_RENDERER ()
-   : m_pLibrary (nullptr)
-   , m_pDevice (nullptr)
+   : m_pDevice (nullptr)
    , m_pWorld (nullptr)
    , m_pCamera (nullptr)
    , m_pRenderer (nullptr)
@@ -48,42 +48,34 @@ bool HELIDE_RENDERER::Initialize (int nWidth, int nHeight)
 
    bool bOk = false;
 
-   m_pLibrary = anariLoadLibrary ("helide", nullptr, nullptr);
-   if (!m_pLibrary)
+   m_pDevice = anariNewHelideDevice (nullptr, nullptr);
+   if (!m_pDevice)
    {
-      std::fprintf (stderr, "ANARI: failed to load helide library\n");
+      std::fprintf (stderr, "ANARI: failed to create helide device\n");
    }
    else
    {
-      m_pDevice = anariNewDevice (m_pLibrary, "default");
-      if (!m_pDevice)
-      {
-         std::fprintf (stderr, "ANARI: failed to create device\n");
-      }
-      else
-      {
-         anariCommitParameters (m_pDevice, m_pDevice);
+      anariCommitParameters (m_pDevice, m_pDevice);
 
-         m_pWorld = anariNewWorld (m_pDevice);
-         m_pCamera = anariNewCamera (m_pDevice, "perspective");
-         m_pRenderer = anariNewRenderer (m_pDevice, "default");
+      m_pWorld = anariNewWorld (m_pDevice);
+      m_pCamera = anariNewCamera (m_pDevice, "perspective");
+      m_pRenderer = anariNewRenderer (m_pDevice, "default");
 
-         float bgColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-         anariSetParameter (m_pDevice, m_pRenderer, "background", ANARI_FLOAT32_VEC4, bgColor);
-         anariCommitParameters (m_pDevice, m_pRenderer);
+      float bgColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+      anariSetParameter (m_pDevice, m_pRenderer, "background", ANARI_FLOAT32_VEC4, bgColor);
+      anariCommitParameters (m_pDevice, m_pRenderer);
 
-         m_pFrame = anariNewFrame (m_pDevice);
-         uint32_t aSize[2] = { static_cast<uint32_t> (nWidth), static_cast<uint32_t> (nHeight) };
-         anariSetParameter (m_pDevice, m_pFrame, "size", ANARI_UINT32_VEC2, aSize);
-         ANARIDataType nColorType = ANARI_UFIXED8_RGBA_SRGB;
-         anariSetParameter (m_pDevice, m_pFrame, "channel.color", ANARI_DATA_TYPE, &nColorType);
-         anariSetParameter (m_pDevice, m_pFrame, "renderer", ANARI_RENDERER, &m_pRenderer);
-         anariSetParameter (m_pDevice, m_pFrame, "camera", ANARI_CAMERA, &m_pCamera);
-         anariSetParameter (m_pDevice, m_pFrame, "world", ANARI_WORLD, &m_pWorld);
-         anariCommitParameters (m_pDevice, m_pFrame);
+      m_pFrame = anariNewFrame (m_pDevice);
+      uint32_t aSize[2] = { static_cast<uint32_t> (nWidth), static_cast<uint32_t> (nHeight) };
+      anariSetParameter (m_pDevice, m_pFrame, "size", ANARI_UINT32_VEC2, aSize);
+      ANARIDataType nColorType = ANARI_UFIXED8_RGBA_SRGB;
+      anariSetParameter (m_pDevice, m_pFrame, "channel.color", ANARI_DATA_TYPE, &nColorType);
+      anariSetParameter (m_pDevice, m_pFrame, "renderer", ANARI_RENDERER, &m_pRenderer);
+      anariSetParameter (m_pDevice, m_pFrame, "camera", ANARI_CAMERA, &m_pCamera);
+      anariSetParameter (m_pDevice, m_pFrame, "world", ANARI_WORLD, &m_pWorld);
+      anariCommitParameters (m_pDevice, m_pFrame);
 
-         bOk = true;
-      }
+      bOk = true;
    }
 
    return bOk;
@@ -115,11 +107,6 @@ void HELIDE_RENDERER::Shutdown ()
       }
       anariRelease (m_pDevice, m_pDevice);
       m_pDevice = nullptr;
-   }
-   if (m_pLibrary)
-   {
-      anariUnloadLibrary (m_pLibrary);
-      m_pLibrary = nullptr;
    }
 }
 

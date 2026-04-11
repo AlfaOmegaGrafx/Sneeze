@@ -41,7 +41,6 @@ public:
    int GetHeight () const override;
 
 private:
-   ANARILibrary  m_pLibrary;
    ANARIDevice   m_pDevice;
    ANARIWorld    m_pWorld;
    ANARICamera   m_pCamera;

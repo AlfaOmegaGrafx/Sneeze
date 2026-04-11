@@ -93,5 +93,50 @@ bool HTTP_CLIENT::Get (const std::string& sUrl, std::string& sResponse, long& nH
    return bOk;
 }
 
+static size_t FileWriteCallback (char* pData, size_t nSize, size_t nMembers, void* pUserData)
+{
+   FILE* pFile = static_cast<FILE*> (pUserData);
+   return std::fwrite (pData, nSize, nMembers, pFile);
+}
+
+bool HTTP_CLIENT::DownloadToFile (const std::string& sUrl, const std::string& sFilePath, long& nHttpCode)
+{
+   bool bOk = false;
+
+   FILE* pFile = nullptr;
+#ifdef _WIN32
+   fopen_s (&pFile, sFilePath.c_str (), "wb");
+#else
+   pFile = std::fopen (sFilePath.c_str (), "wb");
+#endif
+
+   if (!pFile)
+   {
+      std::fprintf (stderr, "HTTP_CLIENT: failed to open %s for writing\n", sFilePath.c_str ());
+      return false;
+   }
+
+   CURL* pCurl = curl_easy_init ();
+   if (pCurl)
+   {
+      curl_easy_setopt (pCurl, CURLOPT_URL, sUrl.c_str ());
+      curl_easy_setopt (pCurl, CURLOPT_WRITEFUNCTION, FileWriteCallback);
+      curl_easy_setopt (pCurl, CURLOPT_WRITEDATA, pFile);
+      curl_easy_setopt (pCurl, CURLOPT_FOLLOWLOCATION, 1L);
+      curl_easy_setopt (pCurl, CURLOPT_TIMEOUT, 300L);
+
+      CURLcode nCode = curl_easy_perform (pCurl);
+
+      bOk = (nCode == CURLE_OK);
+      if (bOk)
+         curl_easy_getinfo (pCurl, CURLINFO_RESPONSE_CODE, &nHttpCode);
+
+      curl_easy_cleanup (pCurl);
+   }
+
+   std::fclose (pFile);
+   return bOk;
+}
+
 } // namespace net
 } // namespace sneeze

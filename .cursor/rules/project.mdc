@@ -13,7 +13,7 @@ alwaysApply: true
 
 The project produces two components:
 
-- **Sneeze** — the Metaverse Browser Engine (MBE). A standalone, reusable engine library (static `.lib`). Analogous to Blink in the web browser world. Owns all third-party dependencies (Wasmtime, SPIRV-Tools, SPIRV-Cross, OpenXR, curl, RmlUi, ANARI) and the engine modules that wrap them (`wasm/`, `spirv/`, `xr/`, `net/`, `ui/`, `core/`, and future `som/`, `smap/`, `compute/`, `identity/`, `audio/`). All test executables (WasmTest, SpvTest, XrTest, NetTest, UiTest) belong to Sneeze. Another team could build a different metaverse browser on top of Sneeze without touching Artemis.
+- **Sneeze** — the Metaverse Browser Engine (MBE). A standalone, reusable engine library (static `.lib`). Analogous to Blink in the web browser world. Owns all third-party dependencies (Wasmtime, SPIRV-Tools, OpenXR, curl, RmlUi, ANARI) and the engine modules that wrap them (`wasm/`, `spirv/`, `xr/`, `net/`, `ui/`, `core/`, and future `som/`, `smap/`, `compute/`, `identity/`, `audio/`). All test executables (WasmTest, SpvTest, XrTest, NetTest, UiTest) belong to Sneeze. Another team could build a different metaverse browser on top of Sneeze without touching Artemis.
 
 - **Artemis** — the metaverse browser application. The single `.exe`. Analogous to Chrome/Chromium. A thin application layer that consumes Sneeze: window management (`canvas/`), user chrome, and `main()`. Owns SDL3 (windowing/input is application-level, not engine-level). The disposable solar system demo (`astro/`) also belongs here. Artemis is **not open source** — proprietary copyright headers.
 
@@ -29,7 +29,6 @@ Sneeze/
 │   ├── ANARI-SDK/         Each has src/, build/, install/
 │   ├── Wasmtime/
 │   ├── SPIRV-Tools/
-│   ├── SPIRV-Cross/
 │   ├── SPIRV-Headers/
 │   ├── OpenXR-SDK/
 │   ├── curl/
@@ -43,7 +42,7 @@ Sneeze/
 │   ├── renderer/          ANARI rendering
 │   ├── view/              Camera orbit controller (decoupled from windowing)
 │   ├── wasm/              Wasmtime WebAssembly sandbox
-│   ├── spirv/             SPIR-V validation and cross-compilation
+│   ├── spirv/             SPIR-V validation
 │   ├── xr/                OpenXR device abstraction
 │   ├── net/               HTTP client (libcurl)
 │   ├── ui/                RmlUi HTML/CSS UI toolkit
@@ -60,6 +59,8 @@ Sneeze/
 
 **The Sneeze/Artemis split has been executed.** Sneeze is a static library. `main.cpp`, `astro/`, and the SDL3 `WINDOW` class moved to Artemis. The `platform/` module was split: `CAMERA_ORBIT` stayed in Sneeze as `view/CameraOrbit` (decoupled from WINDOW — takes raw input deltas), and `WINDOW` moved to Artemis as `canvas/Canvas`.
 
+Artemis is a separate repository with its own `project.mdc`. See the Artemis repository for application-level details (installer, updater, chrome, SDL3 windowing).
+
 ## Architecture Reference
 
 The OMB architecture is fully documented in `OMB_Architecture_4.md` (the authoritative architecture document, version 4, 2026 Q2, maintained outside this repo). This document covers the MBE (Metaverse Browser Engine), its core abstractions, the SOM, rendering engine, UI toolkit, identity, avatars, spatial audio, and the content provider ecosystem.
@@ -70,7 +71,7 @@ The MBE relies on six industry-adopted open standards that abstract the underlyi
 
 - **ANARI** — rendering abstraction (scene description, not GPU calls). High-level scene graph API where the browser describes *what* to render and the ANARI device decides *how*. Extremely thin — imposes no measurable overhead.
 - **SPIR-V Compute via ANARI** — browser-internal GPU compute. Parallel workloads (physics, spatial audio, proximity, coordinate transforms, IK) are authored as GLSL compute shaders, compiled to SPIR-V at build time, and dispatched through ANARI at runtime. ANARI abstracts the underlying GPU API (Vulkan, Metal, DX12) — the browser never interacts with GPU compute APIs directly. Not visible to services — it's the browser team's internal compute tool.
-- **SPIR-V** — GPU interchange format for both graphics shaders and compute shaders. Content providers ship SPIR-V bytecode; the browser cross-compiles to whatever the local GPU requires (Vulkan, Metal, DX12) via SPIR-V Cross.
+- **SPIR-V** — GPU interchange format for both graphics shaders and compute shaders. Content providers ship SPIR-V bytecode; the browser validates it (SPIRV-Tools) and passes it to ANARI, which handles backend translation internally.
 - **OpenXR** — device I/O abstraction for VR/AR headsets, controllers, hand tracking, eye tracking. Confirmed indispensable — no realistic alternative exists.
 - **WASM** — sandboxed execution for third-party service logic. Each connected service runs WASM modules with isolated memory, CPU budgets, and controlled host access. A misbehaving module cannot crash the browser, read other services' data, or access the filesystem.
 - **SMAP** (Service Model Access Protocol) — fabric connectivity and service driver layer. Abstracts the network so the browser can connect to any spatial fabric without knowledge of its underlying protocol.
@@ -107,7 +108,7 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 | `som/` | `sneeze::som` | Scene Object Model (future) | 2 |
 | `smap/` | `sneeze::smap` | SMAP driver layer (future) | 3 |
 | `wasm/` | `sneeze::wasm` | WASM sandbox runtime (Wasmtime v43.0.0) | 1.5 |
-| `spirv/` | `sneeze::spirv` | SPIR-V validation + cross-compilation (SPIRV-Tools + SPIRV-Cross, vulkan-sdk-1.4.341.0) | 1.5 |
+| `spirv/` | `sneeze::spirv` | SPIR-V validation (SPIRV-Tools, vulkan-sdk-1.4.341.0) | 1.5 |
 | `xr/` | `sneeze::xr` | OpenXR device abstraction (OpenXR SDK 1.1.58) | 1.5 |
 | `net/` | `sneeze::net` | HTTP client (libcurl 8.9.1, static, Schannel SSL) | 1.5 |
 | `ui/` | `sneeze::ui` | UI toolkit (RmlUi 6.2, HTML/CSS retained-mode, stub renderer) | 1.5 |
@@ -125,9 +126,9 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 | `CAMERA_ORBIT` | `view` | Orbit camera parameters (theta, phi, distance, target) |
 | `UpdateCameraOrbit` | `view` | Applies raw input deltas (nDX, nDY, dScrollY, mouse buttons) to CAMERA_ORBIT |
 | `WASM_RUNTIME` | `wasm` | Wasmtime engine + store lifecycle (init/shutdown) |
-| `SPV_PIPELINE` | `spirv` | SPIR-V validation (SPIRV-Tools) + cross-compilation to HLSL/GLSL/MSL (SPIRV-Cross) |
+| `SPV_PIPELINE` | `spirv` | SPIR-V validation (SPIRV-Tools) |
 | `XR_RUNTIME` | `xr` | OpenXR loader lifecycle, instance creation, runtime discovery. Gracefully handles no-runtime case. |
-| `HTTP_CLIENT` | `net` | libcurl lifecycle (global init/cleanup), synchronous HTTP GET. Static lib with Schannel SSL. |
+| `HTTP_CLIENT` | `net` | libcurl lifecycle (global init/cleanup), synchronous HTTP GET, file download (`DownloadToFile`). Static lib with Schannel SSL. |
 | `UI_CONTEXT` | `ui` | RmlUi lifecycle (init/shutdown). Provides stub system, render, and font engine interfaces. Real ANARI rendering deferred to SOM phase. |
 | `GetEmbeddedKernel()` | `compute` | Retrieves SPIR-V bytecode embedded in the executable via Win32 resources. Returns pointer + size. |
 
@@ -145,17 +146,13 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 | Error handling | Invalid WAT is rejected with a diagnostic message, no crash |
 | Host functions | WASM-to-C++ callback: module imports `host.multiply`, Sneeze provides the implementation, `square(7)` returns 49. This is how the browser will expose its host API surface to sandboxed service code. |
 
-**SpvTest.exe** — Standalone SPIR-V integration test suite (`tests/SpvPipelineTest.cpp`). 20 assertions across 8 test groups, all passing:
+**SpvTest.exe** — Standalone SPIR-V integration test suite (`tests/SpvPipelineTest.cpp`). Assertions across 4 test groups, all passing:
 
 | Test | What it proves |
 |------|---------------|
 | Assemble | SPIRV-Tools can assemble SPIR-V text (human-readable assembly) into binary bytecode. Validates magic number (0x07230203). |
 | Validate (good) | Valid compute shader passes SPIR-V validation against Vulkan 1.3 rules. |
 | Validate (bad) | Garbage bytecode with valid magic number is correctly rejected — no crash, clean error path. |
-| Cross-compile HLSL | SPIRV-Cross translates a vertex shader to HLSL SM 5.0. Output contains `SV_Position` semantic. Proves the Windows/DX12 cross-compilation path works. |
-| Cross-compile GLSL | Same shader to GLSL 4.50. Output contains `gl_Position` and `#version 450`. Proves the Vulkan/OpenGL path works. |
-| Cross-compile MSL | Same shader to Metal Shading Language. Proves the macOS/iOS path works end-to-end even from a Windows build. |
-| Reflection | SPIRV-Cross inspects shader resources: correctly identifies 1 stage input at location 0, 0 stage outputs (gl_Position is builtin). This is how Sneeze will auto-discover shader interfaces for pipeline setup. |
 | Disassemble | Round-trips binary back to text. Confirms OpEntryPoint and OpReturn survive the assembler/disassembler cycle. |
 
 **XrTest.exe** — Standalone OpenXR integration test suite (`tests/XrRuntimeTest.cpp`). 10 assertions across 5 test groups, all passing:
@@ -235,14 +232,13 @@ The `README.md` is written for **novice-to-intermediate programmers** — someon
 
 ### Dependencies
 
-All eight dependencies are built from source automatically by the CMake SuperBuild. No pre-built binaries. A `vcpkg.json` manifest is provided as an alternative path for developers who prefer it.
+All dependencies are built from source automatically by the CMake SuperBuild. No pre-built binaries. A `vcpkg.json` manifest is provided as an alternative path for developers who prefer it.
 
 | Dependency | Version | Repository | Purpose |
 |------------|---------|------------|---------|
 | ANARI-SDK | v0.15.0 | [KhronosGroup/ANARI-SDK](https://github.com/KhronosGroup/ANARI-SDK) | Rendering abstraction API + helide CPU ray tracer + Embree |
 | Wasmtime | v43.0.0 | [bytecodealliance/wasmtime](https://github.com/bytecodealliance/wasmtime) | WebAssembly sandbox runtime (built via Cargo) |
 | SPIRV-Tools | vulkan-sdk-1.4.341.0 | [KhronosGroup/SPIRV-Tools](https://github.com/KhronosGroup/SPIRV-Tools) | SPIR-V assembler, validator, optimizer |
-| SPIRV-Cross | vulkan-sdk-1.4.341.0 | [KhronosGroup/SPIRV-Cross](https://github.com/KhronosGroup/SPIRV-Cross) | SPIR-V cross-compiler (HLSL, GLSL, MSL) + reflection |
 | SPIRV-Headers | vulkan-sdk-1.4.341.0 | [KhronosGroup/SPIRV-Headers](https://github.com/KhronosGroup/SPIRV-Headers) | SPIR-V specification headers (build dep of SPIRV-Tools) |
 | OpenXR-SDK | release-1.1.58 | [KhronosGroup/OpenXR-SDK](https://github.com/KhronosGroup/OpenXR-SDK) | XR device abstraction |
 | curl | curl-8_9_1 | [curl/curl](https://github.com/curl/curl) | HTTP/HTTPS client (static, Schannel SSL on Windows) |
@@ -267,17 +263,19 @@ All eight dependencies are built from source automatically by the CMake SuperBui
 
 **Why build Wasmtime from source (not pre-built)?** Wasmtime is not available as a vcpkg port. Pre-built binaries exist on GitHub Releases, but building from source is consistent with all other dependencies and gives full control over version, configuration, and debug symbols. The Rust/Cargo build is automated through CMake's ExternalProject mechanism — the developer runs `cmake --build` and Cargo handles the rest.
 
-**Why SPIRV-Tools + SPIRV-Cross (not Shaderc or glslang)?** The browser receives SPIR-V bytecode from content providers — it doesn't compile shaders from GLSL. So glslang (a GLSL-to-SPIR-V compiler) and Shaderc (Google's glslang wrapper) are authoring tools, not browser-runtime tools. What the browser needs is: (1) validation — reject malformed SPIR-V before it reaches the GPU driver (SPIRV-Tools), and (2) cross-compilation — translate SPIR-V to the native shader language for whatever GPU the user has (SPIRV-Cross). Both are Khronos-maintained, pinned to the same Vulkan SDK release for compatibility.
+**Why SPIRV-Tools (not Shaderc or glslang)?** The browser receives SPIR-V bytecode from content providers — it doesn't compile shaders from GLSL. So glslang (a GLSL-to-SPIR-V compiler) and Shaderc (Google's glslang wrapper) are authoring tools, not browser-runtime tools. What the browser needs at runtime is validation — reject malformed SPIR-V before it reaches the GPU driver (SPIRV-Tools). Cross-compilation (SPIRV-Cross) was removed from the architecture — ANARI devices consume SPIR-V natively and handle backend translation internally.
 
 **Why build OpenXR from source (not vcpkg)?** OpenXR is available as `openxr-loader:x64-windows` in vcpkg, but building from source (1) maintains the consistent build-from-source pattern, (2) uses the latest release (1.1.58 vs. vcpkg's 1.1.54), and (3) gives us direct control over build options (static vs. dynamic, with/without Vulkan support). The build is fast (under 1 minute) and has no unusual dependencies.
 
-**Why build SPIR-V tools from source (not vcpkg)?** Both are available in vcpkg (`spirv-tools:x64-windows`, `spirv-cross:x64-windows`), but building from source follows the same pattern as ANARI and Wasmtime: consistent version control, full debug symbols when needed, and no surprises from vcpkg port patches. The Vulkan SDK version tag (`vulkan-sdk-1.4.341.0`) pins both to a known-compatible pair.
+**Why was SPIRV-Cross removed?** SPIRV-Cross is a decompiler — it translates SPIR-V bytecode back into source-level shader languages (HLSL, GLSL, MSL). The OMB architecture originally included it for cross-compiling shaders to whatever the local GPU requires. After architectural review (OMB Architecture Session 26), it was determined that ANARI devices consume SPIR-V natively and handle backend translation internally — the browser never needs to cross-compile shaders itself. Removing SPIRV-Cross eliminated 6 static libraries from the link line, simplified `SPV_PIPELINE` to validation-only, and removed one dependency from the SuperBuild. The `CrossCompileToHLSL()` and `CrossCompileToGLSL()` methods were removed from `SPV_PIPELINE`, and the cross-compilation + reflection tests were removed from `SpvPipelineTest.cpp`. The `libs/SPIRV-Cross/` directory was deleted.
+
+**Why build SPIRV-Tools from source (not vcpkg)?** SPIRV-Tools is available in vcpkg (`spirv-tools:x64-windows`), but building from source follows the same pattern as ANARI and Wasmtime: consistent version control, full debug symbols when needed, and no surprises from vcpkg port patches.
 
 **Why SPIR-V compute via ANARI instead of SYCL?** The OMB architecture originally specified SYCL for browser-internal parallel compute (physics, audio, proximity, IK). After evaluation and consultation with Neil Trevett (Khronos Group president), SYCL was determined to be impractical for Sneeze's current needs:
 
 - **No SYCL implementation works with MSVC on Windows without replacing the compiler.** Intel oneAPI DPC++ requires its own compiler (`icx`/`dpcpp`), a ~10 GB toolchain, and is optimized for Intel GPUs. AdaptiveCpp (formerly hipSYCL) requires Clang. ComputeCpp is deprecated (Codeplay was acquired by Intel). Replacing the C++ compiler is not acceptable.
 - **SYCL targets the wrong abstraction level for a browser engine.** SYCL auto-offloads C++ to GPUs, which trades control for convenience. A browser engine needs explicit control over when and how GPU resources are allocated, dispatched, and synchronized.
-- **SPIR-V compute via ANARI achieves the same goal with tools already in the build.** SPIRV-Tools (validation, optimization) and SPIRV-Cross (cross-compilation) are already integrated. Adding glslang for GLSL-to-SPIR-V compilation completes the authoring pipeline. At runtime, compute SPIR-V is handed to ANARI, which routes to whatever GPU backend is available (Vulkan, Metal, DX12) — the browser never interacts with GPU compute APIs directly.
+- **SPIR-V compute via ANARI achieves the same goal with tools already in the build.** SPIRV-Tools (validation, optimization) is already integrated. Adding glslang for GLSL-to-SPIR-V compilation completes the authoring pipeline. At runtime, compute SPIR-V is handed to ANARI, which routes to whatever GPU backend is available (Vulkan, Metal, DX12) — the browser never interacts with GPU compute APIs directly.
 - **The compute abstraction remains internal.** Services never see the compute layer — it's the browser team's tool. Swapping the underlying ANARI device (or falling back to CPU) requires no changes to service-facing APIs.
 
 Neil Trevett independently recommended this same approach. The decision was made 2026 Q2.
@@ -297,7 +295,7 @@ Neil Trevett independently recommended this same approach. The decision was made
 
 **Decision: GLSL + glslang.** Made 2026-04-10 after evaluating both options.
 
-glslang is the Khronos reference SPIR-V compiler. GLSL compute shaders (`#version 450`, `layout()` bindings) are compiled to SPIR-V at build time. glslang builds cleanly with MSVC and CMake, has no external dependencies, and is version-aligned with the SPIRV-Tools and SPIRV-Cross already in the build (all pinned to the same Vulkan SDK release tag). It is a build-time-only tool — adds zero runtime overhead.
+glslang is the Khronos reference SPIR-V compiler. GLSL compute shaders (`#version 450`, `layout()` bindings) are compiled to SPIR-V at build time. glslang builds cleanly with MSVC and CMake, has no external dependencies, and is version-aligned with SPIRV-Tools (pinned to the same Vulkan SDK release tag). It is a build-time-only tool — adds zero runtime overhead.
 
 **Why not Slang?** Slang (originally NVIDIA, now under Khronos stewardship) is a more modern shader language with generics, interfaces, modules, and multi-target compilation (SPIR-V, HLSL, MSL, CUDA from one source). Neil Trevett informally characterized glslang as older and Slang as more modern. However:
 
@@ -307,7 +305,7 @@ glslang is the Khronos reference SPIR-V compiler. GLSL compute shaders (`#versio
 - The architecture doc positions Slang as a content-provider authoring tool, not a browser-internal requirement. The browser doesn't recommend any specific authoring tool — it accepts valid SPIR-V regardless of what produced it.
 - If the kernel codebase grows complex enough to need Slang's features, migration cost is low — same SPIR-V output, same embedding pipeline, same ANARI dispatch. Only source files and compiler change.
 
-**glslang is already integrated.** Khronos reference SPIR-V compiler (build-time only). Compiles GLSL compute shaders to SPIR-V bytecode. Same org and release cadence as SPIRV-Tools and SPIRV-Cross. Pinned to `vulkan-sdk-1.4.341.0`. No Vulkan SDK dependency — ANARI handles compute dispatch at runtime.
+**glslang is already integrated.** Khronos reference SPIR-V compiler (build-time only). Compiles GLSL compute shaders to SPIR-V bytecode. Same org and release cadence as SPIRV-Tools. Pinned to `vulkan-sdk-1.4.341.0`. No Vulkan SDK dependency — ANARI handles compute dispatch at runtime.
 
 **Why RmlUi (not Dear ImGui)?** Dear ImGui is immediate-mode — every frame, your code rebuilds the entire UI by calling draw functions. RmlUi is retained-mode — you describe the UI in HTML/CSS-like markup, and the library maintains the DOM, handles layout, animations, and event dispatch automatically. For a browser engine with complex, persistent UI (chrome, tabbed interfaces, developer tools, service-provided UI), retained mode is the correct paradigm. RmlUi's HTML/CSS model also aligns with the OMB architecture's intent to let services define UI through standard web-like markup. Single toolkit for all UI surfaces — no mixing of two rendering systems.
 
@@ -318,6 +316,8 @@ glslang is the Khronos reference SPIR-V compiler. GLSL compute shaders (`#versio
 **Why Schannel (not OpenSSL)?** On Windows, Schannel is the native SSL/TLS implementation — it uses the Windows certificate store, requires no CA bundle management, and has zero additional dependencies. OpenSSL would add a ~5 MB dependency and require distributing `libssl.dll` and `libcrypto.dll`. For cross-platform builds, the SSL backend would be platform-appropriate (OpenSSL on Linux, Secure Transport on macOS).
 
 **Why build ANARI from source (not vcpkg)?** The vcpkg `anari` port installs only the base ANARI library (API headers and loader). It does **not** include the **helide** rendering device (the CPU ray tracer Sneeze needs). Helide must be built from the ANARI SDK source. The SuperBuild builds the full SDK including helide and its Embree dependency.
+
+**ANARI static linking.** ANARI core (`anari::anari_static`) is linked statically into Sneeze. The helide device (`anari_library_helide.dll`) remains a dynamic library because the ANARI SDK builds it as a shared plugin — this is by design in the SDK and cannot be changed without vendor modifications. At runtime, `HELIDE_RENDERER` creates the device directly via `anariNewHelideDevice()` rather than dynamically loading a library. Helide is temporary — it will be replaced by a GPU-accelerated ANARI device (e.g., VisRTX).
 
 ### Known Gotchas
 
@@ -338,9 +338,9 @@ glslang is the Khronos reference SPIR-V compiler. GLSL compute shaders (`#versio
 
 ### Build System
 
-The project uses a **CMake SuperBuild** pattern. The top-level `CMakeLists.txt` uses `ExternalProject_Add` to clone, configure, build, and install all 8 dependencies into `libs/<name>/install/`. The Sneeze project itself is also an `ExternalProject` that depends on all of them.
+The project uses a **CMake SuperBuild** pattern. The top-level `CMakeLists.txt` uses `ExternalProject_Add` to clone, configure, build, and install all dependencies into `libs/<name>/install/`. The Sneeze project itself is also an `ExternalProject` that depends on all of them.
 
-- **Top-level CMakeLists.txt** — SuperBuild orchestrator. Defines all 8 dependency targets + the `sneeze` target. All `ExternalProject_Add` declarations are in this single file.
+- **Top-level CMakeLists.txt** — SuperBuild orchestrator. Defines all dependency targets + the `sneeze` target. All `ExternalProject_Add` declarations are in this single file.
 - **src/CMakeLists.txt** — Sneeze project definition. Finds deps by looking in `libs/<name>/install/`. Includes `add_subdirectory` for tests.
 - **tests/CMakeLists.txt** — Defines individual test executables, links against libs.
 - **Wasmtime** is built via `cargo build --release -p wasmtime-c-api`. Not a CMake project — uses custom `BUILD_COMMAND` and `INSTALL_COMMAND` in ExternalProject. The install script copies source headers, overlays Cargo-generated headers (for `conf.h`), and copies the DLL/lib.
@@ -365,70 +365,6 @@ build\sneeze\tests\Release\NetTest.exe
 build\sneeze\tests\Release\UiTest.exe
 build\sneeze\tests\Release\ComputeTest.exe
 ```
-
-## Artemis — Browser Application (Separate Repo)
-
-Artemis lives in a sibling directory (`../Artemis` by default) as a separate repository. It is **not open source** — all source files carry `// Copyright 2026 Metaversal Corporation. All rights reserved.` headers (no Apache License). There is no LICENSE file. The NOTICE file credits Sneeze (Apache 2.0) and SDL3 (zlib).
-
-### How Artemis Consumes Sneeze
-
-Artemis's inner `src/CMakeLists.txt` uses `add_subdirectory("${SNEEZE_DIR}/src" "${CMAKE_BINARY_DIR}/sneeze")` to compile Sneeze's source directly into Artemis's build tree. This means:
-
-- Edit a `.cpp` in either repo, hit build — CMake detects the change and rebuilds the right targets
-- No commit/push/fetch cycle — both repos are just directories on disk
-- Sneeze's PUBLIC link deps (ANARI, Wasmtime, etc.) propagate automatically to Artemis
-- `SNEEZE_DIR` defaults to `../Sneeze` but is overridable with `-DSNEEZE_DIR=<path>`
-- The Artemis `.sln` contains both the Sneeze lib target and the Artemis exe target — one IDE instance, full navigation across both repos
-
-**Prerequisite:** Sneeze's third-party deps must be built first via its SuperBuild. Artemis doesn't rebuild those — it needs them to exist in `Sneeze/libs/`.
-
-### Artemis Directory Structure
-
-```
-Artemis/
-├── libs/                  Artemis-owned deps (SDL3)
-│   └── SDL3/
-├── build/
-│   └── artemis/           Artemis project files and executable
-├── src/
-│   ├── CMakeLists.txt     Artemis inner build
-│   ├── main.cpp           Application entry point
-│   ├── canvas/            SDL3 window wrapper (artemis::canvas::CANVAS)
-│   │   ├── Canvas.h
-│   │   └── Canvas.cpp
-│   └── astro/             Disposable solar system demo (artemis::astro)
-│       ├── Celestial.h / .cpp
-│       ├── Orbit.h / .cpp
-│       ├── RMCObject.h / .cpp
-│       └── BodyData.h / .cpp
-├── CMakeLists.txt         SuperBuild (SDL3 + Artemis)
-├── .gitignore
-├── README.md
-└── NOTICE
-```
-
-### Artemis Namespaces
-
-Files in Artemis use `artemis::` namespaces. The WINDOW class became `artemis::canvas::CANVAS`. The astro module became `artemis::astro`. Engine types are referenced with fully qualified `sneeze::core::`, `sneeze::renderer::`, `sneeze::view::` prefixes.
-
-### Artemis Build Commands
-
-```bash
-# First time (builds SDL3, then Artemis + Sneeze inline)
-cd Artemis
-cmake -S . -B build
-cmake --build build --config Release --parallel
-
-# Day-to-day rebuild (just Artemis + Sneeze source changes)
-cmake --build build/artemis --config Release --parallel
-
-# Override Sneeze location (non-standard layouts or CI)
-cmake -S . -B build -DSNEEZE_DIR="/path/to/Sneeze"
-```
-
-### Artemis main.cpp — Split Integration Point
-
-`main.cpp` bridges Artemis-side modules (canvas, astro) with Sneeze-side modules (renderer, view, wasm, spirv, xr, net, ui). It creates the `artemis::canvas::CANVAS` window, polls input, and passes raw deltas to `sneeze::view::UpdateCameraOrbit()` — the engine never knows about SDL3 or the CANVAS class.
 
 ## Phase 1 — Solar System Proof of Concept (COMPLETE)
 
@@ -464,7 +400,7 @@ Integrate the four remaining core runtime APIs into the build system. The goal i
 | # | Task | Status | Notes |
 |---|------|--------|-------|
 | 1 | ~~WASM~~ | **DONE** | Wasmtime v43.0.0 built from source. `wasm/WASM_RUNTIME` class. WasmTest.exe passes 21/21 integration tests (compile, call, fuel metering, error handling, host functions). |
-| 2 | ~~SPIR-V~~ | **DONE** | SPIRV-Tools + SPIRV-Cross + SPIRV-Headers built from source (vulkan-sdk-1.4.341.0). `spirv/SPV_PIPELINE` class. SpvTest.exe passes 20/20 integration tests. |
+| 2 | ~~SPIR-V~~ | **DONE** | SPIRV-Tools + SPIRV-Headers built from source (vulkan-sdk-1.4.341.0). `spirv/SPV_PIPELINE` class (validation only — SPIRV-Cross removed from architecture). SpvTest.exe passes integration tests. |
 | 3 | ~~OpenXR~~ | **DONE** | OpenXR SDK 1.1.58 built from source (static lib). `xr/XR_RUNTIME` class. XrTest.exe passes 10/10 integration tests. |
 | 4 | ~~curl (HTTP client)~~ | **DONE** | libcurl 8.9.1 built from source (static, Schannel SSL). `net/HTTP_CLIENT` class. NetTest.exe passes 20/20 integration tests. |
 | 5 | ~~glslang + SPIR-V compute pipeline~~ | **DONE** | glslang vulkan-sdk-1.4.341.0 built from source (ENABLE_OPT=OFF, ENABLE_HLSL=OFF). `compute/` module with `GetEmbeddedKernel()`. CMake compiles `.comp` → `.spv` at build time, embeds via Win32 `.rc` resources. ComputeTest.exe passes 11/11 integration tests. ANARI compute dispatch deferred until ANARI device supports it. |
