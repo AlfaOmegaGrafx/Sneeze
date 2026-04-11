@@ -1,5 +1,5 @@
 ---
-description: OMBI project context — Sneeze (MBE engine) and Artemis (metaverse browser application)
+description: Sneeze project context — MBE engine (static lib) consumed by Artemis (metaverse browser application)
 alwaysApply: true
 ---
 
@@ -15,11 +15,11 @@ The project produces two components:
 
 - **Sneeze** — the Metaverse Browser Engine (MBE). A standalone, reusable engine library (static `.lib`). Analogous to Blink in the web browser world. Owns all third-party dependencies (Wasmtime, SPIRV-Tools, SPIRV-Cross, OpenXR, curl, RmlUi, ANARI) and the engine modules that wrap them (`wasm/`, `spirv/`, `xr/`, `net/`, `ui/`, `core/`, and future `som/`, `smap/`, `compute/`, `identity/`, `audio/`). All test executables (WasmTest, SpvTest, XrTest, NetTest, UiTest) belong to Sneeze. Another team could build a different metaverse browser on top of Sneeze without touching Artemis.
 
-- **Artemis** — the metaverse browser application. The single `.exe`. Analogous to Chrome/Chromium. A thin application layer that consumes Sneeze: window management (`platform/`), the render loop (`renderer/`), user chrome, and `main()`. Owns SDL3 (windowing/input is application-level, not engine-level). The disposable solar system demo (`astro/`) also belongs here.
+- **Artemis** — the metaverse browser application. The single `.exe`. Analogous to Chrome/Chromium. A thin application layer that consumes Sneeze: window management (`canvas/`), user chrome, and `main()`. Owns SDL3 (windowing/input is application-level, not engine-level). The disposable solar system demo (`astro/`) also belongs here. Artemis is **not open source** — proprietary copyright headers.
 
-**Rubidium** was the original working name for the combined browser before the split into Sneeze + Artemis was decided. The codebase has been renamed — all namespaces, include guards, string literals, and source references now use `sneeze`. The split into Sneeze (engine `.lib`) + Artemis (browser `.exe`) is planned but not yet executed — a team member will perform the refactor.
+**Rubidium** was the original working name for the combined browser before the split into Sneeze + Artemis was decided. The codebase has been renamed — all namespaces, include guards, string literals, and source references now use `sneeze`. **The split has been executed.** Sneeze is a static `.lib`; Artemis is a separate repo (sibling directory) that compiles Sneeze inline via `add_subdirectory`.
 
-**Dependency ownership:** Sneeze declares and owns all third-party dependencies. Artemis depends only on Sneeze (and SDL3). When Artemis links against Sneeze, CMake transitively pulls in all of Sneeze's dependencies. Sneeze should declare its link dependencies as `PUBLIC` so they propagate automatically.
+**Dependency ownership:** Sneeze declares and owns all third-party engine dependencies. Artemis depends on Sneeze and SDL3. When Artemis links against Sneeze, CMake transitively pulls in all of Sneeze's dependencies via PUBLIC declarations. SDL3 belongs to Artemis, not Sneeze — the engine is embeddable without owning windowing.
 
 **Current directory structure (implemented):**
 
@@ -34,17 +34,14 @@ Sneeze/
 │   ├── OpenXR-SDK/
 │   ├── curl/
 │   ├── RmlUi/
-│   ├── glslang/
-│   └── SDL3/
+│   └── glslang/
 ├── build/                 Build output (gitignored)
-│   └── sneeze/            Sneeze project files and executables
+│   └── sneeze/            Sneeze project files and static library
 ├── src/                   Production source code
 │   ├── CMakeLists.txt
-│   ├── main.cpp
-│   ├── astro/             Orbital mechanics (disposable demo)
 │   ├── core/              Foundational types
 │   ├── renderer/          ANARI rendering
-│   ├── platform/          SDL3 windowing and input
+│   ├── view/              Camera orbit controller (decoupled from windowing)
 │   ├── wasm/              Wasmtime WebAssembly sandbox
 │   ├── spirv/             SPIR-V validation and cross-compilation
 │   ├── xr/                OpenXR device abstraction
@@ -61,7 +58,7 @@ Sneeze/
 └── NOTICE
 ```
 
-**The Sneeze/Artemis split is planned but not yet executed.** Currently everything lives in the Sneeze repo. When the split happens, `platform/`, `renderer/`, `astro/`, and `main.cpp` will move to Artemis, and Sneeze will become a static `.lib`.
+**The Sneeze/Artemis split has been executed.** Sneeze is a static library. `main.cpp`, `astro/`, and the SDL3 `WINDOW` class moved to Artemis. The `platform/` module was split: `CAMERA_ORBIT` stayed in Sneeze as `view/CameraOrbit` (decoupled from WINDOW — takes raw input deltas), and `WINDOW` moved to Artemis as `canvas/Canvas`.
 
 ## Architecture Reference
 
@@ -94,7 +91,7 @@ All paths are relative to the repository root (`Sneeze/`):
 - **Test code:** `tests/`
 - **Build output:** `build/sneeze/` (gitignored)
 - **Dependencies:** `libs/<name>/` — each has `src/`, `build/`, `install/` (gitignored)
-- **Top-level SuperBuild:** `CMakeLists.txt` (ExternalProject_Add for all 9 deps + Sneeze itself)
+- **Top-level SuperBuild:** `CMakeLists.txt` (ExternalProject_Add for all 8 deps + Sneeze itself)
 - **Inner project build:** `src/CMakeLists.txt` (finds deps in `libs/<name>/install/`)
 - **Test build:** `tests/CMakeLists.txt` (defines all test executables)
 
@@ -105,9 +102,8 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 | Module | Namespace | Purpose | Phase |
 |--------|-----------|---------|-------|
 | `core/` | `sneeze::core` | Foundational types (Epoch, Vec3, Quat) used by all modules | 1 |
-| `astro/` | `sneeze::astro` | Orbital mechanics, body registry, Kepler solver | 1 |
 | `renderer/` | `sneeze::renderer` | Abstract rendering interface + ANARI/helide implementation | 1 |
-| `platform/` | `sneeze::platform` | OS windowing and input (SDL3) | 1 |
+| `view/` | `sneeze::view` | Camera orbit controller (decoupled from windowing — takes raw input deltas) | 1 |
 | `som/` | `sneeze::som` | Scene Object Model (future) | 2 |
 | `smap/` | `sneeze::smap` | SMAP driver layer (future) | 3 |
 | `wasm/` | `sneeze::wasm` | WASM sandbox runtime (Wasmtime v43.0.0) | 1.5 |
@@ -124,13 +120,10 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 | Class | Module | Purpose |
 |-------|--------|---------|
 | `EPOCH` | `core` | Julian date calculations, time propagation |
-| `CELESTIAL` | `astro` | Quaternion math, frame conversions, precession |
-| `ORBIT` | `astro` | Keplerian orbital elements, Kepler solver, position calculation |
-| `RMCOBJECT` | `astro` | Body registry, parent/child hierarchy, physical properties |
 | `RENDERER` | `renderer` | Abstract rendering interface (pure virtual) |
 | `HELIDE_RENDERER` | `renderer` | Concrete ANARI/helide implementation of RENDERER |
-| `WINDOW` | `platform` | SDL3 window, event polling, pixel buffer presentation |
-| `CAMERA_ORBIT` | `platform` | Orbit camera parameters, mouse input processing |
+| `CAMERA_ORBIT` | `view` | Orbit camera parameters (theta, phi, distance, target) |
+| `UpdateCameraOrbit` | `view` | Applies raw input deltas (nDX, nDY, dScrollY, mouse buttons) to CAMERA_ORBIT |
 | `WASM_RUNTIME` | `wasm` | Wasmtime engine + store lifecycle (init/shutdown) |
 | `SPV_PIPELINE` | `spirv` | SPIR-V validation (SPIRV-Tools) + cross-compilation to HLSL/GLSL/MSL (SPIRV-Cross) |
 | `XR_RUNTIME` | `xr` | OpenXR loader lifecycle, instance creation, runtime discovery. Gracefully handles no-runtime case. |
@@ -209,7 +202,7 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 
 ### Design Principles (Sneeze-Specific)
 
-- **No leaky abstractions.** Module boundaries are hard. `astro/` never includes ANARI headers. `renderer/` never includes SDL3 headers. `main.cpp` is the only place that knows all modules.
+- **No leaky abstractions.** Module boundaries are hard. `renderer/` never includes windowing headers. The engine has no SDL3 dependency — the application passes raw input deltas.
 - **Namespace everything.** All code in `sneeze::` with module sub-namespaces. No global symbols.
 - **Prepare for concurrency.** Data structures should be read/write separable even in single-threaded code, because GPU compute parallelism is coming.
 - **Own the math.** `core/Types.h` defines the canonical vector/quaternion types. Modules use these, not renderer-specific or library-specific types.
@@ -242,12 +235,11 @@ The `README.md` is written for **novice-to-intermediate programmers** — someon
 
 ### Dependencies
 
-All nine dependencies are built from source automatically by the CMake SuperBuild. No pre-built binaries. A `vcpkg.json` manifest is provided as an alternative path for developers who prefer it.
+All eight dependencies are built from source automatically by the CMake SuperBuild. No pre-built binaries. A `vcpkg.json` manifest is provided as an alternative path for developers who prefer it.
 
 | Dependency | Version | Repository | Purpose |
 |------------|---------|------------|---------|
 | ANARI-SDK | v0.15.0 | [KhronosGroup/ANARI-SDK](https://github.com/KhronosGroup/ANARI-SDK) | Rendering abstraction API + helide CPU ray tracer + Embree |
-| SDL3 | release-3.4.2 | [libsdl-org/SDL](https://github.com/libsdl-org/SDL) | Windowing, input, pixel buffer presentation |
 | Wasmtime | v43.0.0 | [bytecodealliance/wasmtime](https://github.com/bytecodealliance/wasmtime) | WebAssembly sandbox runtime (built via Cargo) |
 | SPIRV-Tools | vulkan-sdk-1.4.341.0 | [KhronosGroup/SPIRV-Tools](https://github.com/KhronosGroup/SPIRV-Tools) | SPIR-V assembler, validator, optimizer |
 | SPIRV-Cross | vulkan-sdk-1.4.341.0 | [KhronosGroup/SPIRV-Cross](https://github.com/KhronosGroup/SPIRV-Cross) | SPIR-V cross-compiler (HLSL, GLSL, MSL) + reflection |
@@ -338,16 +330,17 @@ glslang is the Khronos reference SPIR-V compiler. GLSL compute shaders (`#versio
 - **Static library compile definitions.** `CURL_STATICLIB` and `RMLUI_STATIC_LIB` must be defined when compiling code that includes curl or RmlUi headers. The CMakeLists.txt handles this automatically.
 - **RmlUi requires a font engine interface.** `UiContext.cpp` registers a `STUB_FONT_ENGINE` with dummy metrics. "No font face defined" warnings are expected and cosmetic.
 - **libcurl uses Schannel (Windows native SSL).** No OpenSSL dependency. On Linux/macOS, curl would need OpenSSL or the platform's native SSL.
-- **SDL pixel format must match ANARI byte layout.** ANARI's `ANARI_UFIXED8_RGBA_SRGB` writes R,G,B,A bytes. On little-endian Windows, `SDL_PIXELFORMAT_ABGR8888` matches. Using `RGBA8888` reverses byte order and scrambles all colors.
+- **SDL pixel format must match ANARI byte layout (Artemis-side).** ANARI's `ANARI_UFIXED8_RGBA_SRGB` writes R,G,B,A bytes. On little-endian Windows, `SDL_PIXELFORMAT_ABGR8888` matches. This is Artemis's concern, not Sneeze's — the engine has no SDL3 dependency.
 - **Helide does not support texture mapping on implicit sphere geometry.** Texture-mapped planets require a different ANARI device (e.g., VisRTX) or explicit triangle mesh spheres.
-- **Deleting `build/` is safe.** Re-run `cmake -S . -B build && cmake --build build --config Release --parallel` to regenerate. If `libs/` is intact, dependencies are not re-downloaded.
+- **Do NOT delete the entire `build/` folder for day-to-day rebuilds.** The SuperBuild stores ExternalProject stamp files in `build/` that track which dependencies have been cloned, configured, built, and installed. Deleting the whole `build/` folder loses those stamps, forcing CMake to re-run all dependency steps (5+ minutes even though `libs/` is intact). Instead, delete only `build/sneeze/` to rebuild just the Sneeze library and tests.
 - **Deleting `libs/` triggers full rebuild.** All dependencies will be re-cloned and re-built (20-30 minutes).
+- **CMP0144 policy.** `src/CMakeLists.txt` sets `cmake_policy(SET CMP0144 NEW)` to suppress the warning about `ANARI_ROOT` variable being ignored by `find_package`. The policy tells CMake to respect uppercase `<PACKAGENAME>_ROOT` variables.
 
 ### Build System
 
-The project uses a **CMake SuperBuild** pattern. The top-level `CMakeLists.txt` uses `ExternalProject_Add` to clone, configure, build, and install all 9 dependencies into `libs/<name>/install/`. The Sneeze project itself is also an `ExternalProject` that depends on all of them.
+The project uses a **CMake SuperBuild** pattern. The top-level `CMakeLists.txt` uses `ExternalProject_Add` to clone, configure, build, and install all 8 dependencies into `libs/<name>/install/`. The Sneeze project itself is also an `ExternalProject` that depends on all of them.
 
-- **Top-level CMakeLists.txt** — SuperBuild orchestrator. Defines all 9 dependency targets + the `sneeze` target. All `ExternalProject_Add` declarations are in this single file.
+- **Top-level CMakeLists.txt** — SuperBuild orchestrator. Defines all 8 dependency targets + the `sneeze` target. All `ExternalProject_Add` declarations are in this single file.
 - **src/CMakeLists.txt** — Sneeze project definition. Finds deps by looking in `libs/<name>/install/`. Includes `add_subdirectory` for tests.
 - **tests/CMakeLists.txt** — Defines individual test executables, links against libs.
 - **Wasmtime** is built via `cargo build --release -p wasmtime-c-api`. Not a CMake project — uses custom `BUILD_COMMAND` and `INSTALL_COMMAND` in ExternalProject. The install script copies source headers, overlays Cargo-generated headers (for `conf.h`), and copies the DLL/lib.
@@ -364,9 +357,6 @@ cmake --build build --config Release --parallel
 # Day-to-day rebuild (just Sneeze, seconds)
 cmake --build build/sneeze --config Release --parallel
 
-# Run
-build\sneeze\Release\Sneeze.exe
-
 # Run tests
 build\sneeze\tests\Release\WasmTest.exe
 build\sneeze\tests\Release\SpvTest.exe
@@ -375,6 +365,70 @@ build\sneeze\tests\Release\NetTest.exe
 build\sneeze\tests\Release\UiTest.exe
 build\sneeze\tests\Release\ComputeTest.exe
 ```
+
+## Artemis — Browser Application (Separate Repo)
+
+Artemis lives in a sibling directory (`../Artemis` by default) as a separate repository. It is **not open source** — all source files carry `// Copyright 2026 Metaversal Corporation. All rights reserved.` headers (no Apache License). There is no LICENSE file. The NOTICE file credits Sneeze (Apache 2.0) and SDL3 (zlib).
+
+### How Artemis Consumes Sneeze
+
+Artemis's inner `src/CMakeLists.txt` uses `add_subdirectory("${SNEEZE_DIR}/src" "${CMAKE_BINARY_DIR}/sneeze")` to compile Sneeze's source directly into Artemis's build tree. This means:
+
+- Edit a `.cpp` in either repo, hit build — CMake detects the change and rebuilds the right targets
+- No commit/push/fetch cycle — both repos are just directories on disk
+- Sneeze's PUBLIC link deps (ANARI, Wasmtime, etc.) propagate automatically to Artemis
+- `SNEEZE_DIR` defaults to `../Sneeze` but is overridable with `-DSNEEZE_DIR=<path>`
+- The Artemis `.sln` contains both the Sneeze lib target and the Artemis exe target — one IDE instance, full navigation across both repos
+
+**Prerequisite:** Sneeze's third-party deps must be built first via its SuperBuild. Artemis doesn't rebuild those — it needs them to exist in `Sneeze/libs/`.
+
+### Artemis Directory Structure
+
+```
+Artemis/
+├── libs/                  Artemis-owned deps (SDL3)
+│   └── SDL3/
+├── build/
+│   └── artemis/           Artemis project files and executable
+├── src/
+│   ├── CMakeLists.txt     Artemis inner build
+│   ├── main.cpp           Application entry point
+│   ├── canvas/            SDL3 window wrapper (artemis::canvas::CANVAS)
+│   │   ├── Canvas.h
+│   │   └── Canvas.cpp
+│   └── astro/             Disposable solar system demo (artemis::astro)
+│       ├── Celestial.h / .cpp
+│       ├── Orbit.h / .cpp
+│       ├── RMCObject.h / .cpp
+│       └── BodyData.h / .cpp
+├── CMakeLists.txt         SuperBuild (SDL3 + Artemis)
+├── .gitignore
+├── README.md
+└── NOTICE
+```
+
+### Artemis Namespaces
+
+Files in Artemis use `artemis::` namespaces. The WINDOW class became `artemis::canvas::CANVAS`. The astro module became `artemis::astro`. Engine types are referenced with fully qualified `sneeze::core::`, `sneeze::renderer::`, `sneeze::view::` prefixes.
+
+### Artemis Build Commands
+
+```bash
+# First time (builds SDL3, then Artemis + Sneeze inline)
+cd Artemis
+cmake -S . -B build
+cmake --build build --config Release --parallel
+
+# Day-to-day rebuild (just Artemis + Sneeze source changes)
+cmake --build build/artemis --config Release --parallel
+
+# Override Sneeze location (non-standard layouts or CI)
+cmake -S . -B build -DSNEEZE_DIR="/path/to/Sneeze"
+```
+
+### Artemis main.cpp — Split Integration Point
+
+`main.cpp` bridges Artemis-side modules (canvas, astro) with Sneeze-side modules (renderer, view, wasm, spirv, xr, net, ui). It creates the `artemis::canvas::CANVAS` window, polls input, and passes raw deltas to `sneeze::view::UpdateCameraOrbit()` — the engine never knows about SDL3 or the CANVAS class.
 
 ## Phase 1 — Solar System Proof of Concept (COMPLETE)
 
@@ -385,7 +439,7 @@ Phase 1 ported the existing Solar System simulation (`E:\Dev\SolarSystem\`) from
 - Orbital mechanics as browser-level C++ computation (Kepler solver, precession, frame conversions)
 - Embedded planet/star/moon data for the full solar system (Sun + 9 planet systems + bodies)
 - Abstract RENDERER interface with concrete HELIDE_RENDERER implementation
-- SDL3 windowed display with mouse orbit camera controls
+- Camera orbit controller decoupled from windowing (raw input deltas)
 - Module structure ready for the full browser
 
 ### Known Phase 1 Limitations
@@ -430,7 +484,7 @@ Complete the solar system demo to visual parity with the JavaScript original, an
 | 5 | Add on-screen animation controls | Visual feedback for +/- time scale, pause state |
 | 6 | Improve camera controls | Smooth orbiting, focus-on-body (click to target), zoom limits |
 | 7 | Pre-generate ANARI query files to eliminate Python from build chain | Run codegen once, commit generated .h/.cpp, patch ANARI CMake to skip Python step; verify identical output |
-| 8 | Automate ANARI DLL copy in CMake | Post-build step like the existing SDL3 copy, so Step 6 of the README goes away |
+| 8 | Automate ANARI DLL copy in CMake | Artemis handles DLL copies for its own runtime deps |
 | 9 | Add Sun emissive material | Sun should glow, not just be a matte sphere lit by its own point light |
 | 10 | Moon orbital accuracy | Verify moon positions against JS reference; moons may need parent-relative positioning fixes |
 
@@ -499,7 +553,7 @@ Supporting components that can be developed in parallel with or after the core p
 
 | # | Task | Notes |
 |---|------|-------|
-| 1 | Cross-platform builds (Linux, macOS) | SDL3 and ANARI are cross-platform; CMake should support this with minimal changes |
+| 1 | Cross-platform builds (Linux, macOS) | ANARI is cross-platform; CMake should support this with minimal changes |
 | 2 | GPU-accelerated ANARI device | Replace helide with a Vulkan/Metal/DX12 ANARI device for production frame rates |
 | 3 | Performance profiling and optimization | Frame time budgets, SOM traversal cost, ANARI submission overhead |
 | 4 | Test framework | Unit tests for core/astro math, integration tests for renderer |

@@ -2,7 +2,9 @@
 
 Sneeze is the engine behind the Open Metaverse Browser, developed by the Open Metaverse Browser Initiative (OMBI), a project under the Metaverse Standards Forum. It handles rendering (via ANARI), sandboxed code execution (via WebAssembly/Wasmtime), shader cross-compilation (via SPIR-V tools), XR device access (via OpenXR), networking (via curl), and UI (via RmlUi).
 
-This repository is set up so that a new developer can go from a fresh clone to a fully built project with just two commands. CMake automatically clones and builds all nine third-party dependencies from source — no pre-installed libraries required.
+Sneeze builds as a **static library** (`Sneeze.lib`). It is consumed by an application (such as [Artemis](../Artemis)) via CMake's `add_subdirectory`. The application provides windowing and input; the engine renders into a surface the application supplies.
+
+This repository is set up so that a new developer can go from a fresh clone to a fully built project with just two commands. CMake automatically clones and builds all eight third-party dependencies from source — no pre-installed libraries required.
 
 ---
 
@@ -106,17 +108,17 @@ This is the big step. CMake clones all nine dependencies, compiles them from sou
 
 ### Step 4: Verify the build
 
-After the build completes, check that the main executable and test programs were created:
+After the build completes, check that the static library and test programs were created:
 
 **Windows:**
 ```
-dir build\sneeze\Release\Sneeze.exe
+dir build\sneeze\Release\Sneeze.lib
 dir build\sneeze\tests\Release\WasmTest.exe
 ```
 
 **Linux / macOS:**
 ```
-ls build/sneeze/Sneeze
+ls build/sneeze/libSneeze.a
 ls build/sneeze/tests/WasmTest
 ```
 
@@ -126,7 +128,6 @@ Each test executable exercises one of the integrated dependencies. Run them to c
 
 **Windows:**
 ```
-build\sneeze\Release\Sneeze.exe
 build\sneeze\tests\Release\WasmTest.exe
 build\sneeze\tests\Release\SpvTest.exe
 build\sneeze\tests\Release\XrTest.exe
@@ -137,7 +138,6 @@ build\sneeze\tests\Release\ComputeTest.exe
 
 **Linux / macOS:**
 ```
-./build/sneeze/Sneeze
 ./build/sneeze/tests/WasmTest
 ./build/sneeze/tests/SpvTest
 ./build/sneeze/tests/XrTest
@@ -203,20 +203,17 @@ Sneeze/
 │   ├── OpenXR-SDK/
 │   ├── curl/
 │   ├── RmlUi/
-│   ├── glslang/
-│   └── SDL3/
+│   └── glslang/
 ├── build/                 Build output (gitignored)
-│   └── sneeze/            Sneeze project files and executables
-│       ├── Release/       Sneeze.exe and runtime DLLs
+│   └── sneeze/            Sneeze project files and static library
+│       ├── Release/       Sneeze.lib
 │       ├── tests/         Test .vcxproj files and executables
 │       └── Sneeze.sln     Visual Studio solution (Windows)
 ├── src/                   Production source code
 │   ├── CMakeLists.txt     Sneeze build definition
-│   ├── main.cpp
-│   ├── astro/             Orbital mechanics (disposable demo)
 │   ├── core/              Foundational types (Epoch, Vec3, Quat)
 │   ├── renderer/          ANARI rendering abstraction
-│   ├── platform/          SDL3 windowing and input
+│   ├── view/              Camera orbit controller (decoupled from windowing)
 │   ├── wasm/              Wasmtime WebAssembly sandbox
 │   ├── spirv/             SPIR-V validation and cross-compilation
 │   ├── xr/                OpenXR device abstraction
@@ -246,7 +243,6 @@ All dependencies are built from source by the SuperBuild. No pre-built binaries.
 | Dependency | Version | Repository | Purpose |
 |------------|---------|------------|---------|
 | ANARI-SDK | v0.15.0 | [KhronosGroup/ANARI-SDK](https://github.com/KhronosGroup/ANARI-SDK) | Rendering abstraction API + helide CPU ray tracer |
-| SDL3 | release-3.4.2 | [libsdl-org/SDL](https://github.com/libsdl-org/SDL) | Windowing, input, pixel buffer presentation |
 | Wasmtime | v43.0.0 | [bytecodealliance/wasmtime](https://github.com/bytecodealliance/wasmtime) | WebAssembly sandbox runtime |
 | SPIRV-Tools | vulkan-sdk-1.4.341.0 | [KhronosGroup/SPIRV-Tools](https://github.com/KhronosGroup/SPIRV-Tools) | SPIR-V assembler, validator, optimizer |
 | SPIRV-Cross | vulkan-sdk-1.4.341.0 | [KhronosGroup/SPIRV-Cross](https://github.com/KhronosGroup/SPIRV-Cross) | SPIR-V cross-compiler (HLSL, GLSL, MSL) |
@@ -265,7 +261,7 @@ All dependencies are built from source by the SuperBuild. No pre-built binaries.
 | `cmake` command not found | CMake not installed or not on PATH | Install CMake and ensure its `bin/` directory is on your system PATH |
 | `rustc` command not found | Rust not installed | Install from [rust-lang.org/tools/install](https://rust-lang.org/tools/install/) or `winget install Rustlang.Rustup` (Windows), then restart your terminal |
 | Wasmtime build fails with "cmake not found" | Cargo's build system needs cmake on PATH (not just installed) | Add cmake's directory to your system PATH |
-| ANARI "failed to load helide library" | `anari_library_helide.dll` not next to the executable | The post-build step should copy it automatically. If not, copy from `libs/ANARI-SDK/install/bin/` |
+| ANARI "failed to load helide library" | `anari_library_helide.dll` not next to the application executable | The application's post-build step should copy it. Copy from `libs/ANARI-SDK/install/bin/` if needed. |
 | OpenXR test prints "failed to find active runtime" | No VR runtime installed (SteamVR, Oculus, etc.) | Expected on machines without a headset. The test handles this gracefully. |
 | NetTest fails with connection errors | No internet connection | The HTTP tests make live requests. Expected to fail offline. |
 | `python` opens the Microsoft Store | Windows Store alias is intercepting | Settings > Apps > Advanced app settings > App execution aliases — turn off `python.exe` and `python3.exe` |

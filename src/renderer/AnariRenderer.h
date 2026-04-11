@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#ifndef SNEEZE_RENDERER_ANARIRENDERER_H
+#define SNEEZE_RENDERER_ANARIRENDERER_H
 
 #include "Renderer.h"
 #include <anari/anari.h>
@@ -60,3 +61,5 @@ private:
 };
 
 }} // namespace sneeze::renderer
+
+#endif // SNEEZE_RENDERER_ANARIRENDERER_H

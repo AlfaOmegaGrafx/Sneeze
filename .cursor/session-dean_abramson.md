@@ -58,3 +58,29 @@
   - Added C/C++ compiler verification instructions (Check section).
   - Replaced `rustup.rs` links with `rust-lang.org/tools/install/` throughout.
 - **Updated project.mdc for Sneeze:** Replaced all absolute `E:\Dev\OMBI\...` paths with relative Sneeze paths. Rewrote Build System section for SuperBuild/ExternalProject_Add. Updated Build Commands to two-command workflow. Updated directory structure to actual implemented layout. Consolidated Dependencies into single table. Rewrote Known Gotchas for new setup. Updated test file paths to `tests/` directory.
+
+## 2026-04-10 (Friday) — Evening / Night
+
+- **Executed the Sneeze/Artemis split.** Major architectural refactor splitting the monolithic project into two repos:
+  - **Sneeze** (`E:\Dev\Sneeze\`) — converted from executable to static library (`add_library(STATIC)`)
+  - **Artemis** (`E:\Dev\Artemis\`) — new metaverse browser application executable (separate repo, not open source)
+- **Sneeze changes:**
+  - Removed `main.cpp`, `astro/` module, `platform/` module from source
+  - Created `view/` module (`sneeze::view`) with `CAMERA_ORBIT` struct and `UpdateCameraOrbit()` — decoupled from WINDOW, takes raw input deltas (nDX, nDY, dScrollY, bMouseLeft, bMouseRight)
+  - Removed SDL3 from SuperBuild, `src/CMakeLists.txt`, `vcpkg.json`
+  - Changed all `target_include_directories`, `target_compile_definitions`, `target_link_libraries` from PRIVATE to PUBLIC (dependencies propagate to Artemis)
+  - Updated README.md (removed SDL3 refs, updated directory layout, build verification checks for `.lib` instead of `.exe`)
+  - Added `cmake_policy(SET CMP0144 NEW)` to suppress ANARI_ROOT cosmetic warning
+- **Artemis creation:**
+  - Created directory structure at `E:\Dev\Artemis\` with `src/`, `libs/`, `build/`
+  - Moved `main.cpp` to Artemis, adapted for `artemis::canvas::CANVAS` and `artemis::astro::CreateSolarSystem`
+  - Created `canvas/` module (`artemis::canvas::CANVAS`) from Sneeze's former `WINDOW` class
+  - Moved `astro/` module to Artemis as `artemis::astro` with fully qualified `sneeze::core::` references
+  - Created SuperBuild `CMakeLists.txt` (SDL3 ExternalProject + Artemis target, `SNEEZE_DIR` cache var defaulting to `../Sneeze`)
+  - Created `src/CMakeLists.txt` using `add_subdirectory` to compile Sneeze inline
+  - Removed Apache License headers from all Artemis files — proprietary copyright headers only
+  - Deleted `LICENSE` file, updated `NOTICE` for proprietary attribution
+  - Created `README.md` with build instructions and `SNEEZE_DIR` override info
+- **Build verification:** Sneeze.lib built successfully. Artemis.exe built successfully (SDL3 + Sneeze inline).
+- **Build lesson learned:** Deleting the entire `build/` folder (not just `build/sneeze/`) causes CMake to re-evaluate all ExternalProject stamp files, wasting ~5 min even though `libs/` is intact. Day-to-day: only delete `build/sneeze/`.
+- **Updated project.mdc** extensively: added Artemis section with directory structure, build commands, namespace details, and integration architecture. Updated Known Gotchas about stamp files and CMP0144.

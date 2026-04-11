@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#ifndef SNEEZE_CORE_TYPES_H
+#define SNEEZE_CORE_TYPES_H
 
 #include <cmath>
 #include <cstdint>
@@ -49,3 +50,5 @@ constexpr int64_t TICKS_PER_CY = 36525LL * 86400LL * TICKS_PER_S;
 constexpr double OBLIQUITY_J2000 = 23.4392911;
 
 }} // namespace sneeze::core
+
+#endif // SNEEZE_CORE_TYPES_H

@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#ifndef SNEEZE_VIEW_CAMERAORBIT_H
+#define SNEEZE_VIEW_CAMERAORBIT_H
 
-namespace sneeze { namespace platform {
-
-class WINDOW;
+namespace sneeze { namespace view {
 
 struct CAMERA_ORBIT
 {
@@ -28,6 +27,9 @@ struct CAMERA_ORBIT
    float dTargetZ;
 };
 
-void UpdateCameraOrbit (CAMERA_ORBIT& pOrbit, const WINDOW& pWindow);
+void UpdateCameraOrbit (CAMERA_ORBIT& pOrbit, int nDX, int nDY, float dScrollY,
+                        bool bMouseLeft, bool bMouseRight);
 
-}} // namespace sneeze::platform
+}} // namespace sneeze::view
+
+#endif // SNEEZE_VIEW_CAMERAORBIT_H

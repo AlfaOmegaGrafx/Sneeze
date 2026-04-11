@@ -112,25 +112,6 @@ ExternalProject_Add (anari-sdk
 )
 
 # ---------------------------------------------------------------------------
-# SDL3
-# ---------------------------------------------------------------------------
-
-ExternalProject_Add (sdl3
-   GIT_REPOSITORY   https://github.com/libsdl-org/SDL.git
-   GIT_TAG          release-3.4.2
-   GIT_SHALLOW      ON
-   SOURCE_DIR       "${LIBS_DIR}/SDL3/src"
-   BINARY_DIR       "${LIBS_DIR}/SDL3/build"
-   INSTALL_DIR      "${LIBS_DIR}/SDL3/install"
-   CMAKE_ARGS
-      -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-      -DCMAKE_BUILD_TYPE=Release
-      -DSDL_SHARED=ON
-      -DSDL_STATIC=OFF
-      -DSDL_TEST=OFF
-)
-
-# ---------------------------------------------------------------------------
 # OpenXR-SDK
 # ---------------------------------------------------------------------------
 
@@ -260,7 +241,6 @@ ExternalProject_Add (sneeze
       -DLIBS_DIR=${LIBS_DIR}
    DEPENDS
       anari-sdk
-      sdl3
       wasmtime
       spirv-tools
       spirv-cross

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 cmake_minimum_required (VERSION 3.20)
+cmake_policy (SET CMP0144 NEW)
 project (Sneeze VERSION 0.1.0 LANGUAGES CXX)
 
 set (CMAKE_CXX_STANDARD 17)
@@ -33,14 +34,8 @@ if (USE_LOCAL_DEPS)
    set (ANARI_ROOT "${LIBS_DIR}/ANARI-SDK/install")
    list (APPEND CMAKE_PREFIX_PATH "${ANARI_ROOT}")
    find_package (anari REQUIRED)
-
-   # SDL3 — built from source in libs/
-   set (SDL3_ROOT "${LIBS_DIR}/SDL3/install")
-   list (APPEND CMAKE_PREFIX_PATH "${SDL3_ROOT}")
-   find_package (SDL3 REQUIRED CONFIG)
 else ()
    find_package (anari REQUIRED)
-   find_package (SDL3 REQUIRED CONFIG)
 endif ()
 
 # Wasmtime — always from libs/ (not available in vcpkg)
@@ -147,14 +142,11 @@ endforeach ()
 set (CORE_SOURCES    core/Epoch.cpp)
 set (CORE_HEADERS    core/Epoch.h  core/Types.h)
 
-set (ASTRO_SOURCES   astro/Celestial.cpp  astro/Orbit.cpp  astro/RMCObject.cpp  astro/BodyData.cpp)
-set (ASTRO_HEADERS   astro/Celestial.h  astro/Orbit.h  astro/RMCObject.h  astro/BodyData.h)
-
 set (RENDERER_SOURCES  renderer/AnariRenderer.cpp)
 set (RENDERER_HEADERS  renderer/Renderer.h  renderer/AnariRenderer.h)
 
-set (PLATFORM_SOURCES  platform/Window.cpp  platform/Input.cpp)
-set (PLATFORM_HEADERS  platform/Window.h  platform/Input.h)
+set (VIEW_SOURCES    view/CameraOrbit.cpp)
+set (VIEW_HEADERS    view/CameraOrbit.h)
 
 set (WASM_SOURCES    wasm/WasmRuntime.cpp)
 set (WASM_HEADERS    wasm/WasmRuntime.h)
@@ -175,15 +167,13 @@ set (COMPUTE_SOURCES compute/EmbeddedKernels.cpp)
 set (COMPUTE_HEADERS compute/EmbeddedKernels.h)
 
 # ---------------------------------------------------------------------------
-# Executable
+# Static library
 # ---------------------------------------------------------------------------
 
-add_executable (Sneeze
-   main.cpp
+add_library (Sneeze STATIC
    ${CORE_SOURCES}      ${CORE_HEADERS}
-   ${ASTRO_SOURCES}     ${ASTRO_HEADERS}
    ${RENDERER_SOURCES}  ${RENDERER_HEADERS}
-   ${PLATFORM_SOURCES}  ${PLATFORM_HEADERS}
+   ${VIEW_SOURCES}      ${VIEW_HEADERS}
    ${WASM_SOURCES}      ${WASM_HEADERS}
    ${SPIRV_SOURCES}     ${SPIRV_HEADERS}
    ${XR_SOURCES}        ${XR_HEADERS}
@@ -194,7 +184,7 @@ add_executable (Sneeze
 )
 add_dependencies (Sneeze CompileKernels)
 
-target_include_directories (Sneeze PRIVATE
+target_include_directories (Sneeze PUBLIC
    ${CMAKE_CURRENT_SOURCE_DIR}
    ${WASMTIME_INCLUDE}
    ${SPIRV_TOOLS_INCLUDE}
@@ -204,16 +194,15 @@ target_include_directories (Sneeze PRIVATE
    ${RMLUI_INCLUDE}
 )
 
-target_compile_definitions (Sneeze PRIVATE
+target_compile_definitions (Sneeze PUBLIC
    WASM_API_EXTERN=
    WASI_API_EXTERN=
    CURL_STATICLIB
    RMLUI_STATIC_LIB
 )
 
-target_link_libraries (Sneeze PRIVATE
+target_link_libraries (Sneeze PUBLIC
    anari::anari
-   SDL3::SDL3
    ${WASMTIME_LIB}
    ws2_32 advapi32 userenv ntdll shell32 ole32 bcrypt
    ${SPIRV_TOOLS_LIB}
@@ -236,41 +225,14 @@ target_link_libraries (Sneeze PRIVATE
 # ---------------------------------------------------------------------------
 
 source_group ("core"     FILES ${CORE_SOURCES} ${CORE_HEADERS})
-source_group ("astro"    FILES ${ASTRO_SOURCES} ${ASTRO_HEADERS})
 source_group ("renderer" FILES ${RENDERER_SOURCES} ${RENDERER_HEADERS})
-source_group ("platform" FILES ${PLATFORM_SOURCES} ${PLATFORM_HEADERS})
+source_group ("view"     FILES ${VIEW_SOURCES} ${VIEW_HEADERS})
 source_group ("wasm"     FILES ${WASM_SOURCES} ${WASM_HEADERS})
 source_group ("spirv"    FILES ${SPIRV_SOURCES} ${SPIRV_HEADERS})
 source_group ("xr"       FILES ${XR_SOURCES} ${XR_HEADERS})
 source_group ("net"      FILES ${NET_SOURCES} ${NET_HEADERS})
 source_group ("ui"       FILES ${UI_SOURCES} ${UI_HEADERS})
 source_group ("compute"  FILES ${COMPUTE_SOURCES} ${COMPUTE_HEADERS})
-
-# ---------------------------------------------------------------------------
-# Copy runtime DLLs to output directory
-# ---------------------------------------------------------------------------
-
-if (WIN32)
-   add_custom_command (TARGET Sneeze POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-         $<TARGET_FILE:SDL3::SDL3>
-         $<TARGET_FILE_DIR:Sneeze>
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-         "${WASMTIME_ROOT}/lib/wasmtime.dll"
-         $<TARGET_FILE_DIR:Sneeze>
-   )
-
-   if (EXISTS "${LIBS_DIR}/ANARI-SDK/install/bin/anari.dll")
-      add_custom_command (TARGET Sneeze POST_BUILD
-         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${LIBS_DIR}/ANARI-SDK/install/bin/anari.dll"
-            $<TARGET_FILE_DIR:Sneeze>
-         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${LIBS_DIR}/ANARI-SDK/install/bin/anari_library_helide.dll"
-            $<TARGET_FILE_DIR:Sneeze>
-      )
-   endif ()
-endif ()
 
 # ---------------------------------------------------------------------------
 # Tests (separate directory, nested build output under build/tests/)

@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#ifndef SNEEZE_CORE_EPOCH_H
+#define SNEEZE_CORE_EPOCH_H
 
 #include <string>
 #include <cstdint>
@@ -41,3 +42,5 @@ private:
 extern const EPOCH EPOCH_J2000;
 
 }} // namespace sneeze::core
+
+#endif // SNEEZE_CORE_EPOCH_H

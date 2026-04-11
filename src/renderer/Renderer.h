@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#ifndef SNEEZE_RENDERER_RENDERER_H
+#define SNEEZE_RENDERER_RENDERER_H
 
 #include "core/Types.h"
 #include <cstdint>
@@ -68,3 +69,5 @@ public:
 };
 
 }} // namespace sneeze::renderer
+
+#endif // SNEEZE_RENDERER_RENDERER_H

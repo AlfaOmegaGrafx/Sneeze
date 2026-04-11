@@ -4,7 +4,6 @@
    "description": "Sneeze — Open Metaverse Browser Engine",
    "dependencies": [
       "anari",
-      "sdl3",
       "curl",
       "openxr-loader",
       "spirv-tools",
