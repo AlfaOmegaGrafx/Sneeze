@@ -13,7 +13,8 @@
 # limitations under the License.
 
 cmake_minimum_required (VERSION 3.20)
-project (Sneeze-SuperBuild LANGUAGES NONE)
+file (STRINGS "${CMAKE_SOURCE_DIR}/VERSION" SNEEZE_VER)
+project (Sneeze-SuperBuild VERSION ${SNEEZE_VER} LANGUAGES NONE)
 
 include (ExternalProject)
 
