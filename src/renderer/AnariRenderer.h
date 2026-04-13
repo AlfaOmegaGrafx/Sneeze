@@ -16,16 +16,29 @@
 #define SNEEZE_RENDERER_ANARIRENDERER_H
 
 #include "Renderer.h"
-#include <anari/anari.h>
 #include <vector>
+#include <string>
+
+// Forward declarations for ANARI types used in ANARI_RENDERER class body
+// to avoid transitively including in every unit that uses AnariRenderer.h
+namespace anari { namespace api {
+struct Library;
+struct Object;
+struct Device;
+struct Camera;
+struct Array;
+struct Frame;
+struct Renderer;
+struct World;
+}} // namespace api::anari
 
 namespace sneeze { namespace renderer {
 
-class HELIDE_RENDERER : public RENDERER
+class ANARI_RENDERER : public RENDERER
 {
 public:
-   HELIDE_RENDERER ();
-   ~HELIDE_RENDERER () override;
+   explicit ANARI_RENDERER (const std::string& sLibrary = "helide");
+   ~ANARI_RENDERER () override;
 
    bool Initialize (int nWidth, int nHeight) override;
    void Shutdown () override;
@@ -41,11 +54,13 @@ public:
    int GetHeight () const override;
 
 private:
-   ANARIDevice   m_pDevice;
-   ANARIWorld    m_pWorld;
-   ANARICamera   m_pCamera;
-   ANARIRenderer m_pRenderer;
-   ANARIFrame    m_pFrame;
+   std::string   m_sLibrary;
+   anari::api::Library*  m_pLibrary;
+   anari::api::Device*   m_pDevice;
+   anari::api::World*    m_pWorld;
+   anari::api::Camera*   m_pCamera;
+   anari::api::Renderer* m_pRenderer;
+   anari::api::Frame*    m_pFrame;
 
    int m_nWidth;
    int m_nHeight;

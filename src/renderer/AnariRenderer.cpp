@@ -14,7 +14,12 @@
 
 #include "AnariRenderer.h"
 #include <anari/anari.h>
-#include <anari/ext/helide/anariNewHelideDevice.h>
+
+/* ANARI_RENDERER enum conflicts with our class name,
+ * we rename to _ANARI_RENDERER to avoid the conflict. */
+#define _ANARI_RENDERER ANARI_DATA_TYPE_DEFINE(514)
+#undef ANARI_RENDERER
+
 #include <cstring>
 #include <cstdio>
 
@@ -22,8 +27,10 @@ namespace sneeze { namespace renderer {
 
 // ---------------------------------------------------------------------------
 
-HELIDE_RENDERER::HELIDE_RENDERER ()
-   : m_pDevice (nullptr)
+ANARI_RENDERER::ANARI_RENDERER (const std::string& sLibrary)
+   : m_sLibrary (sLibrary)
+   , m_pLibrary (nullptr)
+   , m_pDevice (nullptr)
    , m_pWorld (nullptr)
    , m_pCamera (nullptr)
    , m_pRenderer (nullptr)
@@ -33,14 +40,14 @@ HELIDE_RENDERER::HELIDE_RENDERER ()
 {
 }
 
-HELIDE_RENDERER::~HELIDE_RENDERER ()
+ANARI_RENDERER::~ANARI_RENDERER ()
 {
    Shutdown ();
 }
 
 // ---------------------------------------------------------------------------
 
-bool HELIDE_RENDERER::Initialize (int nWidth, int nHeight)
+bool ANARI_RENDERER::Initialize (int nWidth, int nHeight)
 {
    m_nWidth  = nWidth;
    m_nHeight = nHeight;
@@ -48,12 +55,23 @@ bool HELIDE_RENDERER::Initialize (int nWidth, int nHeight)
 
    bool bOk = false;
 
-   m_pDevice = anariNewHelideDevice (nullptr, nullptr);
-   if (!m_pDevice)
+   m_pLibrary = anariLoadLibrary (m_sLibrary.c_str (), nullptr, nullptr);
+   if (!m_pLibrary)
    {
-      std::fprintf (stderr, "ANARI: failed to create helide device\n");
+      std::fprintf (stderr, "ANARI: failed to load library '%s'\n", m_sLibrary.c_str ());
    }
    else
+   {
+      m_pDevice = anariNewDevice (m_pLibrary, "default");
+      if (!m_pDevice)
+      {
+         std::fprintf (stderr, "ANARI: failed to create device from library '%s'\n", m_sLibrary.c_str ());
+         anariUnloadLibrary (m_pLibrary);
+         m_pLibrary = nullptr;
+      }
+   }
+
+   if (m_pDevice)
    {
       anariCommitParameters (m_pDevice, m_pDevice);
 
@@ -70,7 +88,7 @@ bool HELIDE_RENDERER::Initialize (int nWidth, int nHeight)
       anariSetParameter (m_pDevice, m_pFrame, "size", ANARI_UINT32_VEC2, aSize);
       ANARIDataType nColorType = ANARI_UFIXED8_RGBA_SRGB;
       anariSetParameter (m_pDevice, m_pFrame, "channel.color", ANARI_DATA_TYPE, &nColorType);
-      anariSetParameter (m_pDevice, m_pFrame, "renderer", ANARI_RENDERER, &m_pRenderer);
+      anariSetParameter (m_pDevice, m_pFrame, "renderer", _ANARI_RENDERER, &m_pRenderer);
       anariSetParameter (m_pDevice, m_pFrame, "camera", ANARI_CAMERA, &m_pCamera);
       anariSetParameter (m_pDevice, m_pFrame, "world", ANARI_WORLD, &m_pWorld);
       anariCommitParameters (m_pDevice, m_pFrame);
@@ -81,7 +99,7 @@ bool HELIDE_RENDERER::Initialize (int nWidth, int nHeight)
    return bOk;
 }
 
-void HELIDE_RENDERER::Shutdown ()
+void ANARI_RENDERER::Shutdown ()
 {
    if (m_pDevice)
    {
@@ -108,11 +126,16 @@ void HELIDE_RENDERER::Shutdown ()
       anariRelease (m_pDevice, m_pDevice);
       m_pDevice = nullptr;
    }
+   if (m_pLibrary)
+   {
+      anariUnloadLibrary (m_pLibrary);
+      m_pLibrary = nullptr;
+   }
 }
 
 // ---------------------------------------------------------------------------
 
-void HELIDE_RENDERER::SetCamera (const CAMERA_DATA& pCamera)
+void ANARI_RENDERER::SetCamera (const CAMERA_DATA& pCamera)
 {
    float pos[3] = { pCamera.dPosX, pCamera.dPosY, pCamera.dPosZ };
    float dir[3] = { pCamera.dDirX, pCamera.dDirY, pCamera.dDirZ };
@@ -126,23 +149,23 @@ void HELIDE_RENDERER::SetCamera (const CAMERA_DATA& pCamera)
    anariCommitParameters (m_pDevice, m_pCamera);
 }
 
-void HELIDE_RENDERER::BeginFrame ()
+void ANARI_RENDERER::BeginFrame ()
 {
    m_aSpheres.clear ();
    m_aCurves.clear ();
 }
 
-void HELIDE_RENDERER::SubmitSpheres (const std::vector<SPHERE_DATA>& aSpheres)
+void ANARI_RENDERER::SubmitSpheres (const std::vector<SPHERE_DATA>& aSpheres)
 {
    m_aSpheres.insert (m_aSpheres.end (), aSpheres.begin (), aSpheres.end ());
 }
 
-void HELIDE_RENDERER::SubmitCurves (const std::vector<CURVE_DATA>& aCurves)
+void ANARI_RENDERER::SubmitCurves (const std::vector<CURVE_DATA>& aCurves)
 {
    m_aCurves.insert (m_aCurves.end (), aCurves.begin (), aCurves.end ());
 }
 
-void HELIDE_RENDERER::EndFrame ()
+void ANARI_RENDERER::EndFrame ()
 {
    RebuildWorld (m_aSpheres, m_aCurves);
 
@@ -163,17 +186,17 @@ void HELIDE_RENDERER::EndFrame ()
    }
 }
 
-const uint32_t* HELIDE_RENDERER::GetFrameBuffer () const
+const uint32_t* ANARI_RENDERER::GetFrameBuffer () const
 {
    return m_aPixels.data ();
 }
 
-int HELIDE_RENDERER::GetWidth () const
+int ANARI_RENDERER::GetWidth () const
 {
    return m_nWidth;
 }
 
-int HELIDE_RENDERER::GetHeight () const
+int ANARI_RENDERER::GetHeight () const
 {
    return m_nHeight;
 }
@@ -182,7 +205,7 @@ int HELIDE_RENDERER::GetHeight () const
 //  RebuildWorld — recreate ANARI scene objects from submitted data
 // ---------------------------------------------------------------------------
 
-void HELIDE_RENDERER::RebuildWorld (const std::vector<SPHERE_DATA>& aSpheres,
+void ANARI_RENDERER::RebuildWorld (const std::vector<SPHERE_DATA>& aSpheres,
                                     const std::vector<CURVE_DATA>& aCurves)
 {
    std::vector<ANARISurface> aSurfaces;
