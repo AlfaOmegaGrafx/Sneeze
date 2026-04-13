@@ -1,6 +1,6 @@
 # Sneeze — Open Metaverse Browser Engine
 
-Sneeze is the engine behind the Open Metaverse Browser, developed by the Open Metaverse Browser Initiative (OMBI), a project under the Metaverse Standards Forum. It handles rendering (via ANARI), sandboxed code execution (via WebAssembly/Wasmtime), SPIR-V shader validation (via SPIRV-Tools), XR device access (via OpenXR), networking (via curl), and UI (via RmlUi).
+Sneeze is the engine behind the Open Metaverse Browser, developed by the Open Metaverse Browser Initiative (OMBI), a project under the Metaverse Standards Forum. It handles rendering (via ANARI and Halogen), sandboxed code execution (via WebAssembly/Wasmtime), SPIR-V shader validation (via SPIRV-Tools), XR device access (via OpenXR), networking (via curl), UI (via RmlUi), and structured data interchange (via nlohmann/json).
 
 Sneeze builds as a **static library** (`Sneeze.lib`). It is consumed by an application (such as [Artemis](../Artemis)) via CMake's `add_subdirectory`. The application provides windowing and input; the engine renders into a surface the application supplies.
 
@@ -71,7 +71,7 @@ After installing, close and reopen your terminal so `rustc` and `cargo` are on y
 
 ## Quick Start — Build Everything from Source (Recommended)
 
-This is the simplest path. CMake will clone all nine dependencies, build them, and then build Sneeze.
+This is the simplest path. CMake will clone all ten dependencies, build them, and then build Sneeze.
 
 ### Step 1: Clone the repository
 
@@ -102,7 +102,7 @@ This step takes a few seconds. It generates the SuperBuild project files that wi
 cmake --build build --config Release --parallel
 ```
 
-This is the big step. CMake clones all eight dependencies, compiles them from source, and then compiles Sneeze and its test suite. Expect this to take **20-30 minutes** the first time (Wasmtime's Rust build is the slowest). You'll see a continuous stream of "Cloning into..." and compilation messages — that's normal.
+This is the big step. CMake clones all ten dependencies, compiles them from source, and then compiles Sneeze and its test suite. Expect this to take **45-90 minutes** the first time (Halogen/Filament is the largest dependency, and Wasmtime's Rust build is the second slowest). You'll see a continuous stream of "Cloning into..." and compilation messages — that's normal.
 
 **If the build fails**, the most common cause is a missing prerequisite (Rust, Python, or a C++ compiler). Check the error message and verify the Prerequisites section above.
 
@@ -186,7 +186,7 @@ This takes about 30-60 seconds — CMake detects that `libs/` already has the bu
 
 **Full rebuild of everything (nuclear option):**
 
-Delete both `build/` and `libs/`, then repeat the Quick Start from Step 2. This re-downloads and recompiles all dependencies (20-30 minutes).
+Delete both `build/` and `libs/`, then repeat the Quick Start from Step 2. This re-downloads and recompiles all dependencies (45-90 minutes).
 
 ---
 
@@ -202,7 +202,9 @@ Sneeze/
 │   ├── OpenXR-SDK/
 │   ├── curl/
 │   ├── RmlUi/
-│   └── glslang/
+│   ├── glslang/
+│   ├── nlohmann-json/
+│   └── Halogen/
 ├── build/                 Build output (gitignored)
 │   └── sneeze/            Sneeze project files and static library
 │       ├── Release/       Sneeze.lib
@@ -249,6 +251,8 @@ All dependencies are built from source by the SuperBuild. No pre-built binaries.
 | curl | curl-8_9_1 | [curl/curl](https://github.com/curl/curl) | HTTP/HTTPS client (static, Schannel SSL on Windows) |
 | RmlUi | 6.2 | [mikke89/RmlUi](https://github.com/mikke89/RmlUi) | HTML/CSS retained-mode UI toolkit |
 | glslang | vulkan-sdk-1.4.341.0 | [KhronosGroup/glslang](https://github.com/KhronosGroup/glslang) | GLSL-to-SPIR-V compiler (build-time only) |
+| nlohmann/json | v3.11.3 | [nlohmann/json](https://github.com/nlohmann/json) | Header-only JSON parsing library |
+| Halogen (Filament) | main | [MetaversalCorp/Halogen](https://github.com/MetaversalCorp/Halogen) | PBR rendering engine (shared libraries, to be ported as ANARI device) |
 
 ---
 
@@ -263,7 +267,7 @@ All dependencies are built from source by the SuperBuild. No pre-built binaries.
 | OpenXR test prints "failed to find active runtime" | No VR runtime installed (SteamVR, Oculus, etc.) | Expected on machines without a headset. The test handles this gracefully. |
 | NetTest fails with connection errors | No internet connection | The HTTP tests make live requests. Expected to fail offline. |
 | `python` opens the Microsoft Store | Windows Store alias is intercepting | Settings > Apps > Advanced app settings > App execution aliases — turn off `python.exe` and `python3.exe` |
-| Build takes extremely long | Wasmtime Rust compilation | Normal for the first build (~15-20 minutes for Wasmtime alone). Subsequent builds skip it. |
+| Build takes extremely long | Wasmtime Rust compilation + Halogen/Filament C++ compilation | Normal for the first build (~15-20 minutes for Wasmtime, ~30-60 minutes for Halogen). Subsequent builds skip completed dependencies. |
 
 ---
 

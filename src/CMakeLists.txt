@@ -71,12 +71,29 @@ if (USE_LOCAL_DEPS)
    # glslang (build-time tool only)
    set (GLSLANG_ROOT "${LIBS_DIR}/glslang/install")
    find_program (GLSLANG_VALIDATOR glslang PATHS "${GLSLANG_ROOT}/bin" NO_DEFAULT_PATH REQUIRED)
+
+   # nlohmann/json (header-only)
+   set (NLOHMANN_JSON_ROOT "${LIBS_DIR}/nlohmann-json/install")
+   find_path (NLOHMANN_JSON_INCLUDE nlohmann/json.hpp PATHS "${NLOHMANN_JSON_ROOT}/include" NO_DEFAULT_PATH REQUIRED)
+
+   # Halogen (Filament fork — shared libraries)
+   set (HALOGEN_ROOT "${LIBS_DIR}/Halogen/install")
+   find_path (HALOGEN_INCLUDE filament/Engine.h PATHS "${HALOGEN_ROOT}/include" NO_DEFAULT_PATH REQUIRED)
+   find_library (HALOGEN_FILAMENT_LIB filament PATHS "${HALOGEN_ROOT}/lib/x86_64" "${HALOGEN_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
+   find_library (HALOGEN_BACKEND_LIB  backend  PATHS "${HALOGEN_ROOT}/lib/x86_64" "${HALOGEN_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
+   find_library (HALOGEN_BLUEGL_LIB   bluegl   PATHS "${HALOGEN_ROOT}/lib/x86_64" "${HALOGEN_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
+   find_library (HALOGEN_UTILS_LIB    utils    PATHS "${HALOGEN_ROOT}/lib/x86_64" "${HALOGEN_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
+   find_library (HALOGEN_MATH_LIB     math     PATHS "${HALOGEN_ROOT}/lib/x86_64" "${HALOGEN_ROOT}/lib" NO_DEFAULT_PATH)
+   find_library (HALOGEN_FILABRIDGE_LIB filabridge PATHS "${HALOGEN_ROOT}/lib/x86_64" "${HALOGEN_ROOT}/lib" NO_DEFAULT_PATH)
+   find_library (HALOGEN_FILAFLAT_LIB   filaflat   PATHS "${HALOGEN_ROOT}/lib/x86_64" "${HALOGEN_ROOT}/lib" NO_DEFAULT_PATH)
+   find_library (HALOGEN_GEOMETRY_LIB   geometry   PATHS "${HALOGEN_ROOT}/lib/x86_64" "${HALOGEN_ROOT}/lib" NO_DEFAULT_PATH)
 else ()
    find_package (spirv_tools REQUIRED CONFIG)
    find_package (OpenXR REQUIRED CONFIG)
    find_package (CURL REQUIRED)
    find_package (RmlUi REQUIRED)
    find_program (GLSLANG_VALIDATOR glslang REQUIRED)
+   find_package (nlohmann_json REQUIRED)
 endif ()
 
 # ---------------------------------------------------------------------------
@@ -177,6 +194,8 @@ target_include_directories (Sneeze PUBLIC
    ${OPENXR_INCLUDE}
    ${CURL_INCLUDE}
    ${RMLUI_INCLUDE}
+   ${NLOHMANN_JSON_INCLUDE}
+   ${HALOGEN_INCLUDE}
 )
 
 target_compile_definitions (Sneeze PUBLIC
@@ -185,6 +204,13 @@ target_compile_definitions (Sneeze PUBLIC
    CURL_STATICLIB
    RMLUI_STATIC_LIB
 )
+
+set (HALOGEN_LIBS ${HALOGEN_FILAMENT_LIB} ${HALOGEN_BACKEND_LIB} ${HALOGEN_BLUEGL_LIB} ${HALOGEN_UTILS_LIB})
+foreach (_opt HALOGEN_MATH_LIB HALOGEN_FILABRIDGE_LIB HALOGEN_FILAFLAT_LIB HALOGEN_GEOMETRY_LIB)
+   if (${_opt})
+      list (APPEND HALOGEN_LIBS ${${_opt}})
+   endif ()
+endforeach ()
 
 target_link_libraries (Sneeze PUBLIC
    anari::anari_static
@@ -198,6 +224,7 @@ target_link_libraries (Sneeze PUBLIC
    wldap32 crypt32 normaliz
    ${RMLUI_CORE_LIB}
    ${RMLUI_DEBUGGER_LIB}
+   ${HALOGEN_LIBS}
 )
 
 # ---------------------------------------------------------------------------

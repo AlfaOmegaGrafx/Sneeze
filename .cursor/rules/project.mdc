@@ -13,7 +13,7 @@ alwaysApply: true
 
 The project produces two components:
 
-- **Sneeze** — the Metaverse Browser Engine (MBE). A standalone, reusable engine library (static `.lib`). Analogous to Blink in the web browser world. Owns all third-party dependencies (Wasmtime, SPIRV-Tools, OpenXR, curl, RmlUi, ANARI) and the engine modules that wrap them (`wasm/`, `spirv/`, `xr/`, `net/`, `ui/`, `core/`, and future `som/`, `smap/`, `compute/`, `identity/`, `audio/`). All test executables (WasmTest, SpvTest, XrTest, NetTest, UiTest) belong to Sneeze. Another team could build a different metaverse browser on top of Sneeze without touching Artemis.
+- **Sneeze** — the Metaverse Browser Engine (MBE). A standalone, reusable engine library (static `.lib`). Analogous to Blink in the web browser world. Owns all third-party dependencies (Wasmtime, SPIRV-Tools, OpenXR, curl, RmlUi, ANARI, nlohmann/json, Halogen) and the engine modules that wrap them (`wasm/`, `spirv/`, `xr/`, `net/`, `ui/`, `core/`, and future `som/`, `smap/`, `compute/`, `identity/`, `audio/`). All test executables (WasmTest, SpvTest, XrTest, NetTest, UiTest) belong to Sneeze. Another team could build a different metaverse browser on top of Sneeze without touching Artemis.
 
 - **Artemis** — the metaverse browser application. The single `.exe`. Analogous to Chrome/Chromium. A thin application layer that consumes Sneeze: window management (`canvas/`), user chrome, and `main()`. Owns SDL3 (windowing/input is application-level, not engine-level). The disposable solar system demo (`astro/`) also belongs here. Artemis is **not open source** — proprietary copyright headers.
 
@@ -33,7 +33,9 @@ Sneeze/
 │   ├── OpenXR-SDK/
 │   ├── curl/
 │   ├── RmlUi/
-│   └── glslang/
+│   ├── glslang/
+│   ├── nlohmann-json/
+│   └── Halogen/
 ├── build/                 Build output (gitignored)
 │   └── sneeze/            Sneeze project files and static library
 ├── src/                   Production source code
@@ -92,7 +94,7 @@ All paths are relative to the repository root (`Sneeze/`):
 - **Test code:** `tests/`
 - **Build output:** `build/sneeze/` (gitignored)
 - **Dependencies:** `libs/<name>/` — each has `src/`, `build/`, `install/` (gitignored)
-- **Top-level SuperBuild:** `CMakeLists.txt` (ExternalProject_Add for all 8 deps + Sneeze itself)
+- **Top-level SuperBuild:** `CMakeLists.txt` (ExternalProject_Add for all 10 deps + Sneeze itself)
 - **Inner project build:** `src/CMakeLists.txt` (finds deps in `libs/<name>/install/`)
 - **Test build:** `tests/CMakeLists.txt` (defines all test executables)
 
@@ -244,6 +246,8 @@ All dependencies are built from source automatically by the CMake SuperBuild. No
 | curl | curl-8_9_1 | [curl/curl](https://github.com/curl/curl) | HTTP/HTTPS client (static, Schannel SSL on Windows) |
 | RmlUi | 6.2 | [mikke89/RmlUi](https://github.com/mikke89/RmlUi) | HTML/CSS retained-mode UI toolkit |
 | glslang | vulkan-sdk-1.4.341.0 | [KhronosGroup/glslang](https://github.com/KhronosGroup/glslang) | GLSL-to-SPIR-V compiler (build-time only) |
+| nlohmann/json | v3.11.3 | [nlohmann/json](https://github.com/nlohmann/json) | Header-only JSON parsing library (MIT license) |
+| Halogen (Filament) | main | [MetaversalCorp/Halogen](https://github.com/MetaversalCorp/Halogen) | PBR rendering engine — Metaversal fork of Google Filament (Apache 2.0, shared libraries) |
 
 **Build-time prerequisites (installed by the developer):**
 
@@ -317,7 +321,18 @@ glslang is the Khronos reference SPIR-V compiler. GLSL compute shaders (`#versio
 
 **Why build ANARI from source (not vcpkg)?** The vcpkg `anari` port installs only the base ANARI library (API headers and loader). It does **not** include the **helide** rendering device (the CPU ray tracer Sneeze needs). Helide must be built from the ANARI SDK source. The SuperBuild builds the full SDK including helide and its Embree dependency.
 
-**ANARI static linking.** ANARI core (`anari::anari_static`) is linked statically into Sneeze. The helide device (`anari_library_helide.dll`) remains a dynamic library because the ANARI SDK builds it as a shared plugin — this is by design in the SDK and cannot be changed without vendor modifications. At runtime, `HELIDE_RENDERER` creates the device directly via `anariNewHelideDevice()` rather than dynamically loading a library. Helide is temporary — it will be replaced by a GPU-accelerated ANARI device (e.g., VisRTX).
+**ANARI static linking.** ANARI core (`anari::anari_static`) is linked statically into Sneeze. The helide device (`anari_library_helide.dll`) remains a dynamic library because the ANARI SDK builds it as a shared plugin — this is by design in the SDK and cannot be changed without vendor modifications. At runtime, `HELIDE_RENDERER` creates the device directly via `anariNewHelideDevice()` rather than dynamically loading a library. Helide is temporary — it will be replaced by a GPU-accelerated ANARI device (e.g., Halogen).
+
+**Why nlohmann/json?** General-purpose JSON parsing for both engine and application use. Header-only (no link libraries, no DLLs), MIT license, single-header deployment. Exposed as PUBLIC on the Sneeze target so Artemis can `#include <nlohmann/json.hpp>` without additional CMake configuration. Replaces the ad-hoc string-searching JSON parser used in the updater module.
+
+**Why Halogen (Filament fork)?** Halogen is Metaversal's fork of Google's Filament — a real-time physically based rendering engine supporting OpenGL, Vulkan, Metal, and WebGPU backends. The long-term goal is to port Halogen as an ANARI device, replacing helide with GPU-accelerated PBR rendering. Filament was chosen for its production-quality PBR pipeline (clustered forward renderer, Cook-Torrance BRDF, IBL, PCSS shadows, HDR post-processing), cross-platform backend support, and proven mobile performance (Android, iOS).
+
+**Halogen linking strategy.** Halogen is currently built as **static libraries** with `USE_STATIC_CRT=OFF` so it uses `/MD` (dynamic CRT) to match Sneeze and Artemis. `BUILD_SHARED_LIBS=ON` was attempted but fails because Filament's bundled third-party dependencies (spirv-tools) don't support shared library builds — the alias target `SPIRV-Tools-shared` doesn't exist when `BUILD_SHARED_LIBS=ON` propagates into `third_party/spirv-tools`. This means Halogen's static libraries get linked into the Artemis executable, adding ~20-50 MB.
+- **Phase 2 (future):** Consolidate into a single `halogen.dll` uber-DLL by modifying the fork's CMake to (1) force `BUILD_SHARED_LIBS=OFF` for all `third_party/` subdirectories, and (2) create one SHARED target that wraps all internal static libraries. This would restore CRT isolation and reduce the Artemis executable size.
+
+**Halogen build options.** The SuperBuild disables samples (`FILAMENT_SKIP_SAMPLES=ON`), SDL2 (`FILAMENT_SKIP_SDL2=ON`), tests (`FILAMENT_BUILD_TESTING=OFF`), Vulkan backend (`FILAMENT_SUPPORTS_VULKAN=OFF`), and the material debugger (`FILAMENT_ENABLE_MATDBG=OFF`). On desktop Windows (`IS_HOST_PLATFORM=TRUE`), Filament's CMake unconditionally builds host tools (matc, cmgen, resgen, etc.) and their dependencies (spirv-tools, glslang, spirv-cross) — these are Filament's bundled copies, isolated in its build tree, and do not conflict with Sneeze's separate copies. The `matc` tool will be needed later for compiling Filament materials.
+
+**Halogen tracks `main`.** The fork has no release tags yet. Pin to a specific commit hash once the ANARI device integration work stabilizes.
 
 ### Known Gotchas
 
@@ -333,7 +348,12 @@ glslang is the Khronos reference SPIR-V compiler. GLSL compute shaders (`#versio
 - **SDL pixel format must match ANARI byte layout (Artemis-side).** ANARI's `ANARI_UFIXED8_RGBA_SRGB` writes R,G,B,A bytes. On little-endian Windows, `SDL_PIXELFORMAT_ABGR8888` matches. This is Artemis's concern, not Sneeze's — the engine has no SDL3 dependency.
 - **Helide does not support texture mapping on implicit sphere geometry.** Texture-mapped planets require a different ANARI device (e.g., VisRTX) or explicit triangle mesh spheres.
 - **Do NOT delete the entire `build/` folder for day-to-day rebuilds.** The SuperBuild stores ExternalProject stamp files in `build/` that track which dependencies have been cloned, configured, built, and installed. Deleting the whole `build/` folder loses those stamps, forcing CMake to re-run all dependency steps (5+ minutes even though `libs/` is intact). Instead, delete only `build/sneeze/` to rebuild just the Sneeze library and tests.
-- **Deleting `libs/` triggers full rebuild.** All dependencies will be re-cloned and re-built (20-30 minutes).
+- **Deleting `libs/` triggers full rebuild.** All dependencies will be re-cloned and re-built (45-90 minutes).
+- **Halogen is the heaviest dependency.** First build takes 30-60 minutes. Incremental rebuilds are fast. The full clone is large (~8k commits). Do not use `GIT_SHALLOW` with `main` — it can be unreliable.
+- **Halogen DLLs must be copied to Artemis output.** Artemis's POST_BUILD step must copy all required Halogen DLLs alongside the executable. This is Artemis-side configuration.
+- **Halogen CRT must match.** `USE_STATIC_CRT=OFF` is passed to Halogen so it uses `/MD` (dynamic CRT), matching Sneeze and Artemis. Without this flag, Filament defaults to `/MT` (static CRT), causing linker errors.
+- **Halogen C++20 vs Sneeze C++17.** Filament compiles with `/std:c++latest`. Since it's an ExternalProject, this is isolated. Sneeze code that includes Filament headers must compile them under C++17. If any public headers use C++20 features, bump Sneeze to C++20 or isolate the includes.
+- **Halogen bundles its own spirv-tools/glslang/spirv-cross.** These are built inside Filament's `third_party/` tree. They do not conflict with Sneeze's separate copies.
 - **CMP0144 policy.** `src/CMakeLists.txt` sets `cmake_policy(SET CMP0144 NEW)` to suppress the warning about `ANARI_ROOT` variable being ignored by `find_package`. The policy tells CMake to respect uppercase `<PACKAGENAME>_ROOT` variables.
 
 ### Build System
@@ -419,8 +439,7 @@ Complete the solar system demo to visual parity with the JavaScript original, an
 | 4 | Add HUD overlay | Body names, time display, speed indicator; likely a 2D overlay composited onto framebuffer |
 | 5 | Add on-screen animation controls | Visual feedback for +/- time scale, pause state |
 | 6 | Improve camera controls | Smooth orbiting, focus-on-body (click to target), zoom limits |
-| 7 | Pre-generate ANARI query files to eliminate Python from build chain | Run codegen once, commit generated .h/.cpp, patch ANARI CMake to skip Python step; verify identical output |
-| 8 | Automate ANARI DLL copy in CMake | Artemis handles DLL copies for its own runtime deps |
+| 7 | Automate ANARI DLL copy in CMake | Artemis handles DLL copies for its own runtime deps |
 | 9 | Add Sun emissive material | Sun should glow, not just be a matte sphere lit by its own point light |
 | 10 | Moon orbital accuracy | Verify moon positions against JS reference; moons may need parent-relative positioning fixes |
 

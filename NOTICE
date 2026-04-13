@@ -14,3 +14,5 @@ This product includes software developed by third parties:
 - curl (c) Daniel Stenberg — curl License (MIT/X derivative)
 - RmlUi (c) mikke89 — MIT License
 - glslang (c) The Khronos Group Inc. — BSD 3-Clause / Apache License 2.0
+- nlohmann/json (c) Niels Lohmann — MIT License
+- Filament / Halogen (c) Google Inc. — Apache License 2.0

@@ -212,6 +212,44 @@ ExternalProject_Add (wasmtime
 )
 
 # ---------------------------------------------------------------------------
+# nlohmann/json (header-only JSON library)
+# ---------------------------------------------------------------------------
+
+ExternalProject_Add (nlohmann-json
+   GIT_REPOSITORY   https://github.com/nlohmann/json.git
+   GIT_TAG          v3.11.3
+   GIT_SHALLOW      ON
+   SOURCE_DIR       "${LIBS_DIR}/nlohmann-json/src"
+   BINARY_DIR       "${LIBS_DIR}/nlohmann-json/build"
+   INSTALL_DIR      "${LIBS_DIR}/nlohmann-json/install"
+   CMAKE_ARGS
+      -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+      -DCMAKE_BUILD_TYPE=Release
+      -DJSON_BuildTests=OFF
+)
+
+# ---------------------------------------------------------------------------
+# Halogen (Filament fork — PBR rendering engine, built as shared libraries)
+# ---------------------------------------------------------------------------
+
+ExternalProject_Add (halogen
+   GIT_REPOSITORY   https://github.com/MetaversalCorp/Halogen.git
+   GIT_TAG          main
+   SOURCE_DIR       "${LIBS_DIR}/Halogen/src"
+   BINARY_DIR       "${LIBS_DIR}/Halogen/build"
+   INSTALL_DIR      "${LIBS_DIR}/Halogen/install"
+   CMAKE_ARGS
+      -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+      -DCMAKE_BUILD_TYPE=Release
+      -DUSE_STATIC_CRT=OFF
+      -DFILAMENT_SKIP_SAMPLES=ON
+      -DFILAMENT_SKIP_SDL2=ON
+      -DFILAMENT_BUILD_TESTING=OFF
+      -DFILAMENT_SUPPORTS_VULKAN=OFF
+      -DFILAMENT_ENABLE_MATDBG=OFF
+)
+
+# ---------------------------------------------------------------------------
 # Sneeze (the actual project — depends on all libs)
 # ---------------------------------------------------------------------------
 
@@ -230,4 +268,6 @@ ExternalProject_Add (sneeze
       openxr-sdk
       curl
       rmlui
+      nlohmann-json
+      halogen
 )
