@@ -235,7 +235,7 @@ ExternalProject_Add (nlohmann-json
 
 ExternalProject_Add (halogen
    GIT_REPOSITORY   https://github.com/MetaversalCorp/Halogen.git
-   GIT_TAG          main
+   GIT_TAG          master
    SOURCE_DIR       "${LIBS_DIR}/Halogen/src"
    BINARY_DIR       "${LIBS_DIR}/Halogen/build"
    INSTALL_DIR      "${LIBS_DIR}/Halogen/install"
