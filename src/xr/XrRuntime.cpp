@@ -35,7 +35,7 @@ XR_RUNTIME::~XR_RUNTIME ()
 
 bool XR_RUNTIME::Initialize ()
 {
-   // Suppress the loader's own stderr diagnostics — we handle all error cases
+   // Suppress the loader's own stderr diagnostics - we handle all error cases
    // ourselves with clearer messages. Without this, the loader prints alarming
    // "Error [GENERAL | xrCreateInstance | OpenXR-Loader]" lines on machines
    // that simply don't have a VR/AR runtime installed.
@@ -57,7 +57,7 @@ bool XR_RUNTIME::Initialize ()
    if (XR_FAILED (nResult))
    {
       bHasRuntime = false;
-      std::printf ("XR_RUNTIME: OpenXR loader initialized — no XR runtime detected (code %d)\n", nResult);
+      std::printf ("XR_RUNTIME: OpenXR loader initialized - no XR runtime detected (code %d)\n", nResult);
       std::printf ("XR_RUNTIME: This is normal on machines without a VR/AR headset or runtime installed.\n");
       return true;
    }
@@ -68,7 +68,7 @@ bool XR_RUNTIME::Initialize ()
    if (XR_SUCCEEDED (xrGetInstanceProperties (hInstance, &pProps)))
    {
       sRuntimeName = pProps.runtimeName;
-      std::printf ("XR_RUNTIME: OpenXR %d.%d.%d initialized — runtime: %s (v%d.%d.%d)\n",
+      std::printf ("XR_RUNTIME: OpenXR %d.%d.%d initialized - runtime: %s (v%d.%d.%d)\n",
          XR_VERSION_MAJOR (XR_CURRENT_API_VERSION),
          XR_VERSION_MINOR (XR_CURRENT_API_VERSION),
          XR_VERSION_PATCH (XR_CURRENT_API_VERSION),

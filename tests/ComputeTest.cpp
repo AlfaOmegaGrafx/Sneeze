@@ -105,7 +105,7 @@ static void TestSpvStructure ()
 
 int main ()
 {
-   std::printf ("ComputeTest — SPIR-V Embedded Kernel Integration Tests\n");
+   std::printf ("ComputeTest - SPIR-V Embedded Kernel Integration Tests\n");
    std::printf ("=======================================================\n");
 
    TestEmbeddedKernelRetrieval ();

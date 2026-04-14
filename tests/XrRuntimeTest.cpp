@@ -97,7 +97,7 @@ static void TestEnumerateExtensions ()
 
    if (XR_FAILED (nResult))
    {
-      std::printf ("    xrEnumerateInstanceExtensionProperties returned %d (no runtime — extensions unavailable)\n", nResult);
+      std::printf ("    xrEnumerateInstanceExtensionProperties returned %d (no runtime - extensions unavailable)\n", nResult);
       Check (true, "Extension query returned a valid error code without a runtime (no crash)");
    }
    else
@@ -142,7 +142,7 @@ static void TestCreateInstance ()
 
    if (XR_FAILED (nResult))
    {
-      std::printf ("    xrCreateInstance returned %d (no runtime installed — this is expected)\n", nResult);
+      std::printf ("    xrCreateInstance returned %d (no runtime installed - this is expected)\n", nResult);
       Check (true, "xrCreateInstance returned a valid error code (no crash)");
    }
    else
@@ -194,7 +194,7 @@ static void TestCreateInstance ()
       }
       else
       {
-         std::printf ("    No HMD system available (code %d) — expected without a headset\n", nResult);
+         std::printf ("    No HMD system available (code %d) - expected without a headset\n", nResult);
          Check (true, "xrGetSystem returned a valid error code for missing HMD (no crash)");
       }
 
@@ -209,7 +209,7 @@ static void TestCreateInstance ()
       }
       else
       {
-         std::printf ("    No handheld display available (code %d) — expected on desktop\n", nResult);
+         std::printf ("    No handheld display available (code %d) - expected on desktop\n", nResult);
          Check (true, "xrGetSystem returned a valid error code for missing handheld (no crash)");
       }
 

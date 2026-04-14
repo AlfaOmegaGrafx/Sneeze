@@ -157,7 +157,7 @@ ExternalProject_Add (rmlui
 )
 
 # ---------------------------------------------------------------------------
-# Wasmtime (Rust/Cargo — custom build, not CMake)
+# Wasmtime (Rust/Cargo - custom build, not CMake)
 # ---------------------------------------------------------------------------
 
 if (WIN32)
@@ -256,7 +256,7 @@ ExternalProject_Add (halogen
 )
 
 # ---------------------------------------------------------------------------
-# Sneeze (the actual project — depends on all libs)
+# Sneeze (the actual project - depends on all libs)
 # ---------------------------------------------------------------------------
 
 ExternalProject_Add (sneeze

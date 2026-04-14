@@ -44,7 +44,7 @@ static void Check (bool bCondition, const char* szName)
 }
 
 // ---------------------------------------------------------------------------
-// Stub interfaces (same as UiContext.cpp — self-contained for the test)
+// Stub interfaces (same as UiContext.cpp - self-contained for the test)
 // ---------------------------------------------------------------------------
 
 namespace

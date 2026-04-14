@@ -149,7 +149,7 @@ static void TestCompileAndCall ()
 }
 
 // ---------------------------------------------------------------------------
-// Test 3: Fuel metering — CPU budget enforcement
+// Test 3: Fuel metering - CPU budget enforcement
 // ---------------------------------------------------------------------------
 static void TestFuelMetering ()
 {
@@ -263,7 +263,7 @@ static void TestFuelMetering ()
 }
 
 // ---------------------------------------------------------------------------
-// Test 4: Error handling — invalid WAT
+// Test 4: Error handling - invalid WAT
 // ---------------------------------------------------------------------------
 static void TestInvalidWat ()
 {
@@ -281,7 +281,7 @@ static void TestInvalidWat ()
 }
 
 // ---------------------------------------------------------------------------
-// Test 5: Host function — calling back from WASM into C++
+// Test 5: Host function - calling back from WASM into C++
 // ---------------------------------------------------------------------------
 static wasm_trap_t* HostMultiply (
    void* /*env*/, wasmtime_caller_t* /*caller*/,

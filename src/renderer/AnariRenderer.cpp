@@ -202,7 +202,7 @@ int ANARI_RENDERER::GetHeight () const
 }
 
 // ---------------------------------------------------------------------------
-//  RebuildWorld — recreate ANARI scene objects from submitted data
+//  RebuildWorld - recreate ANARI scene objects from submitted data
 // ---------------------------------------------------------------------------
 
 void ANARI_RENDERER::RebuildWorld (const std::vector<SPHERE_DATA>& aSpheres,

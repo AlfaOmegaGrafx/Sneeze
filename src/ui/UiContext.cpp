@@ -25,7 +25,7 @@
 namespace
 {
 
-// Minimal system interface — provides elapsed time and logging.
+// Minimal system interface - provides elapsed time and logging.
 class STUB_SYSTEM : public Rml::SystemInterface
 {
 public:
@@ -55,7 +55,7 @@ private:
    std::chrono::steady_clock::time_point tpStart;
 };
 
-// Minimal render interface — stubs every pure virtual so the library
+// Minimal render interface - stubs every pure virtual so the library
 // links and initializes. No pixels are drawn; real rendering comes
 // when RmlUi is wired to ANARI through the SOM.
 class STUB_RENDER : public Rml::RenderInterface
@@ -85,7 +85,7 @@ public:
    void SetScissorRegion (Rml::Rectanglei) override {}
 };
 
-// Minimal font engine — all methods use the base class defaults (no-ops).
+// Minimal font engine - all methods use the base class defaults (no-ops).
 // Real font rendering comes when we integrate FreeType or a custom engine.
 class STUB_FONT_ENGINE : public Rml::FontEngineInterface
 {
