@@ -233,6 +233,14 @@ ExternalProject_Add (nlohmann-json
 # Halogen (Filament-based ANARI implementation)
 # ---------------------------------------------------------------------------
 
+# filament, built through Halogen, no build command
+ExternalProject_Add (filament
+   GIT_REPOSITORY   https://github.com/MetaversalCorp/filament.git
+   GIT_TAG          v1.71.0
+   SOURCE_DIR       "${LIBS_DIR}/filament/src"
+   BUILD_COMMAND ""
+)
+
 ExternalProject_Add (halogen
    GIT_REPOSITORY   https://github.com/MetaversalCorp/Halogen.git
    GIT_TAG          master
@@ -243,6 +251,8 @@ ExternalProject_Add (halogen
       -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
       -DCMAKE_BUILD_TYPE=Release
       -DBUILD_TESTS=OFF
+      -DANARI_ROOT="${LIBS_DIR}/ANARI-SDK/src"
+      -DFILAMENT_ROOT="${LIBS_DIR}/filament/src"
 )
 
 # ---------------------------------------------------------------------------
