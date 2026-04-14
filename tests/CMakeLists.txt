@@ -87,11 +87,14 @@ add_executable (ComputeTest
    ComputeTest.cpp
    ${SRC_DIR}/compute/EmbeddedKernels.cpp
    ${SRC_DIR}/compute/EmbeddedKernels.h
+   ${SRC_DIR}/compute/ComputeDispatch.cpp
+   ${SRC_DIR}/compute/ComputeDispatch.h
    ${KERNEL_RC_FILE}
 )
 add_dependencies (ComputeTest CompileKernels)
 
 target_include_directories (ComputeTest PRIVATE ${SRC_DIR})
+target_link_libraries (ComputeTest PRIVATE anari::anari_static)
 
 # ---------------------------------------------------------------------------
 # Copy runtime DLLs to test output directories

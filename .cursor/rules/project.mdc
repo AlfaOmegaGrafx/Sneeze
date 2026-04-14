@@ -104,17 +104,17 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 
 | Module | Namespace | Purpose | Phase |
 |--------|-----------|---------|-------|
-| `core/` | `sneeze::core` | Foundational types (Epoch, Vec3, Quat) used by all modules | 1 |
-| `renderer/` | `sneeze::renderer` | Abstract rendering interface + ANARI/helide implementation | 1 |
-| `view/` | `sneeze::view` | Camera orbit controller (decoupled from windowing — takes raw input deltas) | 1 |
-| `som/` | `sneeze::som` | Scene Object Model (future) | 2 |
-| `smap/` | `sneeze::smap` | SMAP driver layer (future) | 3 |
-| `wasm/` | `sneeze::wasm` | WASM sandbox runtime (Wasmtime v43.0.0) | 1.5 |
-| `spirv/` | `sneeze::spirv` | SPIR-V validation (SPIRV-Tools, vulkan-sdk-1.4.341.0) | 1.5 |
-| `xr/` | `sneeze::xr` | OpenXR device abstraction (OpenXR SDK 1.1.58) | 1.5 |
-| `net/` | `sneeze::net` | HTTP client (libcurl 8.9.1, static, Schannel SSL) | 1.5 |
-| `ui/` | `sneeze::ui` | UI toolkit (RmlUi 6.2, HTML/CSS retained-mode, stub renderer) | 1.5 |
-| `compute/` | `sneeze::compute` | SPIR-V kernel embedding + retrieval; GPU compute dispatch via ANARI (future) | 1.5 |
+| `core/` | `sneeze::core` | Foundational types (Epoch, Vec3, Quat) used by all modules | PoC |
+| `renderer/` | `sneeze::renderer` | Abstract rendering interface + ANARI/helide implementation | PoC |
+| `view/` | `sneeze::view` | Camera orbit controller (decoupled from windowing — takes raw input deltas) | PoC |
+| `som/` | `sneeze::som` | Scene Object Model (future) | 4 |
+| `smap/` | `sneeze::smap` | SMAP driver layer (future) | 5 |
+| `wasm/` | `sneeze::wasm` | WASM sandbox runtime (Wasmtime v43.0.0) | 1 |
+| `spirv/` | `sneeze::spirv` | SPIR-V validation (SPIRV-Tools, vulkan-sdk-1.4.341.0) | 1 |
+| `xr/` | `sneeze::xr` | OpenXR device abstraction (OpenXR SDK 1.1.58) | 1 |
+| `net/` | `sneeze::net` | HTTP client (libcurl 8.9.1, static, Schannel SSL) | 1 |
+| `ui/` | `sneeze::ui` | UI toolkit (RmlUi 6.2, HTML/CSS retained-mode, stub renderer) | 1 |
+| `compute/` | `sneeze::compute` | SPIR-V kernel embedding, retrieval, and dispatch via ANARI (CPU fallback when device lacks compute extension) | 1 |
 | `identity/` | `sneeze::identity` | Browser-managed identity (future) | — |
 | `audio/` | `sneeze::audio` | Spatial audio mixing (future) | — |
 
@@ -133,6 +133,7 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 | `HTTP_CLIENT` | `net` | libcurl lifecycle (global init/cleanup), synchronous HTTP GET, file download (`DownloadToFile`). Static lib with Schannel SSL. |
 | `UI_CONTEXT` | `ui` | RmlUi lifecycle (init/shutdown). Provides stub system, render, and font engine interfaces. Real ANARI rendering deferred to SOM phase. |
 | `GetEmbeddedKernel()` | `compute` | Retrieves SPIR-V bytecode embedded in the executable via Win32 resources. Returns pointer + size. |
+| `COMPUTE_DISPATCH` | `compute` | Dispatches SPIR-V compute kernels through ANARI. Checks for `SNEEZE_dispatch_compute` device extension via `anariDeviceGetProcAddress`; falls back to registered CPU kernels when unavailable. Built-in CPU fallback for `TEST_PROXIMITY` kernel. Accepts `nullptr` device for CPU-only mode. |
 
 **Naming note:** The concrete renderer class is `HELIDE_RENDERER`, not `ANARI_RENDERER`. The ANARI SDK reserves `ANARI_*` as enum constants (e.g. `ANARI_RENDERER`, `ANARI_CAMERA`), so our class name avoids that prefix to prevent collisions.
 
@@ -188,7 +189,7 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 | Update cycle | `Context.Update()` + `Context.Render()` complete without crash. Proves the layout engine and render dispatch pipeline are functional (stub renderer receives calls). |
 | Multiple contexts | Two simultaneous contexts with distinct names, both create and destroy cleanly. Proves multi-context architecture works. |
 
-**ComputeTest.exe** — Standalone SPIR-V kernel embedding integration test suite (`tests/ComputeTest.cpp`). 11 assertions across 4 test groups, all passing:
+**ComputeTest.exe** — Standalone SPIR-V compute integration test suite (`tests/ComputeTest.cpp`). 20 assertions across 8 test groups, all passing:
 
 | Test | What it proves |
 |------|---------------|
@@ -196,6 +197,10 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 | Unknown kernel lookup | Non-existent kernel name returns null pointer and zero size — clean error path. |
 | Multiple retrievals | Same kernel retrieved twice returns identical pointer and size — resources are stable in memory. |
 | SPIR-V structure validation | Header fields are correct: magic number, version >= 1.0, non-zero ID bound, word-aligned size. |
+| Dispatch construction | `COMPUTE_DISPATCH` constructs with nullptr device. Reports no native compute support (expected without ANARI device). |
+| Proximity kernel dispatch | Full compute pipeline: embedded SPIR-V kernel dispatched via `COMPUTE_DISPATCH` (CPU fallback). 4 test positions dispatched, all computed distances match expected values (3.0, 4.0, 5.0, sqrt(3)). |
+| Non-origin query point | Proximity dispatch with query point at (5,0,0) instead of origin. Verifies the kernel correctly offsets distances. |
+| Unknown kernel dispatch | Dispatch of unregistered kernel name returns false — clean error path, no crash. |
 
 **Note:** The OpenXR loader writes diagnostic messages to stderr when no runtime is found (e.g., "failed to find active runtime file in registry"). These are informational, not errors — they come from the loader's own logging system, not from Sneeze code.
 
@@ -292,8 +297,10 @@ Neil Trevett independently recommended this same approach. The decision was made
    - **Windows:** Win32 resources (`.rc` file, loaded via `FindResource`/`LoadResource`)
    - **Linux:** ELF binary embedding via `objcopy` (symbols: `_binary_*_start`, `_binary_*_end`, `_binary_*_size`)
    - **macOS:** Mach-O section embedding via `ld -sectcreate`
-4. **Dispatch** at runtime through ANARI. The `compute/` module provides a platform-independent `GetEmbeddedKernel()` interface. ANARI routes the SPIR-V to whatever GPU backend is available.
-5. **Fallback** to CPU (plain C++ doing the same math, serial or threaded) on systems where ANARI has no GPU compute device.
+4. **Dispatch** at runtime through ANARI via `COMPUTE_DISPATCH`. The class probes the ANARI device for the `SNEEZE_dispatch_compute` extension using `anariDeviceGetProcAddress`. If the device supports it, the SPIR-V bytecode is passed to the device for native GPU execution. The extension function signature (`PFN_sneeze_dispatch_compute`) accepts device, SPIR-V bytes, workgroup dimensions, buffer bindings (`BUFFER_BINDING` structs with binding index, data pointer, size, read-only flag), and push constants.
+5. **Fallback** to CPU when the ANARI device lacks compute support. `COMPUTE_DISPATCH` maintains a registry of C++ kernel implementations keyed by kernel name. Built-in CPU fallbacks mirror the GLSL logic exactly (e.g., `CpuProximityKernel` for `TEST_PROXIMITY`). Callers can register additional CPU kernels via `RegisterCpuKernel()`. Passing `nullptr` as the ANARI device skips the native check entirely (CPU-only mode).
+
+**Current state (2026-04-14):** ANARI v0.15.0 has no native compute primitives in the core spec. The `anariDeviceGetProcAddress` extension mechanism is the designated path. For native GPU dispatch to work, the Filament-based ANARI device must implement the `SNEEZE_dispatch_compute` extension and handle SPIR-V → Filament compute translation. The CPU fallback is fully functional today. ComputeTest.exe exercises the full pipeline end-to-end (20/20 assertions passing, including verified distance computations).
 
 **Shader/kernel authoring language — GLSL + glslang (decided):**
 
@@ -386,7 +393,7 @@ build\sneeze\tests\Release\UiTest.exe
 build\sneeze\tests\Release\ComputeTest.exe
 ```
 
-## Phase 1 — Solar System Proof of Concept (COMPLETE)
+## Proof of Concept — Solar System (COMPLETE)
 
 Phase 1 ported the existing Solar System simulation (`E:\Dev\SolarSystem\`) from JavaScript/Three.js to C++/ANARI as a disposable proof of concept. The solar system exercises the ANARI rendering pipeline end-to-end (multiple objects, real-time updates, camera controls) while establishing the module structure, build system, and coding conventions that the full browser will use. The astro module and solar system code will be removed as the browser progresses — it exists only to validate the stack, not as permanent functionality.
 
@@ -413,7 +420,7 @@ Phase 1 ported the existing Solar System simulation (`E:\Dev\SolarSystem\`) from
 
 ## Sneeze Roadmap
 
-### Phase 1.5 — Attach Core Runtime APIs
+### Phase 1 — Attach Core Runtime APIs
 
 Integrate the four remaining core runtime APIs into the build system. The goal is not to use them yet — it's to confirm they compile, link, and initialize on the target platform so that no future phase is blocked by a dependency surprise.
 
@@ -423,11 +430,23 @@ Integrate the four remaining core runtime APIs into the build system. The goal i
 | 2 | ~~SPIR-V~~ | **DONE** | SPIRV-Tools + SPIRV-Headers built from source (vulkan-sdk-1.4.341.0). `spirv/SPV_PIPELINE` class (validation only — SPIRV-Cross removed from architecture). SpvTest.exe passes integration tests. |
 | 3 | ~~OpenXR~~ | **DONE** | OpenXR SDK 1.1.58 built from source (static lib). `xr/XR_RUNTIME` class. XrTest.exe passes 10/10 integration tests. |
 | 4 | ~~curl (HTTP client)~~ | **DONE** | libcurl 8.9.1 built from source (static, Schannel SSL). `net/HTTP_CLIENT` class. NetTest.exe passes 20/20 integration tests. |
-| 5 | ~~glslang + SPIR-V compute pipeline~~ | **DONE** | glslang vulkan-sdk-1.4.341.0 built from source (ENABLE_OPT=OFF, ENABLE_HLSL=OFF). `compute/` module with `GetEmbeddedKernel()`. CMake compiles `.comp` → `.spv` at build time, embeds via Win32 `.rc` resources. ComputeTest.exe passes 11/11 integration tests. ANARI compute dispatch deferred until ANARI device supports it. |
-| 6 | Add VisRTX (GPU-accelerated ANARI device) | | Replace helide (CPU ray tracing) with VisRTX (NVIDIA GPU ray tracing ANARI device). No Sneeze code changes — swap the ANARI device, rendering pipeline adapts automatically. |
+| 5 | glslang + SPIR-V compute pipeline | **PENDING** | glslang vulkan-sdk-1.4.341.0 built from source (ENABLE_OPT=OFF, ENABLE_HLSL=OFF). `compute/` module with `GetEmbeddedKernel()` and `COMPUTE_DISPATCH`. CMake compiles `.comp` → `.spv` at build time, embeds via Win32 `.rc` resources. `COMPUTE_DISPATCH` routes through ANARI (`SNEEZE_dispatch_compute` extension via `anariDeviceGetProcAddress`), falls back to CPU when device lacks support. ComputeTest.exe passes 20/20 integration tests. **Remaining:** Native ANARI compute dispatch — requires the Filament-based ANARI device to implement `SNEEZE_dispatch_compute` extension and handle SPIR-V → Filament compute translation. CPU fallback works today. |
+| 6 | Add VisRTX (GPU-accelerated ANARI device) | **DEFERRED** | Replace helide (CPU ray tracing) with VisRTX (NVIDIA GPU ray tracing ANARI device). No Sneeze code changes — swap the ANARI device, rendering pipeline adapts automatically. Deferred — Filament-based ANARI renderer makes this lower priority; VisRTX requires CUDA + OptiX SDK. |
 | 7 | ~~RmlUi (UI toolkit)~~ | **DONE** | RmlUi 6.2 built from source (static lib, no FreeType). `ui/UI_CONTEXT` class with stub system/render/font interfaces. UiTest.exe passes 20/20 integration tests (init, context lifecycle, document loading, update/render cycle, multi-context). |
 
-### Phase 2 — Solar System Polish + Build Hardening
+### Phase 2 — Implement RmlUI Elements
+
+Build out the RmlUI integration from stub interfaces to functional UI components. RmlUI's HTML/CSS retained-mode model will power all browser chrome, developer tools, and service-provided UI surfaces.
+
+| # | Task | Notes |
+|---|------|-------|
+| 1 | Implement font engine | Replace `STUB_FONT_ENGINE` with a real font engine (FreeType or custom). Required for readable text. |
+| 2 | Implement render interface | Connect RmlUi's render calls to ANARI (or a 2D overlay compositor). Currently stubbed. |
+| 3 | Basic chrome elements | Address bar, tab bar, navigation controls — the minimal browser UI shell. |
+| 4 | Developer tools panel | Inspectable SOM tree, network activity, console output. |
+| 5 | Service-provided UI | Allow WASM services to define UI via RmlUI documents injected into the browser. |
+
+### Phase 3 — Solar System Polish + Build Hardening
 
 Complete the solar system demo to visual parity with the JavaScript original, and clean up the build chain.
 
@@ -443,7 +462,7 @@ Complete the solar system demo to visual parity with the JavaScript original, an
 | 9 | Add Sun emissive material | Sun should glow, not just be a matte sphere lit by its own point light |
 | 10 | Moon orbital accuracy | Verify moon positions against JS reference; moons may need parent-relative positioning fixes |
 
-### Phase 3 — Scene Object Model (SOM)
+### Phase 4 — Scene Object Model (SOM)
 
 The SOM is the browser's central data structure — analogous to the DOM in a web browser. It's where all runtime interfaces converge. Without it, there's no way to manage content from multiple sources.
 
@@ -456,7 +475,7 @@ The SOM is the browser's central data structure — analogous to the DOM in a we
 | 5 | Multi-source branch architecture | SOM branches owned by different sources (local astro vs. future fabric services) |
 | 6 | SOM change detection / dirty flagging | Only re-submit changed geometry to ANARI, not the entire scene every frame |
 
-### Phase 4 — SMAP (Networking Abstraction)
+### Phase 5 — SMAP (Networking Abstraction)
 
 SMAP abstracts the network layer so the browser can connect to any spatial fabric service without knowledge of its underlying protocol.
 
@@ -468,20 +487,20 @@ SMAP abstracts the network layer so the browser can connect to any spatial fabri
 | 4 | Proximity-based discovery prototype | Local proximity triggers fabric connection per architecture doc (Section 5) |
 | 5 | Multi-fabric simultaneous connection | Browser maintains connections to multiple fabrics, each owning SOM branches |
 
-### Phase 5 — WASM (Content Execution Sandbox)
+### Phase 6 — WASM (Content Execution Sandbox)
 
-WASM provides sandboxed execution for third-party service logic with per-service memory isolation. Wasmtime v43.0.0 is already integrated (Phase 1.5) with engine/store lifecycle and a passing test suite. This phase builds on that foundation to create the actual service execution infrastructure.
+WASM provides sandboxed execution for third-party service logic with per-service memory isolation. Wasmtime v43.0.0 is already integrated (Phase 1) with engine/store lifecycle and a passing test suite. This phase builds on that foundation to create the actual service execution infrastructure.
 
 | # | Task | Notes |
 |---|------|-------|
-| 1 | ~~Evaluate WASM runtimes~~ | **DONE in Phase 1.5.** Selected Wasmtime v43.0.0. |
-| 2 | ~~Initial `wasm/` module integration~~ | **DONE in Phase 1.5.** `WASM_RUNTIME` class, 21/21 integration tests passing. |
+| 1 | ~~Evaluate WASM runtimes~~ | **DONE in Phase 1.** Selected Wasmtime v43.0.0. |
+| 2 | ~~Initial `wasm/` module integration~~ | **DONE in Phase 1.** `WASM_RUNTIME` class, 21/21 integration tests passing. |
 | 3 | Expand `wasm/` module for multi-instance lifecycle | Per-service store creation, memory isolation between instances, clean teardown |
 | 4 | Define service-to-browser host API | What WASM services can do: create SOM nodes, request resources, respond to proximity |
 | 5 | Load and execute a trivial WASM service | Proof of concept: WASM module creates a SOM node |
 | 6 | Per-service isolation verification | Confirm memory isolation, resource limits (fuel + memory caps), concurrent instances |
 
-### Phase 6 — OpenXR Integration
+### Phase 7 — OpenXR Integration
 
 OpenXR provides a unified API for VR/AR devices, enabling Sneeze to run on headsets.
 
@@ -493,7 +512,7 @@ OpenXR provides a unified API for VR/AR devices, enabling Sneeze to run on heads
 | 4 | Controller input mapping | Map OpenXR input actions to browser navigation and interaction |
 | 5 | AR passthrough / anchoring | Physical-world anchoring per architecture doc (Section 12) |
 
-### Phase 7 — Identity + Audio + Content Ecosystem
+### Phase 8 — Identity + Audio + Content Ecosystem
 
 Supporting components that can be developed in parallel with or after the core phases.
 
@@ -508,9 +527,8 @@ Supporting components that can be developed in parallel with or after the core p
 
 | # | Task | Notes |
 |---|------|-------|
-| 1 | Cross-platform builds (Linux, macOS) | ANARI is cross-platform; CMake should support this with minimal changes |
-| 2 | GPU-accelerated ANARI device | Replace helide with a Vulkan/Metal/DX12 ANARI device for production frame rates |
-| 3 | Performance profiling and optimization | Frame time budgets, SOM traversal cost, ANARI submission overhead |
-| 4 | Test framework | Unit tests for core/astro math, integration tests for renderer |
-| 5 | CI/CD pipeline | Automated builds, test runs on commit |
+| 1 | GPU-accelerated ANARI device | Replace helide with a Vulkan/Metal/DX12 ANARI device for production frame rates |
+| 2 | Performance profiling and optimization | Frame time budgets, SOM traversal cost, ANARI submission overhead |
+| 3 | Test framework | Unit tests for core/astro math, integration tests for renderer |
+| 4 | CI/CD pipeline | Automated builds, test runs on commit |
 

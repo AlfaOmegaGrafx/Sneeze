@@ -155,8 +155,8 @@ set (NET_HEADERS     net/HttpClient.h)
 set (UI_SOURCES      ui/UiContext.cpp)
 set (UI_HEADERS      ui/UiContext.h)
 
-set (COMPUTE_SOURCES compute/EmbeddedKernels.cpp)
-set (COMPUTE_HEADERS compute/EmbeddedKernels.h)
+set (COMPUTE_SOURCES compute/EmbeddedKernels.cpp compute/ComputeDispatch.cpp)
+set (COMPUTE_HEADERS compute/EmbeddedKernels.h compute/ComputeDispatch.h)
 
 # ---------------------------------------------------------------------------
 # Static library

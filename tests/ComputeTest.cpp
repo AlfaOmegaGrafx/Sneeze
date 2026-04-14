@@ -13,11 +13,13 @@
 // limitations under the License.
 
 #include "compute/EmbeddedKernels.h"
+#include "compute/ComputeDispatch.h"
 
 #include <cstdio>
 #include <cstdlib>
 #include <cstdint>
 #include <cstring>
+#include <cmath>
 
 static int nPassed = 0;
 static int nFailed = 0;
@@ -103,15 +105,108 @@ static void TestSpvStructure ()
    }
 }
 
+static void TestDispatchConstruction ()
+{
+   std::printf ("\n--- Compute dispatch construction ---\n");
+
+   sneeze::compute::COMPUTE_DISPATCH pDispatch (nullptr);
+   Check (!pDispatch.SupportsNativeCompute (), "No native compute without ANARI device");
+}
+
+static void TestProximityDispatch ()
+{
+   std::printf ("\n--- Proximity kernel dispatch (CPU fallback) ---\n");
+
+   sneeze::compute::COMPUTE_DISPATCH pDispatch (nullptr);
+
+   float aPositions[] = {
+      3.0f, 0.0f, 0.0f, 1.0f,
+      0.0f, 4.0f, 0.0f, 1.0f,
+      3.0f, 4.0f, 0.0f, 1.0f,
+      1.0f, 1.0f, 1.0f, 1.0f
+   };
+
+   float aDistances[4] = { -1.0f, -1.0f, -1.0f, -1.0f };
+
+   sneeze::compute::BUFFER_BINDING aBindings[2];
+   aBindings[0] = { 0, aPositions, sizeof (aPositions), true };
+   aBindings[1] = { 1, aDistances, sizeof (aDistances), false };
+
+   struct { float dX, dY, dZ, dW; uint32_t nCount; } pushConstants =
+      { 0.0f, 0.0f, 0.0f, 0.0f, 4 };
+
+   bool bResult = pDispatch.Dispatch (
+      "TEST_PROXIMITY", 1, 1, 1,
+      aBindings, 2,
+      &pushConstants, sizeof (pushConstants)
+   );
+
+   Check (bResult, "Dispatch returned true");
+
+   float dTolerance = 0.001f;
+   Check (std::fabs (aDistances[0] - 3.0f) < dTolerance, "Distance[0] = 3.0 (single axis)");
+   Check (std::fabs (aDistances[1] - 4.0f) < dTolerance, "Distance[1] = 4.0 (single axis)");
+   Check (std::fabs (aDistances[2] - 5.0f) < dTolerance, "Distance[2] = 5.0 (3-4-5 triangle)");
+   Check (std::fabs (aDistances[3] - std::sqrt (3.0f)) < dTolerance, "Distance[3] = sqrt(3) (diagonal)");
+
+   std::printf ("    Results: %.3f, %.3f, %.3f, %.3f\n",
+      aDistances[0], aDistances[1], aDistances[2], aDistances[3]);
+}
+
+static void TestNonOriginQuery ()
+{
+   std::printf ("\n--- Proximity dispatch with non-origin query point ---\n");
+
+   sneeze::compute::COMPUTE_DISPATCH pDispatch (nullptr);
+
+   float aPositions[] = {
+      10.0f, 0.0f, 0.0f, 1.0f,
+       0.0f, 0.0f, 0.0f, 1.0f
+   };
+
+   float aDistances[2] = { -1.0f, -1.0f };
+
+   sneeze::compute::BUFFER_BINDING aBindings[2];
+   aBindings[0] = { 0, aPositions, sizeof (aPositions), true };
+   aBindings[1] = { 1, aDistances, sizeof (aDistances), false };
+
+   struct { float dX, dY, dZ, dW; uint32_t nCount; } pushConstants =
+      { 5.0f, 0.0f, 0.0f, 0.0f, 2 };
+
+   pDispatch.Dispatch (
+      "TEST_PROXIMITY", 1, 1, 1,
+      aBindings, 2,
+      &pushConstants, sizeof (pushConstants)
+   );
+
+   float dTolerance = 0.001f;
+   Check (std::fabs (aDistances[0] - 5.0f) < dTolerance, "Distance from (5,0,0) to (10,0,0) = 5.0");
+   Check (std::fabs (aDistances[1] - 5.0f) < dTolerance, "Distance from (5,0,0) to (0,0,0) = 5.0");
+}
+
+static void TestUnknownKernelDispatch ()
+{
+   std::printf ("\n--- Unknown kernel dispatch ---\n");
+
+   sneeze::compute::COMPUTE_DISPATCH pDispatch (nullptr);
+
+   bool bResult = pDispatch.Dispatch ("NONEXISTENT_KERNEL", 1, 1, 1, nullptr, 0, nullptr, 0);
+   Check (!bResult, "Dispatch of unknown kernel returns false");
+}
+
 int main ()
 {
-   std::printf ("ComputeTest - SPIR-V Embedded Kernel Integration Tests\n");
+   std::printf ("ComputeTest - SPIR-V Compute Integration Tests\n");
    std::printf ("=======================================================\n");
 
    TestEmbeddedKernelRetrieval ();
    TestUnknownKernel ();
    TestMultipleRetrievals ();
    TestSpvStructure ();
+   TestDispatchConstruction ();
+   TestProximityDispatch ();
+   TestNonOriginQuery ();
+   TestUnknownKernelDispatch ();
 
    std::printf ("\n=======================================================\n");
    std::printf ("Results: %d passed, %d failed, %d total\n",
