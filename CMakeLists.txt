@@ -34,6 +34,8 @@ ExternalProject_Add (spirv-headers
    CMAKE_ARGS
       -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
       -DCMAKE_BUILD_TYPE=Release
+      -DSPIRV_HEADERS_ENABLE_TESTS=OFF
+      -DSPIRV_HEADERS_ENABLE_INSTALL=ON
 )
 
 # ---------------------------------------------------------------------------
@@ -90,6 +92,8 @@ ExternalProject_Add (anari-sdk
    CMAKE_ARGS
       -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
       -DCMAKE_BUILD_TYPE=Release
+      -DCMAKE_POLICY_DEFAULT_CMP0091=NEW
+      -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>DLL
       -DBUILD_HELIDE_DEVICE=ON
       -DBUILD_TESTING=OFF
       -DBUILD_EXAMPLES=OFF
@@ -233,17 +237,31 @@ ExternalProject_Add (nlohmann-json
 # Halogen (Filament-based ANARI implementation)
 # ---------------------------------------------------------------------------
 
-# filament, built through Halogen, no build command
+# Filament SDK, built and installed separately for Halogen consumption.
+if (WIN32)
+   set (FILAMENT_CRT_ARGS -DUSE_STATIC_CRT=OFF -DDIST_DIR=x86_64/md)
+endif ()
+
 ExternalProject_Add (filament
    GIT_REPOSITORY   https://github.com/MetaversalCorp/filament.git
-   GIT_TAG          v1.71.0
+   GIT_TAG          main
+   GIT_SHALLOW      ON
    SOURCE_DIR       "${LIBS_DIR}/filament/src"
-   BUILD_COMMAND ""
+   BINARY_DIR       "${LIBS_DIR}/filament/build"
+   INSTALL_DIR      "${LIBS_DIR}/filament/install"
+   CMAKE_ARGS
+      -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+      -DCMAKE_BUILD_TYPE=Release
+      -DFILAMENT_BUILD_TESTING=OFF
+      -DFILAMENT_SKIP_SAMPLES=ON
+      -DFILAMENT_SUPPORTS_VULKAN=ON
+      ${FILAMENT_CRT_ARGS}
 )
 
 ExternalProject_Add (halogen
    GIT_REPOSITORY   https://github.com/MetaversalCorp/Halogen.git
    GIT_TAG          master
+   GIT_SHALLOW      ON
    SOURCE_DIR       "${LIBS_DIR}/Halogen/src"
    BINARY_DIR       "${LIBS_DIR}/Halogen/build"
    INSTALL_DIR      "${LIBS_DIR}/Halogen/install"
@@ -251,8 +269,10 @@ ExternalProject_Add (halogen
       -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
       -DCMAKE_BUILD_TYPE=Release
       -DBUILD_TESTS=OFF
-      -DANARI_ROOT="${LIBS_DIR}/ANARI-SDK/src"
-      -DFILAMENT_ROOT="${LIBS_DIR}/filament/src"
+      -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>DLL
+      -DANARI_ROOT=${LIBS_DIR}/ANARI-SDK/install
+      -DFILAMENT_ROOT=${LIBS_DIR}/filament/install
+   DEPENDS anari-sdk filament
 )
 
 # ---------------------------------------------------------------------------
