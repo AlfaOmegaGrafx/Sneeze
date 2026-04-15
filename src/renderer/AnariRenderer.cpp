@@ -81,6 +81,10 @@ bool ANARI_RENDERER::Initialize (int nWidth, int nHeight)
 
       float bgColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
       anariSetParameter (m_pDevice, m_pRenderer, "background", ANARI_FLOAT32_VEC4, bgColor);
+      float ambientColor[3] = { 1.0f, 1.0f, 1.0f };
+      float ambientRadiance = 0.2f;
+      anariSetParameter (m_pDevice, m_pRenderer, "ambientColor", ANARI_FLOAT32_VEC3, ambientColor);
+      anariSetParameter (m_pDevice, m_pRenderer, "ambientRadiance", ANARI_FLOAT32, &ambientRadiance);
       anariCommitParameters (m_pDevice, m_pRenderer);
 
       m_pFrame = anariNewFrame (m_pDevice);
@@ -178,6 +182,7 @@ void ANARI_RENDERER::EndFrame ()
    uint32_t nW = 0, nH = 0;
    ANARIDataType nType = ANARI_UNKNOWN;
    const void* pData = anariMapFrame (m_pDevice, m_pFrame, "channel.color", &nW, &nH, &nType);
+
 
    if (pData)
    {
@@ -312,13 +317,13 @@ void ANARI_RENDERER::RebuildWorld (const std::vector<SPHERE_DATA>& aSpheres,
 
    // --- Point light at origin (the Sun) ---
 
-   ANARILight pLight = anariNewLight (m_pDevice, "point");
-   float lightPos[3] = { 0.0f, 0.0f, 0.0f };
+   ANARILight pLight = anariNewLight (m_pDevice, "directional");
+   float lightDir[3] = { -0.5f, -1.0f, -0.5f };
    float lightColor[3] = { 1.0f, 1.0f, 0.95f };
-   float lightIntensity = 1.0f;
-   anariSetParameter (m_pDevice, pLight, "position", ANARI_FLOAT32_VEC3, lightPos);
+   float lightIntensity = 3.0f;
+   anariSetParameter (m_pDevice, pLight, "direction", ANARI_FLOAT32_VEC3, lightDir);
    anariSetParameter (m_pDevice, pLight, "color", ANARI_FLOAT32_VEC3, lightColor);
-   anariSetParameter (m_pDevice, pLight, "intensity", ANARI_FLOAT32, &lightIntensity);
+   anariSetParameter (m_pDevice, pLight, "irradiance", ANARI_FLOAT32, &lightIntensity);
    anariCommitParameters (m_pDevice, pLight);
 
    ANARIArray1D pLightArr = anariNewArray1D (m_pDevice, &pLight, nullptr, nullptr,
