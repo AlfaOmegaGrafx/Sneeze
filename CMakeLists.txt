@@ -21,6 +21,60 @@ include (ExternalProject)
 set (LIBS_DIR "${CMAKE_SOURCE_DIR}/libs")
 
 # ---------------------------------------------------------------------------
+# Feature gates (forwarded from parent or set here)
+# ---------------------------------------------------------------------------
+
+option (SNEEZE_ENABLE_WASM "Enable WebAssembly runtime (Wasmtime)" ON)
+option (SNEEZE_ENABLE_XR   "Enable OpenXR integration" ON)
+
+# Automatically disable XR on iOS
+if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
+   set (SNEEZE_ENABLE_XR OFF CACHE BOOL "" FORCE)
+endif ()
+
+# ---------------------------------------------------------------------------
+# Cross-compilation variable forwarding
+# ---------------------------------------------------------------------------
+# When cross-compiling, these variables are forwarded to every CMake-based
+# ExternalProject_Add so that all dependencies build for the target platform.
+
+set (CROSS_COMPILE_ARGS)
+
+if (CMAKE_TOOLCHAIN_FILE)
+   list (APPEND CROSS_COMPILE_ARGS -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE})
+endif ()
+if (CMAKE_SYSTEM_NAME)
+   list (APPEND CROSS_COMPILE_ARGS -DCMAKE_SYSTEM_NAME=${CMAKE_SYSTEM_NAME})
+endif ()
+if (CMAKE_SYSTEM_PROCESSOR)
+   list (APPEND CROSS_COMPILE_ARGS -DCMAKE_SYSTEM_PROCESSOR=${CMAKE_SYSTEM_PROCESSOR})
+endif ()
+if (CMAKE_OSX_ARCHITECTURES)
+   list (APPEND CROSS_COMPILE_ARGS "-DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}")
+endif ()
+if (CMAKE_OSX_DEPLOYMENT_TARGET)
+   list (APPEND CROSS_COMPILE_ARGS -DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET})
+endif ()
+if (CMAKE_OSX_SYSROOT)
+   list (APPEND CROSS_COMPILE_ARGS -DCMAKE_OSX_SYSROOT=${CMAKE_OSX_SYSROOT})
+endif ()
+if (CMAKE_ANDROID_NDK)
+   list (APPEND CROSS_COMPILE_ARGS -DCMAKE_ANDROID_NDK=${CMAKE_ANDROID_NDK})
+endif ()
+if (ANDROID_ABI)
+   list (APPEND CROSS_COMPILE_ARGS -DANDROID_ABI=${ANDROID_ABI})
+endif ()
+if (ANDROID_PLATFORM)
+   list (APPEND CROSS_COMPILE_ARGS -DANDROID_PLATFORM=${ANDROID_PLATFORM})
+endif ()
+if (CMAKE_C_COMPILER)
+   list (APPEND CROSS_COMPILE_ARGS -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER})
+endif ()
+if (CMAKE_CXX_COMPILER)
+   list (APPEND CROSS_COMPILE_ARGS -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER})
+endif ()
+
+# ---------------------------------------------------------------------------
 # SPIRV-Headers (header-only, required by SPIRV-Tools)
 # ---------------------------------------------------------------------------
 
@@ -36,6 +90,7 @@ ExternalProject_Add (spirv-headers
       -DCMAKE_BUILD_TYPE=Release
       -DSPIRV_HEADERS_ENABLE_TESTS=OFF
       -DSPIRV_HEADERS_ENABLE_INSTALL=ON
+      ${CROSS_COMPILE_ARGS}
 )
 
 # ---------------------------------------------------------------------------
@@ -55,6 +110,7 @@ ExternalProject_Add (spirv-tools
       -DSPIRV-Headers_SOURCE_DIR=${LIBS_DIR}/SPIRV-Headers/src
       -DSPIRV_SKIP_TESTS=ON
       -DSPIRV_SKIP_EXECUTABLES=ON
+      ${CROSS_COMPILE_ARGS}
    DEPENDS spirv-headers
 )
 
@@ -62,21 +118,36 @@ ExternalProject_Add (spirv-tools
 # glslang (depends on SPIRV-Tools for optimizer integration)
 # ---------------------------------------------------------------------------
 
-ExternalProject_Add (glslang
-   GIT_REPOSITORY   https://github.com/KhronosGroup/glslang.git
-   GIT_TAG          vulkan-sdk-1.4.341.0
-   GIT_SHALLOW      ON
-   SOURCE_DIR       "${LIBS_DIR}/glslang/src"
-   BINARY_DIR       "${LIBS_DIR}/glslang/build"
-   INSTALL_DIR      "${LIBS_DIR}/glslang/install"
-   CMAKE_ARGS
-      -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-      -DCMAKE_BUILD_TYPE=Release
-      -DENABLE_CTEST=OFF
-      -DENABLE_OPT=OFF
-      -DENABLE_HLSL=OFF
-   DEPENDS spirv-tools
-)
+# ---------------------------------------------------------------------------
+# glslang — build-time tool, must run on the HOST when cross-compiling
+# ---------------------------------------------------------------------------
+# When cross-compiling, glslang is built WITHOUT the cross-toolchain so it
+# produces a host-native executable.  Set GLSLANG_HOST_DIR to point to a
+# pre-built host glslang to skip this step entirely.
+
+set (GLSLANG_HOST_DIR "" CACHE PATH "Pre-built host glslang directory (skip build)")
+
+if (GLSLANG_HOST_DIR)
+   # Use pre-built glslang from the specified path
+   add_custom_target (glslang)
+else ()
+   # glslang is a build tool — always build for the host, not the target
+   ExternalProject_Add (glslang
+      GIT_REPOSITORY   https://github.com/KhronosGroup/glslang.git
+      GIT_TAG          vulkan-sdk-1.4.341.0
+      GIT_SHALLOW      ON
+      SOURCE_DIR       "${LIBS_DIR}/glslang/src"
+      BINARY_DIR       "${LIBS_DIR}/glslang/build"
+      INSTALL_DIR      "${LIBS_DIR}/glslang/install"
+      CMAKE_ARGS
+         -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+         -DCMAKE_BUILD_TYPE=Release
+         -DENABLE_CTEST=OFF
+         -DENABLE_OPT=OFF
+         -DENABLE_HLSL=OFF
+      DEPENDS spirv-tools
+   )
+endif ()
 
 # ---------------------------------------------------------------------------
 # ANARI-SDK (with helide device)
@@ -97,24 +168,30 @@ ExternalProject_Add (anari-sdk
       -DBUILD_HELIDE_DEVICE=ON
       -DBUILD_TESTING=OFF
       -DBUILD_EXAMPLES=OFF
+      ${CROSS_COMPILE_ARGS}
 )
 
 # ---------------------------------------------------------------------------
-# OpenXR-SDK
+# OpenXR-SDK (skipped when SNEEZE_ENABLE_XR=OFF)
 # ---------------------------------------------------------------------------
 
-ExternalProject_Add (openxr-sdk
-   GIT_REPOSITORY   https://github.com/KhronosGroup/OpenXR-SDK.git
-   GIT_TAG          release-1.1.58
-   GIT_SHALLOW      ON
-   SOURCE_DIR       "${LIBS_DIR}/OpenXR-SDK/src"
-   BINARY_DIR       "${LIBS_DIR}/OpenXR-SDK/build"
-   INSTALL_DIR      "${LIBS_DIR}/OpenXR-SDK/install"
-   CMAKE_ARGS
-      -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-      -DCMAKE_BUILD_TYPE=Release
-      -DDYNAMIC_LOADER=OFF
-)
+if (SNEEZE_ENABLE_XR)
+   ExternalProject_Add (openxr-sdk
+      GIT_REPOSITORY   https://github.com/KhronosGroup/OpenXR-SDK.git
+      GIT_TAG          release-1.1.58
+      GIT_SHALLOW      ON
+      SOURCE_DIR       "${LIBS_DIR}/OpenXR-SDK/src"
+      BINARY_DIR       "${LIBS_DIR}/OpenXR-SDK/build"
+      INSTALL_DIR      "${LIBS_DIR}/OpenXR-SDK/install"
+      CMAKE_ARGS
+         -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+         -DCMAKE_BUILD_TYPE=Release
+         -DDYNAMIC_LOADER=OFF
+         ${CROSS_COMPILE_ARGS}
+   )
+else ()
+   add_custom_target (openxr-sdk)
+endif ()
 
 # ---------------------------------------------------------------------------
 # curl
@@ -122,7 +199,14 @@ ExternalProject_Add (openxr-sdk
 
 if (WIN32)
    set (CURL_SSL_ARGS -DCURL_USE_SCHANNEL=ON -DCURL_USE_OPENSSL=OFF)
+elseif (CMAKE_SYSTEM_NAME STREQUAL "iOS")
+   # iOS: use Apple's Secure Transport
+   set (CURL_SSL_ARGS -DCURL_USE_SECTRANSPORT=ON -DCURL_USE_OPENSSL=OFF -DCURL_USE_SCHANNEL=OFF)
+elseif (ANDROID)
+   # Android: OpenSSL (must be pre-built or built alongside)
+   set (CURL_SSL_ARGS -DCURL_USE_OPENSSL=ON -DCURL_USE_SCHANNEL=OFF)
 else ()
+   # macOS, Linux
    set (CURL_SSL_ARGS -DCURL_USE_SCHANNEL=OFF -DCURL_USE_OPENSSL=ON)
 endif ()
 
@@ -139,6 +223,7 @@ ExternalProject_Add (curl
       -DBUILD_SHARED_LIBS=OFF
       -DBUILD_CURL_EXE=OFF
       ${CURL_SSL_ARGS}
+      ${CROSS_COMPILE_ARGS}
 )
 
 # ---------------------------------------------------------------------------
@@ -158,25 +243,55 @@ ExternalProject_Add (rmlui
       -DBUILD_SHARED_LIBS=OFF
       -DBUILD_SAMPLES=OFF
       -DRMLUI_FONT_ENGINE=none
+      ${CROSS_COMPILE_ARGS}
 )
 
 # ---------------------------------------------------------------------------
-# Wasmtime (Rust/Cargo - custom build, not CMake)
+# Wasmtime (Rust/Cargo — custom build, not CMake)
+# Skipped when SNEEZE_ENABLE_WASM=OFF
 # ---------------------------------------------------------------------------
 
-if (WIN32)
+if (SNEEZE_ENABLE_WASM)
+
+# Map CMake target to Rust target triple for cross-compilation
+set (WASMTIME_CARGO_TARGET "" CACHE STRING "Rust target triple for Wasmtime cross-compilation")
+set (WASMTIME_TARGET_DIR "release")
+
+if (WASMTIME_CARGO_TARGET)
+   set (WASMTIME_TARGET_DIR "${WASMTIME_CARGO_TARGET}/release")
+   set (WASMTIME_CARGO_TARGET_ARG --target ${WASMTIME_CARGO_TARGET})
+else ()
+   set (WASMTIME_CARGO_TARGET_ARG)
+endif ()
+
+# Determine library filename based on target
+if (WIN32 AND NOT WASMTIME_CARGO_TARGET)
    set (WASMTIME_COPY_CMDS
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
-         "<SOURCE_DIR>/target/release/wasmtime.dll"
+         "<SOURCE_DIR>/target/${WASMTIME_TARGET_DIR}/wasmtime.dll"
          "<INSTALL_DIR>/lib/wasmtime.dll"
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
-         "<SOURCE_DIR>/target/release/wasmtime.dll.lib"
+         "<SOURCE_DIR>/target/${WASMTIME_TARGET_DIR}/wasmtime.dll.lib"
          "<INSTALL_DIR>/lib/wasmtime.dll.lib"
    )
+elseif (APPLE OR (WASMTIME_CARGO_TARGET MATCHES "apple"))
+   set (WASMTIME_COPY_CMDS
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+         "<SOURCE_DIR>/target/${WASMTIME_TARGET_DIR}/libwasmtime.dylib"
+         "<INSTALL_DIR>/lib/libwasmtime.dylib"
+   )
+   # iOS requires static library (no custom dylibs allowed)
+   if (CMAKE_SYSTEM_NAME STREQUAL "iOS" OR (WASMTIME_CARGO_TARGET MATCHES "ios"))
+      set (WASMTIME_COPY_CMDS
+         COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "<SOURCE_DIR>/target/${WASMTIME_TARGET_DIR}/libwasmtime.a"
+            "<INSTALL_DIR>/lib/libwasmtime.a"
+      )
+   endif ()
 else ()
    set (WASMTIME_COPY_CMDS
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
-         "<SOURCE_DIR>/target/release/libwasmtime.so"
+         "<SOURCE_DIR>/target/${WASMTIME_TARGET_DIR}/libwasmtime.so"
          "<INSTALL_DIR>/lib/libwasmtime.so"
    )
 endif ()
@@ -189,7 +304,11 @@ cmake_minimum_required (VERSION 3.20)
 file (MAKE_DIRECTORY "${DST}/include")
 file (MAKE_DIRECTORY "${DST}/lib")
 file (COPY "${SRC}/crates/c-api/include/" DESTINATION "${DST}/include")
-file (GLOB _gen_dirs "${SRC}/target/release/build/wasmtime-c-api-impl-*/out/include")
+file (GLOB _gen_dirs "${SRC}/target/${TARGET_DIR}/build/wasmtime-c-api-impl-*/out/include")
+if (NOT _gen_dirs)
+   # Fallback: non-cross path
+   file (GLOB _gen_dirs "${SRC}/target/release/build/wasmtime-c-api-impl-*/out/include")
+endif ()
 list (LENGTH _gen_dirs _n)
 if (_n GREATER 0)
    list (GET _gen_dirs 0 _gen)
@@ -206,15 +325,22 @@ ExternalProject_Add (wasmtime
    BINARY_DIR       "${LIBS_DIR}/Wasmtime/build"
    INSTALL_DIR      "${LIBS_DIR}/Wasmtime/install"
    CONFIGURE_COMMAND ""
-   BUILD_COMMAND     cargo build --release -p wasmtime-c-api --manifest-path <SOURCE_DIR>/Cargo.toml
+   BUILD_COMMAND     cargo build --release -p wasmtime-c-api
+                        --manifest-path <SOURCE_DIR>/Cargo.toml
+                        ${WASMTIME_CARGO_TARGET_ARG}
    INSTALL_COMMAND
       ${CMAKE_COMMAND}
          -DSRC=<SOURCE_DIR>
          -DDST=<INSTALL_DIR>
+         -DTARGET_DIR=${WASMTIME_TARGET_DIR}
          -P "${CMAKE_BINARY_DIR}/wasmtime-install.cmake"
       ${WASMTIME_COPY_CMDS}
    BUILD_IN_SOURCE   OFF
 )
+
+else ()  # SNEEZE_ENABLE_WASM=OFF
+   add_custom_target (wasmtime)
+endif ()
 
 # ---------------------------------------------------------------------------
 # nlohmann/json (header-only JSON library)
@@ -231,6 +357,7 @@ ExternalProject_Add (nlohmann-json
       -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
       -DCMAKE_BUILD_TYPE=Release
       -DJSON_BuildTests=OFF
+      ${CROSS_COMPILE_ARGS}
 )
 
 # ---------------------------------------------------------------------------
@@ -240,6 +367,15 @@ ExternalProject_Add (nlohmann-json
 # Filament SDK, built and installed separately for Halogen consumption.
 if (WIN32)
    set (FILAMENT_CRT_ARGS -DUSE_STATIC_CRT=OFF -DDIST_DIR=x86_64/md)
+endif ()
+
+# Select Filament rendering backend per platform
+if (APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+   set (FILAMENT_BACKEND_ARGS -DFILAMENT_SUPPORTS_METAL=ON -DFILAMENT_SUPPORTS_VULKAN=OFF)
+elseif (CMAKE_SYSTEM_NAME STREQUAL "iOS")
+   set (FILAMENT_BACKEND_ARGS -DFILAMENT_SUPPORTS_METAL=ON -DFILAMENT_SUPPORTS_VULKAN=OFF)
+else ()
+   set (FILAMENT_BACKEND_ARGS -DFILAMENT_SUPPORTS_VULKAN=ON)
 endif ()
 
 ExternalProject_Add (filament
@@ -254,8 +390,9 @@ ExternalProject_Add (filament
       -DCMAKE_BUILD_TYPE=Release
       -DFILAMENT_BUILD_TESTING=OFF
       -DFILAMENT_SKIP_SAMPLES=ON
-      -DFILAMENT_SUPPORTS_VULKAN=ON
+      ${FILAMENT_BACKEND_ARGS}
       ${FILAMENT_CRT_ARGS}
+      ${CROSS_COMPILE_ARGS}
 )
 
 ExternalProject_Add (halogen
@@ -272,12 +409,26 @@ ExternalProject_Add (halogen
       -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>DLL
       -DANARI_ROOT=${LIBS_DIR}/ANARI-SDK/install
       -DFILAMENT_ROOT=${LIBS_DIR}/filament/install
+      ${CROSS_COMPILE_ARGS}
    DEPENDS anari-sdk filament
 )
 
 # ---------------------------------------------------------------------------
 # Sneeze (the actual project - depends on all libs)
 # ---------------------------------------------------------------------------
+
+# Determine which SuperBuild targets Sneeze depends on
+set (SNEEZE_DEPENDS
+   anari-sdk
+   wasmtime
+   spirv-tools
+   glslang
+   openxr-sdk
+   curl
+   rmlui
+   nlohmann-json
+   halogen
+)
 
 ExternalProject_Add (sneeze
    SOURCE_DIR       "${CMAKE_SOURCE_DIR}/src"
@@ -286,14 +437,9 @@ ExternalProject_Add (sneeze
    CMAKE_ARGS
       -DCMAKE_BUILD_TYPE=Release
       -DLIBS_DIR=${LIBS_DIR}
+      -DSNEEZE_ENABLE_WASM=${SNEEZE_ENABLE_WASM}
+      -DSNEEZE_ENABLE_XR=${SNEEZE_ENABLE_XR}
+      ${CROSS_COMPILE_ARGS}
    DEPENDS
-      anari-sdk
-      wasmtime
-      spirv-tools
-      glslang
-      openxr-sdk
-      curl
-      rmlui
-      nlohmann-json
-      halogen
+      ${SNEEZE_DEPENDS}
 )
