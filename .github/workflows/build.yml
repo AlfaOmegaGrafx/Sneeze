@@ -9,151 +9,419 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
-jobs:
-  # ---------------------------------------------------------------------------
-  # macOS — all deps in one job (order matters for dep chains), then Sneeze
-  # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Dependency tiers:
+#   Tier 0: no deps           — all parallel
+#   Tier 1: needs tier 0 deps — spirv-tools(→spirv-headers), halogen(→anari-sdk+filament)
+#   Tier 2: needs tier 1 deps — glslang(→spirv-tools)
+#   Sneeze: needs all
+# ---------------------------------------------------------------------------
 
-  macos-deps:
+jobs:
+
+  # =========================================================================
+  # macOS
+  # =========================================================================
+
+  macos-tier0:
     runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        dep: [spirv-headers, anari-sdk, openxr-sdk, curl, rmlui, nlohmann-json, wasmtime, filament]
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache libs
+      - name: Cache ${{ matrix.dep }}
         id: cache
         uses: actions/cache@v4
         with:
-          path: libs-macos
-          key: macos-libs-${{ hashFiles('CMakeLists.txt') }}
+          path: libs-macos/${{ matrix.dep }}
+          key: macos-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
 
       - name: Install Rust
-        if: steps.cache.outputs.cache-hit != 'true'
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
-
-      - name: Build all deps
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: |
-          chmod +x scripts/build-deps.sh
-          ./scripts/build-deps.sh \
-            --build-dir build-macos \
-            --libs-dir ${{ github.workspace }}/libs-macos \
-            -DCMAKE_OSX_ARCHITECTURES=arm64 \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
-
-      - name: Upload libs artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-libs
-          path: libs-macos
-          retention-days: 7
-
-  macos-sneeze:
-    needs: macos-deps
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download libs
-        uses: actions/download-artifact@v4
-        with:
-          name: macos-libs
-          path: libs-macos
-
-      - name: Install Rust
+        if: matrix.dep == 'wasmtime' && steps.cache.outputs.cache-hit != 'true'
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Build Sneeze
+      - name: Build ${{ matrix.dep }}
+        if: steps.cache.outputs.cache-hit != 'true'
         run: |
-          cmake -S . -B build-macos \
+          cmake -S . -B build \
             -DLIBS_DIR=${{ github.workspace }}/libs-macos \
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
-          cmake --build build-macos --target sneeze --parallel $(sysctl -n hw.ncpu)
+          cmake --build build --target ${{ matrix.dep }} --parallel $(sysctl -n hw.ncpu)
 
-      - name: Run tests
-        run: |
-          cd build-macos/sneeze
-          ctest --output-on-failure --parallel $(sysctl -n hw.ncpu) || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.dep }}
+          path: libs-macos/${{ matrix.dep }}
+          retention-days: 3
 
-  # ---------------------------------------------------------------------------
-  # Linux x64 — clang + libc++
-  # ---------------------------------------------------------------------------
-
-  linux-deps:
-    runs-on: ubuntu-22.04
-    env:
-      CC: clang
-      CXX: clang++
+  macos-tier1:
+    needs: macos-tier0
+    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dep: spirv-tools
+            needs_deps: spirv-headers
+          - dep: halogen
+            needs_deps: anari-sdk filament
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install clang + libc++ + GL/Vulkan/X11 headers
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang lld libc++-dev libc++abi-dev \
-            libvulkan-dev libgl-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
-
-      - name: Cache libs
+      - name: Cache ${{ matrix.dep }}
         id: cache
         uses: actions/cache@v4
         with:
-          path: libs-linux
-          key: linux-libs-${{ hashFiles('CMakeLists.txt') }}
+          path: libs-macos/${{ matrix.dep }}
+          key: macos-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
 
-      - name: Install Rust
-        if: steps.cache.outputs.cache-hit != 'true'
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Build all deps
+      - name: Download dependencies
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
-          chmod +x scripts/build-deps.sh
-          ./scripts/build-deps.sh \
-            --build-dir build-linux \
-            --libs-dir ${{ github.workspace }}/libs-linux \
-            -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-linux-clang.cmake
+          for dep in ${{ matrix.needs_deps }}; do
+            echo "Downloading macos-${dep}"
+          done
 
-      - name: Upload libs artifact
-        uses: actions/upload-artifact@v4
+      - name: Download dependency artifacts
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/download-artifact@v4
         with:
-          name: linux-libs
-          path: libs-linux
-          retention-days: 7
+          pattern: macos-{spirv-headers,anari-sdk,filament}
+          path: libs-macos
+          merge-multiple: false
 
-  linux-sneeze:
-    needs: linux-deps
-    runs-on: ubuntu-22.04
-    env:
-      CC: clang
-      CXX: clang++
+      - name: Arrange artifacts
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          # download-artifact puts each artifact in a subdir named after the artifact
+          # Move contents: libs-macos/macos-<dep>/* → libs-macos/<dep>/
+          cd libs-macos
+          for d in macos-*; do
+            dep_name="${d#macos-}"
+            if [ -d "$d" ] && [ ! -d "$dep_name" ]; then
+              mv "$d" "$dep_name"
+            fi
+          done
+
+      - name: Build ${{ matrix.dep }}
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          cmake -S . -B build \
+            -DLIBS_DIR=${{ github.workspace }}/libs-macos \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+          cmake --build build --target ${{ matrix.dep }} --parallel $(sysctl -n hw.ncpu)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.dep }}
+          path: libs-macos/${{ matrix.dep }}
+          retention-days: 3
+
+  macos-tier2:
+    needs: macos-tier1
+    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dep: glslang
+            needs_deps: spirv-tools
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install clang + libc++ + GL/Vulkan/X11 headers
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang lld libc++-dev libc++abi-dev \
-            libvulkan-dev libgl-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+      - name: Cache ${{ matrix.dep }}
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: libs-macos/${{ matrix.dep }}
+          key: macos-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
 
-      - name: Download libs
+      - name: Download dependency artifacts
+        if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/download-artifact@v4
         with:
-          name: linux-libs
-          path: libs-linux
+          pattern: macos-spirv-*
+          path: libs-macos
+          merge-multiple: false
+
+      - name: Arrange artifacts
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          cd libs-macos
+          for d in macos-*; do
+            dep_name="${d#macos-}"
+            if [ -d "$d" ] && [ ! -d "$dep_name" ]; then
+              mv "$d" "$dep_name"
+            fi
+          done
+
+      - name: Build ${{ matrix.dep }}
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          cmake -S . -B build \
+            -DLIBS_DIR=${{ github.workspace }}/libs-macos \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+          cmake --build build --target ${{ matrix.dep }} --parallel $(sysctl -n hw.ncpu)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.dep }}
+          path: libs-macos/${{ matrix.dep }}
+          retention-days: 3
+
+  macos-sneeze:
+    needs: [macos-tier0, macos-tier1, macos-tier2]
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all dep artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: macos-*
+          path: libs-macos
+          merge-multiple: false
+
+      - name: Arrange artifacts
+        run: |
+          cd libs-macos
+          for d in macos-*; do
+            dep_name="${d#macos-}"
+            if [ -d "$d" ] && [ ! -d "$dep_name" ]; then
+              mv "$d" "$dep_name"
+            fi
+          done
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
       - name: Build Sneeze
         run: |
-          cmake -S . -B build-linux \
-            -DLIBS_DIR=${{ github.workspace }}/libs-linux \
-            -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-linux-clang.cmake
-          cmake --build build-linux --target sneeze --parallel $(nproc)
+          cmake -S . -B build \
+            -DLIBS_DIR=${{ github.workspace }}/libs-macos \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+          cmake --build build --target sneeze --parallel $(sysctl -n hw.ncpu)
 
       - name: Run tests
         run: |
-          cd build-linux/sneeze
+          cd build/sneeze
+          ctest --output-on-failure --parallel $(sysctl -n hw.ncpu) || true
+
+  # =========================================================================
+  # Linux x64 — clang + libc++
+  # =========================================================================
+
+  linux-tier0:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        dep: [spirv-headers, anari-sdk, openxr-sdk, curl, rmlui, nlohmann-json, wasmtime, filament]
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld libc++-dev libc++abi-dev \
+            libvulkan-dev libgl-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+
+      - name: Cache ${{ matrix.dep }}
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: libs-linux/${{ matrix.dep }}
+          key: linux-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Install Rust
+        if: matrix.dep == 'wasmtime' && steps.cache.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build ${{ matrix.dep }}
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          cmake -S . -B build \
+            -DLIBS_DIR=${{ github.workspace }}/libs-linux \
+            -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-linux-clang.cmake
+          cmake --build build --target ${{ matrix.dep }} --parallel $(nproc)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.dep }}
+          path: libs-linux/${{ matrix.dep }}
+          retention-days: 3
+
+  linux-tier1:
+    needs: linux-tier0
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dep: spirv-tools
+            needs_deps: spirv-headers
+          - dep: halogen
+            needs_deps: anari-sdk filament
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld libc++-dev libc++abi-dev \
+            libvulkan-dev libgl-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+
+      - name: Cache ${{ matrix.dep }}
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: libs-linux/${{ matrix.dep }}
+          key: linux-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Download dependency artifacts
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: linux-{spirv-headers,anari-sdk,filament}
+          path: libs-linux
+          merge-multiple: false
+
+      - name: Arrange artifacts
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          cd libs-linux
+          for d in linux-*; do
+            dep_name="${d#linux-}"
+            [ -d "$d" ] && [ ! -d "$dep_name" ] && mv "$d" "$dep_name"
+          done
+
+      - name: Build ${{ matrix.dep }}
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          cmake -S . -B build \
+            -DLIBS_DIR=${{ github.workspace }}/libs-linux \
+            -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-linux-clang.cmake
+          cmake --build build --target ${{ matrix.dep }} --parallel $(nproc)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.dep }}
+          path: libs-linux/${{ matrix.dep }}
+          retention-days: 3
+
+  linux-tier2:
+    needs: linux-tier1
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dep: glslang
+            needs_deps: spirv-tools
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld libc++-dev libc++abi-dev \
+            libvulkan-dev libgl-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+
+      - name: Cache ${{ matrix.dep }}
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: libs-linux/${{ matrix.dep }}
+          key: linux-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Download dependency artifacts
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: linux-spirv-*
+          path: libs-linux
+          merge-multiple: false
+
+      - name: Arrange artifacts
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          cd libs-linux
+          for d in linux-*; do
+            dep_name="${d#linux-}"
+            [ -d "$d" ] && [ ! -d "$dep_name" ] && mv "$d" "$dep_name"
+          done
+
+      - name: Build ${{ matrix.dep }}
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          cmake -S . -B build \
+            -DLIBS_DIR=${{ github.workspace }}/libs-linux \
+            -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-linux-clang.cmake
+          cmake --build build --target ${{ matrix.dep }} --parallel $(nproc)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.dep }}
+          path: libs-linux/${{ matrix.dep }}
+          retention-days: 3
+
+  linux-sneeze:
+    needs: [linux-tier0, linux-tier1, linux-tier2]
+    runs-on: ubuntu-22.04
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld libc++-dev libc++abi-dev \
+            libvulkan-dev libgl-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+
+      - name: Download all dep artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: linux-*
+          path: libs-linux
+          merge-multiple: false
+
+      - name: Arrange artifacts
+        run: |
+          cd libs-linux
+          for d in linux-*; do
+            dep_name="${d#linux-}"
+            [ -d "$d" ] && [ ! -d "$dep_name" ] && mv "$d" "$dep_name"
+          done
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build Sneeze
+        run: |
+          cmake -S . -B build \
+            -DLIBS_DIR=${{ github.workspace }}/libs-linux \
+            -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-linux-clang.cmake
+          cmake --build build --target sneeze --parallel $(nproc)
+
+      - name: Run tests
+        run: |
+          cd build/sneeze
           ctest --output-on-failure --parallel $(nproc) || true
