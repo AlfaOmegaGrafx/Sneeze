@@ -18,7 +18,7 @@ project (Sneeze-SuperBuild VERSION ${SNEEZE_VER} LANGUAGES NONE)
 
 include (ExternalProject)
 
-set (LIBS_DIR "${CMAKE_SOURCE_DIR}/libs")
+set (LIBS_DIR "${CMAKE_SOURCE_DIR}/libs" CACHE PATH "Dependency source/build/install root. Override with -DLIBS_DIR= for platform-isolated builds.")
 
 # ---------------------------------------------------------------------------
 # Feature gates (forwarded from parent or set here)

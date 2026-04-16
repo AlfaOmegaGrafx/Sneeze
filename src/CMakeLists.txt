@@ -51,7 +51,20 @@ endif ()
 # Wasmtime - always from libs/ (not available in vcpkg)
 if (SNEEZE_ENABLE_WASM)
    set (WASMTIME_ROOT "${LIBS_DIR}/Wasmtime/install")
-   find_library (WASMTIME_LIB NAMES wasmtime wasmtime.dll PATHS "${WASMTIME_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
+   if (WIN32)
+      # Windows: link against the import lib produced by Cargo (wasmtime.dll.lib)
+      find_library (WASMTIME_LIB NAMES wasmtime.dll PATHS "${WASMTIME_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
+   elseif (CMAKE_SYSTEM_NAME STREQUAL "iOS")
+      # iOS forbids custom dylibs — Cargo produces a static .a
+      set (_saved_suffixes ${CMAKE_FIND_LIBRARY_SUFFIXES})
+      set (CMAKE_FIND_LIBRARY_SUFFIXES .a)
+      find_library (WASMTIME_LIB NAMES wasmtime PATHS "${WASMTIME_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
+      set (CMAKE_FIND_LIBRARY_SUFFIXES ${_saved_suffixes})
+      unset (_saved_suffixes)
+   else ()
+      # macOS (.dylib), Linux (.so), Android (.so)
+      find_library (WASMTIME_LIB NAMES wasmtime PATHS "${WASMTIME_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
+   endif ()
    find_path (WASMTIME_INCLUDE wasmtime.h PATHS "${WASMTIME_ROOT}/include" NO_DEFAULT_PATH REQUIRED)
 endif ()
 
@@ -71,7 +84,13 @@ if (USE_LOCAL_DEPS)
 
    # curl
    set (CURL_ROOT "${LIBS_DIR}/curl/install")
-   find_library (CURL_LIB libcurl PATHS "${CURL_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
+   if (WIN32)
+      # MSVC static curl installs as libcurl_a.lib or libcurl.lib depending on version
+      find_library (CURL_LIB NAMES libcurl_a libcurl PATHS "${CURL_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
+   else ()
+      # Unix: find_library prepends "lib", so NAMES curl → libcurl.a / libcurl.so
+      find_library (CURL_LIB NAMES curl PATHS "${CURL_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
+   endif ()
    find_path (CURL_INCLUDE curl/curl.h PATHS "${CURL_ROOT}/include" NO_DEFAULT_PATH REQUIRED)
 
    # RmlUi
