@@ -312,11 +312,11 @@ endforeach ()
       INSTALL_DIR      "${LIBS_DIR}/Wasmtime/install"
       CONFIGURE_COMMAND ""
       BUILD_COMMAND
-         cargo build --release -p wasmtime-c-api
+         ${CARGO_EXECUTABLE} build --release -p wasmtime-c-api
             --manifest-path <SOURCE_DIR>/Cargo.toml
             --target aarch64-apple-darwin
          COMMAND
-         cargo build --release -p wasmtime-c-api
+         ${CARGO_EXECUTABLE} build --release -p wasmtime-c-api
             --manifest-path <SOURCE_DIR>/Cargo.toml
             --target x86_64-apple-darwin
       INSTALL_COMMAND
@@ -391,6 +391,26 @@ if (_n GREATER 0)
 endif ()
 ]=])
 
+# Locate cargo: prefer env var override, then common install locations.
+# The SuperBuild runs via /bin/sh which may not source ~/.cargo/env.
+if (NOT CARGO_EXECUTABLE)
+   find_program (CARGO_EXECUTABLE cargo
+      PATHS
+         "$ENV{HOME}/.cargo/bin"
+         "/root/.cargo/bin"
+         "/usr/local/bin"
+         "/usr/bin"
+      NO_DEFAULT_PATH
+   )
+   if (NOT CARGO_EXECUTABLE)
+      find_program (CARGO_EXECUTABLE cargo)
+   endif ()
+endif ()
+if (NOT CARGO_EXECUTABLE)
+   message (FATAL_ERROR "cargo not found. Install Rust: https://rustup.rs")
+endif ()
+message (STATUS "Using cargo: ${CARGO_EXECUTABLE}")
+
 ExternalProject_Add (wasmtime
    GIT_REPOSITORY   https://github.com/bytecodealliance/wasmtime.git
    GIT_TAG          v43.0.0
@@ -400,7 +420,7 @@ ExternalProject_Add (wasmtime
    BINARY_DIR       "${LIBS_DIR}/Wasmtime/build"
    INSTALL_DIR      "${LIBS_DIR}/Wasmtime/install"
    CONFIGURE_COMMAND ""
-   BUILD_COMMAND     cargo build --release -p wasmtime-c-api
+   BUILD_COMMAND     ${CARGO_EXECUTABLE} build --release -p wasmtime-c-api
                         --manifest-path <SOURCE_DIR>/Cargo.toml
                         ${WASMTIME_CARGO_TARGET_ARG}
    INSTALL_COMMAND
