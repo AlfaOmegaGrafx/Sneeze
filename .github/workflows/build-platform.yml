@@ -1,0 +1,272 @@
+name: Build Platform (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      platform:
+        required: true
+        type: string
+        description: "Platform name for artifact prefix and cache keys"
+      runs-on:
+        required: true
+        type: string
+        description: "Runner label"
+      cmake-args:
+        required: true
+        type: string
+        description: "Platform-specific CMake args (space-separated)"
+      rust-targets:
+        required: false
+        type: string
+        default: ""
+        description: "Rust targets to install (comma-separated, empty = no rust)"
+      system-deps:
+        required: false
+        type: string
+        default: ""
+        description: "apt-get packages to install (Linux only)"
+      setup-ndk:
+        required: false
+        type: boolean
+        default: false
+        description: "Install Android NDK"
+
+jobs:
+  tier0:
+    runs-on: ${{ inputs.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        dep: [spirv-headers, anari-sdk, openxr-sdk, curl, rmlui, nlohmann-json, wasmtime, filament]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps
+        if: inputs.system-deps != ''
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ inputs.system-deps }}
+
+      - name: Setup Android NDK
+        if: inputs.setup-ndk
+        uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r27c
+
+      - name: Cache ${{ matrix.dep }}
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: libs-${{ inputs.platform }}/${{ matrix.dep }}
+          key: ${{ inputs.platform }}-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Install Rust
+        if: matrix.dep == 'wasmtime' && steps.cache.outputs.cache-hit != 'true' && inputs.rust-targets != ''
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ inputs.rust-targets }}
+
+      - name: Build ${{ matrix.dep }}
+        if: steps.cache.outputs.cache-hit != 'true'
+        env:
+          ANDROID_NDK_ROOT: ${{ steps.ndk.outputs.ndk-path || '' }}
+        run: |
+          CMAKE_ARGS="${{ inputs.cmake-args }}"
+          # Substitute $ANDROID_NDK_ROOT in cmake args
+          CMAKE_ARGS="${CMAKE_ARGS//\$ANDROID_NDK_ROOT/$ANDROID_NDK_ROOT}"
+          cmake -S . -B build -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} $CMAKE_ARGS
+          cmake --build build --target ${{ matrix.dep }} --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.platform }}-${{ matrix.dep }}
+          path: libs-${{ inputs.platform }}/${{ matrix.dep }}
+          retention-days: 3
+
+  tier1:
+    needs: tier0
+    if: ${{ !cancelled() }}
+    runs-on: ${{ inputs.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dep: spirv-tools
+          - dep: halogen
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps
+        if: inputs.system-deps != ''
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ inputs.system-deps }}
+
+      - name: Setup Android NDK
+        if: inputs.setup-ndk
+        uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r27c
+
+      - name: Cache ${{ matrix.dep }}
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: libs-${{ inputs.platform }}/${{ matrix.dep }}
+          key: ${{ inputs.platform }}-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Download tier0 artifacts
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ${{ inputs.platform }}-*
+          path: libs-${{ inputs.platform }}
+          merge-multiple: false
+
+      - name: Arrange artifacts
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          cd libs-${{ inputs.platform }}
+          for d in ${{ inputs.platform }}-*; do
+            dep="${d#${{ inputs.platform }}-}"
+            [ -d "$d" ] && [ ! -d "$dep" ] && mv "$d" "$dep"
+          done
+
+      - name: Build ${{ matrix.dep }}
+        if: steps.cache.outputs.cache-hit != 'true'
+        env:
+          ANDROID_NDK_ROOT: ${{ steps.ndk.outputs.ndk-path || '' }}
+        run: |
+          CMAKE_ARGS="${{ inputs.cmake-args }}"
+          CMAKE_ARGS="${CMAKE_ARGS//\$ANDROID_NDK_ROOT/$ANDROID_NDK_ROOT}"
+          cmake -S . -B build -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} $CMAKE_ARGS
+          cmake --build build --target ${{ matrix.dep }} --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.platform }}-${{ matrix.dep }}
+          path: libs-${{ inputs.platform }}/${{ matrix.dep }}
+          retention-days: 3
+
+  tier2:
+    needs: tier1
+    if: ${{ !cancelled() }}
+    runs-on: ${{ inputs.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dep: glslang
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps
+        if: inputs.system-deps != ''
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ inputs.system-deps }}
+
+      - name: Setup Android NDK
+        if: inputs.setup-ndk
+        uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r27c
+
+      - name: Cache ${{ matrix.dep }}
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: libs-${{ inputs.platform }}/${{ matrix.dep }}
+          key: ${{ inputs.platform }}-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Download artifacts
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ${{ inputs.platform }}-spirv-*
+          path: libs-${{ inputs.platform }}
+          merge-multiple: false
+
+      - name: Arrange artifacts
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          cd libs-${{ inputs.platform }}
+          for d in ${{ inputs.platform }}-*; do
+            dep="${d#${{ inputs.platform }}-}"
+            [ -d "$d" ] && [ ! -d "$dep" ] && mv "$d" "$dep"
+          done
+
+      - name: Build ${{ matrix.dep }}
+        if: steps.cache.outputs.cache-hit != 'true'
+        env:
+          ANDROID_NDK_ROOT: ${{ steps.ndk.outputs.ndk-path || '' }}
+        run: |
+          CMAKE_ARGS="${{ inputs.cmake-args }}"
+          CMAKE_ARGS="${CMAKE_ARGS//\$ANDROID_NDK_ROOT/$ANDROID_NDK_ROOT}"
+          cmake -S . -B build -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} $CMAKE_ARGS
+          cmake --build build --target ${{ matrix.dep }} --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.platform }}-${{ matrix.dep }}
+          path: libs-${{ inputs.platform }}/${{ matrix.dep }}
+          retention-days: 3
+
+  sneeze:
+    needs: [tier0, tier1, tier2]
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
+    runs-on: ${{ inputs.runs-on }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps
+        if: inputs.system-deps != ''
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ inputs.system-deps }}
+
+      - name: Setup Android NDK
+        if: inputs.setup-ndk
+        uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r27c
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ${{ inputs.platform }}-*
+          path: libs-${{ inputs.platform }}
+          merge-multiple: false
+
+      - name: Arrange artifacts
+        run: |
+          cd libs-${{ inputs.platform }}
+          for d in ${{ inputs.platform }}-*; do
+            dep="${d#${{ inputs.platform }}-}"
+            [ -d "$d" ] && [ ! -d "$dep" ] && mv "$d" "$dep"
+          done
+
+      - name: Install Rust
+        if: inputs.rust-targets != ''
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ inputs.rust-targets }}
+
+      - name: Build Sneeze
+        env:
+          ANDROID_NDK_ROOT: ${{ steps.ndk.outputs.ndk-path || '' }}
+        run: |
+          CMAKE_ARGS="${{ inputs.cmake-args }}"
+          CMAKE_ARGS="${CMAKE_ARGS//\$ANDROID_NDK_ROOT/$ANDROID_NDK_ROOT}"
+          cmake -S . -B build -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} $CMAKE_ARGS
+          cmake --build build --target sneeze --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
+
+      - name: Run tests
+        if: ${{ !inputs.setup-ndk }}
+        run: |
+          cd build/sneeze
+          ctest --output-on-failure --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu) || true
