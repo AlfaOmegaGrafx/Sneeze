@@ -59,20 +59,38 @@ jobs:
         with:
           ndk-version: r27c
 
+      - name: Resolve dep dir name
+        id: dir
+        run: |
+          declare -A MAP=(
+            [spirv-headers]=SPIRV-Headers [spirv-tools]=SPIRV-Tools
+            [anari-sdk]=ANARI-SDK [openxr-sdk]=OpenXR-SDK
+            [rmlui]=RmlUi [wasmtime]=Wasmtime [halogen]=Halogen
+          )
+          echo "name=${MAP[${{ matrix.dep }}]:-${{ matrix.dep }}}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache ${{ matrix.dep }}
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: libs-${{ inputs.platform }}/${{ steps.dir.outputs.name }}
+          key: ${{ inputs.platform }}-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
+
       - name: Install Rust
-        if: matrix.dep == 'wasmtime' && inputs.rust-targets != ''
+        if: matrix.dep == 'wasmtime' && steps.cache.outputs.cache-hit != 'true' && inputs.rust-targets != ''
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ inputs.rust-targets }}
 
       - name: Download Filament host tools
-        if: matrix.dep == 'filament' && inputs.filament-host-artifact != ''
+        if: matrix.dep == 'filament' && inputs.filament-host-artifact != '' && steps.cache.outputs.cache-hit != 'true'
         uses: actions/download-artifact@v4
         with:
           name: ${{ inputs.filament-host-artifact }}
           path: filament-host
 
       - name: Build ${{ matrix.dep }}
+        if: steps.cache.outputs.cache-hit != 'true'
         env:
           ANDROID_NDK_ROOT: ${{ steps.ndk.outputs.ndk-path || '' }}
         run: |
