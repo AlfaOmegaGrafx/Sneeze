@@ -113,10 +113,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install clang + libc++
+      - name: Install clang + libc++ + GL/Vulkan headers
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang lld libc++-dev libc++abi-dev libvulkan-dev
+          sudo apt-get install -y clang lld libc++-dev libc++abi-dev \
+            libvulkan-dev libgl-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
 
       - name: Cache dep install
         id: cache
@@ -146,10 +147,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install clang + libc++
+      - name: Install clang + libc++ + GL/Vulkan headers
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang lld libc++-dev libc++abi-dev libvulkan-dev
+          sudo apt-get install -y clang lld libc++-dev libc++abi-dev \
+            libvulkan-dev libgl-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
 
       - name: Restore all dep caches
         uses: actions/cache@v4
