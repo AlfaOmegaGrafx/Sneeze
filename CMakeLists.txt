@@ -378,6 +378,10 @@ else ()
    set (FILAMENT_BACKEND_ARGS -DFILAMENT_SUPPORTS_VULKAN=ON)
 endif ()
 
+if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+   set (FILAMENT_GCC_ARGS -DFILAMENT_ENABLE_EXPERIMENTAL_GCC_SUPPORT=ON)
+endif ()
+
 ExternalProject_Add (filament
    GIT_REPOSITORY   https://github.com/MetaversalCorp/filament.git
    GIT_TAG          main
@@ -392,6 +396,7 @@ ExternalProject_Add (filament
       -DFILAMENT_SKIP_SAMPLES=ON
       ${FILAMENT_BACKEND_ARGS}
       ${FILAMENT_CRT_ARGS}
+      ${FILAMENT_GCC_ARGS}
       ${CROSS_COMPILE_ARGS}
 )
 
