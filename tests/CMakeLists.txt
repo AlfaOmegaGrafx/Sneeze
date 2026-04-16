@@ -20,10 +20,14 @@ add_executable (WasmTest WasmRuntimeTest.cpp)
 
 target_include_directories (WasmTest PRIVATE ${WASMTIME_INCLUDE})
 target_compile_definitions (WasmTest PRIVATE WASM_API_EXTERN= WASI_API_EXTERN=)
-target_link_libraries (WasmTest PRIVATE
-   ${WASMTIME_LIB}
-   ws2_32 advapi32 userenv ntdll shell32 ole32 bcrypt
-)
+target_link_libraries (WasmTest PRIVATE ${WASMTIME_LIB})
+if (WIN32)
+   target_link_libraries (WasmTest PRIVATE ws2_32 advapi32 userenv ntdll shell32 ole32 bcrypt)
+elseif (APPLE)
+   target_link_libraries (WasmTest PRIVATE pthread dl)
+else ()
+   target_link_libraries (WasmTest PRIVATE pthread dl m)
+endif ()
 
 # ---------------------------------------------------------------------------
 # SPIR-V test executable
@@ -46,10 +50,10 @@ target_link_libraries (SpvTest PRIVATE
 add_executable (XrTest XrRuntimeTest.cpp)
 
 target_include_directories (XrTest PRIVATE ${OPENXR_INCLUDE})
-target_link_libraries (XrTest PRIVATE
-   ${OPENXR_LOADER_LIB}
-   advapi32
-)
+target_link_libraries (XrTest PRIVATE ${OPENXR_LOADER_LIB})
+if (WIN32)
+   target_link_libraries (XrTest PRIVATE advapi32)
+endif ()
 
 # ---------------------------------------------------------------------------
 # curl test executable
@@ -59,10 +63,20 @@ add_executable (NetTest HttpClientTest.cpp)
 
 target_include_directories (NetTest PRIVATE ${CURL_INCLUDE})
 target_compile_definitions (NetTest PRIVATE CURL_STATICLIB)
-target_link_libraries (NetTest PRIVATE
-   ${CURL_LIB}
-   ws2_32 wldap32 crypt32 normaliz advapi32
-)
+target_link_libraries (NetTest PRIVATE ${CURL_LIB})
+if (WIN32)
+   target_link_libraries (NetTest PRIVATE ws2_32 wldap32 crypt32 normaliz advapi32)
+elseif (APPLE)
+   find_library (_NET_SECURITY_FW Security)
+   find_library (_NET_CF_FW CoreFoundation)
+   target_link_libraries (NetTest PRIVATE pthread ${_NET_SECURITY_FW} ${_NET_CF_FW})
+else ()
+   find_package (OpenSSL QUIET)
+   if (OpenSSL_FOUND)
+      target_link_libraries (NetTest PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+   endif ()
+   target_link_libraries (NetTest PRIVATE pthread dl)
+endif ()
 
 # ---------------------------------------------------------------------------
 # RmlUi test executable
