@@ -411,6 +411,60 @@ if (NOT CARGO_EXECUTABLE)
 endif ()
 message (STATUS "Using cargo: ${CARGO_EXECUTABLE}")
 
+# ---------------------------------------------------------------------------
+# Cross-compilation linker setup for Cargo
+# ---------------------------------------------------------------------------
+# Android: Cargo needs NDK clang as linker for the target triple.
+# iOS: Cargo needs cc from Xcode SDK.
+# We generate a .cargo/config.toml next to the Wasmtime source to configure
+# the linker for cross-compilation targets.
+
+set (WASMTIME_BUILD_ENV)
+
+if (WASMTIME_CARGO_TARGET MATCHES "aarch64-linux-android")
+   # Find NDK clang
+   if (CMAKE_ANDROID_NDK)
+      # NDK r25+ prebuilt clang path
+      set (_ndk_host "linux-x86_64")
+      if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
+         set (_ndk_host "darwin-x86_64")
+      elseif (CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
+         set (_ndk_host "windows-x86_64")
+      endif ()
+      set (_ndk_clang "${CMAKE_ANDROID_NDK}/toolchains/llvm/prebuilt/${_ndk_host}/bin/aarch64-linux-android26-clang")
+      if (EXISTS "${_ndk_clang}")
+         set (_android_linker "${_ndk_clang}")
+      else ()
+         # Fallback: try generic clang
+         set (_android_linker "${CMAKE_ANDROID_NDK}/toolchains/llvm/prebuilt/${_ndk_host}/bin/clang")
+      endif ()
+   else ()
+      find_program (_android_linker aarch64-linux-android26-clang)
+   endif ()
+   if (_android_linker)
+      message (STATUS "Wasmtime Android linker: ${_android_linker}")
+      # Write Cargo config for Android cross-linker
+      file (WRITE "${CMAKE_BINARY_DIR}/wasmtime-cargo-config.toml"
+         "[target.aarch64-linux-android]\nlinker = \"${_android_linker}\"\n"
+      )
+      set (WASMTIME_BUILD_ENV
+         ${CMAKE_COMMAND} -E env
+            "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=${_android_linker}"
+      )
+   else ()
+      message (WARNING "Android NDK clang not found — Wasmtime cross-compile may fail")
+   endif ()
+
+elseif (WASMTIME_CARGO_TARGET MATCHES "aarch64-apple-ios")
+   # iOS: Cargo uses cc which finds Xcode SDK automatically via xcrun.
+   # Set SDKROOT so cc picks the right sysroot.
+   if (CMAKE_OSX_SYSROOT)
+      set (WASMTIME_BUILD_ENV
+         ${CMAKE_COMMAND} -E env "SDKROOT=${CMAKE_OSX_SYSROOT}"
+      )
+   endif ()
+endif ()
+
 ExternalProject_Add (wasmtime
    GIT_REPOSITORY   https://github.com/bytecodealliance/wasmtime.git
    GIT_TAG          v43.0.0
@@ -420,7 +474,8 @@ ExternalProject_Add (wasmtime
    BINARY_DIR       "${LIBS_DIR}/Wasmtime/build"
    INSTALL_DIR      "${LIBS_DIR}/Wasmtime/install"
    CONFIGURE_COMMAND ""
-   BUILD_COMMAND     ${CARGO_EXECUTABLE} build --release -p wasmtime-c-api
+   BUILD_COMMAND     ${WASMTIME_BUILD_ENV}
+                     ${CARGO_EXECUTABLE} build --release -p wasmtime-c-api
                         --manifest-path <SOURCE_DIR>/Cargo.toml
                         ${WASMTIME_CARGO_TARGET_ARG}
    INSTALL_COMMAND
