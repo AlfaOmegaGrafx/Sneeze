@@ -159,6 +159,12 @@ endif ()
 # ANARI-SDK (with helide device)
 # ---------------------------------------------------------------------------
 
+if (WIN32)
+   set (MSVC_CRT_ARGS
+      -DCMAKE_POLICY_DEFAULT_CMP0091=NEW
+      -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>DLL)
+endif ()
+
 ExternalProject_Add (anari-sdk
    GIT_REPOSITORY   https://github.com/KhronosGroup/ANARI-SDK.git
    GIT_TAG          next_release
@@ -169,8 +175,7 @@ ExternalProject_Add (anari-sdk
    CMAKE_ARGS
       -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
       -DCMAKE_BUILD_TYPE=Release
-      -DCMAKE_POLICY_DEFAULT_CMP0091=NEW
-      -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>DLL
+      ${MSVC_CRT_ARGS}
       -DBUILD_HELIDE_DEVICE=ON
       -DBUILD_TESTING=OFF
       -DBUILD_EXAMPLES=OFF
@@ -417,7 +422,7 @@ ExternalProject_Add (halogen
       -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
       -DCMAKE_BUILD_TYPE=Release
       -DBUILD_TESTS=OFF
-      -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>DLL
+      ${MSVC_CRT_ARGS}
       -DANARI_ROOT=${LIBS_DIR}/ANARI-SDK/install
       -DFILAMENT_ROOT=${LIBS_DIR}/filament/install
       ${CROSS_COMPILE_ARGS}
