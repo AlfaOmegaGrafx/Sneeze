@@ -40,6 +40,12 @@ endif ()
 
 set (CROSS_COMPILE_ARGS)
 
+# Forward the generator so all ExternalProject deps use the same one
+# (Ninja is faster than Make for dep scanning and parallel builds).
+if (CMAKE_GENERATOR)
+   list (APPEND CROSS_COMPILE_ARGS -G ${CMAKE_GENERATOR})
+endif ()
+
 # Always forward toolchain file — it carries compiler, stdlib, linker flags.
 # Even for native builds (e.g. clang+libc++ on Linux), ExternalProject deps
 # need the same toolchain to avoid mixing compilers/stdlibs.
