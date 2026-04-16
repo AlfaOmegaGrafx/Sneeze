@@ -17,11 +17,12 @@ for arg in "$@"; do
    esac
 done
 
-echo "==> Linux x86_64 build"
+echo "==> Linux x86_64 build (clang + libc++)"
 
 "$SCRIPT_DIR/build-deps.sh" \
    --build-dir "$BUILD_DIR" \
    --libs-dir "$LIBS_DIR" \
+   -DCMAKE_TOOLCHAIN_FILE="$SNEEZE_DIR/cmake/toolchain-linux-clang.cmake" \
    "${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}"
 
 if [[ $DEPS_ONLY -eq 0 ]]; then
