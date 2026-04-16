@@ -42,7 +42,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dep: [SPIRV-Headers, ANARI-SDK, OpenXR-SDK, openssl, curl, RmlUi, nlohmann-json, Wasmtime, filament]
+        dep: [spirv-headers, anari-sdk, openxr-sdk, openssl, curl, rmlui, nlohmann-json, wasmtime, filament]
     steps:
       - uses: actions/checkout@v4
 
@@ -59,50 +59,41 @@ jobs:
         with:
           ndk-version: r27c
 
-      - name: Cache ${{ matrix.dep }}
-        id: cache
-        uses: actions/cache@v4
-        with:
-          path: libs-${{ inputs.platform }}/${{ matrix.dep }}
-          key: ${{ inputs.platform }}-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
-
       - name: Install Rust
-        if: matrix.dep == 'wasmtime' && steps.cache.outputs.cache-hit != 'true' && inputs.rust-targets != ''
+        if: matrix.dep == 'wasmtime' && inputs.rust-targets != ''
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ inputs.rust-targets }}
 
       - name: Download Filament host tools
-        if: matrix.dep == 'filament' && inputs.filament-host-artifact != '' && steps.cache.outputs.cache-hit != 'true'
+        if: matrix.dep == 'filament' && inputs.filament-host-artifact != ''
         uses: actions/download-artifact@v4
         with:
           name: ${{ inputs.filament-host-artifact }}
           path: filament-host
 
       - name: Build ${{ matrix.dep }}
-        if: steps.cache.outputs.cache-hit != 'true'
         env:
           ANDROID_NDK_ROOT: ${{ steps.ndk.outputs.ndk-path || '' }}
         run: |
           CMAKE_ARGS="${{ inputs.cmake-args }}"
           CMAKE_ARGS="${CMAKE_ARGS//\$ANDROID_NDK_ROOT/$ANDROID_NDK_ROOT}"
 
-          # Cross-compile Filament: use host tools from native platform build
           if [ "${{ matrix.dep }}" = "filament" ] && [ -d "filament-host" ]; then
             HOST_TOOLS=$(find filament-host -name "ImportExecutables*.cmake" -print -quit 2>/dev/null)
             if [ -n "$HOST_TOOLS" ]; then
               CMAKE_ARGS="$CMAKE_ARGS -DIMPORT_EXECUTABLES=${{ github.workspace }}/$HOST_TOOLS"
-              echo "Using Filament host tools: $HOST_TOOLS"
             fi
           fi
 
           cmake -S . -B build -GNinja -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} $CMAKE_ARGS
           cmake --build build --target ${{ matrix.dep }} --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload dep artifact
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.platform }}-${{ matrix.dep }}
-          path: libs-${{ inputs.platform }}/${{ matrix.dep }}
+          path: libs-${{ inputs.platform }}
           retention-days: 3
 
   tier1:
@@ -113,8 +104,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - dep: SPIRV-Tools
-          - dep: Halogen
+          - dep: spirv-tools
+          - dep: halogen
     steps:
       - uses: actions/checkout@v4
 
@@ -131,46 +122,28 @@ jobs:
         with:
           ndk-version: r27c
 
-      - name: Cache ${{ matrix.dep }}
-        id: cache
-        uses: actions/cache@v4
-        with:
-          path: libs-${{ inputs.platform }}/${{ matrix.dep }}
-          key: ${{ inputs.platform }}-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
-
       - name: Download tier0 artifacts
-        if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/download-artifact@v4
         with:
           pattern: ${{ inputs.platform }}-*
-          path: libs-${{ inputs.platform }}
-          merge-multiple: false
-
-      - name: Arrange artifacts
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p libs-${{ inputs.platform }}
-          cd libs-${{ inputs.platform }}
-          for d in ${{ inputs.platform }}-*; do
-            dep="${d#${{ inputs.platform }}-}"
-            [ -d "$d" ] && [ ! -d "$dep" ] && mv "$d" "$dep"
-          done
-          ls -1 || true
+          path: .
+          merge-multiple: true
 
       - name: Build ${{ matrix.dep }}
-        if: steps.cache.outputs.cache-hit != 'true'
         env:
           ANDROID_NDK_ROOT: ${{ steps.ndk.outputs.ndk-path || '' }}
         run: |
           CMAKE_ARGS="${{ inputs.cmake-args }}"
           CMAKE_ARGS="${CMAKE_ARGS//\$ANDROID_NDK_ROOT/$ANDROID_NDK_ROOT}"
+          echo "Available deps:" && ls libs-${{ inputs.platform }}/ || true
           cmake -S . -B build -GNinja -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} $CMAKE_ARGS
           cmake --build build --target ${{ matrix.dep }} --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload dep artifact
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.platform }}-${{ matrix.dep }}
-          path: libs-${{ inputs.platform }}/${{ matrix.dep }}
+          path: libs-${{ inputs.platform }}
           retention-days: 3
 
   tier2:
@@ -198,46 +171,28 @@ jobs:
         with:
           ndk-version: r27c
 
-      - name: Cache ${{ matrix.dep }}
-        id: cache
-        uses: actions/cache@v4
-        with:
-          path: libs-${{ inputs.platform }}/${{ matrix.dep }}
-          key: ${{ inputs.platform }}-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
-
       - name: Download artifacts
-        if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/download-artifact@v4
         with:
-          pattern: ${{ inputs.platform }}-spirv-*
-          path: libs-${{ inputs.platform }}
-          merge-multiple: false
-
-      - name: Arrange artifacts
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p libs-${{ inputs.platform }}
-          cd libs-${{ inputs.platform }}
-          for d in ${{ inputs.platform }}-*; do
-            dep="${d#${{ inputs.platform }}-}"
-            [ -d "$d" ] && [ ! -d "$dep" ] && mv "$d" "$dep"
-          done
-          ls -1 || true
+          pattern: ${{ inputs.platform }}-*
+          path: .
+          merge-multiple: true
 
       - name: Build ${{ matrix.dep }}
-        if: steps.cache.outputs.cache-hit != 'true'
         env:
           ANDROID_NDK_ROOT: ${{ steps.ndk.outputs.ndk-path || '' }}
         run: |
           CMAKE_ARGS="${{ inputs.cmake-args }}"
           CMAKE_ARGS="${CMAKE_ARGS//\$ANDROID_NDK_ROOT/$ANDROID_NDK_ROOT}"
+          echo "Available deps:" && ls libs-${{ inputs.platform }}/ || true
           cmake -S . -B build -GNinja -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} $CMAKE_ARGS
           cmake --build build --target ${{ matrix.dep }} --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload dep artifact
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.platform }}-${{ matrix.dep }}
-          path: libs-${{ inputs.platform }}/${{ matrix.dep }}
+          path: libs-${{ inputs.platform }}
           retention-days: 3
 
   sneeze:
@@ -264,18 +219,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           pattern: ${{ inputs.platform }}-*
-          path: libs-${{ inputs.platform }}
-          merge-multiple: false
+          path: .
+          merge-multiple: true
 
-      - name: Arrange artifacts
-        run: |
-          mkdir -p libs-${{ inputs.platform }}
-          cd libs-${{ inputs.platform }}
-          for d in ${{ inputs.platform }}-*; do
-            dep="${d#${{ inputs.platform }}-}"
-            [ -d "$d" ] && [ ! -d "$dep" ] && mv "$d" "$dep"
-          done
-          ls -1 || true
+      - name: List deps
+        run: echo "Available deps:" && ls libs-${{ inputs.platform }}/ || true
 
       - name: Install Rust
         if: inputs.rust-targets != ''
