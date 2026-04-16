@@ -264,10 +264,76 @@ ExternalProject_Add (rmlui
 
 if (SNEEZE_ENABLE_WASM)
 
-# Map CMake target to Rust target triple for cross-compilation
+# Map CMake target to Rust target triple for cross-compilation.
+# Special value "universal-apple-darwin" triggers a macOS fat-binary build
+# (arm64 + x86_64 built separately, then lipo'd together).
 set (WASMTIME_CARGO_TARGET "" CACHE STRING "Rust target triple for Wasmtime cross-compilation")
-set (WASMTIME_TARGET_DIR "release")
+option (WASMTIME_MACOS_UNIVERSAL "Build Wasmtime as a macOS universal (arm64+x86_64) dylib" OFF)
 
+if (WASMTIME_MACOS_UNIVERSAL)
+   # Build both arches, lipo into a universal dylib.
+   file (WRITE "${CMAKE_BINARY_DIR}/wasmtime-lipo.cmake" [=[
+cmake_minimum_required (VERSION 3.20)
+file (MAKE_DIRECTORY "${DST}/lib")
+execute_process (
+   COMMAND lipo -create
+      "${SRC}/target/aarch64-apple-darwin/release/libwasmtime.dylib"
+      "${SRC}/target/x86_64-apple-darwin/release/libwasmtime.dylib"
+      -output "${DST}/lib/libwasmtime.dylib"
+   RESULT_VARIABLE _r
+)
+if (_r)
+   message (FATAL_ERROR "lipo failed: ${_r}")
+endif ()
+]=])
+
+   file (WRITE "${CMAKE_BINARY_DIR}/wasmtime-install.cmake" [=[
+cmake_minimum_required (VERSION 3.20)
+file (MAKE_DIRECTORY "${DST}/include")
+file (MAKE_DIRECTORY "${DST}/lib")
+file (COPY "${SRC}/crates/c-api/include/" DESTINATION "${DST}/include")
+foreach (_td "aarch64-apple-darwin/release" "release")
+   file (GLOB _gen_dirs "${SRC}/target/${_td}/build/wasmtime-c-api-impl-*/out/include")
+   if (_gen_dirs)
+      list (GET _gen_dirs 0 _gen)
+      file (COPY "${_gen}/" DESTINATION "${DST}/include")
+      break ()
+   endif ()
+endforeach ()
+]=])
+
+   ExternalProject_Add (wasmtime
+      GIT_REPOSITORY   https://github.com/bytecodealliance/wasmtime.git
+      GIT_TAG          v43.0.0
+      GIT_SHALLOW      ON
+      GIT_SUBMODULES   ""
+      SOURCE_DIR       "${LIBS_DIR}/Wasmtime/src"
+      BINARY_DIR       "${LIBS_DIR}/Wasmtime/build"
+      INSTALL_DIR      "${LIBS_DIR}/Wasmtime/install"
+      CONFIGURE_COMMAND ""
+      BUILD_COMMAND
+         cargo build --release -p wasmtime-c-api
+            --manifest-path <SOURCE_DIR>/Cargo.toml
+            --target aarch64-apple-darwin
+         COMMAND
+         cargo build --release -p wasmtime-c-api
+            --manifest-path <SOURCE_DIR>/Cargo.toml
+            --target x86_64-apple-darwin
+      INSTALL_COMMAND
+         ${CMAKE_COMMAND}
+            -DSRC=<SOURCE_DIR>
+            -DDST=<INSTALL_DIR>
+            -P "${CMAKE_BINARY_DIR}/wasmtime-install.cmake"
+         COMMAND ${CMAKE_COMMAND}
+            -DSRC=<SOURCE_DIR>
+            -DDST=<INSTALL_DIR>
+            -P "${CMAKE_BINARY_DIR}/wasmtime-lipo.cmake"
+      BUILD_IN_SOURCE   OFF
+   )
+
+else ()
+
+set (WASMTIME_TARGET_DIR "release")
 if (WASMTIME_CARGO_TARGET)
    set (WASMTIME_TARGET_DIR "${WASMTIME_CARGO_TARGET}/release")
    set (WASMTIME_CARGO_TARGET_ARG --target ${WASMTIME_CARGO_TARGET})
@@ -286,17 +352,18 @@ if (WIN32 AND NOT WASMTIME_CARGO_TARGET)
          "<INSTALL_DIR>/lib/wasmtime.dll.lib"
    )
 elseif (APPLE OR (WASMTIME_CARGO_TARGET MATCHES "apple"))
-   set (WASMTIME_COPY_CMDS
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-         "<SOURCE_DIR>/target/${WASMTIME_TARGET_DIR}/libwasmtime.dylib"
-         "<INSTALL_DIR>/lib/libwasmtime.dylib"
-   )
    # iOS requires static library (no custom dylibs allowed)
    if (CMAKE_SYSTEM_NAME STREQUAL "iOS" OR (WASMTIME_CARGO_TARGET MATCHES "ios"))
       set (WASMTIME_COPY_CMDS
          COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "<SOURCE_DIR>/target/${WASMTIME_TARGET_DIR}/libwasmtime.a"
             "<INSTALL_DIR>/lib/libwasmtime.a"
+      )
+   else ()
+      set (WASMTIME_COPY_CMDS
+         COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "<SOURCE_DIR>/target/${WASMTIME_TARGET_DIR}/libwasmtime.dylib"
+            "<INSTALL_DIR>/lib/libwasmtime.dylib"
       )
    endif ()
 else ()
@@ -308,8 +375,6 @@ else ()
 endif ()
 
 # Cargo generates conf.h (from conf.h.in) inside a hashed build dir.
-# This script copies source headers first, then overlays the generated
-# headers so conf.h replaces the template.
 file (WRITE "${CMAKE_BINARY_DIR}/wasmtime-install.cmake" [=[
 cmake_minimum_required (VERSION 3.20)
 file (MAKE_DIRECTORY "${DST}/include")
@@ -317,7 +382,6 @@ file (MAKE_DIRECTORY "${DST}/lib")
 file (COPY "${SRC}/crates/c-api/include/" DESTINATION "${DST}/include")
 file (GLOB _gen_dirs "${SRC}/target/${TARGET_DIR}/build/wasmtime-c-api-impl-*/out/include")
 if (NOT _gen_dirs)
-   # Fallback: non-cross path
    file (GLOB _gen_dirs "${SRC}/target/release/build/wasmtime-c-api-impl-*/out/include")
 endif ()
 list (LENGTH _gen_dirs _n)
@@ -348,6 +412,8 @@ ExternalProject_Add (wasmtime
       ${WASMTIME_COPY_CMDS}
    BUILD_IN_SOURCE   OFF
 )
+
+endif () # WASMTIME_MACOS_UNIVERSAL
 
 else ()  # SNEEZE_ENABLE_WASM=OFF
    add_custom_target (wasmtime)
