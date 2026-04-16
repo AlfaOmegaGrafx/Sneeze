@@ -433,162 +433,32 @@ jobs:
           ctest --output-on-failure --parallel $(nproc) || true
 
   # =========================================================================
-  # Android arm64 — NDK cross-compile
+  # iOS arm64 — tiered matrix (same pattern as macOS/Linux)
   # =========================================================================
 
-  android-deps:
-    runs-on: ubuntu-22.04
+  ios-tier0:
+    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        dep: [spirv-headers, anari-sdk, openxr-sdk, curl, rmlui, nlohmann-json, wasmtime, filament]
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install system deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build
-
-      - name: Setup Android NDK
-        uses: nttld/setup-ndk@v1
-        id: ndk
-        with:
-          ndk-version: r27c
-
-      - name: Cache libs
+      - name: Cache ${{ matrix.dep }}
         id: cache
         uses: actions/cache@v4
         with:
-          path: libs-android
-          key: android-libs-${{ hashFiles('CMakeLists.txt') }}
-
-      - name: Install Rust + Android target
-        if: steps.cache.outputs.cache-hit != 'true'
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android
-
-      - name: Build all deps
-        if: steps.cache.outputs.cache-hit != 'true'
-        env:
-          ANDROID_NDK_ROOT: ${{ steps.ndk.outputs.ndk-path }}
-        run: |
-          chmod +x scripts/build-deps.sh
-          ./scripts/build-deps.sh \
-            --build-dir build-android \
-            --libs-dir ${{ github.workspace }}/libs-android \
-            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake \
-            -DANDROID_ABI=arm64-v8a \
-            -DANDROID_PLATFORM=android-26 \
-            -DWASMTIME_CARGO_TARGET=aarch64-linux-android \
-            -DSNEEZE_ENABLE_XR=ON
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: android-libs
-          path: libs-android
-          retention-days: 3
-
-  android-sneeze:
-    needs: android-deps
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install system deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build
-
-      - name: Setup Android NDK
-        uses: nttld/setup-ndk@v1
-        id: ndk
-        with:
-          ndk-version: r27c
-
-      - name: Download libs
-        uses: actions/download-artifact@v4
-        with:
-          name: android-libs
-          path: libs-android
-
-      - name: Install Rust + Android target
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android
-
-      - name: Build Sneeze
-        env:
-          ANDROID_NDK_ROOT: ${{ steps.ndk.outputs.ndk-path }}
-        run: |
-          cmake -S . -B build-android \
-            -DLIBS_DIR=${{ github.workspace }}/libs-android \
-            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake \
-            -DANDROID_ABI=arm64-v8a \
-            -DANDROID_PLATFORM=android-26 \
-            -DWASMTIME_CARGO_TARGET=aarch64-linux-android \
-            -DSNEEZE_ENABLE_XR=ON
-          cmake --build build-android --target sneeze --parallel $(nproc)
-
-  # =========================================================================
-  # iOS arm64 — Xcode cross-compile
-  # =========================================================================
-
-  ios-deps:
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Cache libs
-        id: cache
-        uses: actions/cache@v4
-        with:
-          path: libs-ios
-          key: ios-libs-${{ hashFiles('CMakeLists.txt') }}
-
-      - name: Install Rust + iOS target
-        if: steps.cache.outputs.cache-hit != 'true'
+          path: libs-ios/${{ matrix.dep }}
+          key: ios-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
+      - name: Install Rust
+        if: matrix.dep == 'wasmtime' && steps.cache.outputs.cache-hit != 'true'
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-ios
-
-      - name: Build all deps
+      - name: Build ${{ matrix.dep }}
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
-          chmod +x scripts/build-deps.sh
-          ./scripts/build-deps.sh \
-            --build-dir build-ios \
-            --libs-dir ${{ github.workspace }}/libs-ios \
-            -DCMAKE_SYSTEM_NAME=iOS \
-            -DCMAKE_OSX_SYSROOT=iphoneos \
-            -DCMAKE_OSX_ARCHITECTURES=arm64 \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
-            -DWASMTIME_CARGO_TARGET=aarch64-apple-ios \
-            -DSNEEZE_ENABLE_XR=OFF
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ios-libs
-          path: libs-ios
-          retention-days: 3
-
-  ios-sneeze:
-    needs: ios-deps
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download libs
-        uses: actions/download-artifact@v4
-        with:
-          name: ios-libs
-          path: libs-ios
-
-      - name: Install Rust + iOS target
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-ios
-
-      - name: Build Sneeze
-        run: |
-          cmake -S . -B build-ios \
+          cmake -S . -B build \
             -DLIBS_DIR=${{ github.workspace }}/libs-ios \
             -DCMAKE_SYSTEM_NAME=iOS \
             -DCMAKE_OSX_SYSROOT=iphoneos \
@@ -596,4 +466,333 @@ jobs:
             -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
             -DWASMTIME_CARGO_TARGET=aarch64-apple-ios \
             -DSNEEZE_ENABLE_XR=OFF
-          cmake --build build-ios --target sneeze --parallel $(sysctl -n hw.ncpu)
+          cmake --build build --target ${{ matrix.dep }} --parallel $(sysctl -n hw.ncpu)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-${{ matrix.dep }}
+          path: libs-ios/${{ matrix.dep }}
+          retention-days: 3
+
+  ios-tier1:
+    needs: ios-tier0
+    if: ${{ !cancelled() }}
+    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dep: spirv-tools
+          - dep: halogen
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache ${{ matrix.dep }}
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: libs-ios/${{ matrix.dep }}
+          key: ios-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
+      - name: Download tier0 artifacts
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ios-*
+          path: libs-ios
+          merge-multiple: false
+      - name: Arrange artifacts
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          cd libs-ios
+          for d in ios-*; do dep="${d#ios-}"; [ -d "$d" ] && [ ! -d "$dep" ] && mv "$d" "$dep"; done
+      - name: Build ${{ matrix.dep }}
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          cmake -S . -B build \
+            -DLIBS_DIR=${{ github.workspace }}/libs-ios \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_SYSROOT=iphoneos \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
+            -DWASMTIME_CARGO_TARGET=aarch64-apple-ios \
+            -DSNEEZE_ENABLE_XR=OFF
+          cmake --build build --target ${{ matrix.dep }} --parallel $(sysctl -n hw.ncpu)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-${{ matrix.dep }}
+          path: libs-ios/${{ matrix.dep }}
+          retention-days: 3
+
+  ios-tier2:
+    needs: ios-tier1
+    if: ${{ !cancelled() }}
+    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dep: glslang
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache ${{ matrix.dep }}
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: libs-ios/${{ matrix.dep }}
+          key: ios-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
+      - name: Download artifacts
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ios-spirv-*
+          path: libs-ios
+          merge-multiple: false
+      - name: Arrange artifacts
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          cd libs-ios
+          for d in ios-*; do dep="${d#ios-}"; [ -d "$d" ] && [ ! -d "$dep" ] && mv "$d" "$dep"; done
+      - name: Build ${{ matrix.dep }}
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          cmake -S . -B build \
+            -DLIBS_DIR=${{ github.workspace }}/libs-ios \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_SYSROOT=iphoneos \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
+            -DWASMTIME_CARGO_TARGET=aarch64-apple-ios \
+            -DSNEEZE_ENABLE_XR=OFF
+          cmake --build build --target ${{ matrix.dep }} --parallel $(sysctl -n hw.ncpu)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-${{ matrix.dep }}
+          path: libs-ios/${{ matrix.dep }}
+          retention-days: 3
+
+  ios-sneeze:
+    needs: [ios-tier0, ios-tier1, ios-tier2]
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ios-*
+          path: libs-ios
+          merge-multiple: false
+      - name: Arrange artifacts
+        run: |
+          cd libs-ios
+          for d in ios-*; do dep="${d#ios-}"; [ -d "$d" ] && [ ! -d "$dep" ] && mv "$d" "$dep"; done
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+      - name: Build Sneeze
+        run: |
+          cmake -S . -B build \
+            -DLIBS_DIR=${{ github.workspace }}/libs-ios \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_SYSROOT=iphoneos \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
+            -DWASMTIME_CARGO_TARGET=aarch64-apple-ios \
+            -DSNEEZE_ENABLE_XR=OFF
+          cmake --build build --target sneeze --parallel $(sysctl -n hw.ncpu)
+
+  # =========================================================================
+  # Android arm64 — tiered matrix
+  # =========================================================================
+
+  android-tier0:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        dep: [spirv-headers, anari-sdk, openxr-sdk, curl, rmlui, nlohmann-json, wasmtime, filament]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r27c
+      - name: Cache ${{ matrix.dep }}
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: libs-android/${{ matrix.dep }}
+          key: android-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
+      - name: Install Rust
+        if: matrix.dep == 'wasmtime' && steps.cache.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - name: Build ${{ matrix.dep }}
+        if: steps.cache.outputs.cache-hit != 'true'
+        env:
+          ANDROID_NDK_ROOT: ${{ steps.ndk.outputs.ndk-path }}
+        run: |
+          cmake -S . -B build \
+            -DLIBS_DIR=${{ github.workspace }}/libs-android \
+            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-26 \
+            -DWASMTIME_CARGO_TARGET=aarch64-linux-android \
+            -DSNEEZE_ENABLE_XR=ON
+          cmake --build build --target ${{ matrix.dep }} --parallel $(nproc)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-${{ matrix.dep }}
+          path: libs-android/${{ matrix.dep }}
+          retention-days: 3
+
+  android-tier1:
+    needs: android-tier0
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dep: spirv-tools
+          - dep: halogen
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r27c
+      - name: Cache ${{ matrix.dep }}
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: libs-android/${{ matrix.dep }}
+          key: android-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
+      - name: Download tier0 artifacts
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: android-*
+          path: libs-android
+          merge-multiple: false
+      - name: Arrange artifacts
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          cd libs-android
+          for d in android-*; do dep="${d#android-}"; [ -d "$d" ] && [ ! -d "$dep" ] && mv "$d" "$dep"; done
+      - name: Install Rust
+        if: matrix.dep == 'wasmtime' && steps.cache.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - name: Build ${{ matrix.dep }}
+        if: steps.cache.outputs.cache-hit != 'true'
+        env:
+          ANDROID_NDK_ROOT: ${{ steps.ndk.outputs.ndk-path }}
+        run: |
+          cmake -S . -B build \
+            -DLIBS_DIR=${{ github.workspace }}/libs-android \
+            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-26 \
+            -DWASMTIME_CARGO_TARGET=aarch64-linux-android \
+            -DSNEEZE_ENABLE_XR=ON
+          cmake --build build --target ${{ matrix.dep }} --parallel $(nproc)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-${{ matrix.dep }}
+          path: libs-android/${{ matrix.dep }}
+          retention-days: 3
+
+  android-tier2:
+    needs: android-tier1
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dep: glslang
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r27c
+      - name: Cache ${{ matrix.dep }}
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: libs-android/${{ matrix.dep }}
+          key: android-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
+      - name: Download artifacts
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: android-spirv-*
+          path: libs-android
+          merge-multiple: false
+      - name: Arrange artifacts
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          cd libs-android
+          for d in android-*; do dep="${d#android-}"; [ -d "$d" ] && [ ! -d "$dep" ] && mv "$d" "$dep"; done
+      - name: Build ${{ matrix.dep }}
+        if: steps.cache.outputs.cache-hit != 'true'
+        env:
+          ANDROID_NDK_ROOT: ${{ steps.ndk.outputs.ndk-path }}
+        run: |
+          cmake -S . -B build \
+            -DLIBS_DIR=${{ github.workspace }}/libs-android \
+            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-26 \
+            -DWASMTIME_CARGO_TARGET=aarch64-linux-android \
+            -DSNEEZE_ENABLE_XR=ON
+          cmake --build build --target ${{ matrix.dep }} --parallel $(nproc)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-${{ matrix.dep }}
+          path: libs-android/${{ matrix.dep }}
+          retention-days: 3
+
+  android-sneeze:
+    needs: [android-tier0, android-tier1, android-tier2]
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r27c
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: android-*
+          path: libs-android
+          merge-multiple: false
+      - name: Arrange artifacts
+        run: |
+          cd libs-android
+          for d in android-*; do dep="${d#android-}"; [ -d "$d" ] && [ ! -d "$dep" ] && mv "$d" "$dep"; done
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - name: Build Sneeze
+        env:
+          ANDROID_NDK_ROOT: ${{ steps.ndk.outputs.ndk-path }}
+        run: |
+          cmake -S . -B build \
+            -DLIBS_DIR=${{ github.workspace }}/libs-android \
+            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-26 \
+            -DWASMTIME_CARGO_TARGET=aarch64-linux-android \
+            -DSNEEZE_ENABLE_XR=ON
+          cmake --build build --target sneeze --parallel $(nproc)
