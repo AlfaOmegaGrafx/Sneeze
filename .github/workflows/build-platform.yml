@@ -64,7 +64,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: libs-${{ inputs.platform }}/${{ matrix.dep }}
-          key: ${{ inputs.platform }}-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
+          key: ${{ inputs.platform }}-${{ matrix.dep }}-v2-${{ hashFiles('CMakeLists.txt') }}
 
       - name: Install Rust
         if: matrix.dep == 'wasmtime' && steps.cache.outputs.cache-hit != 'true' && inputs.rust-targets != ''
@@ -136,7 +136,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: libs-${{ inputs.platform }}/${{ matrix.dep }}
-          key: ${{ inputs.platform }}-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
+          key: ${{ inputs.platform }}-${{ matrix.dep }}-v2-${{ hashFiles('CMakeLists.txt') }}
 
       - name: Download tier0 artifacts
         if: steps.cache.outputs.cache-hit != 'true'
@@ -203,7 +203,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: libs-${{ inputs.platform }}/${{ matrix.dep }}
-          key: ${{ inputs.platform }}-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
+          key: ${{ inputs.platform }}-${{ matrix.dep }}-v2-${{ hashFiles('CMakeLists.txt') }}
 
       - name: Download artifacts
         if: steps.cache.outputs.cache-hit != 'true'
