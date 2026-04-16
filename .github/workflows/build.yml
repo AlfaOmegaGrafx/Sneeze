@@ -60,6 +60,7 @@ jobs:
 
   macos-tier1:
     needs: macos-tier0
+    if: ${{ !cancelled() }}
     runs-on: macos-14
     strategy:
       fail-fast: false
@@ -124,6 +125,7 @@ jobs:
 
   macos-tier2:
     needs: macos-tier1
+    if: ${{ !cancelled() }}
     runs-on: macos-14
     strategy:
       fail-fast: false
@@ -177,6 +179,7 @@ jobs:
 
   macos-sneeze:
     needs: [macos-tier0, macos-tier1, macos-tier2]
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
@@ -234,7 +237,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang lld libc++-dev libc++abi-dev \
-            libvulkan-dev libgl-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+            libvulkan-dev libgl-dev \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libxxf86vm-dev libxext-dev libxfixes-dev libxrender-dev libxss-dev
 
       - name: Cache ${{ matrix.dep }}
         id: cache
@@ -263,6 +268,7 @@ jobs:
 
   linux-tier1:
     needs: linux-tier0
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
@@ -282,7 +288,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang lld libc++-dev libc++abi-dev \
-            libvulkan-dev libgl-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+            libvulkan-dev libgl-dev \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libxxf86vm-dev libxext-dev libxfixes-dev libxrender-dev libxss-dev
 
       - name: Cache ${{ matrix.dep }}
         id: cache
@@ -324,6 +332,7 @@ jobs:
 
   linux-tier2:
     needs: linux-tier1
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
@@ -341,7 +350,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang lld libc++-dev libc++abi-dev \
-            libvulkan-dev libgl-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+            libvulkan-dev libgl-dev \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libxxf86vm-dev libxext-dev libxfixes-dev libxrender-dev libxss-dev
 
       - name: Cache ${{ matrix.dep }}
         id: cache
@@ -383,6 +394,7 @@ jobs:
 
   linux-sneeze:
     needs: [linux-tier0, linux-tier1, linux-tier2]
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-22.04
     env:
       CC: clang
@@ -394,7 +406,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang lld libc++-dev libc++abi-dev \
-            libvulkan-dev libgl-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+            libvulkan-dev libgl-dev \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libxxf86vm-dev libxext-dev libxfixes-dev libxrender-dev libxss-dev
 
       - name: Download all dep artifacts
         uses: actions/download-artifact@v4
