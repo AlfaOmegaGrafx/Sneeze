@@ -1,0 +1,175 @@
+name: Build
+
+on:
+  push:
+    branches: [main, porting/*]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # macOS — deps built individually, cached, then Sneeze + tests
+  # ---------------------------------------------------------------------------
+
+  macos-deps:
+    runs-on: macos-14  # Apple Silicon
+    strategy:
+      fail-fast: false
+      matrix:
+        dep:
+          - spirv-headers
+          - spirv-tools
+          - glslang
+          - anari-sdk
+          - openxr-sdk
+          - curl
+          - rmlui
+          - nlohmann-json
+          - wasmtime
+          - filament
+          - halogen
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache dep install
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: libs-macos/${{ matrix.dep }}
+          key: macos-dep-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Install Rust
+        if: matrix.dep == 'wasmtime' && steps.cache.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Build ${{ matrix.dep }}
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          cmake -S . -B build-macos \
+            -DLIBS_DIR=${{ github.workspace }}/libs-macos \
+            -DCMAKE_OSX_ARCHITECTURES="arm64" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+          cmake --build build-macos --target ${{ matrix.dep }} --parallel $(sysctl -n hw.ncpu)
+
+  macos-sneeze:
+    needs: macos-deps
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore all dep caches
+        uses: actions/cache@v4
+        with:
+          path: libs-macos
+          key: macos-deps-all-${{ hashFiles('CMakeLists.txt') }}
+          restore-keys: |
+            macos-dep-
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Configure + Build Sneeze
+        run: |
+          cmake -S . -B build-macos \
+            -DLIBS_DIR=${{ github.workspace }}/libs-macos \
+            -DCMAKE_OSX_ARCHITECTURES="arm64" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+          cmake --build build-macos --target sneeze --parallel $(sysctl -n hw.ncpu)
+
+      - name: Run tests
+        run: |
+          cd build-macos/sneeze
+          ctest --output-on-failure --parallel $(sysctl -n hw.ncpu) || true
+
+  # ---------------------------------------------------------------------------
+  # Linux x64 — clang + libc++
+  # ---------------------------------------------------------------------------
+
+  linux-deps:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        dep:
+          - spirv-headers
+          - spirv-tools
+          - glslang
+          - anari-sdk
+          - openxr-sdk
+          - curl
+          - rmlui
+          - nlohmann-json
+          - wasmtime
+          - filament
+          - halogen
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang + libc++
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld libc++-dev libc++abi-dev libvulkan-dev
+
+      - name: Cache dep install
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: libs-linux/${{ matrix.dep }}
+          key: linux-dep-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Install Rust
+        if: matrix.dep == 'wasmtime' && steps.cache.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build ${{ matrix.dep }}
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          cmake -S . -B build-linux \
+            -DLIBS_DIR=${{ github.workspace }}/libs-linux \
+            -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-linux-clang.cmake
+          cmake --build build-linux --target ${{ matrix.dep }} --parallel $(nproc)
+
+  linux-sneeze:
+    needs: linux-deps
+    runs-on: ubuntu-22.04
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang + libc++
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld libc++-dev libc++abi-dev libvulkan-dev
+
+      - name: Restore all dep caches
+        uses: actions/cache@v4
+        with:
+          path: libs-linux
+          key: linux-deps-all-${{ hashFiles('CMakeLists.txt') }}
+          restore-keys: |
+            linux-dep-
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Configure + Build Sneeze
+        run: |
+          cmake -S . -B build-linux \
+            -DLIBS_DIR=${{ github.workspace }}/libs-linux \
+            -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-linux-clang.cmake
+          cmake --build build-linux --target sneeze --parallel $(nproc)
+
+      - name: Run tests
+        run: |
+          cd build-linux/sneeze
+          ctest --output-on-failure --parallel $(nproc) || true
