@@ -103,7 +103,7 @@ add_executable (ComputeTest
    ${SRC_DIR}/compute/EmbeddedKernels.h
    ${SRC_DIR}/compute/ComputeDispatch.cpp
    ${SRC_DIR}/compute/ComputeDispatch.h
-   ${KERNEL_RC_FILE}
+   ${KERNEL_EMBED_FILES}
 )
 add_dependencies (ComputeTest CompileKernels)
 
