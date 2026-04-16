@@ -42,7 +42,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dep: [spirv-headers, anari-sdk, openxr-sdk, openssl, curl, rmlui, nlohmann-json, wasmtime, filament]
+        dep: [SPIRV-Headers, ANARI-SDK, OpenXR-SDK, openssl, curl, RmlUi, nlohmann-json, Wasmtime, filament]
     steps:
       - uses: actions/checkout@v4
 
@@ -64,7 +64,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: libs-${{ inputs.platform }}/${{ matrix.dep }}
-          key: ${{ inputs.platform }}-${{ matrix.dep }}-v2-${{ hashFiles('CMakeLists.txt') }}
+          key: ${{ inputs.platform }}-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
 
       - name: Install Rust
         if: matrix.dep == 'wasmtime' && steps.cache.outputs.cache-hit != 'true' && inputs.rust-targets != ''
@@ -113,8 +113,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - dep: spirv-tools
-          - dep: halogen
+          - dep: SPIRV-Tools
+          - dep: Halogen
     steps:
       - uses: actions/checkout@v4
 
@@ -136,7 +136,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: libs-${{ inputs.platform }}/${{ matrix.dep }}
-          key: ${{ inputs.platform }}-${{ matrix.dep }}-v2-${{ hashFiles('CMakeLists.txt') }}
+          key: ${{ inputs.platform }}-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
 
       - name: Download tier0 artifacts
         if: steps.cache.outputs.cache-hit != 'true'
@@ -203,7 +203,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: libs-${{ inputs.platform }}/${{ matrix.dep }}
-          key: ${{ inputs.platform }}-${{ matrix.dep }}-v2-${{ hashFiles('CMakeLists.txt') }}
+          key: ${{ inputs.platform }}-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
 
       - name: Download artifacts
         if: steps.cache.outputs.cache-hit != 'true'
