@@ -40,7 +40,16 @@ endif ()
 
 set (CROSS_COMPILE_ARGS)
 
-# Only forward cross-compilation flags when actually cross-compiling.
+# Always forward compiler selection — needed when using a non-default
+# compiler (e.g. clang on Linux via toolchain file) even for native builds.
+if (CMAKE_C_COMPILER)
+   list (APPEND CROSS_COMPILE_ARGS -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER})
+endif ()
+if (CMAKE_CXX_COMPILER)
+   list (APPEND CROSS_COMPILE_ARGS -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER})
+endif ()
+
+# Forward cross-compilation flags only when actually cross-compiling.
 # CMAKE_SYSTEM_NAME is auto-detected even for native builds; forwarding it
 # explicitly to sub-projects causes CMake to set CMAKE_CROSSCOMPILING=TRUE,
 # which breaks projects like Filament that have a cross-compile workflow.
@@ -72,11 +81,15 @@ if (CMAKE_CROSSCOMPILING)
    if (ANDROID_PLATFORM)
       list (APPEND CROSS_COMPILE_ARGS -DANDROID_PLATFORM=${ANDROID_PLATFORM})
    endif ()
-   if (CMAKE_C_COMPILER)
-      list (APPEND CROSS_COMPILE_ARGS -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER})
+endif ()
+
+# Forward macOS/iOS settings even for native builds (e.g. deployment target)
+if (NOT CMAKE_CROSSCOMPILING)
+   if (CMAKE_OSX_ARCHITECTURES)
+      list (APPEND CROSS_COMPILE_ARGS "-DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}")
    endif ()
-   if (CMAKE_CXX_COMPILER)
-      list (APPEND CROSS_COMPILE_ARGS -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER})
+   if (CMAKE_OSX_DEPLOYMENT_TARGET)
+      list (APPEND CROSS_COMPILE_ARGS -DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET})
    endif ()
 endif ()
 
@@ -156,13 +169,20 @@ else ()
 endif ()
 
 # ---------------------------------------------------------------------------
-# ANARI-SDK (with helide device)
+# ANARI-SDK (with helide device on desktop, without on mobile)
+# Helide uses embree which requires x86 SSE/AVX — disabled on arm64 mobile.
 # ---------------------------------------------------------------------------
 
 if (WIN32)
    set (MSVC_CRT_ARGS
       -DCMAKE_POLICY_DEFAULT_CMP0091=NEW
       -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>DLL)
+endif ()
+
+if (ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
+   set (ANARI_HELIDE_ARG -DBUILD_HELIDE_DEVICE=OFF)
+else ()
+   set (ANARI_HELIDE_ARG -DBUILD_HELIDE_DEVICE=ON)
 endif ()
 
 ExternalProject_Add (anari-sdk
@@ -176,7 +196,7 @@ ExternalProject_Add (anari-sdk
       -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
       -DCMAKE_BUILD_TYPE=Release
       ${MSVC_CRT_ARGS}
-      -DBUILD_HELIDE_DEVICE=ON
+      ${ANARI_HELIDE_ARG}
       -DBUILD_TESTING=OFF
       -DBUILD_EXAMPLES=OFF
       ${CROSS_COMPILE_ARGS}

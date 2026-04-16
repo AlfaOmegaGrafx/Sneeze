@@ -447,9 +447,10 @@ jobs:
           sudo apt-get install -y ninja-build
 
       - name: Setup Android NDK
-        uses: android-actions/setup-android@v3
+        uses: nttld/setup-ndk@v1
+        id: ndk
         with:
-          packages: ndk;27.0.12077973
+          ndk-version: r27c
 
       - name: Cache libs
         id: cache
@@ -467,7 +468,7 @@ jobs:
       - name: Build all deps
         if: steps.cache.outputs.cache-hit != 'true'
         env:
-          ANDROID_NDK_ROOT: ${{ env.ANDROID_HOME }}/ndk/27.0.12077973
+          ANDROID_NDK_ROOT: ${{ steps.ndk.outputs.ndk-path }}
         run: |
           chmod +x scripts/build-deps.sh
           ./scripts/build-deps.sh \
@@ -497,9 +498,10 @@ jobs:
           sudo apt-get install -y ninja-build
 
       - name: Setup Android NDK
-        uses: android-actions/setup-android@v3
+        uses: nttld/setup-ndk@v1
+        id: ndk
         with:
-          packages: ndk;27.0.12077973
+          ndk-version: r27c
 
       - name: Download libs
         uses: actions/download-artifact@v4
@@ -514,7 +516,7 @@ jobs:
 
       - name: Build Sneeze
         env:
-          ANDROID_NDK_ROOT: ${{ env.ANDROID_HOME }}/ndk/27.0.12077973
+          ANDROID_NDK_ROOT: ${{ steps.ndk.outputs.ndk-path }}
         run: |
           cmake -S . -B build-android \
             -DLIBS_DIR=${{ github.workspace }}/libs-android \
