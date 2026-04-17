@@ -57,6 +57,9 @@ if (NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
    target_link_libraries (XrTest PRIVATE ${OPENXR_LOADER_LIB})
    if (WIN32)
       target_link_libraries (XrTest PRIVATE advapi32)
+   elseif (ANDROID)
+      # openxr_loader uses Android AssetManager + logging
+      target_link_libraries (XrTest PRIVATE android log)
    endif ()
 endif ()
 
