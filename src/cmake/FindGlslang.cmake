@@ -9,19 +9,13 @@ if (NOT LIBS_DIR)
 endif ()
 
 # glslang is a HOST tool (runs at build time to compile .comp -> .spv).
-# For cross-compile (Android/iOS), the per-platform LIBS_DIR contains a
-# target-architecture binary that can't run on the host. Prefer LIBS_DIR
-# only when not cross-compiling; fall back to system PATH so Android/iOS
-# builds can use apt/brew glslang on the host runner.
+# For cross-compile (Android/iOS) the caller must stage a host-arch glslang
+# into ${LIBS_DIR}/glslang/install/bin/ before configure — the target-arch
+# binary from the Sneeze cross artifact can't run on the build host.
 set (_ROOT "${LIBS_DIR}/glslang/install")
 
-if (CMAKE_CROSSCOMPILING)
-   find_program (GLSLANG_VALIDATOR glslang REQUIRED)
-else ()
-   find_program (GLSLANG_VALIDATOR glslang
-      HINTS "${_ROOT}/bin"
-      REQUIRED)
-endif ()
+find_program (GLSLANG_VALIDATOR glslang
+   PATHS "${_ROOT}/bin" NO_DEFAULT_PATH REQUIRED)
 
 include (FindPackageHandleStandardArgs)
 find_package_handle_standard_args (Glslang DEFAULT_MSG GLSLANG_VALIDATOR)
