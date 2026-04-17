@@ -15,10 +15,19 @@ if (WIN32)
    set (FILAMENT_CRT_ARGS -DUSE_STATIC_CRT=OFF -DDIST_DIR=x86_64/md)
 endif ()
 
-# Cross-compile: forward IMPORT_EXECUTABLES (directory holding host tools
-# ImportExecutables-Release.cmake from a prior desktop Filament build).
-if (DEFINED IMPORT_EXECUTABLES)
-   set (FILAMENT_HOST_ARGS -DIMPORT_EXECUTABLES=${IMPORT_EXECUTABLES})
+# Cross-compile: copy host-built ImportExecutables-Release.cmake into filament's
+# source root (via PATCH_COMMAND, runs after clone, before configure).
+# Filament's top-level CMake resolves IMPORT_EXECUTABLES as
+#   ${FILAMENT}/${IMPORT_EXECUTABLES_DIR}/ImportExecutables-Release.cmake
+# with IMPORT_EXECUTABLES_DIR empty by default — so placing the file at
+# ${FILAMENT}/ImportExecutables-Release.cmake satisfies the include().
+set (FILAMENT_PATCH_COMMAND "")
+if (IMPORT_EXECUTABLES_HOST_FILE AND EXISTS "${IMPORT_EXECUTABLES_HOST_FILE}")
+   set (FILAMENT_PATCH_COMMAND
+      ${CMAKE_COMMAND} -E copy
+         "${IMPORT_EXECUTABLES_HOST_FILE}"
+         "${LIBS_DIR}/filament/src/ImportExecutables-Release.cmake"
+   )
 endif ()
 
 ExternalProject_Add (filament
@@ -37,6 +46,6 @@ ExternalProject_Add (filament
       -DFILAMENT_ENABLE_MATDBG=OFF
       ${FILAMENT_BACKEND_ARGS}
       ${FILAMENT_CRT_ARGS}
-      ${FILAMENT_HOST_ARGS}
       ${CROSS_COMPILE_ARGS}
+   PATCH_COMMAND ${FILAMENT_PATCH_COMMAND}
 )

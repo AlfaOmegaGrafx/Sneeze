@@ -110,10 +110,9 @@ jobs:
           CMAKE_ARGS="${CMAKE_ARGS//cmake\/toolchain/${{ github.workspace }}/cmake/toolchain}"
 
           if [ "${{ matrix.dep }}" = "filament" ] && [ -d "filament-host" ]; then
-            HOST_TOOLS=$(find filament-host -name "ImportExecutables*.cmake" -print -quit 2>/dev/null)
+            HOST_TOOLS=$(find filament-host -name "ImportExecutables-Release.cmake" -print -quit 2>/dev/null)
             if [ -n "$HOST_TOOLS" ]; then
-              HOST_DIR=$(dirname "$HOST_TOOLS")
-              CMAKE_ARGS="$CMAKE_ARGS -DIMPORT_EXECUTABLES=${{ github.workspace }}/$HOST_DIR"
+              CMAKE_ARGS="$CMAKE_ARGS -DIMPORT_EXECUTABLES_HOST_FILE=${{ github.workspace }}/$HOST_TOOLS"
             fi
           fi
 
