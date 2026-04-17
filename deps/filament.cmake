@@ -3,15 +3,14 @@
 if (APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
    set (FILAMENT_BACKEND_ARGS -DFILAMENT_SUPPORTS_METAL=ON -DFILAMENT_SUPPORTS_VULKAN=ON)
 elseif (CMAKE_SYSTEM_NAME STREQUAL "iOS")
-   # OpenGL backend requires bluegl (not compiled on iOS); skip it. Metal is
-   # primary on iOS; Vulkan via MoltenVK covers bluevk (needed by Halogen).
-   # FILAMENT_IOS preprocessor define gates iOS-specific branches in Metal
-   # backend source (MetalEnums.h guards BC formats + Depth24Unorm_Stencil8).
-   # Filament's own iOS.cmake toolchain adds this via add_definitions; we
-   # don't use that toolchain, so inject via CMAKE_<LANG>_FLAGS.
+   # Metal-only on iOS. Vulkan is disabled: filament's VulkanPlatformApple
+   # pulls Cocoa headers (macOS-only); Halogen's iOS path doesn't link
+   # bluevk/bluegl anyway (see Halogen src/CMakeLists.txt APPLE/iOS branch).
+   # FILAMENT_IOS preprocessor define gates iOS-specific code in Metal
+   # backend (MetalEnums.h guards BC formats + Depth24Unorm_Stencil8).
    set (FILAMENT_BACKEND_ARGS
       -DFILAMENT_SUPPORTS_METAL=ON
-      -DFILAMENT_SUPPORTS_VULKAN=ON
+      -DFILAMENT_SUPPORTS_VULKAN=OFF
       -DFILAMENT_SUPPORTS_OPENGL=OFF
       -DIOS=1
       -DDIST_DIR=arm64
@@ -24,10 +23,12 @@ elseif (ANDROID)
    # Cross-compile: filament defaults DIST_ARCH to CMAKE_HOST_SYSTEM_PROCESSOR
    # (x86_64 on Linux CI runners), installing to lib/x86_64/. Override so
    # libraries land at lib/arm64-v8a/ where Halogen's FindFilament looks.
+   # EGL=TRUE compiles PlatformEGL.cpp (needed by PlatformEGLAndroid base).
    set (FILAMENT_BACKEND_ARGS
       -DFILAMENT_SUPPORTS_VULKAN=ON
       -DDIST_DIR=arm64-v8a
-      -DDIST_ARCH=aarch64)
+      -DDIST_ARCH=aarch64
+      -DEGL=TRUE)
 else ()
    set (FILAMENT_BACKEND_ARGS -DFILAMENT_SUPPORTS_VULKAN=ON)
 endif ()
