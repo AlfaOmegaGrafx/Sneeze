@@ -15,6 +15,12 @@ if (WIN32)
    set (FILAMENT_CRT_ARGS -DUSE_STATIC_CRT=OFF -DDIST_DIR=x86_64/md)
 endif ()
 
+# Cross-compile: forward IMPORT_EXECUTABLES (directory holding host tools
+# ImportExecutables-Release.cmake from a prior desktop Filament build).
+if (DEFINED IMPORT_EXECUTABLES)
+   set (FILAMENT_HOST_ARGS -DIMPORT_EXECUTABLES=${IMPORT_EXECUTABLES})
+endif ()
+
 ExternalProject_Add (filament
    GIT_REPOSITORY   https://github.com/MetaversalCorp/filament.git
    GIT_TAG          main
@@ -31,5 +37,6 @@ ExternalProject_Add (filament
       -DFILAMENT_ENABLE_MATDBG=OFF
       ${FILAMENT_BACKEND_ARGS}
       ${FILAMENT_CRT_ARGS}
+      ${FILAMENT_HOST_ARGS}
       ${CROSS_COMPILE_ARGS}
 )

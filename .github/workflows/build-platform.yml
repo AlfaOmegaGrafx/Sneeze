@@ -42,7 +42,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dep: [spirv-headers, anari-sdk, openxr-sdk, openssl, curl, rmlui, nlohmann-json, wasmtime, filament]
+        dep: [spirv-headers, anari-sdk, openxr-sdk, openssl, rmlui, nlohmann-json, wasmtime, filament]
     steps:
       - uses: actions/checkout@v4
 
@@ -112,7 +112,8 @@ jobs:
           if [ "${{ matrix.dep }}" = "filament" ] && [ -d "filament-host" ]; then
             HOST_TOOLS=$(find filament-host -name "ImportExecutables*.cmake" -print -quit 2>/dev/null)
             if [ -n "$HOST_TOOLS" ]; then
-              CMAKE_ARGS="$CMAKE_ARGS -DIMPORT_EXECUTABLES=${{ github.workspace }}/$HOST_TOOLS"
+              HOST_DIR=$(dirname "$HOST_TOOLS")
+              CMAKE_ARGS="$CMAKE_ARGS -DIMPORT_EXECUTABLES=${{ github.workspace }}/$HOST_DIR"
             fi
           fi
 
@@ -139,6 +140,7 @@ jobs:
         include:
           - dep: spirv-tools
           - dep: halogen
+          - dep: curl
     steps:
       - uses: actions/checkout@v4
 

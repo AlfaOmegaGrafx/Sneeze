@@ -6,7 +6,6 @@ if (ANDROID)
       GIT_TAG          openssl-3.3.1
       GIT_SHALLOW      ON
       SOURCE_DIR       "${LIBS_DIR}/openssl/src"
-      BINARY_DIR       "${LIBS_DIR}/openssl/src"
       INSTALL_DIR      "${OPENSSL_INSTALL_DIR}"
       CONFIGURE_COMMAND
          ${CMAKE_COMMAND} -E env
