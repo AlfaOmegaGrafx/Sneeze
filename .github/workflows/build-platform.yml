@@ -84,7 +84,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: libs-${{ inputs.platform }}/${{ steps.dir.outputs.name }}
-          key: ${{ inputs.platform }}-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt') }}
+          key: ${{ inputs.platform }}-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt', format('deps/{0}.cmake', matrix.dep), 'deps/CMakeLists.txt') }}
 
       - name: Install Rust
         if: matrix.dep == 'wasmtime' && steps.cache.outputs.cache-hit != 'true' && inputs.rust-targets != ''
