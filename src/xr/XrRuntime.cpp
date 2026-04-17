@@ -39,7 +39,11 @@ bool XR_RUNTIME::Initialize ()
    // ourselves with clearer messages. Without this, the loader prints alarming
    // "Error [GENERAL | xrCreateInstance | OpenXR-Loader]" lines on machines
    // that simply don't have a VR/AR runtime installed.
+#ifdef _WIN32
    _putenv_s ("XR_LOADER_DEBUG", "none");
+#else
+   setenv ("XR_LOADER_DEBUG", "none", 1);
+#endif
 
    XrApplicationInfo pAppInfo = {};
    std::strncpy (pAppInfo.applicationName, "Sneeze", XR_MAX_APPLICATION_NAME_SIZE);

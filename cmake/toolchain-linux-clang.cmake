@@ -18,5 +18,5 @@ set (CMAKE_C_COMPILER   "${_clang}")
 set (CMAKE_CXX_COMPILER "${_clangpp}")
 
 set (CMAKE_CXX_FLAGS_INIT "-stdlib=libc++")
-set (CMAKE_EXE_LINKER_FLAGS_INIT "-stdlib=libc++ -fuse-ld=lld")
+set (CMAKE_EXE_LINKER_FLAGS_INIT "-stdlib=libc++ -fuse-ld=lld -Wl,--allow-shlib-undefined")
 set (CMAKE_SHARED_LINKER_FLAGS_INIT "-stdlib=libc++ -fuse-ld=lld")
