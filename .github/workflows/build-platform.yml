@@ -114,8 +114,11 @@ jobs:
             fi
           fi
 
-          cmake -S . -B build -GNinja -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} $CMAKE_ARGS
-          cmake --build build --target ${{ matrix.dep }} --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
+          cmake -S deps -B build -GNinja \
+            -DDEP=${{ matrix.dep }} \
+            -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} \
+            $CMAKE_ARGS
+          cmake --build build --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
 
       - name: Upload dep artifact
         uses: actions/upload-artifact@v4
@@ -164,20 +167,11 @@ jobs:
           CMAKE_ARGS="${{ inputs.cmake-args }}"
           CMAKE_ARGS="${CMAKE_ARGS//\$ANDROID_NDK_ROOT/$ANDROID_NDK_ROOT}"
           echo "Available deps:" && ls libs-${{ inputs.platform }}/ || true
-          cmake -S . -B build -GNinja -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} $CMAKE_ARGS
-
-          # Touch stamps for pre-built deps from artifacts so SuperBuild
-          # doesn't re-run their build/install steps.
-          for dir in build/*-prefix/src/*-stamp; do
-            dep_name=$(basename "$dir" | sed 's/-stamp$//')
-            if [ "$dep_name" != "${{ matrix.dep }}" ]; then
-              for step in mkdir download update patch configure build install done; do
-                touch "$dir/${dep_name}-${step}" 2>/dev/null || true
-              done
-            fi
-          done
-
-          cmake --build build --target ${{ matrix.dep }} --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
+          cmake -S deps -B build -GNinja \
+            -DDEP=${{ matrix.dep }} \
+            -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} \
+            $CMAKE_ARGS
+          cmake --build build --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
 
       - name: Upload dep artifact
         uses: actions/upload-artifact@v4
@@ -225,19 +219,11 @@ jobs:
           CMAKE_ARGS="${{ inputs.cmake-args }}"
           CMAKE_ARGS="${CMAKE_ARGS//\$ANDROID_NDK_ROOT/$ANDROID_NDK_ROOT}"
           echo "Available deps:" && ls libs-${{ inputs.platform }}/ || true
-          cmake -S . -B build -GNinja -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} $CMAKE_ARGS
-
-          # Touch stamps for pre-built deps
-          for dir in build/*-prefix/src/*-stamp; do
-            dep_name=$(basename "$dir" | sed 's/-stamp$//')
-            if [ "$dep_name" != "${{ matrix.dep }}" ]; then
-              for step in mkdir download update patch configure build install done; do
-                touch "$dir/${dep_name}-${step}" 2>/dev/null || true
-              done
-            fi
-          done
-
-          cmake --build build --target ${{ matrix.dep }} --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
+          cmake -S deps -B build -GNinja \
+            -DDEP=${{ matrix.dep }} \
+            -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} \
+            $CMAKE_ARGS
+          cmake --build build --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
 
       - name: Upload dep artifact
         uses: actions/upload-artifact@v4
