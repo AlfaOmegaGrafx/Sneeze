@@ -184,6 +184,26 @@ jobs:
           find libs-${{ inputs.platform }} -path '*/install/bin/*' -type f -exec chmod +x {} +
           echo "Available deps:" && ls libs-${{ inputs.platform }}/
 
+      # halogen compiles filament materials via matc. On cross-compile the
+      # target-platform filament install has no matc — inject the host one.
+      - name: Download Filament host tools for halogen cross-compile
+        if: matrix.dep == 'halogen' && inputs.filament-host-artifact != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.filament-host-artifact }}
+          path: filament-host
+
+      - name: Stage host matc for halogen
+        if: matrix.dep == 'halogen' && inputs.filament-host-artifact != ''
+        run: |
+          MATC=$(find filament-host -name matc -type f -print -quit 2>/dev/null || true)
+          if [ -n "$MATC" ]; then
+            mkdir -p libs-${{ inputs.platform }}/filament/install/bin
+            cp "$MATC" libs-${{ inputs.platform }}/filament/install/bin/matc
+            chmod +x libs-${{ inputs.platform }}/filament/install/bin/matc
+            echo "Staged host matc at libs-${{ inputs.platform }}/filament/install/bin/matc"
+          fi
+
       - name: Build ${{ matrix.dep }}
         env:
           ANDROID_NDK_ROOT: ${{ steps.ndk.outputs.ndk-path || '' }}

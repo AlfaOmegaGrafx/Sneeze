@@ -36,5 +36,6 @@ ExternalProject_Add (halogen
       ${HALOGEN_FIND_ARGS}
       -DANARI_ROOT=${LIBS_DIR}/ANARI-SDK/install
       -DFILAMENT_ROOT=${LIBS_DIR}/filament/install
+      -DFILAMENT_SDK_DIR=${LIBS_DIR}/filament/install
       ${CROSS_COMPILE_ARGS}
 )

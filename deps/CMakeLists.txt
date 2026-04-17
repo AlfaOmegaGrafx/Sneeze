@@ -64,14 +64,15 @@ if (CMAKE_CROSSCOMPILING)
    endif ()
 endif ()
 
-# Forward macOS/iOS settings even for native builds
-if (NOT CMAKE_CROSSCOMPILING)
-   if (CMAKE_OSX_ARCHITECTURES)
-      list (APPEND CROSS_COMPILE_ARGS "-DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}")
-   endif ()
-   if (CMAKE_OSX_DEPLOYMENT_TARGET)
-      list (APPEND CROSS_COMPILE_ARGS -DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET})
-   endif ()
+# Always forward macOS/iOS settings — both native (macOS) and cross
+# (iOS) builds need the architecture and deployment target to match the
+# outer configure. Without this, filament's internal defaults override
+# (e.g. deployment target 10.15, which is invalid on iOS).
+if (CMAKE_OSX_ARCHITECTURES)
+   list (APPEND CROSS_COMPILE_ARGS "-DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}")
+endif ()
+if (CMAKE_OSX_DEPLOYMENT_TARGET)
+   list (APPEND CROSS_COMPILE_ARGS -DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET})
 endif ()
 
 # ---------------------------------------------------------------------------
