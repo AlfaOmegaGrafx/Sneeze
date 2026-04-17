@@ -155,12 +155,19 @@ jobs:
         with:
           ndk-version: r27c
 
-      - name: Download tier0 artifacts
+      - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: ${{ inputs.platform }}-*
-          path: .
-          merge-multiple: true
+          path: dep-artifacts
+
+      - name: Arrange artifacts
+        run: |
+          mkdir -p libs-${{ inputs.platform }}
+          for d in dep-artifacts/${{ inputs.platform }}-*/libs-${{ inputs.platform }}/*; do
+            [ -d "$d" ] && cp -a "$d" libs-${{ inputs.platform }}/ 2>/dev/null || true
+          done
+          echo "Available deps:" && ls libs-${{ inputs.platform }}/
 
       - name: Build ${{ matrix.dep }}
         env:
@@ -168,9 +175,7 @@ jobs:
         run: |
           CMAKE_ARGS="${{ inputs.cmake-args }}"
           CMAKE_ARGS="${CMAKE_ARGS//\$ANDROID_NDK_ROOT/$ANDROID_NDK_ROOT}"
-          # Toolchain paths are relative to repo root — make absolute
           CMAKE_ARGS="${CMAKE_ARGS//cmake\/toolchain/${{ github.workspace }}/cmake/toolchain}"
-          echo "Available deps:" && ls libs-${{ inputs.platform }}/ || true
           cmake -S deps -B build -GNinja \
             -DDEP=${{ matrix.dep }} \
             -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} \
@@ -262,11 +267,15 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           pattern: ${{ inputs.platform }}-*
-          path: .
-          merge-multiple: true
+          path: dep-artifacts
 
-      - name: List deps
-        run: echo "Available deps:" && ls libs-${{ inputs.platform }}/ || true
+      - name: Arrange artifacts
+        run: |
+          mkdir -p libs-${{ inputs.platform }}
+          for d in dep-artifacts/${{ inputs.platform }}-*/libs-${{ inputs.platform }}/*; do
+            [ -d "$d" ] && cp -a "$d" libs-${{ inputs.platform }}/ 2>/dev/null || true
+          done
+          echo "Available deps:" && ls libs-${{ inputs.platform }}/
 
       - name: Install Rust
         if: inputs.rust-targets != ''
