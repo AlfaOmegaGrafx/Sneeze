@@ -4,12 +4,19 @@ elseif (APPLE)
    # macOS + iOS: Apple's Secure Transport (no OpenSSL dep)
    set (CURL_SSL_ARGS -DCURL_USE_SECTRANSPORT=ON -DCURL_USE_OPENSSL=OFF -DCURL_USE_SCHANNEL=OFF)
 elseif (ANDROID)
-   # Android: cross-compile OpenSSL, then curl uses it
-   set (CURL_SSL_ARGS -DCURL_USE_OPENSSL=ON -DCURL_USE_SCHANNEL=OFF)
+   # Android: cross-compile OpenSSL, then curl uses it.
+   # The Android NDK toolchain sets CMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY
+   # which makes find_package(OpenSSL) ignore OPENSSL_ROOT_DIR. Provide the
+   # library/include paths explicitly so FindOpenSSL short-circuits.
    set (OPENSSL_INSTALL_DIR "${LIBS_DIR}/openssl/install")
-   set (CURL_SSL_ARGS ${CURL_SSL_ARGS}
+   set (CURL_SSL_ARGS
+      -DCURL_USE_OPENSSL=ON
+      -DCURL_USE_SCHANNEL=OFF
       -DOPENSSL_ROOT_DIR=${OPENSSL_INSTALL_DIR}
       -DOPENSSL_USE_STATIC_LIBS=TRUE
+      -DOPENSSL_INCLUDE_DIR=${OPENSSL_INSTALL_DIR}/include
+      -DOPENSSL_CRYPTO_LIBRARY=${OPENSSL_INSTALL_DIR}/lib/libcrypto.a
+      -DOPENSSL_SSL_LIBRARY=${OPENSSL_INSTALL_DIR}/lib/libssl.a
    )
 else ()
    # Linux

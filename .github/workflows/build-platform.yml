@@ -112,6 +112,13 @@ jobs:
           if [ "${{ matrix.dep }}" = "filament" ] && [ -d "filament-host" ]; then
             HOST_TOOLS=$(find filament-host -name "ImportExecutables-Release.cmake" -print -quit 2>/dev/null)
             if [ -n "$HOST_TOOLS" ]; then
+              # ImportExecutables-Release.cmake bakes in absolute host-build
+              # paths (e.g. .../libs-macos/filament/build/tools/cmgen/cmgen).
+              # Rewrite those to point into our filament-host download dir so
+              # the imported targets resolve on this runner.
+              sed -i.bak \
+                "s#/\(home\|Users\)/runner/work/[^/]*/[^/]*/libs-[a-z]*#${{ github.workspace }}/filament-host#g" \
+                "$HOST_TOOLS"
               CMAKE_ARGS="$CMAKE_ARGS -DIMPORT_EXECUTABLES_HOST_FILE=${{ github.workspace }}/$HOST_TOOLS"
             fi
           fi
