@@ -28,6 +28,15 @@ ExternalProject_Add (curl
       -DCMAKE_BUILD_TYPE=Release
       -DBUILD_SHARED_LIBS=OFF
       -DBUILD_CURL_EXE=OFF
+      # Minimize optional deps — we only need HTTP/HTTPS for a web client
+      -DCURL_DISABLE_LDAP=ON
+      -DCURL_DISABLE_LDAPS=ON
+      -DUSE_LIBIDN2=OFF
+      -DCURL_USE_LIBPSL=OFF
+      -DCURL_USE_LIBSSH2=OFF
+      -DCURL_ZLIB=OFF
+      -DCURL_BROTLI=OFF
+      -DCURL_ZSTD=OFF
       ${CURL_SSL_ARGS}
       ${CROSS_COMPILE_ARGS}
 )
