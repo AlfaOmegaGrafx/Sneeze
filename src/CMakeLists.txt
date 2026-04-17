@@ -39,73 +39,37 @@ endif ()
 # Dependencies
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Find modules live in src/cmake/. For local deps (USE_LOCAL_DEPS=ON, default),
+# they search LIBS_DIR/<dep>/install/. For system deps, standard find_package.
+# ---------------------------------------------------------------------------
+
+list (APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
 if (USE_LOCAL_DEPS)
-   # ANARI - built from source in libs/
    set (ANARI_ROOT "${LIBS_DIR}/ANARI-SDK/install")
    list (APPEND CMAKE_PREFIX_PATH "${ANARI_ROOT}")
-   find_package (anari REQUIRED)
-else ()
-   find_package (anari REQUIRED)
 endif ()
+find_package (anari REQUIRED)
 
-# Wasmtime - always from libs/ (not available in vcpkg)
 if (SNEEZE_ENABLE_WASM)
-   set (WASMTIME_ROOT "${LIBS_DIR}/Wasmtime/install")
-   if (WIN32)
-      # Windows: link against the import lib produced by Cargo (wasmtime.dll.lib)
-      find_library (WASMTIME_LIB NAMES wasmtime.dll PATHS "${WASMTIME_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
-   elseif (CMAKE_SYSTEM_NAME STREQUAL "iOS")
-      # iOS forbids custom dylibs — Cargo produces a static .a
-      set (_saved_suffixes ${CMAKE_FIND_LIBRARY_SUFFIXES})
-      set (CMAKE_FIND_LIBRARY_SUFFIXES .a)
-      find_library (WASMTIME_LIB NAMES wasmtime PATHS "${WASMTIME_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
-      set (CMAKE_FIND_LIBRARY_SUFFIXES ${_saved_suffixes})
-      unset (_saved_suffixes)
+   if (USE_LOCAL_DEPS)
+      find_package (Wasmtime REQUIRED)
    else ()
-      # macOS (.dylib), Linux (.so), Android (.so)
-      find_library (WASMTIME_LIB NAMES wasmtime PATHS "${WASMTIME_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
+      # Wasmtime has no system package — always from LIBS_DIR
+      find_package (Wasmtime REQUIRED)
    endif ()
-   find_path (WASMTIME_INCLUDE wasmtime.h PATHS "${WASMTIME_ROOT}/include" NO_DEFAULT_PATH REQUIRED)
 endif ()
 
 if (USE_LOCAL_DEPS)
-   # SPIRV-Tools
-   set (SPIRV_TOOLS_ROOT "${LIBS_DIR}/SPIRV-Tools/install")
-   find_library (SPIRV_TOOLS_LIB SPIRV-Tools PATHS "${SPIRV_TOOLS_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
-   find_library (SPIRV_TOOLS_OPT_LIB SPIRV-Tools-opt PATHS "${SPIRV_TOOLS_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
-   find_path (SPIRV_TOOLS_INCLUDE spirv-tools/libspirv.h PATHS "${SPIRV_TOOLS_ROOT}/include" NO_DEFAULT_PATH REQUIRED)
-
-   # OpenXR
+   find_package (SpirvTools REQUIRED)
    if (SNEEZE_ENABLE_XR)
-      set (OPENXR_ROOT "${LIBS_DIR}/OpenXR-SDK/install")
-      find_library (OPENXR_LOADER_LIB openxr_loader PATHS "${OPENXR_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
-      find_path (OPENXR_INCLUDE openxr/openxr.h PATHS "${OPENXR_ROOT}/include" NO_DEFAULT_PATH REQUIRED)
+      find_package (SneezeOpenXR REQUIRED)
    endif ()
-
-   # curl
-   set (CURL_ROOT "${LIBS_DIR}/curl/install")
-   if (WIN32)
-      # MSVC static curl installs as libcurl_a.lib or libcurl.lib depending on version
-      find_library (CURL_LIB NAMES libcurl_a libcurl PATHS "${CURL_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
-   else ()
-      # Unix: find_library prepends "lib", so NAMES curl → libcurl.a / libcurl.so
-      find_library (CURL_LIB NAMES curl PATHS "${CURL_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
-   endif ()
-   find_path (CURL_INCLUDE curl/curl.h PATHS "${CURL_ROOT}/include" NO_DEFAULT_PATH REQUIRED)
-
-   # RmlUi
-   set (RMLUI_ROOT "${LIBS_DIR}/RmlUi/install")
-   find_library (RMLUI_CORE_LIB rmlui PATHS "${RMLUI_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
-   find_library (RMLUI_DEBUGGER_LIB rmlui_debugger PATHS "${RMLUI_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
-   find_path (RMLUI_INCLUDE RmlUi/Core.h PATHS "${RMLUI_ROOT}/include" NO_DEFAULT_PATH REQUIRED)
-
-   # glslang (build-time tool only)
-   set (GLSLANG_ROOT "${LIBS_DIR}/glslang/install")
-   find_program (GLSLANG_VALIDATOR glslang PATHS "${GLSLANG_ROOT}/bin" NO_DEFAULT_PATH REQUIRED)
-
-   # nlohmann/json (header-only)
-   set (NLOHMANN_JSON_ROOT "${LIBS_DIR}/nlohmann-json/install")
-   find_path (NLOHMANN_JSON_INCLUDE nlohmann/json.hpp PATHS "${NLOHMANN_JSON_ROOT}/include" NO_DEFAULT_PATH REQUIRED)
+   find_package (SneezeCurl REQUIRED)
+   find_package (SneezeRmlUi REQUIRED)
+   find_package (Glslang REQUIRED)
+   find_package (NlohmannJson REQUIRED)
 else ()
    find_package (spirv_tools REQUIRED CONFIG)
    if (SNEEZE_ENABLE_XR)
