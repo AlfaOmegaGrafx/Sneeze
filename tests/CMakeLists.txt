@@ -72,8 +72,12 @@ elseif (APPLE)
    target_link_libraries (NetTest PRIVATE pthread ${_NET_SECURITY_FW} ${_NET_CF_FW})
 else ()
    find_package (OpenSSL QUIET)
+   find_package (ZLIB QUIET)
    if (OpenSSL_FOUND)
       target_link_libraries (NetTest PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+   endif ()
+   if (ZLIB_FOUND)
+      target_link_libraries (NetTest PRIVATE ZLIB::ZLIB)
    endif ()
    target_link_libraries (NetTest PRIVATE pthread dl)
 endif ()
@@ -97,18 +101,11 @@ target_link_libraries (UiTest PRIVATE
 
 set (SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 
-add_executable (ComputeTest
-   ComputeTest.cpp
-   ${SRC_DIR}/compute/EmbeddedKernels.cpp
-   ${SRC_DIR}/compute/EmbeddedKernels.h
-   ${SRC_DIR}/compute/ComputeDispatch.cpp
-   ${SRC_DIR}/compute/ComputeDispatch.h
-   ${KERNEL_EMBED_FILES}
-)
-add_dependencies (ComputeTest CompileKernels)
-
+add_executable (ComputeTest ComputeTest.cpp)
 target_include_directories (ComputeTest PRIVATE ${SRC_DIR})
-target_link_libraries (ComputeTest PRIVATE anari::anari_static)
+# Link Sneeze lib — already contains EmbeddedKernels + ComputeDispatch +
+# the kernels_embedded.c (.rc on Windows) symbols.
+target_link_libraries (ComputeTest PRIVATE Sneeze anari::anari_static)
 
 # ---------------------------------------------------------------------------
 # Copy runtime DLLs to test output directories
