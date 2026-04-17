@@ -116,9 +116,14 @@ jobs:
               # paths (e.g. .../libs-macos/filament/build/tools/cmgen/cmgen).
               # Rewrite those to point into our filament-host download dir so
               # the imported targets resolve on this runner.
-              sed -i.bak \
-                "s#/\(home\|Users\)/runner/work/[^/]*/[^/]*/libs-[a-z]*#${{ github.workspace }}/filament-host#g" \
+              # -E (ERE) is required because BSD sed on macOS runners doesn't
+              # support \| alternation in BRE.
+              sed -i.bak -E \
+                "s#/(home|Users)/runner/work/[^/]*/[^/]*/libs-[a-z]*#${{ github.workspace }}/filament-host#g" \
                 "$HOST_TOOLS"
+              # GH Actions upload-artifact strips execute bits — restore for
+              # filament host tools (matc, cmgen, resgen, filamesh, ...).
+              find filament-host -path '*/tools/*' -type f ! -name '*.cmake' -exec chmod +x {} +
               CMAKE_ARGS="$CMAKE_ARGS -DIMPORT_EXECUTABLES_HOST_FILE=${{ github.workspace }}/$HOST_TOOLS"
             fi
           fi
