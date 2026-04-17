@@ -292,6 +292,8 @@ jobs:
         run: |
           CMAKE_ARGS="${{ inputs.cmake-args }}"
           CMAKE_ARGS="${CMAKE_ARGS//\$ANDROID_NDK_ROOT/$ANDROID_NDK_ROOT}"
+          # Toolchain path is relative to repo root — make absolute for cmake -S src
+          CMAKE_ARGS="${CMAKE_ARGS//cmake\/toolchain/${{ github.workspace }}/cmake/toolchain}"
           cmake -S src -B build-sneeze -GNinja \
             -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} \
             -DSNEEZE_ENABLE_WASM=ON \
