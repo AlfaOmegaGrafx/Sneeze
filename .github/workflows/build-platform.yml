@@ -59,15 +59,25 @@ jobs:
         with:
           ndk-version: r27c
 
+      # CMake target names (lowercase) differ from ExternalProject dir names
+      # (mixed case, matching upstream repos). This map bridges the two for
+      # cache paths and artifact uploads. If the SuperBuild dirs were renamed
+      # to lowercase, this step could be removed and matrix.dep used directly.
       - name: Resolve dep dir name
         id: dir
+        shell: bash
         run: |
-          declare -A MAP=(
-            [spirv-headers]=SPIRV-Headers [spirv-tools]=SPIRV-Tools
-            [anari-sdk]=ANARI-SDK [openxr-sdk]=OpenXR-SDK
-            [rmlui]=RmlUi [wasmtime]=Wasmtime [halogen]=Halogen
-          )
-          echo "name=${MAP[${{ matrix.dep }}]:-${{ matrix.dep }}}" >> "$GITHUB_OUTPUT"
+          case "${{ matrix.dep }}" in
+            spirv-headers) DIR=SPIRV-Headers ;;
+            spirv-tools)   DIR=SPIRV-Tools ;;
+            anari-sdk)     DIR=ANARI-SDK ;;
+            openxr-sdk)    DIR=OpenXR-SDK ;;
+            rmlui)         DIR=RmlUi ;;
+            wasmtime)      DIR=Wasmtime ;;
+            halogen)       DIR=Halogen ;;
+            *)             DIR="${{ matrix.dep }}" ;;
+          esac
+          echo "name=$DIR" >> "$GITHUB_OUTPUT"
 
       - name: Cache ${{ matrix.dep }}
         id: cache

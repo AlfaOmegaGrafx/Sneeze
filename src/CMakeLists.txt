@@ -201,10 +201,10 @@ file (WRITE "${OUT_FILE}" "${_out}")
    add_custom_command (
       OUTPUT "${KERNEL_C_FILE}"
       COMMAND ${CMAKE_COMMAND}
-         -DKERNEL_NAMES="${_kernel_names}"
-         -DSPV_DIR="${KERNEL_OUTPUT_DIR}"
-         -DOUT_FILE="${KERNEL_C_FILE}"
-         -P "${KERNEL_EMBED_SCRIPT}"
+         -DKERNEL_NAMES=${_kernel_names}
+         -DSPV_DIR=${KERNEL_OUTPUT_DIR}
+         -DOUT_FILE=${KERNEL_C_FILE}
+         -P ${KERNEL_EMBED_SCRIPT}
       DEPENDS ${KERNEL_SPV_OUTPUTS}
       COMMENT "Generating cross-platform SPIR-V embedding source"
       VERBATIM
