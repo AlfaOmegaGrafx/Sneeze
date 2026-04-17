@@ -46,6 +46,13 @@ endif ()
 
 list (APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
+# Cross-compile: Android/iOS toolchains default CMAKE_FIND_ROOT_PATH_MODE_PACKAGE
+# to ONLY, blocking find_package from honoring user-set ROOT variables. Allow
+# both so CMAKE_PREFIX_PATH below finds ANARI in libs-<platform>/ANARI-SDK.
+if (ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
+   set (CMAKE_FIND_ROOT_PATH_MODE_PACKAGE BOTH)
+endif ()
+
 if (USE_LOCAL_DEPS)
    set (ANARI_ROOT "${LIBS_DIR}/ANARI-SDK/install")
    list (APPEND CMAKE_PREFIX_PATH "${ANARI_ROOT}")
