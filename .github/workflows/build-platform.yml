@@ -164,7 +164,7 @@ jobs:
       - name: Arrange artifacts
         run: |
           mkdir -p libs-${{ inputs.platform }}
-          for d in dep-artifacts/${{ inputs.platform }}-*/libs-${{ inputs.platform }}/*; do
+          for d in dep-artifacts/${{ inputs.platform }}-*/*; do
             [ -d "$d" ] && cp -a "$d" libs-${{ inputs.platform }}/ 2>/dev/null || true
           done
           echo "Available deps:" && ls libs-${{ inputs.platform }}/
@@ -272,7 +272,7 @@ jobs:
       - name: Arrange artifacts
         run: |
           mkdir -p libs-${{ inputs.platform }}
-          for d in dep-artifacts/${{ inputs.platform }}-*/libs-${{ inputs.platform }}/*; do
+          for d in dep-artifacts/${{ inputs.platform }}-*/*; do
             [ -d "$d" ] && cp -a "$d" libs-${{ inputs.platform }}/ 2>/dev/null || true
           done
           echo "Available deps:" && ls libs-${{ inputs.platform }}/
