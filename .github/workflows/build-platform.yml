@@ -167,6 +167,8 @@ jobs:
           for d in dep-artifacts/${{ inputs.platform }}-*/*; do
             [ -d "$d" ] && cp -a "$d" libs-${{ inputs.platform }}/ 2>/dev/null || true
           done
+          # GH Actions upload-artifact strips execute bits — restore for bin/ tools
+          find libs-${{ inputs.platform }} -path '*/install/bin/*' -type f -exec chmod +x {} +
           echo "Available deps:" && ls libs-${{ inputs.platform }}/
 
       - name: Build ${{ matrix.dep }}
@@ -275,6 +277,8 @@ jobs:
           for d in dep-artifacts/${{ inputs.platform }}-*/*; do
             [ -d "$d" ] && cp -a "$d" libs-${{ inputs.platform }}/ 2>/dev/null || true
           done
+          # GH Actions upload-artifact strips execute bits — restore for bin/ tools
+          find libs-${{ inputs.platform }} -path '*/install/bin/*' -type f -exec chmod +x {} +
           echo "Available deps:" && ls libs-${{ inputs.platform }}/
 
       - name: Install Rust
