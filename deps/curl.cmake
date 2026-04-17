@@ -1,7 +1,7 @@
 if (WIN32)
    set (CURL_SSL_ARGS -DCURL_USE_SCHANNEL=ON -DCURL_USE_OPENSSL=OFF)
-elseif (CMAKE_SYSTEM_NAME STREQUAL "iOS")
-   # iOS: use Apple's Secure Transport
+elseif (APPLE)
+   # macOS + iOS: Apple's Secure Transport (no OpenSSL dep)
    set (CURL_SSL_ARGS -DCURL_USE_SECTRANSPORT=ON -DCURL_USE_OPENSSL=OFF -DCURL_USE_SCHANNEL=OFF)
 elseif (ANDROID)
    # Android: cross-compile OpenSSL, then curl uses it
@@ -12,7 +12,7 @@ elseif (ANDROID)
       -DOPENSSL_USE_STATIC_LIBS=TRUE
    )
 else ()
-   # macOS, Linux
+   # Linux
    set (CURL_SSL_ARGS -DCURL_USE_SCHANNEL=OFF -DCURL_USE_OPENSSL=ON)
 endif ()
 

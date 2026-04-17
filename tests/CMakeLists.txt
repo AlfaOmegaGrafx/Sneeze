@@ -101,10 +101,12 @@ target_link_libraries (UiTest PRIVATE
 
 set (SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 
-add_executable (ComputeTest ComputeTest.cpp)
+add_executable (ComputeTest
+   ComputeTest.cpp
+   ${KERNEL_EMBED_FILES}
+)
+add_dependencies (ComputeTest CompileKernels)
 target_include_directories (ComputeTest PRIVATE ${SRC_DIR})
-# Link Sneeze lib — already contains EmbeddedKernels + ComputeDispatch +
-# the kernels_embedded.c (.rc on Windows) symbols.
 target_link_libraries (ComputeTest PRIVATE Sneeze anari::anari_static)
 
 # ---------------------------------------------------------------------------
