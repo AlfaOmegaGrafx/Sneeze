@@ -10,9 +10,9 @@
 #   cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-linux-clang.cmake
 
 # Use versioned clang if available (apt.llvm.org on older distros), else bare name
-find_program (_clang   NAMES clang-14 clang)
-find_program (_clangpp NAMES clang++-14 clang++)
-find_program (_lld     NAMES lld-14 lld ld.lld-14 ld.lld)
+find_program (_clang   NAMES clang clang-14)
+find_program (_clangpp NAMES clang++ clang++-14)
+find_program (_lld     NAMES lld ld.lld lld-14 ld.lld-14)
 
 set (CMAKE_C_COMPILER   "${_clang}")
 set (CMAKE_CXX_COMPILER "${_clangpp}")
