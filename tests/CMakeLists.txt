@@ -25,6 +25,9 @@ if (WIN32)
    target_link_libraries (WasmTest PRIVATE ws2_32 advapi32 userenv ntdll shell32 ole32 bcrypt)
 elseif (APPLE)
    target_link_libraries (WasmTest PRIVATE pthread dl)
+elseif (ANDROID)
+   # Android bionic includes pthread in libc — no separate -lpthread
+   target_link_libraries (WasmTest PRIVATE dl m log)
 else ()
    target_link_libraries (WasmTest PRIVATE pthread dl m)
 endif ()
@@ -44,15 +47,17 @@ target_link_libraries (SpvTest PRIVATE
 )
 
 # ---------------------------------------------------------------------------
-# OpenXR test executable
+# OpenXR test executable — iOS disables XR (no VR support on iOS)
 # ---------------------------------------------------------------------------
 
-add_executable (XrTest XrRuntimeTest.cpp)
+if (NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+   add_executable (XrTest XrRuntimeTest.cpp)
 
-target_include_directories (XrTest PRIVATE ${OPENXR_INCLUDE})
-target_link_libraries (XrTest PRIVATE ${OPENXR_LOADER_LIB})
-if (WIN32)
-   target_link_libraries (XrTest PRIVATE advapi32)
+   target_include_directories (XrTest PRIVATE ${OPENXR_INCLUDE})
+   target_link_libraries (XrTest PRIVATE ${OPENXR_LOADER_LIB})
+   if (WIN32)
+      target_link_libraries (XrTest PRIVATE advapi32)
+   endif ()
 endif ()
 
 # ---------------------------------------------------------------------------
@@ -72,6 +77,14 @@ elseif (APPLE)
    find_library (_NET_SC_FW SystemConfiguration)
    target_link_libraries (NetTest PRIVATE pthread
       ${_NET_SECURITY_FW} ${_NET_CF_FW} ${_NET_SC_FW})
+elseif (ANDROID)
+   # curl on Android links against our OpenSSL artifact; no system OpenSSL
+   # search needed. pthread is in libc.
+   set (_ANDROID_OPENSSL "${LIBS_DIR}/openssl/install")
+   target_link_libraries (NetTest PRIVATE
+      "${_ANDROID_OPENSSL}/lib/libssl.a"
+      "${_ANDROID_OPENSSL}/lib/libcrypto.a"
+      dl log)
 else ()
    find_package (OpenSSL QUIET)
    find_package (ZLIB QUIET)
