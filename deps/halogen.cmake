@@ -14,6 +14,13 @@ if (WIN32)
       -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>DLL)
 endif ()
 
+# Cross-compile: the Android/iOS toolchain restricts find_package to the
+# sysroot via CMAKE_FIND_ROOT_PATH_MODE_PACKAGE — set BOTH so halogen's
+# find_package(anari) sees ANARI_ROOT pointing into our libs-* install tree.
+if (ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
+   set (HALOGEN_FIND_ARGS -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH)
+endif ()
+
 ExternalProject_Add (halogen
    GIT_REPOSITORY   https://github.com/MetaversalCorp/Halogen.git
    GIT_TAG          master
@@ -26,6 +33,7 @@ ExternalProject_Add (halogen
       -DCMAKE_BUILD_TYPE=Release
       -DBUILD_TESTS=OFF
       ${MSVC_CRT_ARGS}
+      ${HALOGEN_FIND_ARGS}
       -DANARI_ROOT=${LIBS_DIR}/ANARI-SDK/install
       -DFILAMENT_ROOT=${LIBS_DIR}/filament/install
       ${CROSS_COMPILE_ARGS}
