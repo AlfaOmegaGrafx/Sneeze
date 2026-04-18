@@ -80,6 +80,9 @@ ANARI_RENDERER::ANARI_RENDERER (const std::string& sLibrary)
    , m_pCamera (nullptr)
    , m_pRenderer (nullptr)
    , m_pFrame (nullptr)
+   , m_pNativeSurface (nullptr)
+   , m_pNativeWindow (nullptr)
+   , m_bNativeSurface (false)
    , m_nWidth (0)
    , m_nHeight (0)
 {
@@ -90,7 +93,33 @@ ANARI_RENDERER::~ANARI_RENDERER ()
    Shutdown ();
 }
 
+void ANARI_RENDERER::SetNativeWindow (void* pHandle)
+{
+   m_pNativeWindow = pHandle;
+}
+
+bool ANARI_RENDERER::IsRenderingToNativeSurface () const
+{
+   return m_bNativeSurface;
+}
+
 // ---------------------------------------------------------------------------
+
+namespace {
+
+// True if 'sName' appears in the null-terminated extension list returned by
+// anariGetDeviceExtensions().
+bool HasExtension (const char* const* pList, const char* sName)
+{
+   if (!pList || !sName) return false;
+   for (const char* const* p = pList; *p; ++p)
+   {
+      if (std::strcmp (*p, sName) == 0) return true;
+   }
+   return false;
+}
+
+} // namespace
 
 bool ANARI_RENDERER::Initialize (int nWidth, int nHeight)
 {
@@ -138,6 +167,25 @@ bool ANARI_RENDERER::Initialize (int nWidth, int nHeight)
    {
       anariCommitParameters (m_pDevice, m_pDevice);
 
+      // Opt into direct-to-window rendering when the implementation advertises
+      // Halogen's native-surface extension AND the app has provided a window.
+      if (m_pNativeWindow)
+      {
+         const char* const* pExtensions =
+            anariGetDeviceExtensions (reinterpret_cast<ANARILibrary> (m_pLibrary), "default");
+         if (HasExtension (pExtensions, "HALOGEN_NATIVE_SURFACE"))
+         {
+            ANARIObject ns = anariNewObject (m_pDevice, "nativeSurface", "default");
+            if (ns)
+            {
+               anariSetParameter (m_pDevice, ns, "nativeWindow", ANARI_VOID_POINTER, &m_pNativeWindow);
+               anariCommitParameters (m_pDevice, ns);
+               m_pNativeSurface = reinterpret_cast<anari::api::Object*> (ns);
+               m_bNativeSurface = true;
+            }
+         }
+      }
+
       m_pWorld = anariNewWorld (m_pDevice);
       m_pCamera = anariNewCamera (m_pDevice, "perspective");
       m_pRenderer = anariNewRenderer (m_pDevice, "default");
@@ -158,6 +206,11 @@ bool ANARI_RENDERER::Initialize (int nWidth, int nHeight)
       anariSetParameter (m_pDevice, m_pFrame, "renderer", _ANARI_RENDERER, &m_pRenderer);
       anariSetParameter (m_pDevice, m_pFrame, "camera", ANARI_CAMERA, &m_pCamera);
       anariSetParameter (m_pDevice, m_pFrame, "world", ANARI_WORLD, &m_pWorld);
+      if (m_pNativeSurface)
+      {
+         ANARIObject ns = reinterpret_cast<ANARIObject> (m_pNativeSurface);
+         anariSetParameter (m_pDevice, m_pFrame, "nativeSurface", ANARI_OBJECT, &ns);
+      }
       anariCommitParameters (m_pDevice, m_pFrame);
 
       bOk = true;
@@ -174,6 +227,11 @@ void ANARI_RENDERER::Shutdown ()
       {
          anariRelease (m_pDevice, m_pFrame);
          m_pFrame = nullptr;
+      }
+      if (m_pNativeSurface)
+      {
+         anariRelease (m_pDevice, reinterpret_cast<ANARIObject> (m_pNativeSurface));
+         m_pNativeSurface = nullptr;
       }
       if (m_pRenderer)
       {
@@ -198,6 +256,7 @@ void ANARI_RENDERER::Shutdown ()
       anariUnloadLibrary (m_pLibrary);
       m_pLibrary = nullptr;
    }
+   m_bNativeSurface = false;
 }
 
 // ---------------------------------------------------------------------------
@@ -242,10 +301,12 @@ void ANARI_RENDERER::EndFrame ()
    anariRenderFrame (m_pDevice, m_pFrame);
    anariFrameReady (m_pDevice, m_pFrame, ANARI_WAIT);
 
+   // Native-surface mode: Halogen presented directly to the window; no readback.
+   if (m_bNativeSurface) return;
+
    uint32_t nW = 0, nH = 0;
    ANARIDataType nType = ANARI_UNKNOWN;
    const void* pData = anariMapFrame (m_pDevice, m_pFrame, "channel.color", &nW, &nH, &nType);
-
 
    if (pData)
    {
@@ -256,6 +317,8 @@ void ANARI_RENDERER::EndFrame ()
 
 const uint32_t* ANARI_RENDERER::GetFrameBuffer () const
 {
+   // No CPU-readable framebuffer in native-surface mode.
+   if (m_bNativeSurface) return nullptr;
    return m_aPixels.data ();
 }
 

@@ -40,6 +40,9 @@ public:
    explicit ANARI_RENDERER (const std::string& sLibrary);
    ~ANARI_RENDERER () override;
 
+   void SetNativeWindow (void* pHandle) override;
+   bool IsRenderingToNativeSurface () const override;
+
    bool Initialize (int nWidth, int nHeight) override;
    void Shutdown () override;
 
@@ -61,6 +64,10 @@ private:
    anari::api::Camera*   m_pCamera;
    anari::api::Renderer* m_pRenderer;
    anari::api::Frame*    m_pFrame;
+   anari::api::Object*   m_pNativeSurface;
+
+   void* m_pNativeWindow;
+   bool  m_bNativeSurface;
 
    int m_nWidth;
    int m_nHeight;

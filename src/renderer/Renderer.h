@@ -54,6 +54,18 @@ class RENDERER
 public:
    virtual ~RENDERER () = default;
 
+   // Optional. Must be called before Initialize(). If the underlying renderer
+   // implementation advertises support (see IsRenderingToNativeSurface() after
+   // Initialize), it will render directly to this platform handle instead of a
+   // CPU-readable framebuffer. Type: HWND (Win32), ANativeWindow* (Android),
+   // CAMetalLayer*/UIView* (iOS), NSView*/NSWindow* (macOS).
+   virtual void SetNativeWindow (void* pHandle) { (void) pHandle; }
+
+   // True after Initialize() if the renderer is presenting to the native
+   // window directly. In that case GetFrameBuffer() returns nullptr and the
+   // app must skip any CPU-side blit.
+   virtual bool IsRenderingToNativeSurface () const { return false; }
+
    virtual bool Initialize (int nWidth, int nHeight) = 0;
    virtual void Shutdown () = 0;
 
