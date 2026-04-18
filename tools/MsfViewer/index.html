@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<!--
+   Copyright 2026 Metaversal Corporation
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MSF / MSS Viewer</title>
+<style>
+  :root {
+    --bg:        #0d1117;
+    --surface:   #161b22;
+    --surface-2: #1c232b;
+    --border:    #30363d;
+    --text:      #c9d1d9;
+    --muted:     #8b949e;
+    --accent:    #58a6ff;
+    --success:   #3fb950;
+    --success-bg:#0f2a17;
+    --error:     #f85149;
+    --error-bg:  #2a1113;
+    --warning:   #d29922;
+    --warning-bg:#2a2010;
+    --mono:      ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --font:      -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body { height: 100%; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.5;
+    padding: 24px;
+    min-height: 100vh;
+  }
+
+  .container { max-width: 1100px; margin: 0 auto; }
+
+  header {
+    margin-bottom: 32px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  header h1 {
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  header .subtitle {
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  #drop-zone {
+    background: var(--surface);
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 32px;
+    text-align: center;
+    transition: border-color 0.15s, background 0.15s;
+  }
+
+  #drop-zone.dragover {
+    border-color: var(--accent);
+    background: var(--surface-2);
+  }
+
+  #drop-zone p { color: var(--muted); margin-bottom: 12px; }
+
+  #drop-zone .file-label {
+    display: inline-block;
+    background: var(--accent);
+    color: #0d1117;
+    padding: 6px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 13px;
+  }
+
+  #drop-zone .file-label:hover { opacity: 0.9; }
+  #drop-zone input[type=file] { display: none; }
+
+  #paste {
+    width: 100%;
+    min-height: 100px;
+    max-height: 200px;
+    margin-top: 16px;
+    padding: 10px 12px;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+    resize: vertical;
+  }
+
+  #paste:focus { outline: none; border-color: var(--accent); }
+
+  .actions {
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+  }
+
+  button {
+    background: var(--accent);
+    color: #0d1117;
+    border: none;
+    padding: 8px 18px;
+    font-weight: 500;
+    font-size: 13px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: var(--font);
+  }
+
+  button:hover { opacity: 0.9; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  button.secondary {
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  #results { margin-top: 32px; }
+
+  #status {
+    padding: 16px 20px;
+    border-radius: 8px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 500;
+    border: 1px solid;
+  }
+
+  #status.pass {
+    background: var(--success-bg);
+    color: var(--success);
+    border-color: var(--success);
+  }
+
+  #status.fail {
+    background: var(--error-bg);
+    color: var(--error);
+    border-color: var(--error);
+  }
+
+  #status.warn {
+    background: var(--warning-bg);
+    color: var(--warning);
+    border-color: var(--warning);
+  }
+
+  #status .icon {
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  #status .details {
+    font-size: 13px;
+    color: var(--muted);
+    font-weight: normal;
+    margin-top: 2px;
+  }
+
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+
+  .section h2 {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    padding: 10px 16px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section .body { padding: 16px; }
+
+  .kv-grid {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 6px 16px;
+    font-size: 13px;
+  }
+
+  .kv-grid .key {
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .kv-grid .val {
+    font-family: var(--mono);
+    word-break: break-all;
+  }
+
+  .cert-card {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px;
+    margin-bottom: 10px;
+    background: var(--bg);
+  }
+
+  .cert-card:last-child { margin-bottom: 0; }
+
+  .cert-card.leaf {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent) inset;
+  }
+
+  .cert-label {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+  }
+
+  .cert-label.leaf {
+    background: var(--accent);
+    color: #0d1117;
+  }
+
+  .cert-label.intermediate {
+    background: var(--surface-2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+
+  .cert-label.expired {
+    background: var(--warning-bg);
+    color: var(--warning);
+    border: 1px solid var(--warning);
+    margin-left: 6px;
+  }
+
+  pre.json {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  .json-key    { color: #79c0ff; }
+  .json-string { color: #a5d6ff; }
+  .json-number { color: #ffa657; }
+  .json-bool   { color: #ff7b72; }
+  .json-null   { color: #ff7b72; }
+
+  .mss-service {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+  }
+
+  .mss-service:last-child { margin-bottom: 0; }
+
+  .mss-service .name {
+    font-weight: 600;
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+
+  .mss-service .meta {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--mono);
+  }
+
+  .fingerprint {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    word-break: break-all;
+    background: var(--surface-2);
+    padding: 6px 8px;
+    border-radius: 4px;
+    margin-top: 4px;
+  }
+
+  .empty-hint {
+    color: var(--muted);
+    font-style: italic;
+    font-size: 13px;
+  }
+
+  .error-detail {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--error);
+    margin-top: 8px;
+    padding: 10px;
+    background: var(--bg);
+    border-radius: 4px;
+  }
+
+  footer {
+    margin-top: 48px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<header>
+  <h1>MSF / MSS Viewer</h1>
+  <p class="subtitle">
+    Standalone JWS inspector for Metaverse Service Fabric and Metaverse Service Specification files.
+    Verifies the cryptographic signature against the leaf certificate's public key.
+    Chain-to-root validation is not performed (browsers do not expose the OS trust store).
+  </p>
+</header>
+
+<div id="drop-zone">
+  <p><strong>Drop a .msf or .mss file here</strong></p>
+  <p>or <label class="file-label">Choose a file<input type="file" id="file-picker" accept=".msf,.mss,.jws,.txt"></label></p>
+  <textarea id="paste" placeholder="…or paste a JWS compact serialization here (three base64url segments joined by dots)"></textarea>
+  <div class="actions">
+    <button id="verify-btn">Verify</button>
+    <button id="clear-btn" class="secondary">Clear</button>
+  </div>
+</div>
+
+<div id="results" hidden>
+  <div id="status"></div>
+  <div id="sections"></div>
+</div>
+
+<footer>
+  Signature verification uses the browser's native Web Crypto API.
+  The public-key fingerprint matches the Sneeze engine's identity derivation
+  (SHA-256 of the leaf certificate's SubjectPublicKeyInfo).
+</footer>
+
+</div>
+
+<script>
+"use strict";
+
+// ---------------------------------------------------------------------------
+// OID lookup table (common X.509 attribute types and signature algorithms)
+// ---------------------------------------------------------------------------
+
+const OIDS = {
+  "2.5.4.3":             { short: "CN", name: "commonName" },
+  "2.5.4.6":             { short: "C",  name: "country" },
+  "2.5.4.7":             { short: "L",  name: "locality" },
+  "2.5.4.8":             { short: "ST", name: "state" },
+  "2.5.4.10":            { short: "O",  name: "organization" },
+  "2.5.4.11":            { short: "OU", name: "organizationalUnit" },
+  "1.2.840.113549.1.9.1":{ short: "E",  name: "emailAddress" },
+
+  "1.2.840.113549.1.1.1":  { name: "rsaEncryption" },
+  "1.2.840.113549.1.1.11": { name: "sha256WithRSAEncryption" },
+  "1.2.840.113549.1.1.12": { name: "sha384WithRSAEncryption" },
+  "1.2.840.113549.1.1.13": { name: "sha512WithRSAEncryption" },
+  "1.2.840.10045.2.1":     { name: "ecPublicKey" },
+  "1.2.840.10045.4.3.2":   { name: "ecdsa-with-SHA256" },
+  "1.2.840.10045.4.3.3":   { name: "ecdsa-with-SHA384" },
+  "1.2.840.10045.4.3.4":   { name: "ecdsa-with-SHA512" },
+  "1.2.840.10045.3.1.7":   { name: "prime256v1" },
+  "1.3.132.0.34":          { name: "secp384r1" },
+  "1.3.132.0.35":          { name: "secp521r1" },
+};
+
+// ---------------------------------------------------------------------------
+// Encoding helpers
+// ---------------------------------------------------------------------------
+
+function base64UrlToBytes(s) {
+  s = s.replace(/-/g, "+").replace(/_/g, "/");
+  while (s.length % 4) s += "=";
+  const bin = atob(s);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function base64ToBytes(s) {
+  const bin = atob(s.replace(/\s+/g, ""));
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function bytesToUtf8(bytes) {
+  return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+}
+
+function bytesToHex(bytes) {
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+function utf8ToBytes(s) { return new TextEncoder().encode(s); }
+
+// ---------------------------------------------------------------------------
+// ASN.1 DER parser (minimal — handles what X.509 needs)
+// ---------------------------------------------------------------------------
+
+function parseAsn1(bytes, offset) {
+  if (offset >= bytes.length) throw new Error("ASN.1: offset past end of buffer");
+  const tag = bytes[offset];
+  let p = offset + 1;
+  let length;
+
+  if (bytes[p] < 0x80) {
+    length = bytes[p];
+    p += 1;
+  }
+  else {
+    const n = bytes[p] & 0x7f;
+    if (n === 0)   throw new Error("ASN.1: indefinite length not supported");
+    if (n > 4)     throw new Error("ASN.1: length > 32 bits");
+    length = 0;
+    p += 1;
+    for (let i = 0; i < n; i++) length = (length << 8) | bytes[p + i];
+    p += n;
+  }
+
+  const contentsOffset = p;
+  const totalLength = contentsOffset + length - offset;
+
+  return {
+    tag:      tag,
+    length:   length,
+    contents: bytes.subarray(contentsOffset, contentsOffset + length),
+    raw:      bytes.subarray(offset, offset + totalLength),
+    totalLength: totalLength,
+  };
+}
+
+function walkSequence(bytes) {
+  const out = [];
+  let offset = 0;
+  while (offset < bytes.length) {
+    const el = parseAsn1(bytes, offset);
+    out.push(el);
+    offset += el.totalLength;
+  }
+  return out;
+}
+
+function parseOid(contents) {
+  if (contents.length === 0) return "";
+  const first  = Math.floor(contents[0] / 40);
+  const second = contents[0] % 40;
+  const parts = [first, second];
+  let value = 0;
+  for (let i = 1; i < contents.length; i++) {
+    value = (value << 7) | (contents[i] & 0x7f);
+    if ((contents[i] & 0x80) === 0) {
+      parts.push(value);
+      value = 0;
+    }
+  }
+  return parts.join(".");
+}
+
+function parseName(nameBytes) {
+  // Name ::= SEQUENCE OF RelativeDistinguishedName
+  // RDN  ::= SET OF AttributeTypeAndValue
+  // ATV  ::= SEQUENCE { type OID, value ANY }
+  const rdns = walkSequence(nameBytes);
+  const attrs = [];
+  for (const rdn of rdns) {
+    if (rdn.tag !== 0x31) continue;
+    const atvs = walkSequence(rdn.contents);
+    for (const atv of atvs) {
+      if (atv.tag !== 0x30) continue;
+      const parts = walkSequence(atv.contents);
+      if (parts.length < 2) continue;
+      const oid = parseOid(parts[0].contents);
+      const value = bytesToUtf8(parts[1].contents);
+      const entry = OIDS[oid];
+      attrs.push({
+        oid:   oid,
+        short: entry ? entry.short : oid,
+        name:  entry ? entry.name  : oid,
+        value: value,
+      });
+    }
+  }
+  return attrs;
+}
+
+function formatName(attrs) {
+  return attrs.map(a => `${a.short || a.oid}=${a.value}`).join(", ");
+}
+
+function parseTime(el) {
+  const s = bytesToUtf8(el.contents);
+  let year, mon, day, hr, min, sec;
+
+  if (el.tag === 0x17) { // UTCTime YYMMDDhhmmssZ
+    year = parseInt(s.substring(0, 2), 10);
+    year += year < 50 ? 2000 : 1900;
+    mon = parseInt(s.substring(2, 4), 10);
+    day = parseInt(s.substring(4, 6), 10);
+    hr  = parseInt(s.substring(6, 8), 10);
+    min = parseInt(s.substring(8, 10), 10);
+    sec = parseInt(s.substring(10, 12), 10);
+  }
+  else if (el.tag === 0x18) { // GeneralizedTime YYYYMMDDhhmmssZ
+    year = parseInt(s.substring(0, 4), 10);
+    mon  = parseInt(s.substring(4, 6), 10);
+    day  = parseInt(s.substring(6, 8), 10);
+    hr   = parseInt(s.substring(8, 10), 10);
+    min  = parseInt(s.substring(10, 12), 10);
+    sec  = parseInt(s.substring(12, 14), 10);
+  }
+  else {
+    return null;
+  }
+
+  return new Date(Date.UTC(year, mon - 1, day, hr, min, sec));
+}
+
+function parseX509(derBytes) {
+  // Certificate ::= SEQUENCE { tbs, sigAlg, sigValue }
+  const cert = parseAsn1(derBytes, 0);
+  if (cert.tag !== 0x30) throw new Error("X.509: outer element is not a SEQUENCE");
+  const tlvs = walkSequence(cert.contents);
+  const tbs  = tlvs[0];
+  const sigAlgId = tlvs[1];
+  const tbsItems = walkSequence(tbs.contents);
+
+  let idx = 0;
+  let version = 1;
+  if (tbsItems[idx] && tbsItems[idx].tag === 0xA0) { // [0] EXPLICIT version
+    const v = parseAsn1(tbsItems[idx].contents, 0);
+    version = (v.contents[0] || 0) + 1;
+    idx++;
+  }
+
+  const serialBytes    = tbsItems[idx++].contents;
+  /* const tbsSigAlg = */ tbsItems[idx++];
+  const issuerAttrs    = parseName(tbsItems[idx++].contents);
+  const validitySeq    = walkSequence(tbsItems[idx++].contents);
+  const notBefore      = parseTime(validitySeq[0]);
+  const notAfter       = parseTime(validitySeq[1]);
+  const subjectAttrs   = parseName(tbsItems[idx++].contents);
+  const spkiElement    = tbsItems[idx++];
+
+  // SPKI ::= SEQUENCE { AlgorithmIdentifier, BIT STRING }
+  const spkiInner      = walkSequence(spkiElement.contents);
+  const pubKeyAlgSeq   = walkSequence(spkiInner[0].contents);
+  const pubKeyAlgOid   = parseOid(pubKeyAlgSeq[0].contents);
+
+  // Signature algorithm (outer)
+  const sigAlgSeq      = walkSequence(sigAlgId.contents);
+  const sigAlgOid      = parseOid(sigAlgSeq[0].contents);
+
+  return {
+    version:      version,
+    serialHex:    bytesToHex(serialBytes).replace(/^0+/, "") || "0",
+    issuer:       issuerAttrs,
+    notBefore:    notBefore,
+    notAfter:     notAfter,
+    subject:      subjectAttrs,
+    spkiDer:      spkiElement.raw,
+    pubKeyAlgOid: pubKeyAlgOid,
+    sigAlgOid:    sigAlgOid,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Crypto helpers
+// ---------------------------------------------------------------------------
+
+async function sha256Hex(bytes) {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return bytesToHex(new Uint8Array(digest));
+}
+
+const JWS_ALG_MAP = {
+  "RS256": { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+  "RS384": { name: "RSASSA-PKCS1-v1_5", hash: "SHA-384" },
+  "RS512": { name: "RSASSA-PKCS1-v1_5", hash: "SHA-512" },
+  "ES256": { name: "ECDSA", namedCurve: "P-256", hash: "SHA-256" },
+  "ES384": { name: "ECDSA", namedCurve: "P-384", hash: "SHA-384" },
+  "ES512": { name: "ECDSA", namedCurve: "P-521", hash: "SHA-512" },
+  "PS256": { name: "RSA-PSS", hash: "SHA-256", saltLength: 32 },
+  "PS384": { name: "RSA-PSS", hash: "SHA-384", saltLength: 48 },
+  "PS512": { name: "RSA-PSS", hash: "SHA-512", saltLength: 64 },
+};
+
+async function verifyJwsSignature(alg, spkiDer, signedInputBytes, sigBytes) {
+  const algSpec = JWS_ALG_MAP[alg];
+  if (!algSpec) throw new Error(`unsupported JWS algorithm: ${alg}`);
+
+  const importAlg =
+    algSpec.name === "ECDSA"
+      ? { name: "ECDSA", namedCurve: algSpec.namedCurve }
+      : { name: algSpec.name, hash: algSpec.hash };
+
+  const key = await crypto.subtle.importKey("spki", spkiDer, importAlg, false, ["verify"]);
+
+  const verifyAlg =
+    algSpec.name === "ECDSA"
+      ? { name: "ECDSA", hash: algSpec.hash }
+      : algSpec.name === "RSA-PSS"
+        ? { name: "RSA-PSS", saltLength: algSpec.saltLength }
+        : { name: algSpec.name };
+
+  return crypto.subtle.verify(verifyAlg, key, sigBytes, signedInputBytes);
+}
+
+// ---------------------------------------------------------------------------
+// JWS parser
+// ---------------------------------------------------------------------------
+
+function parseJws(compact) {
+  const trimmed = compact.trim();
+  const parts = trimmed.split(".");
+  if (parts.length !== 3) {
+    throw new Error(`JWS: expected 3 segments, found ${parts.length}`);
+  }
+
+  const [headerB64, payloadB64, sigB64] = parts;
+  const headerJson  = bytesToUtf8(base64UrlToBytes(headerB64));
+  const payloadJson = bytesToUtf8(base64UrlToBytes(payloadB64));
+  const header  = JSON.parse(headerJson);
+
+  let payload;
+  try { payload = JSON.parse(payloadJson); }
+  catch (e) { payload = payloadJson; } // leave as raw string
+
+  return {
+    header:           header,
+    payload:          payload,
+    signedInputBytes: utf8ToBytes(headerB64 + "." + payloadB64),
+    sigBytes:         base64UrlToBytes(sigB64),
+    raw:              trimmed,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------------------
+
+function el(tag, attrs = {}, children = []) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class")        node.className = v;
+    else if (k === "html")    node.innerHTML = v;
+    else if (k === "text")    node.textContent = v;
+    else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+    else                      node.setAttribute(k, v);
+  }
+  for (const c of (Array.isArray(children) ? children : [children])) {
+    if (c == null) continue;
+    node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+  }
+  return node;
+}
+
+function section(title, bodyChildren) {
+  return el("div", { class: "section" }, [
+    el("h2", { text: title }),
+    el("div", { class: "body" }, bodyChildren),
+  ]);
+}
+
+function kvGrid(pairs) {
+  const nodes = [];
+  for (const [k, v] of pairs) {
+    nodes.push(el("div", { class: "key", text: k }));
+    if (typeof v === "string") nodes.push(el("div", { class: "val", text: v }));
+    else nodes.push(el("div", { class: "val" }, v));
+  }
+  return el("div", { class: "kv-grid" }, nodes);
+}
+
+function highlightJson(obj) {
+  const formatted = JSON.stringify(obj, null, 2);
+  const escaped = formatted
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  return escaped.replace(
+    /("(\\u[a-fA-F0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(\.\d+)?([eE][+-]?\d+)?)/g,
+    match => {
+      let cls = "json-number";
+      if (/^"/.test(match)) cls = /:$/.test(match) ? "json-key" : "json-string";
+      else if (/true|false/.test(match)) cls = "json-bool";
+      else if (/null/.test(match)) cls = "json-null";
+      return `<span class="${cls}">${match}</span>`;
+    }
+  );
+}
+
+function renderCert(cert, isLeaf, fingerprint) {
+  const now = new Date();
+  const expired = cert.notAfter && now > cert.notAfter;
+  const notYetValid = cert.notBefore && now < cert.notBefore;
+
+  const pubKeyName =
+    (OIDS[cert.pubKeyAlgOid] && OIDS[cert.pubKeyAlgOid].name) ||
+    cert.pubKeyAlgOid;
+  const sigAlgName =
+    (OIDS[cert.sigAlgOid] && OIDS[cert.sigAlgOid].name) ||
+    cert.sigAlgOid;
+
+  const labels = [];
+  labels.push(el("span", {
+    class: "cert-label " + (isLeaf ? "leaf" : "intermediate"),
+    text:  isLeaf ? "Leaf (signer)" : "Intermediate / Root",
+  }));
+  if (expired)       labels.push(el("span", { class: "cert-label expired", text: "EXPIRED" }));
+  if (notYetValid)   labels.push(el("span", { class: "cert-label expired", text: "NOT YET VALID" }));
+
+  const pairs = [
+    ["Subject",        formatName(cert.subject)    || "(empty)"],
+    ["Issuer",         formatName(cert.issuer)     || "(empty)"],
+    ["Serial",         cert.serialHex],
+    ["Version",        "v" + cert.version],
+    ["Not Before",     cert.notBefore ? cert.notBefore.toISOString() : "(unparseable)"],
+    ["Not After",      cert.notAfter  ? cert.notAfter.toISOString()  : "(unparseable)"],
+    ["Public-Key Alg", pubKeyName],
+    ["Signature Alg",  sigAlgName],
+  ];
+
+  const children = [el("div", {}, labels), kvGrid(pairs)];
+
+  if (isLeaf && fingerprint) {
+    children.push(el("div", { class: "key", text: "Fingerprint (SHA-256 of SPKI)", style: "margin-top: 10px;" }));
+    children.push(el("div", { class: "fingerprint", text: fingerprint }));
+  }
+
+  return el("div", { class: "cert-card" + (isLeaf ? " leaf" : "") }, children);
+}
+
+function renderMssView(payload) {
+  if (!payload || typeof payload !== "object") return null;
+
+  const pairs = [];
+  if (payload.namespace)    pairs.push(["Namespace",    payload.namespace]);
+  if (payload.organization) pairs.push(["Organization", payload.organization]);
+  if (payload.successor)    pairs.push(["Successor",    payload.successor]);
+
+  if (pairs.length === 0 && !payload.services && !payload.modules) return null;
+
+  const children = [];
+  if (pairs.length) children.push(kvGrid(pairs));
+
+  if (Array.isArray(payload.services) && payload.services.length > 0) {
+    children.push(el("h3", {
+      text:  "Services",
+      style: "margin: 12px 0 6px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;",
+    }));
+    for (const svc of payload.services) {
+      if (typeof svc !== "object") continue;
+      const svcChildren = [];
+      svcChildren.push(el("div", { class: "name", text: svc.name || "(unnamed)" }));
+      const meta = [];
+      if (svc.type)     meta.push(`type=${svc.type}`);
+      if (svc.endpoint) meta.push(`endpoint=${svc.endpoint}`);
+      if (Array.isArray(svc.modules)) meta.push(`modules=[${svc.modules.join(", ")}]`);
+      svcChildren.push(el("div", { class: "meta", text: meta.join("  ") }));
+      children.push(el("div", { class: "mss-service" }, svcChildren));
+    }
+  }
+
+  if (payload.modules && typeof payload.modules === "object") {
+    children.push(el("h3", {
+      text:  "Modules",
+      style: "margin: 12px 0 6px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;",
+    }));
+    for (const [key, mod] of Object.entries(payload.modules)) {
+      if (typeof mod !== "object") continue;
+      const modChildren = [
+        el("div", { class: "name", text: key }),
+        el("div", { class: "meta", text: `${mod.url || ""}  sha256=${mod.sha256 || ""}` }),
+      ];
+      children.push(el("div", { class: "mss-service" }, modChildren));
+    }
+  }
+
+  return el("div", {}, children);
+}
+
+function showError(message, detail) {
+  const results = document.getElementById("results");
+  const status  = document.getElementById("status");
+  const sections = document.getElementById("sections");
+
+  results.hidden = false;
+  status.className = "fail";
+  status.innerHTML = "";
+  status.appendChild(el("span", { class: "icon", text: "✖" }));
+  status.appendChild(el("div", {}, [
+    el("div", { text: message }),
+    detail ? el("div", { class: "details", text: detail }) : null,
+  ]));
+  sections.innerHTML = "";
+}
+
+// ---------------------------------------------------------------------------
+// Main verify flow
+// ---------------------------------------------------------------------------
+
+async function verify(compact) {
+  if (!compact || !compact.trim()) {
+    showError("No input", "Drop a file, choose one, or paste a JWS string.");
+    return;
+  }
+
+  let jws;
+  try { jws = parseJws(compact); }
+  catch (e) {
+    showError("Could not parse JWS compact serialization", e.message);
+    return;
+  }
+
+  const alg = jws.header.alg;
+  const x5c = jws.header.x5c;
+
+  if (!alg) { showError("JWS header missing 'alg'"); return; }
+  if (!Array.isArray(x5c) || x5c.length === 0) {
+    showError("JWS header missing 'x5c' certificate chain",
+      "This viewer requires the signing certificate chain to be embedded in the JWS header.");
+    return;
+  }
+
+  let certs;
+  try { certs = x5c.map(b64 => parseX509(base64ToBytes(b64))); }
+  catch (e) {
+    showError("Failed to parse x5c certificate", e.message);
+    return;
+  }
+
+  const leaf = certs[0];
+  let fingerprint;
+  try { fingerprint = await sha256Hex(leaf.spkiDer); }
+  catch (e) {
+    showError("Failed to hash leaf public key", e.message);
+    return;
+  }
+
+  let sigValid = false;
+  let sigError = null;
+  try {
+    sigValid = await verifyJwsSignature(alg, leaf.spkiDer, jws.signedInputBytes, jws.sigBytes);
+  }
+  catch (e) { sigError = e.message; }
+
+  renderResults(jws, certs, fingerprint, alg, sigValid, sigError);
+}
+
+function renderResults(jws, certs, fingerprint, alg, sigValid, sigError) {
+  const results  = document.getElementById("results");
+  const status   = document.getElementById("status");
+  const sections = document.getElementById("sections");
+
+  results.hidden = false;
+  sections.innerHTML = "";
+
+  const leaf = certs[0];
+  const now  = new Date();
+  const leafExpired = leaf.notAfter && now > leaf.notAfter;
+
+  // ------------------------------------------------------------------
+  // Status banner
+  // ------------------------------------------------------------------
+  status.innerHTML = "";
+  if (sigValid && !leafExpired) {
+    status.className = "pass";
+    status.appendChild(el("span", { class: "icon", text: "✓" }));
+    status.appendChild(el("div", {}, [
+      el("div", { text: `Signature verified (${alg})` }),
+      el("div", { class: "details", text: `Signed by ${fingerprint.substring(0, 16)}…` }),
+    ]));
+  }
+  else if (sigValid && leafExpired) {
+    status.className = "warn";
+    status.appendChild(el("span", { class: "icon", text: "⚠" }));
+    status.appendChild(el("div", {}, [
+      el("div", { text: `Signature valid (${alg}), but leaf certificate is expired` }),
+      el("div", { class: "details", text: `Expired ${leaf.notAfter.toISOString()}` }),
+    ]));
+  }
+  else {
+    status.className = "fail";
+    status.appendChild(el("span", { class: "icon", text: "✖" }));
+    status.appendChild(el("div", {}, [
+      el("div", { text: `Signature verification failed (${alg})` }),
+      el("div", { class: "details", text: sigError || "Signature does not match leaf certificate's public key" }),
+    ]));
+  }
+
+  // ------------------------------------------------------------------
+  // JWS header
+  // ------------------------------------------------------------------
+  sections.appendChild(section("JWS Header", [
+    el("pre", { class: "json", html: highlightJson(jws.header) }),
+  ]));
+
+  // ------------------------------------------------------------------
+  // Certificate chain
+  // ------------------------------------------------------------------
+  const certChildren = certs.map((c, i) => renderCert(c, i === 0, i === 0 ? fingerprint : null));
+  sections.appendChild(section(`Certificate Chain (${certs.length})`, certChildren));
+
+  // ------------------------------------------------------------------
+  // MSS structured view (if applicable)
+  // ------------------------------------------------------------------
+  // Per the signing convention, the payload is wrapped as { data: "<json-string>" }.
+  let innerPayload = jws.payload;
+  if (innerPayload && typeof innerPayload === "object" && typeof innerPayload.data === "string") {
+    try { innerPayload = JSON.parse(innerPayload.data); }
+    catch (_) { /* leave as-is */ }
+  }
+
+  const mssView = renderMssView(innerPayload);
+  if (mssView) {
+    sections.appendChild(section("Payload (MSS Structured View)", [mssView]));
+  }
+
+  // ------------------------------------------------------------------
+  // Raw payload JSON
+  // ------------------------------------------------------------------
+  sections.appendChild(section("Payload (Raw)", [
+    el("pre", { class: "json", html: highlightJson(innerPayload) }),
+  ]));
+}
+
+// ---------------------------------------------------------------------------
+// Event wiring
+// ---------------------------------------------------------------------------
+
+const dropZone   = document.getElementById("drop-zone");
+const filePicker = document.getElementById("file-picker");
+const pasteArea  = document.getElementById("paste");
+const verifyBtn  = document.getElementById("verify-btn");
+const clearBtn   = document.getElementById("clear-btn");
+
+function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload  = () => resolve(String(r.result));
+    r.onerror = () => reject(r.error);
+    r.readAsText(file);
+  });
+}
+
+["dragenter", "dragover"].forEach(ev =>
+  dropZone.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation();
+    dropZone.classList.add("dragover");
+  })
+);
+
+["dragleave", "drop"].forEach(ev =>
+  dropZone.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation();
+    dropZone.classList.remove("dragover");
+  })
+);
+
+dropZone.addEventListener("drop", async e => {
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  const text = await readFileAsText(file);
+  pasteArea.value = text;
+  verify(text);
+});
+
+filePicker.addEventListener("change", async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const text = await readFileAsText(file);
+  pasteArea.value = text;
+  verify(text);
+});
+
+verifyBtn.addEventListener("click", () => verify(pasteArea.value));
+
+clearBtn.addEventListener("click", () => {
+  pasteArea.value = "";
+  document.getElementById("results").hidden = true;
+  filePicker.value = "";
+});
+
+pasteArea.addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") verify(pasteArea.value);
+});
+</script>
+
+</body>
+</html>

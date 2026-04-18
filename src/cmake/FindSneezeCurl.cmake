@@ -12,7 +12,7 @@ endif ()
 set (_ROOT "${LIBS_DIR}/curl/install")
 
 if (WIN32)
-   find_library (CURL_LIB NAMES libcurl_a libcurl
+   find_library (CURL_LIB NAMES libcurl_a libcurl_a-d libcurl libcurl-d
       PATHS "${_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
 else ()
    find_library (CURL_LIB NAMES curl

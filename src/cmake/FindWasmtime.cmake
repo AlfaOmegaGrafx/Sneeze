@@ -2,6 +2,7 @@
 #
 # Sets:
 #   Wasmtime_FOUND
+#   WASMTIME_ROOT      — Install prefix (parent of lib/ and include/)
 #   WASMTIME_LIB       — Library path
 #   WASMTIME_INCLUDE   — Include directory
 #
@@ -12,7 +13,8 @@ if (NOT LIBS_DIR)
    message (FATAL_ERROR "LIBS_DIR must be set to find Wasmtime")
 endif ()
 
-set (_WASMTIME_ROOT "${LIBS_DIR}/Wasmtime/install")
+set (WASMTIME_ROOT  "${LIBS_DIR}/Wasmtime/install")
+set (_WASMTIME_ROOT "${WASMTIME_ROOT}")
 
 if (WIN32)
    find_library (WASMTIME_LIB NAMES wasmtime.dll

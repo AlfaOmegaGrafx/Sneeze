@@ -7,17 +7,26 @@ if (GLSLANG_HOST_DIR)
    # Use pre-built glslang from the specified path
    add_custom_target (glslang)
 else ()
+   set (_repo "${SNEEZE_DEP_REPO}/glslang")
+   if (EXISTS "${_repo}/.git")
+      set (_git_args)
+   else ()
+      set (_git_args
+         GIT_REPOSITORY https://github.com/KhronosGroup/glslang.git
+         GIT_TAG        vulkan-sdk-1.4.341.0
+         GIT_SHALLOW    ON
+      )
+   endif ()
+
    # glslang is a build tool -- always build for the host, not the target
    ExternalProject_Add (glslang
-      GIT_REPOSITORY   https://github.com/KhronosGroup/glslang.git
-      GIT_TAG          vulkan-sdk-1.4.341.0
-      GIT_SHALLOW      ON
-      SOURCE_DIR       "${LIBS_DIR}/glslang/src"
+      ${_git_args}
+      SOURCE_DIR       "${_repo}"
       BINARY_DIR       "${LIBS_DIR}/glslang/build"
       INSTALL_DIR      "${LIBS_DIR}/glslang/install"
       CMAKE_ARGS
          -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-         -DCMAKE_BUILD_TYPE=Release
+         -DCMAKE_BUILD_TYPE=${SNEEZE_CONFIG}
          -DENABLE_CTEST=OFF
          -DENABLE_OPT=OFF
          -DENABLE_HLSL=OFF

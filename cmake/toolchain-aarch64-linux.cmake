@@ -4,8 +4,9 @@
 # Prerequisites (Ubuntu/Debian):
 #   sudo apt install clang lld libc++-dev-arm64-cross libc++abi-dev-arm64-cross
 #
-# Usage:
-#   cmake -S . -B build-arm64 -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-aarch64-linux.cmake
+# Usage (forwarded by the build scripts; can also be passed directly):
+#   cmake -S deps -B deps/builds/linux-arm64/release/build -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-aarch64-linux.cmake
+#   cmake -S src  -B builds/linux-arm64/release/build      -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-aarch64-linux.cmake
 
 set (CMAKE_SYSTEM_NAME    Linux)
 set (CMAKE_SYSTEM_PROCESSOR aarch64)

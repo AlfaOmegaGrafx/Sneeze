@@ -21,6 +21,10 @@
 #include <string>
 #include <unordered_map>
 
+// Forward-declare Vox types; no vox/Vox.h dependency in this header so
+// consumers that don't need Vox directly don't pull in the backend.
+namespace vox { class DEVICE; }
+
 namespace sneeze
 {
 namespace compute
@@ -47,10 +51,19 @@ typedef void (*CpuKernelFn) (
 class COMPUTE_DISPATCH
 {
 public:
-   COMPUTE_DISPATCH (ANARIDevice pDevice);
+   // The ANARIDevice parameter is retained for source compatibility but
+   // is no longer used — ANARI never shipped a compute extension. GPU
+   // dispatch goes through Vox (Vulkan/DX12/Metal) when available, CPU
+   // kernel registry otherwise.
+   COMPUTE_DISPATCH (ANARIDevice pDevice = nullptr);
    ~COMPUTE_DISPATCH ();
 
+   COMPUTE_DISPATCH (const COMPUTE_DISPATCH&)            = delete;
+   COMPUTE_DISPATCH& operator= (const COMPUTE_DISPATCH&) = delete;
+
+   // True if a Vox GPU backend (Vulkan, DX12, or Metal) was created.
    bool SupportsNativeCompute () const;
+
    void RegisterCpuKernel (const char* szName, CpuKernelFn fnKernel);
 
    bool Dispatch (
@@ -65,8 +78,19 @@ public:
    );
 
 private:
-   ANARIDevice                                  m_pDevice;
-   void                                         (*m_pfnNativeDispatch) ();
+   bool DispatchVox (
+      const uint8_t*  pSpvBytes,
+      size_t          nSpvSize,
+      uint32_t        nGroupsX,
+      uint32_t        nGroupsY,
+      uint32_t        nGroupsZ,
+      BUFFER_BINDING* aBindings,
+      uint32_t        nBindingCount,
+      const void*     pPushConstants,
+      size_t          nPushConstantSize
+   );
+
+   vox::DEVICE*                                 m_pVoxDevice;
    std::unordered_map<std::string, CpuKernelFn> m_aCpuKernels;
 };
 

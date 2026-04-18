@@ -42,7 +42,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dep: [spirv-headers, anari-sdk, openxr-sdk, openssl, rmlui, nlohmann-json, wasmtime, filament]
+        dep: [spirv-headers, anari-sdk, openxr-sdk, boringssl, jwt-cpp, spirv-cross, rmlui, nlohmann-json, wasmtime, filament]
     steps:
       - uses: actions/checkout@v4
 
@@ -70,6 +70,8 @@ jobs:
           case "${{ matrix.dep }}" in
             spirv-headers) DIR=SPIRV-Headers ;;
             spirv-tools)   DIR=SPIRV-Tools ;;
+            spirv-cross)   DIR=SPIRV-Cross ;;
+            vox)           DIR=Vox ;;
             anari-sdk)     DIR=ANARI-SDK ;;
             openxr-sdk)    DIR=OpenXR-SDK ;;
             rmlui)         DIR=RmlUi ;;
@@ -131,6 +133,7 @@ jobs:
           cmake -S deps -B build -GNinja \
             -DDEP=${{ matrix.dep }} \
             -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} \
+            -DSNEEZE_DEP_REPO=${{ github.workspace }}/deps/repos \
             $CMAKE_ARGS
           cmake --build build --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
 
@@ -152,6 +155,7 @@ jobs:
           - dep: spirv-tools
           - dep: halogen
           - dep: curl
+          - dep: vox
     steps:
       - uses: actions/checkout@v4
 
@@ -214,6 +218,7 @@ jobs:
           cmake -S deps -B build -GNinja \
             -DDEP=${{ matrix.dep }} \
             -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} \
+            -DSNEEZE_DEP_REPO=${{ github.workspace }}/deps/repos \
             $CMAKE_ARGS
           cmake --build build --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
 
@@ -268,6 +273,7 @@ jobs:
           cmake -S deps -B build -GNinja \
             -DDEP=${{ matrix.dep }} \
             -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} \
+            -DSNEEZE_DEP_REPO=${{ github.workspace }}/deps/repos \
             $CMAKE_ARGS
           cmake --build build --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
 

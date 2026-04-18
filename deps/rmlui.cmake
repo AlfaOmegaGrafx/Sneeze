@@ -1,13 +1,22 @@
+set (_repo "${SNEEZE_DEP_REPO}/RmlUi")
+if (EXISTS "${_repo}/.git")
+   set (_git_args)
+else ()
+   set (_git_args
+      GIT_REPOSITORY https://github.com/mikke89/RmlUi.git
+      GIT_TAG        6.2
+      GIT_SHALLOW    ON
+   )
+endif ()
+
 ExternalProject_Add (rmlui
-   GIT_REPOSITORY   https://github.com/mikke89/RmlUi.git
-   GIT_TAG          6.2
-   GIT_SHALLOW      ON
-   SOURCE_DIR       "${LIBS_DIR}/RmlUi/src"
+   ${_git_args}
+   SOURCE_DIR       "${_repo}"
    BINARY_DIR       "${LIBS_DIR}/RmlUi/build"
    INSTALL_DIR      "${LIBS_DIR}/RmlUi/install"
    CMAKE_ARGS
       -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-      -DCMAKE_BUILD_TYPE=Release
+      -DCMAKE_BUILD_TYPE=${SNEEZE_CONFIG}
       -DBUILD_SHARED_LIBS=OFF
       -DBUILD_SAMPLES=OFF
       -DRMLUI_FONT_ENGINE=none

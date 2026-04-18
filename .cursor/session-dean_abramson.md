@@ -120,3 +120,58 @@
 
 - **Dependency depot planning:** Discussed extracting the SuperBuild (all 11 ExternalProject_Add targets) into a standalone repo — a "dependency depot" that builds once, with Sneeze and Artemis consuming pre-built headers/libs via a `DEPS_ROOT` path. Motivated by the risk of accidental full rebuilds (45-90 min) blocking developers during routine engine work. Modeled after Chromium's `depot_tools` / `third_party` separation. Approved for implementation this weekend.
 - **Updated project.mdc:** Added Unphased task #5 (Extract dependency depot) and a full "Planned: Dependency Depot" section with problem statement, solution design, precedents (Chromium, Qt, LLVM, Yocto, Unreal), impact on Sneeze/developers/CI, and open design questions. Also updated Halogen documentation to reflect the two-project build structure (separate `filament` + `halogen` ExternalProjects), ANARI target namespacing, CRT handling, dependency table split, and directory layout.
+
+## 2026-04-15 → 2026-04-16 (Tues–Wed) — Dependency Depot + Vox Compute Library
+
+- **Dependency depot implemented** (`dep/` folder): Created `dep/CMakeLists.txt` SuperBuild with all 13 ExternalProject_Add targets. Configuration isolation via `${CFG_SUFFIX}` (`-release`/`-debug`) on every BINARY_DIR and INSTALL_DIR. Release build succeeded (~35 min). Debug build encountered `_ITERATOR_DEBUG_LEVEL` mismatch in Halogen (parked).
+- **SPIRV-Cross reintroduced** into the depot — required by Vox for DX12 (HLSL) and Metal (MSL) cross-compilation. Sneeze itself does not link against it.
+- **Vox compute library created** (`MetaversalCorp/Vox`, Apache 2.0). Standalone GPU compute dispatch library replacing the dead ANARI compute path. Polymorphic architecture: `DEVICE`/`BUFFER`/`KERNEL` base classes, `VULKAN_DEVICE`/`DX12_DEVICE`/`METAL_DEVICE` derived implementations, `DEVICE::Create()` static factory.
+- **DX12 backend fully implemented and debugged:**
+  - SPIRV-Cross cross-compiles SPIR-V → HLSL (ByteAddressBuffer/RWByteAddressBuffer + cbuffer)
+  - Reflection-driven root signature: SPIRV-Cross preserves SPIR-V binding numbers in HLSL register assignments (e.g., binding 1 → `register(u1)` not `u0`). Root signature built dynamically from reflection with root SRV/UAV descriptors (no descriptor heap needed).
+  - DX12 three-heap buffer model (upload/default/readback) with CPU shadow buffer for pre-dispatch GetData.
+  - Full pipeline: SPIR-V → SPIRV-Cross → HLSL → D3DCompile → root signature → PSO → dispatch → readback.
+- **Metal backend fixed** (untested, no macOS available): Applied same SPIRV-Cross reflection pattern — `get_automatic_msl_resource_binding()` for buffer indices, `get_cleansed_entry_point_name()` for renamed entry points. Push constant index now comes from reflection instead of being guessed.
+- **Vulkan backend reviewed** — no fix needed. SPIR-V consumed natively, no binding remapping.
+- **VoxTest.exe passes 14/14** on DX12: device creation, buffer round-trip, null backend, full SPIR-V proximity kernel dispatch (results: 3.000, 4.000, 5.000, 1.732).
+- **Vox added to depot** as ExternalProject_Add (depends on spirv-cross). README updated with test instructions.
+- **E:\Dev\Vox working copy** can be deleted — depot clones from GitHub. Future Vox work should happen directly in `dep/repo/Vox/src/`.
+- **Updated project.mdc:** Added Vox to dependencies, architecture, and roadmap. Updated SPIRV-Cross rationale. Updated compute dispatch state. Replaced "Planned: Dependency Depot" with "Dependency Depot (Implemented)" section. Updated directory structure.
+
+## 2026-04-17 → 2026-04-18 (Fri–Sat) — Depot Restructure, Debug Build, Halogen CRT Isolation
+
+**Build-system consolidation and scripts.**
+- Deleted the top-level `CMakeLists.txt` that bridged deps + src. Deps and Sneeze are now two fully independent CMake projects; the `scripts/build-*` wrappers are the sole glue. Hard invariant: neither `deps/CMakeLists.txt` nor `src/CMakeLists.txt` ever references the other branch.
+- Renamed `deps/repo/` → `deps/repos/` and `build/` → `builds/` (plural, matching the "contains multiple items" convention — e.g. `builds/windows-x64`, `linux-x64`, ...; `repos/` contains many repositories).
+- Flipped `build-windows.ps1` / `build-linux.sh` / `build-macos.sh` default: no flags = **Sneeze only** (plain `cmake --build`, no dep checks, no configure). Added `-Deps` / `--deps` (deps only), `-All` / `--all` (deps then Sneeze), `-Configure` / `--configure` (reconfigure + build Sneeze only). `-Only`, `-List`, `-CleanStamps` imply deps mode. Mode flags are mutually exclusive.
+- Added `Invalidate-DepConfigure` helper to the build scripts: before invoking `cmake --build --target <dep>`, explicitly removes `<DepsBuildDir>/<dep>-prefix/src/<dep>-stamp/<Config>/<dep>-configure` so edits to `deps/<dep>.cmake` always take effect on retry.
+- Removed every user-facing mention of `--parallel` in README and scripts.
+
+**Release dep build passed end-to-end on Windows.** All 14 deps built cleanly into `deps/builds/windows-x64/release/libs/`. Sneeze Release linked and ran.
+
+**Debug dep build debugging (marathon session).**
+- `spirv-tools` + `glslang` failed with *"Invalid character escape '\D'"*. Root cause: Windows-native paths (backslashes) from PowerShell `Join-Path` were being embedded into generated CMake strings inside spirv-tools where `\D` was read as an escape sequence. Fix: `file(TO_CMAKE_PATH ...)` on `SNEEZE_DEP_REPO` and `LIBS_DIR` at the top of `deps/CMakeLists.txt`. Both deps then built cleanly.
+- `halogen` failed with `LNK2038` — `_ITERATOR_DEBUG_LEVEL` + `RuntimeLibrary` mismatches. Root cause chased across several attempts:
+  1. Filament Debug on Windows is internally hybrid: `/MDd` (Debug CRT) + `/FAILIFMISMATCH:_ITERATOR_DEBUG_LEVEL=0`. Nothing outside Filament can link against it without matching the same hybrid, which is not a standard configuration and contaminates every downstream consumer.
+  2. Multi-config generators (VS) ignore `CMAKE_BUILD_TYPE` in `CMAKE_ARGS`; `ExternalProject_Add`'s inner build silently inherits the outer `--config Debug`, so prior "pin filament to Release" attempts still produced Debug artifacts.
+  3. `find_package(anari CONFIG)` caches `anari_DIR` on first resolve and subsequently ignores new `ANARI_ROOT` hints. A previous Debug configure had cached the Debug ANARI-SDK path; later passing a Release `ANARI_ROOT` was silently dropped.
+- **Final isolation strategy** (Dean's requirement: "I need an `anari_library_halogen.dll` file that compiles and works"):
+  - `filament` pinned to **always Release** regardless of outer config. Enforced via `-DCMAKE_BUILD_TYPE=Release` **plus** explicit `BUILD_COMMAND`/`INSTALL_COMMAND` overrides that pass `--config Release` literally to the inner cmake.
+  - Created `deps/anari-sdk-release.cmake` — a **Debug-only** shadow ExternalProject over the shared `deps/repos/ANARI-SDK` source, producing a Release install at `libs/ANARI-SDK-release/install/`. Conditionally registered by `deps/CMakeLists.txt` only when `SNEEZE_CONFIG=Debug`.
+  - `halogen` pinned to always Release with the same `BUILD_COMMAND`/`INSTALL_COMMAND` trick. Consumes Filament from `libs/filament/install/`; consumes ANARI from `libs/ANARI-SDK-release/install/` in Debug outer builds, or `libs/ANARI-SDK/install/` in Release outer builds.
+  - `halogen.cmake` explicitly passes **both** `-DANARI_ROOT=...` and `-Danari_DIR=...lib/cmake/anari-0.16.0` to defeat cached `anari_DIR` stickiness.
+  - `$DepsOrdered` in `build-windows.ps1` and `DEPS_ORDERED` in `build-deps.sh` conditionally insert `anari-sdk-release` before `halogen` when `$Config -eq 'Debug'`.
+- **Result:** Full Debug dep build passes. `dumpbin /directives` confirms `anari_static.lib` (Sneeze-facing) is `MDd_DynamicDebug` / `_IDL=2`, while `anari_backend.lib` + `helium.lib` + `filament.lib` (Halogen-facing) are all `MD_DynamicRelease` / `_IDL=0`. `anari_library_halogen.dll` imports `VCRUNTIME140.dll` (Release runtime), not `VCRUNTIME140D.dll`. Debug Sneeze.exe will load it over the ANARI plain-C ABI — no C++ objects cross the DLL boundary.
+
+**Sneeze Debug build kicked off at end of session** (`scripts\build-windows.ps1 -Configure -Config Debug`). Outcome pending tomorrow.
+
+**Environment.**
+- Installed Go (`winget install GoLang.Go`) and NASM (`winget install NASM.NASM`) for BoringSSL. NASM doesn't self-register in PATH — added `C:\Program Files\NASM` via `[Environment]::SetEnvironmentVariable('Path', ..., 'User')`.
+- `Launch-VsDevShell.ps1` clobbers user PATH, making Go/NASM invisible in VS Developer PowerShell. Fixed by re-merging persisted User+Machine PATH back into `$env:Path` inside the user's PowerShell profile. Go + NASM now available in every shell type.
+
+**Docs.**
+- `README.md` + `.cursor/rules/project.mdc` updated: new directory layout, new build-command surface, Halogen isolation strategy, `Invalidate-DepConfigure`, `anari_DIR` cache caveat, `ExternalProject`/multi-config caveat, VS Dev Shell PATH caveat.
+- Replaced obsolete "Halogen two-project build structure" section with the three-target CRT isolation model.
+- Rewrote the "Dependency Depot (Implemented)" section to reflect the current `deps/{repos,builds}/<plat>/<cfg>/` layout (old `dep/build-release/`, `dep/build-debug/` copy was stale).
+
+**Not yet verified:** Halogen actually loads in Sneeze at runtime (swap `anari_library_filament` for `anari_library_halogen`, run astro demo). Deferred.

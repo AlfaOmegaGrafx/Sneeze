@@ -81,12 +81,12 @@ elseif (APPLE)
    target_link_libraries (NetTest PRIVATE pthread
       ${_NET_SECURITY_FW} ${_NET_CF_FW} ${_NET_SC_FW})
 elseif (ANDROID)
-   # curl on Android links against our OpenSSL artifact; no system OpenSSL
-   # search needed. pthread is in libc.
-   set (_ANDROID_OPENSSL "${LIBS_DIR}/openssl/install")
+   # curl on Android links against our BoringSSL artifact (replaces OpenSSL);
+   # no system OpenSSL search needed. pthread is in libc.
+   set (_ANDROID_BORINGSSL "${LIBS_DIR}/boringssl/install")
    target_link_libraries (NetTest PRIVATE
-      "${_ANDROID_OPENSSL}/lib/libssl.a"
-      "${_ANDROID_OPENSSL}/lib/libcrypto.a"
+      "${_ANDROID_BORINGSSL}/lib/libssl.a"
+      "${_ANDROID_BORINGSSL}/lib/libcrypto.a"
       dl log)
 else ()
    find_package (OpenSSL QUIET)
@@ -122,6 +122,41 @@ set (SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 add_executable (ComputeTest ComputeTest.cpp)
 target_include_directories (ComputeTest PRIVATE ${SRC_DIR})
 target_link_libraries (ComputeTest PRIVATE Sneeze anari::anari_static)
+
+# ---------------------------------------------------------------------------
+# Vox test executable — verifies Vox links through Sneeze and that the
+# device factory produces a backend on machines with a GPU driver. The
+# test skips (without failing) on headless runners. Mirrors the upstream
+# VoxTest so we catch API drift when Vox is rolled forward.
+# ---------------------------------------------------------------------------
+
+add_executable (VoxTest VoxTest.cpp)
+target_link_libraries (VoxTest PRIVATE Sneeze)
+
+# ---------------------------------------------------------------------------
+# JWS test executable — exercises sign/verify, x5c chain validation, and
+# fingerprint stability using fixtures under tests/certs/.
+# ---------------------------------------------------------------------------
+
+add_executable (JwsTest JwsTest.cpp)
+target_link_libraries (JwsTest PRIVATE Sneeze)
+
+# Tests load cert fixtures via the relative path "tests/certs/..." — run
+# from the repo root, or from build-sneeze/tests/ with a symlink; CTest
+# here sets WORKING_DIRECTORY to the repo root so ReadFile() resolves.
+set (_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
+
+include (CTest)
+add_test (NAME JwsTest COMMAND JwsTest WORKING_DIRECTORY "${_REPO_ROOT}")
+
+# ---------------------------------------------------------------------------
+# GenCerts — regenerates test CA + leaf + expired certs under tests/certs/.
+# Linked against Sneeze so it picks up BoringSSL transitively. Not run as
+# part of CTest — invoke manually when fixtures need to be refreshed.
+# ---------------------------------------------------------------------------
+
+add_executable (GenCerts GenCerts.cpp)
+target_link_libraries (GenCerts PRIVATE Sneeze)
 
 # ---------------------------------------------------------------------------
 # Copy runtime DLLs to test output directories

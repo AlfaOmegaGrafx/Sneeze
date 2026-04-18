@@ -14,33 +14,17 @@
 
 #include "compute/ComputeDispatch.h"
 #include "compute/EmbeddedKernels.h"
-#include <anari/ext/anari_ext_interface.h>
+
+#include <vox/Vox.h>
+
 #include <cmath>
 #include <cstring>
+#include <vector>
 
 namespace sneeze
 {
 namespace compute
 {
-
-// ---------------------------------------------------------------------------
-// ANARI compute extension
-// ---------------------------------------------------------------------------
-
-static const char* ANARI_COMPUTE_EXT = "SNEEZE_dispatch_compute";
-
-typedef bool (*PFN_sneeze_dispatch_compute) (
-   ANARIDevice     pDevice,
-   const uint8_t*  pSpvBytes,
-   size_t          nSpvSize,
-   uint32_t        nGroupsX,
-   uint32_t        nGroupsY,
-   uint32_t        nGroupsZ,
-   BUFFER_BINDING* aBindings,
-   uint32_t        nBindingCount,
-   const void*     pPushConstants,
-   size_t          nPushConstantSize
-);
 
 // ---------------------------------------------------------------------------
 // CPU fallback: test_proximity kernel
@@ -51,9 +35,9 @@ static void CpuProximityKernel (
    uint32_t        nBindingCount,
    const void*     pPushConstants,
    size_t          nPushConstantSize,
-   uint32_t        nGroupsX,
-   uint32_t        nGroupsY,
-   uint32_t        nGroupsZ
+   uint32_t        /*nGroupsX*/,
+   uint32_t        /*nGroupsY*/,
+   uint32_t        /*nGroupsZ*/
 )
 {
    struct PC
@@ -95,23 +79,26 @@ static void CpuProximityKernel (
 // COMPUTE_DISPATCH
 // ---------------------------------------------------------------------------
 
-COMPUTE_DISPATCH::COMPUTE_DISPATCH (ANARIDevice pDevice)
-   : m_pDevice (pDevice)
-   , m_pfnNativeDispatch (nullptr)
+COMPUTE_DISPATCH::COMPUTE_DISPATCH (ANARIDevice /*pDevice*/)
+   : m_pVoxDevice (nullptr)
 {
-   if (m_pDevice)
-      m_pfnNativeDispatch = anariDeviceGetProcAddress (m_pDevice, ANARI_COMPUTE_EXT);
+   // Lazily probe for a GPU backend. Failure is fine — we fall back to
+   // the CPU kernel registry. Vox picks Vulkan/DX12/Metal in priority
+   // order via Backend::Auto and returns null if none are available.
+   m_pVoxDevice = vox::DEVICE::Create (vox::Backend::Auto);
 
    RegisterCpuKernel ("TEST_PROXIMITY", CpuProximityKernel);
 }
 
 COMPUTE_DISPATCH::~COMPUTE_DISPATCH ()
 {
+   delete m_pVoxDevice;
+   m_pVoxDevice = nullptr;
 }
 
 bool COMPUTE_DISPATCH::SupportsNativeCompute () const
 {
-   return m_pfnNativeDispatch != nullptr;
+   return m_pVoxDevice != nullptr;
 }
 
 void COMPUTE_DISPATCH::RegisterCpuKernel (const char* szName, CpuKernelFn fnKernel)
@@ -133,16 +120,21 @@ bool COMPUTE_DISPATCH::Dispatch (
    if (!szKernelName)
       return false;
 
-   if (m_pfnNativeDispatch && m_pDevice)
+   if (m_pVoxDevice)
    {
       KERNEL_DATA pKernel = GetEmbeddedKernel (szKernelName);
       if (pKernel.pBytes && pKernel.nSize > 0)
       {
-         auto pfn = reinterpret_cast<PFN_sneeze_dispatch_compute> (m_pfnNativeDispatch);
-         return pfn (m_pDevice, pKernel.pBytes, pKernel.nSize,
-            nGroupsX, nGroupsY, nGroupsZ,
-            aBindings, nBindingCount,
-            pPushConstants, nPushConstantSize);
+         if (DispatchVox (pKernel.pBytes, pKernel.nSize,
+                          nGroupsX, nGroupsY, nGroupsZ,
+                          aBindings, nBindingCount,
+                          pPushConstants, nPushConstantSize))
+         {
+            return true;
+         }
+         // Vox path failed (shader translation, kernel creation, etc.).
+         // Fall through to the CPU registry so callers still get a
+         // valid result when a CPU mirror exists.
       }
    }
 
@@ -156,6 +148,79 @@ bool COMPUTE_DISPATCH::Dispatch (
    }
 
    return false;
+}
+
+bool COMPUTE_DISPATCH::DispatchVox (
+   const uint8_t*  pSpvBytes,
+   size_t          nSpvSize,
+   uint32_t        nGroupsX,
+   uint32_t        nGroupsY,
+   uint32_t        nGroupsZ,
+   BUFFER_BINDING* aBindings,
+   uint32_t        nBindingCount,
+   const void*     pPushConstants,
+   size_t          nPushConstantSize
+)
+{
+   vox::KERNEL* pKernel = m_pVoxDevice->CreateKernel (pSpvBytes, nSpvSize, "main");
+   if (!pKernel)
+      return false;
+
+   // Mirror each Sneeze BUFFER_BINDING into a Vox BUFFER, upload the
+   // caller's bytes, then read back after dispatch for non-read-only
+   // bindings. Everything is destroyed before we return so the caller's
+   // memory remains authoritative.
+   std::vector<vox::BUFFER*> aVoxBuffers (nBindingCount, nullptr);
+
+   for (uint32_t i = 0; i < nBindingCount; i++)
+   {
+      vox::BUFFER_DESC desc;
+      desc.nSize        = aBindings[i].nSize;
+      desc.bHostVisible = true;
+
+      aVoxBuffers[i] = m_pVoxDevice->CreateBuffer (desc);
+      if (!aVoxBuffers[i])
+      {
+         for (uint32_t j = 0; j < i; j++)
+            m_pVoxDevice->DestroyBuffer (aVoxBuffers[j]);
+         m_pVoxDevice->DestroyKernel (pKernel);
+         return false;
+      }
+
+      if (aBindings[i].pData && aBindings[i].nSize > 0)
+         aVoxBuffers[i]->SetData (aBindings[i].pData, aBindings[i].nSize);
+   }
+
+   m_pVoxDevice->SetKernel (pKernel);
+
+   for (uint32_t i = 0; i < nBindingCount; i++)
+   {
+      m_pVoxDevice->SetBuffer (aVoxBuffers[i], aBindings[i].nBinding,
+                               aBindings[i].bReadOnly);
+   }
+
+   if (pPushConstants && nPushConstantSize > 0)
+      m_pVoxDevice->SetPushConstants (pPushConstants, nPushConstantSize);
+
+   vox::DISPATCH_ARGS args;
+   args.nGroupsX = nGroupsX;
+   args.nGroupsY = nGroupsY;
+   args.nGroupsZ = nGroupsZ;
+   m_pVoxDevice->Dispatch (args);
+   m_pVoxDevice->Finish ();
+
+   for (uint32_t i = 0; i < nBindingCount; i++)
+   {
+      if (!aBindings[i].bReadOnly && aBindings[i].pData && aBindings[i].nSize > 0)
+         aVoxBuffers[i]->GetData (aBindings[i].pData, aBindings[i].nSize);
+   }
+
+   for (uint32_t i = 0; i < nBindingCount; i++)
+      m_pVoxDevice->DestroyBuffer (aVoxBuffers[i]);
+
+   m_pVoxDevice->DestroyKernel (pKernel);
+
+   return true;
 }
 
 } // namespace compute

@@ -109,8 +109,15 @@ static void TestDispatchConstruction ()
 {
    std::printf ("\n--- Compute dispatch construction ---\n");
 
-   sneeze::compute::COMPUTE_DISPATCH pDispatch (nullptr);
-   Check (!pDispatch.SupportsNativeCompute (), "No native compute without ANARI device");
+   sneeze::compute::COMPUTE_DISPATCH pDispatch;
+
+   // With Vox wired in, native compute availability is a property of
+   // the host machine (GPU drivers present). We can't assert either way
+   // portably, but construction must not throw and the flag must be
+   // queryable.
+   bool bNative = pDispatch.SupportsNativeCompute ();
+   Check (true, "Dispatch construction succeeded");
+   std::printf ("    Native compute (Vox) available: %s\n", bNative ? "yes" : "no");
 }
 
 static void TestProximityDispatch ()

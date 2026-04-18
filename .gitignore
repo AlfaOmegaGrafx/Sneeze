@@ -1,8 +1,13 @@
-# Dependencies (cloned and built by SuperBuild)
-libs/
+# ---------------------------------------------------------------------------
+# Generated build trees
+# ---------------------------------------------------------------------------
+# deps/repos/                shared source clones (one per dep)
+# deps/builds/<plat>/<cfg>/  per-config dep scratch + install trees
+# builds/<plat>/<cfg>/       Sneeze's own CMake scratch, lib/, bin/
 
-# Build output (CMake-generated project files and binaries)
-build/
+deps/repos/
+deps/builds/
+builds/
 
 # IDE and editor files
 .vs/

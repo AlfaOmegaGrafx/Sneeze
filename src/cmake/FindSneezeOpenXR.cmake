@@ -11,7 +11,7 @@ endif ()
 
 set (_ROOT "${LIBS_DIR}/OpenXR-SDK/install")
 
-find_library (OPENXR_LOADER_LIB openxr_loader
+find_library (OPENXR_LOADER_LIB NAMES openxr_loader openxr_loaderd
    PATHS "${_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
 find_path (OPENXR_INCLUDE openxr/openxr.h
    PATHS "${_ROOT}/include" NO_DEFAULT_PATH REQUIRED)

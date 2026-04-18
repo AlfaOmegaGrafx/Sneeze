@@ -40,26 +40,54 @@ if (WIN32)
    set (FILAMENT_CRT_ARGS -DUSE_STATIC_CRT=OFF -DDIST_DIR=x86_64/md)
 endif ()
 
+set (_repo "${SNEEZE_DEP_REPO}/filament")
+if (EXISTS "${_repo}/.git")
+   set (_git_args)
+else ()
+   set (_git_args
+      GIT_REPOSITORY https://github.com/MetaversalCorp/filament.git
+      GIT_TAG        main
+      GIT_SHALLOW    ON
+   )
+endif ()
+
 # Cross-compile: copy host-built ImportExecutables-Release.cmake into filament's
 # source root (via PATCH_COMMAND, runs after clone, before configure).
 # Filament's top-level CMake resolves IMPORT_EXECUTABLES as
 #   ${FILAMENT}/${IMPORT_EXECUTABLES_DIR}/ImportExecutables-Release.cmake
-# with IMPORT_EXECUTABLES_DIR empty by default — so placing the file at
+# with IMPORT_EXECUTABLES_DIR empty by default -- so placing the file at
 # ${FILAMENT}/ImportExecutables-Release.cmake satisfies the include().
 set (FILAMENT_PATCH_COMMAND "")
 if (IMPORT_EXECUTABLES_HOST_FILE AND EXISTS "${IMPORT_EXECUTABLES_HOST_FILE}")
    set (FILAMENT_PATCH_COMMAND
       ${CMAKE_COMMAND} -E copy
          "${IMPORT_EXECUTABLES_HOST_FILE}"
-         "${LIBS_DIR}/filament/src/ImportExecutables-Release.cmake"
+         "${_repo}/ImportExecutables-Release.cmake"
    )
 endif ()
 
+# Filament is always built Release regardless of the outer deps config.
+#
+# Rationale: only Halogen consumes filament, and filament.lib (Debug) on
+# Windows is shipped in a hybrid CRT state (/MDd + -D_ITERATOR_DEBUG_LEVEL=0)
+# that nothing else can link against without matching it exactly -- pulling
+# that contamination up through anari_backend and into Sneeze itself would
+# force Sneeze Debug to disable checked iterators. Pinning to Release avoids
+# the contagion entirely: halogen links Release filament + Release anari,
+# ships as anari_library_halogen.dll, and is loaded across the ANARI plain-C
+# ABI regardless of whether Sneeze is Debug or Release.
+#
+# Nothing else consumes filament, so losing Debug-buildable filament has no
+# practical impact -- you can't step into filament internals anyway.
+# NOTE: Multi-config generators (Visual Studio, Xcode) ignore CMAKE_BUILD_TYPE
+# entirely -- config is chosen at build time via `cmake --build --config`.
+# ExternalProject_Add by default inherits the outer config into the inner
+# build, so a Debug outer deps build would produce a Debug filament.lib even
+# with CMAKE_BUILD_TYPE=Release in CMAKE_ARGS. Override BUILD_COMMAND and
+# INSTALL_COMMAND to pin the inner build to Release explicitly.
 ExternalProject_Add (filament
-   GIT_REPOSITORY   https://github.com/MetaversalCorp/filament.git
-   GIT_TAG          main
-   GIT_SHALLOW      ON
-   SOURCE_DIR       "${LIBS_DIR}/filament/src"
+   ${_git_args}
+   SOURCE_DIR       "${_repo}"
    BINARY_DIR       "${LIBS_DIR}/filament/build"
    INSTALL_DIR      "${LIBS_DIR}/filament/install"
    CMAKE_ARGS
@@ -72,5 +100,7 @@ ExternalProject_Add (filament
       ${FILAMENT_BACKEND_ARGS}
       ${FILAMENT_CRT_ARGS}
       ${CROSS_COMPILE_ARGS}
+   BUILD_COMMAND    ${CMAKE_COMMAND} --build <BINARY_DIR> --config Release
+   INSTALL_COMMAND  ${CMAKE_COMMAND} --build <BINARY_DIR> --config Release --target install
    PATCH_COMMAND ${FILAMENT_PATCH_COMMAND}
 )

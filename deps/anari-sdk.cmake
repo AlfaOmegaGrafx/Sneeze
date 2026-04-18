@@ -10,16 +10,25 @@ else ()
    set (ANARI_HELIDE_ARG -DBUILD_HELIDE_DEVICE=ON)
 endif ()
 
+set (_repo "${SNEEZE_DEP_REPO}/ANARI-SDK")
+if (EXISTS "${_repo}/.git")
+   set (_git_args)
+else ()
+   set (_git_args
+      GIT_REPOSITORY https://github.com/KhronosGroup/ANARI-SDK.git
+      GIT_TAG        next_release
+      GIT_SHALLOW    ON
+   )
+endif ()
+
 ExternalProject_Add (anari-sdk
-   GIT_REPOSITORY   https://github.com/KhronosGroup/ANARI-SDK.git
-   GIT_TAG          next_release
-   GIT_SHALLOW      ON
-   SOURCE_DIR       "${LIBS_DIR}/ANARI-SDK/src"
+   ${_git_args}
+   SOURCE_DIR       "${_repo}"
    BINARY_DIR       "${LIBS_DIR}/ANARI-SDK/build"
    INSTALL_DIR      "${LIBS_DIR}/ANARI-SDK/install"
    CMAKE_ARGS
       -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-      -DCMAKE_BUILD_TYPE=Release
+      -DCMAKE_BUILD_TYPE=${SNEEZE_CONFIG}
       ${MSVC_CRT_ARGS}
       ${ANARI_HELIDE_ARG}
       -DBUILD_TESTING=OFF

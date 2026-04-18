@@ -4,38 +4,50 @@ elseif (APPLE)
    # macOS + iOS: Apple's Secure Transport (no OpenSSL dep)
    set (CURL_SSL_ARGS -DCURL_USE_SECTRANSPORT=ON -DCURL_USE_OPENSSL=OFF -DCURL_USE_SCHANNEL=OFF)
 elseif (ANDROID)
-   # Android: cross-compile OpenSSL, then curl uses it.
-   # The Android NDK toolchain sets CMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY
-   # which makes find_package(OpenSSL) ignore OPENSSL_ROOT_DIR. Provide the
-   # library/include paths explicitly so FindOpenSSL short-circuits.
-   set (OPENSSL_INSTALL_DIR "${LIBS_DIR}/openssl/install")
+   # Android: curl links against BoringSSL (built by deps/boringssl.cmake).
+   # BoringSSL answers to the same FindOpenSSL interface as OpenSSL, so
+   # CURL_USE_OPENSSL=ON still works -- we just point it at the BoringSSL
+   # install tree. The Android NDK toolchain sets
+   # CMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY which makes find_package(OpenSSL)
+   # ignore OPENSSL_ROOT_DIR, so we also pass the explicit lib and include
+   # paths to short-circuit the search.
+   set (BORINGSSL_INSTALL_DIR "${LIBS_DIR}/boringssl/install")
    set (CURL_SSL_ARGS
       -DCURL_USE_OPENSSL=ON
       -DCURL_USE_SCHANNEL=OFF
-      -DOPENSSL_ROOT_DIR=${OPENSSL_INSTALL_DIR}
+      -DOPENSSL_ROOT_DIR=${BORINGSSL_INSTALL_DIR}
       -DOPENSSL_USE_STATIC_LIBS=TRUE
-      -DOPENSSL_INCLUDE_DIR=${OPENSSL_INSTALL_DIR}/include
-      -DOPENSSL_CRYPTO_LIBRARY=${OPENSSL_INSTALL_DIR}/lib/libcrypto.a
-      -DOPENSSL_SSL_LIBRARY=${OPENSSL_INSTALL_DIR}/lib/libssl.a
+      -DOPENSSL_INCLUDE_DIR=${BORINGSSL_INSTALL_DIR}/include
+      -DOPENSSL_CRYPTO_LIBRARY=${BORINGSSL_INSTALL_DIR}/lib/libcrypto.a
+      -DOPENSSL_SSL_LIBRARY=${BORINGSSL_INSTALL_DIR}/lib/libssl.a
    )
 else ()
    # Linux
    set (CURL_SSL_ARGS -DCURL_USE_SCHANNEL=OFF -DCURL_USE_OPENSSL=ON)
 endif ()
 
+set (_repo "${SNEEZE_DEP_REPO}/curl")
+if (EXISTS "${_repo}/.git")
+   set (_git_args)
+else ()
+   set (_git_args
+      GIT_REPOSITORY https://github.com/curl/curl.git
+      GIT_TAG        curl-8_9_1
+      GIT_SHALLOW    ON
+   )
+endif ()
+
 ExternalProject_Add (curl
-   GIT_REPOSITORY   https://github.com/curl/curl.git
-   GIT_TAG          curl-8_9_1
-   GIT_SHALLOW      ON
-   SOURCE_DIR       "${LIBS_DIR}/curl/src"
+   ${_git_args}
+   SOURCE_DIR       "${_repo}"
    BINARY_DIR       "${LIBS_DIR}/curl/build"
    INSTALL_DIR      "${LIBS_DIR}/curl/install"
    CMAKE_ARGS
       -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-      -DCMAKE_BUILD_TYPE=Release
+      -DCMAKE_BUILD_TYPE=${SNEEZE_CONFIG}
       -DBUILD_SHARED_LIBS=OFF
       -DBUILD_CURL_EXE=OFF
-      # Minimize optional deps — we only need HTTP/HTTPS for a web client
+      # Minimize optional deps -- we only need HTTP/HTTPS for a web client
       -DCURL_DISABLE_LDAP=ON
       -DCURL_DISABLE_LDAPS=ON
       -DUSE_LIBIDN2=OFF

@@ -13,7 +13,7 @@ alwaysApply: true
 
 The project produces two components:
 
-- **Sneeze** — the Metaverse Browser Engine (MBE). A standalone, reusable engine library (static `.lib`). Analogous to Blink in the web browser world. Owns all third-party dependencies (Wasmtime, SPIRV-Tools, OpenXR, curl, RmlUi, ANARI, nlohmann/json, Filament, Halogen) and the engine modules that wrap them (`wasm/`, `spirv/`, `xr/`, `net/`, `ui/`, `core/`, and future `som/`, `smap/`, `compute/`, `identity/`, `audio/`). All test executables (WasmTest, SpvTest, XrTest, NetTest, UiTest) belong to Sneeze. Another team could build a different metaverse browser on top of Sneeze without touching Artemis.
+- **Sneeze** — the Metaverse Browser Engine (MBE). A standalone, reusable engine library (static `.lib`). Analogous to Blink in the web browser world. Owns all third-party dependencies (Wasmtime, SPIRV-Tools, OpenXR, curl, RmlUi, ANARI, nlohmann/json, Filament, Halogen, BoringSSL, jwt-cpp) and the engine modules that wrap them (`wasm/`, `spirv/`, `xr/`, `net/`, `ui/`, `core/`, `compute/`, `jws/`, and future `som/`, `smap/`, `identity/`, `audio/`). All test executables (WasmTest, SpvTest, XrTest, NetTest, UiTest, ComputeTest, JwsTest) belong to Sneeze. Another team could build a different metaverse browser on top of Sneeze without touching Artemis.
 
 - **Artemis** — the metaverse browser application. The single `.exe`. Analogous to Chrome/Chromium. A thin application layer that consumes Sneeze: window management (`canvas/`), user chrome, and `main()`. Owns SDL3 (windowing/input is application-level, not engine-level). The disposable solar system demo (`astro/`) also belongs here. Artemis is **not open source** — proprietary copyright headers.
 
@@ -25,22 +25,17 @@ The project produces two components:
 
 ```
 Sneeze/
-├── libs/                  Dependencies (cloned + built by CMake, gitignored)
-│   ├── ANARI-SDK/         Each has src/, build/, install/
-│   ├── Wasmtime/
-│   ├── SPIRV-Tools/
-│   ├── SPIRV-Headers/
-│   ├── OpenXR-SDK/
-│   ├── curl/
-│   ├── RmlUi/
-│   ├── glslang/
-│   ├── nlohmann-json/
-│   ├── filament/
-│   └── Halogen/
-├── build/                 Build output (gitignored)
-│   └── sneeze/            Sneeze project files and static library
-├── src/                   Production source code
-│   ├── CMakeLists.txt
+├── deps/                  Deps CMake project (standalone, never references src/)
+│   ├── CMakeLists.txt     Deps entry: all deps by default, -DDEP=<name> for CI
+│   ├── <dep>.cmake        One ExternalProject_Add per dep (spirv-headers, filament, vox, ...)
+│   │   --- Generated at build time, gitignored ---
+│   ├── repos/             Shared source clones (one per dep, reused across configs)
+│   └── builds/<platform>/<config>/
+│       ├── build/         Deps CMake scratch + stamp files
+│       └── libs/<Name>/{build,install}/
+├── src/                   Sneeze CMake project (standalone, never references deps/)
+│   ├── CMakeLists.txt     Sneeze library target (forces lib/ + bin/ output)
+│   ├── cmake/             Find<Name>.cmake modules for deps w/o clean configs
 │   ├── core/              Foundational types
 │   ├── renderer/          ANARI rendering
 │   ├── view/              Camera orbit controller (decoupled from windowing)
@@ -49,16 +44,35 @@ Sneeze/
 │   ├── xr/                OpenXR device abstraction
 │   ├── net/               HTTP client (libcurl)
 │   ├── ui/                RmlUi HTML/CSS UI toolkit
-│   └── compute/           SPIR-V kernel embedding
-├── tests/                 Test source code
+│   ├── compute/           SPIR-V kernel embedding + dispatch (Vox GPU, CPU fallback)
+│   └── jws/               JWS signing/verification for MSF/MSS file formats
+├── tests/                 Test source (pulled in by src/CMakeLists.txt)
 │   ├── CMakeLists.txt
+│   ├── certs/             Self-signed X.509 v3 test certificates (CA, provider, expired)
+│   ├── GenCerts.cpp       One-shot utility to regenerate tests/certs/ (not in main build)
 │   └── *Test.cpp
-├── CMakeLists.txt         Top-level SuperBuild
+├── tools/                 Standalone auxiliary tools (not part of Sneeze library)
+│   ├── SignMsf/           CLI: signs .msf/.mss payloads with provider keys
+│   └── MsfViewer/         Standalone HTML/JS viewer for .msf/.mss files
+├── scripts/               Platform build drivers (the only glue between deps and src)
+│   ├── build-deps.sh      Shared dep-iteration logic (Unix)
+│   ├── build-linux.sh     Linux entry point
+│   ├── build-macos.sh     macOS entry point
+│   └── build-windows.ps1  Windows entry point (dep loop inline)
+├── cmake/                 Cross-compilation toolchain files
+├── .github/workflows/     CI (uses cmake -S deps and cmake -S src directly)
+│   --- Generated at build time, gitignored ---
+├── builds/<platform>/<config>/
+│   ├── build/             Sneeze CMake scratch
+│   ├── lib/               Sneeze.lib / libSneeze.a
+│   └── bin/               Test executables + CLI tools (SignMsf, ...)
 ├── vcpkg.json             Alternative vcpkg manifest
 ├── README.md
 ├── LICENSE                Apache 2.0
 └── NOTICE
 ```
+
+**There is no top-level `CMakeLists.txt`.** Deps and Sneeze are two fully independent CMake projects. The scripts in `scripts/` are the only glue: they invoke `cmake -S deps` for dependencies and `cmake -S src` for Sneeze, with no shared outer project.
 
 **The Sneeze/Artemis split has been executed.** Sneeze is a static library. `main.cpp`, `astro/`, and the SDL3 `WINDOW` class moved to Artemis. The `platform/` module was split: `CAMERA_ORBIT` stayed in Sneeze as `view/CameraOrbit` (decoupled from WINDOW — takes raw input deltas), and `WINDOW` moved to Artemis as `canvas/Canvas`.
 
@@ -73,7 +87,7 @@ The OMB architecture is fully documented in `OMB_Architecture_4.md` (the authori
 The MBE relies on six industry-adopted open standards that abstract the underlying hardware. These are genuinely different kinds of things — APIs, bytecode formats, and a programming model — which is why they are called "core abstractions" rather than "runtime interfaces."
 
 - **ANARI** — rendering abstraction (scene description, not GPU calls). High-level scene graph API where the browser describes *what* to render and the ANARI device decides *how*. Extremely thin — imposes no measurable overhead.
-- **SPIR-V Compute via ANARI** — browser-internal GPU compute. Parallel workloads (physics, spatial audio, proximity, coordinate transforms, IK) are authored as GLSL compute shaders, compiled to SPIR-V at build time, and dispatched through ANARI at runtime. ANARI abstracts the underlying GPU API (Vulkan, Metal, DX12) — the browser never interacts with GPU compute APIs directly. Not visible to services — it's the browser team's internal compute tool.
+- **SPIR-V Compute via Vox** — browser-internal GPU compute. Parallel workloads (physics, spatial audio, proximity, coordinate transforms, IK) are authored as GLSL compute shaders, compiled to SPIR-V at build time, and dispatched through **Vox** at runtime. Vox is a standalone library (`MetaversalCorp/Vox`) that abstracts Vulkan, DX12, and Metal compute dispatch behind a polymorphic C++ API. The browser writes one SPIR-V shader; Vox handles cross-compilation (SPIRV-Cross) and GPU-specific pipeline setup. ANARI does not and will not support compute shaders — Vox replaces the original ANARI compute path. Not visible to services — it's the browser team's internal compute tool.
 - **SPIR-V** — GPU interchange format for both graphics shaders and compute shaders. Content providers ship SPIR-V bytecode; the browser validates it (SPIRV-Tools) and passes it to ANARI, which handles backend translation internally.
 - **OpenXR** — device I/O abstraction for VR/AR headsets, controllers, hand tracking, eye tracking. Confirmed indispensable — no realistic alternative exists.
 - **WASM** — sandboxed execution for third-party service logic. Each connected service runs WASM modules with isolated memory, CPU budgets, and controlled host access. A misbehaving module cannot crash the browser, read other services' data, or access the filesystem.
@@ -93,11 +107,17 @@ All paths are relative to the repository root (`Sneeze/`):
 
 - **Source code:** `src/`
 - **Test code:** `tests/`
-- **Build output:** `build/sneeze/` (gitignored)
-- **Dependencies:** `libs/<name>/` — each has `src/`, `build/`, `install/` (gitignored)
-- **Top-level SuperBuild:** `CMakeLists.txt` (ExternalProject_Add for all 11 deps + Sneeze itself)
-- **Inner project build:** `src/CMakeLists.txt` (finds deps in `libs/<name>/install/`)
-- **Test build:** `tests/CMakeLists.txt` (defines all test executables)
+- **Sneeze build output:** `builds/<platform>/<config>/` — `lib/` for `Sneeze.lib`/`libSneeze.a`, `bin/` for test executables (gitignored)
+- **Dependency source clones:** `deps/repos/<Name>/` — one shared clone per dep, reused across configs (gitignored)
+- **Dependency build/install trees:** `deps/builds/<platform>/<config>/libs/<Name>/` — each has `build/` (scratch) and `install/` (usable artifacts) (gitignored)
+- **Two isolated CMake trees, no top-level bridge:**
+  - `deps/CMakeLists.txt` — standalone deps project. Knows only about `deps/`. Invoked as `cmake -S deps`. All-deps mode by default; `-DDEP=<name>` for single-dep CI builds. Iterates `deps/*.cmake` and declares `add_dependencies(...)` ordering.
+  - `src/CMakeLists.txt` — standalone Sneeze project. Knows only about `src/` and `tests/`. Invoked as `cmake -S src`. Finds deps in `${LIBS_DIR}/<Name>/install/`, forces output into `${SNEEZE_BUILD_ROOT}/lib` and `${SNEEZE_BUILD_ROOT}/bin`.
+  - **Neither CMakeLists ever references the other branch.** The scripts are the only glue.
+- **Per-dep CMake files:** `deps/*.cmake` — single source of truth. One `ExternalProject_Add` per dep; included by `deps/CMakeLists.txt` and unchanged for CI's single-dep path.
+- **Test build:** `tests/CMakeLists.txt` (defines all test executables; pulled in by `src/CMakeLists.txt`)
+- **Platform slugs:** `windows-x64`, `linux-x64`, `linux-arm64`, `macos-arm64`, `macos-x64`, `ios-arm64`, `android-arm64` — must match `Artemis/pkg/manifest.json`.
+- **Config:** `Debug` or `Release` (lowercased in paths: `debug`/`release`).
 
 ### Module Structure
 
@@ -116,6 +136,7 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 | `net/` | `sneeze::net` | HTTP client (libcurl 8.9.1, static, Schannel SSL) | 1 |
 | `ui/` | `sneeze::ui` | UI toolkit (RmlUi 6.2, HTML/CSS retained-mode, stub renderer) | 1 |
 | `compute/` | `sneeze::compute` | SPIR-V kernel embedding, retrieval, and dispatch via ANARI (CPU fallback when device lacks compute extension) | 1 |
+| `jws/` | `sneeze::jws` | JWS (RFC 7515) signing and verification for MSF/MSS file formats. BoringSSL + jwt-cpp. Part of the Sneeze static library; consumed by `JwsTest`, `SignMsf`, and (eventually) the SMAP driver. | 5 |
 | `identity/` | `sneeze::identity` | Browser-managed identity (future) | — |
 | `audio/` | `sneeze::audio` | Spatial audio mixing (future) | — |
 
@@ -134,7 +155,11 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 | `HTTP_CLIENT` | `net` | libcurl lifecycle (global init/cleanup), synchronous HTTP GET, file download (`DownloadToFile`). Static lib with Schannel SSL. |
 | `UI_CONTEXT` | `ui` | RmlUi lifecycle (init/shutdown). Provides stub system, render, and font engine interfaces. Real ANARI rendering deferred to SOM phase. |
 | `GetEmbeddedKernel()` | `compute` | Retrieves SPIR-V bytecode embedded in the executable via Win32 resources. Returns pointer + size. |
-| `COMPUTE_DISPATCH` | `compute` | Dispatches SPIR-V compute kernels through ANARI. Checks for `SNEEZE_dispatch_compute` device extension via `anariDeviceGetProcAddress`; falls back to registered CPU kernels when unavailable. Built-in CPU fallback for `TEST_PROXIMITY` kernel. Accepts `nullptr` device for CPU-only mode. |
+| `COMPUTE_DISPATCH` | `compute` | Dispatches SPIR-V compute kernels via **Vox** (`vox::DEVICE::Create(Backend::Auto)` picks Vulkan / DX12 / Metal at construction). Falls back to registered CPU kernels when no GPU backend is available or Vox rejects the kernel. Built-in CPU fallback for `TEST_PROXIMITY`. The legacy `ANARIDevice` constructor parameter is retained for source compatibility but ignored. |
+| `JWS_BASE` | `jws` | Shared core for JWS sign + verify. Static `Sign()` produces compact serialization with embedded `x5c` chain; instance `Verify()` validates the chain, checks the signature against the leaf's public key (via jwt-cpp), returns a `JWS_RESULT` struct (payload JSON, fingerprint, successor fingerprint, algorithm, error string). Supports RS256/384/512 and ES256/384/512. |
+| `CERT_CHAIN` | `jws` | X.509 chain validation via BoringSSL's `X509_STORE`. Loads the Windows ROOT certificate store on Windows (`CertOpenSystemStoreA` + `CertEnumCertificatesInStore`), `X509_STORE_set_default_paths()` on Linux/macOS. Computes the leaf certificate's **public-key fingerprint** — `SHA-256(i2d_PUBKEY(leaf))` — which is the organizational identity used across the browser, the signing tool, and the HTML viewer. |
+| `JWS_SERVICE` | `jws` | Derived from `JWS_BASE`. Typed accessors for MSS payloads: `GetNamespace()`, `GetOrganization()`, `GetServices()`, `GetModules()`, `GetSuccessor()`. Strongly-typed `MSS_SERVICE` and `MSS_MODULE` structs. |
+| `JWS_FABRIC` | `jws` | Derived from `JWS_BASE`. Stubbed accessors for MSF payloads (`GetServiceRefs()`). The MSF payload schema is not yet fully defined — this class is a placeholder until the format stabilizes. |
 
 **Naming note:** The concrete renderer class is `HELIDE_RENDERER`, not `ANARI_RENDERER`. The ANARI SDK reserves `ANARI_*` as enum constants (e.g. `ANARI_RENDERER`, `ANARI_CAMERA`), so our class name avoids that prefix to prevent collisions.
 
@@ -190,6 +215,20 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 | Update cycle | `Context.Update()` + `Context.Render()` complete without crash. Proves the layout engine and render dispatch pipeline are functional (stub renderer receives calls). |
 | Multiple contexts | Two simultaneous contexts with distinct names, both create and destroy cleanly. Proves multi-context architecture works. |
 
+**JwsTest.exe** — JWS signing + verification integration test suite (`tests/JwsTest.cpp`). 32 assertions across 7 test groups, all passing. Wired into `tests/CMakeLists.txt` (linked against the Sneeze library) and registered with CTest (`WORKING_DIRECTORY` set to the repo root so the `tests/certs/` fixtures resolve):
+
+| Test | What it proves |
+|------|---------------|
+| Sign + Verify round-trip | `JWS_BASE::Sign()` produces a valid JWS compact serialization with embedded `x5c` chain; `Verify()` validates the chain through `CERT_CHAIN`, extracts the leaf's public key, checks the signature (RS256), and returns the correct fingerprint. |
+| JWS_SERVICE payload parsing | MSS payload (namespace, organization, services, modules, successor) is signed and verified; typed accessors return all fields correctly; `MSS_SERVICE` and `MSS_MODULE` structs parse nested fields (endpoint, type, sha256). |
+| Tampered payload rejected | Flipping a character in the payload segment causes verification to fail with a non-empty error message. |
+| Expired certificate rejected | A cert with `notAfter = now - 1s` is rejected by BoringSSL's `X509_STORE_CTX` with `"certificate has expired"`. |
+| Untrusted chain rejected | A JWS signed by a cert chain whose root is not in the verifier's trust store is rejected with `"self signed certificate in certificate chain"`. |
+| Fingerprint stability | Two independent verifications of the same JWS produce byte-identical fingerprints — identity is deterministic. |
+| Malformed JWS rejected | Empty string, garbage, and one-segment inputs all produce non-empty error messages without crashing. |
+
+**Note:** The HTML/JS viewer at `tools/MsfViewer/index.html` computes the same fingerprint (SHA-256 of SPKI) using the browser's Web Crypto API. Engine and viewer produce byte-identical fingerprints for the same leaf certificate — confirmed end-to-end against `sample.mss`.
+
 **ComputeTest.exe** — Standalone SPIR-V compute integration test suite (`tests/ComputeTest.cpp`). 20 assertions across 8 test groups, all passing:
 
 | Test | What it proves |
@@ -198,8 +237,8 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 | Unknown kernel lookup | Non-existent kernel name returns null pointer and zero size — clean error path. |
 | Multiple retrievals | Same kernel retrieved twice returns identical pointer and size — resources are stable in memory. |
 | SPIR-V structure validation | Header fields are correct: magic number, version >= 1.0, non-zero ID bound, word-aligned size. |
-| Dispatch construction | `COMPUTE_DISPATCH` constructs with nullptr device. Reports no native compute support (expected without ANARI device). |
-| Proximity kernel dispatch | Full compute pipeline: embedded SPIR-V kernel dispatched via `COMPUTE_DISPATCH` (CPU fallback). 4 test positions dispatched, all computed distances match expected values (3.0, 4.0, 5.0, sqrt(3)). |
+| Dispatch construction | `COMPUTE_DISPATCH` constructs cleanly. `SupportsNativeCompute()` reports whether a Vox GPU backend came up on the host (DX12 on Windows, Metal on macOS, Vulkan where available). |
+| Proximity kernel dispatch | Full compute pipeline: embedded SPIR-V kernel dispatched via `COMPUTE_DISPATCH`. Routes through Vox (SPIR-V → HLSL/MSL → GPU dispatch → readback) when a backend is available, CPU fallback otherwise. 4 test positions dispatched, all computed distances match expected values (3.0, 4.0, 5.0, sqrt(3)). |
 | Non-origin query point | Proximity dispatch with query point at (5,0,0) instead of origin. Verifies the kernel correctly offsets distances. |
 | Unknown kernel dispatch | Dispatch of unregistered kernel name returns false — clean error path, no crash. |
 
@@ -255,6 +294,10 @@ All dependencies are built from source automatically by the CMake SuperBuild. No
 | nlohmann/json | v3.11.3 | [nlohmann/json](https://github.com/nlohmann/json) | Header-only JSON parsing library (MIT license) |
 | Filament | main | [MetaversalCorp/filament](https://github.com/MetaversalCorp/filament) | PBR rendering engine — Metaversal fork of Google Filament (Apache 2.0) |
 | Halogen | master | [MetaversalCorp/Halogen](https://github.com/MetaversalCorp/Halogen) | ANARI device (`anari_library_filament`) built on Filament — GPU-accelerated PBR rendering through ANARI |
+| SPIRV-Cross | vulkan-sdk-1.4.341.0 | [KhronosGroup/SPIRV-Cross](https://github.com/KhronosGroup/SPIRV-Cross) | SPIR-V → HLSL/MSL/GLSL cross-compiler. Used by Vox; Sneeze links the static archives (core + hlsl / msl + glsl) to satisfy Vox's unresolved references. |
+| Vox | main | [MetaversalCorp/Vox](https://github.com/MetaversalCorp/Vox) | Standalone GPU compute dispatch library. Accepts SPIR-V, dispatches on Vulkan (native), DX12 (via SPIRV-Cross→HLSL), or Metal (via SPIRV-Cross→MSL). Wired into `compute/COMPUTE_DISPATCH`; replaces the dead ANARI compute path. |
+| BoringSSL | main | [google/boringssl](https://github.com/google/boringssl) | Cryptographic backend: X.509 parsing, PEM decoding, SHA-256, RSA/ECDSA signing and verification, `X509_STORE` chain validation. Built statically (`BUILD_SHARED_LIBS=OFF`). Used by the `jws/` module. |
+| jwt-cpp | v0.7.0 | [Thalhammer/jwt-cpp](https://github.com/Thalhammer/jwt-cpp) | Header-only C++ library for JWS/JWT creation and verification. BoringSSL-compatible. Installed into the depot via a custom header-copy `INSTALL_COMMAND` (bypassing its problematic `FindOpenSSL` integration since no linking is required). |
 
 **Build-time prerequisites (installed by the developer):**
 
@@ -264,9 +307,11 @@ All dependencies are built from source automatically by the CMake SuperBuild. No
 | C/C++ compiler (C++17) | MSVC 2022, GCC, or Clang |
 | Rust / Cargo | Wasmtime build only (installed via rustup or winget) |
 | Python 3 | glslang build-time code generation only |
+| Go | BoringSSL build only (`winget install GoLang.Go`) |
+| NASM | BoringSSL build only on Windows, for assembly-optimized crypto primitives (`winget install NASM.NASM`; the install path must be added to PATH manually) |
 | Git | Cloning dependencies |
 
-**Important:** Rust is a build-time dependency of Wasmtime only. Python is a build-time dependency of glslang only. glslang produces `.spv` bytecode embedded into the executable; no glslang or Python code runs at runtime.
+**Important:** Rust is a build-time dependency of Wasmtime only. Python is a build-time dependency of glslang only. Go and NASM are build-time dependencies of BoringSSL only. None of these tools run at runtime.
 
 ### Decision Rationale
 
@@ -278,7 +323,7 @@ All dependencies are built from source automatically by the CMake SuperBuild. No
 
 **Why build OpenXR from source (not vcpkg)?** OpenXR is available as `openxr-loader:x64-windows` in vcpkg, but building from source (1) maintains the consistent build-from-source pattern, (2) uses the latest release (1.1.58 vs. vcpkg's 1.1.54), and (3) gives us direct control over build options (static vs. dynamic, with/without Vulkan support). The build is fast (under 1 minute) and has no unusual dependencies.
 
-**Why was SPIRV-Cross removed?** SPIRV-Cross is a decompiler — it translates SPIR-V bytecode back into source-level shader languages (HLSL, GLSL, MSL). The OMB architecture originally included it for cross-compiling shaders to whatever the local GPU requires. After architectural review (OMB Architecture Session 26), it was determined that ANARI devices consume SPIR-V natively and handle backend translation internally — the browser never needs to cross-compile shaders itself. Removing SPIRV-Cross eliminated 6 static libraries from the link line, simplified `SPV_PIPELINE` to validation-only, and removed one dependency from the SuperBuild. The `CrossCompileToHLSL()` and `CrossCompileToGLSL()` methods were removed from `SPV_PIPELINE`, and the cross-compilation + reflection tests were removed from `SpvPipelineTest.cpp`. The `libs/SPIRV-Cross/` directory was deleted.
+**Why was SPIRV-Cross removed from Sneeze (and brought back for Vox)?** SPIRV-Cross is a decompiler — it translates SPIR-V bytecode back into source-level shader languages (HLSL, GLSL, MSL). The OMB architecture originally included it in Sneeze for cross-compiling shaders to whatever the local GPU requires. After architectural review (OMB Architecture Session 26), it was determined that ANARI devices consume SPIR-V natively and handle backend translation internally — the browser never needs to cross-compile shaders itself as a rendering concern. SPIRV-Cross was removed from Sneeze. It was reintroduced when **Vox** (the standalone GPU compute dispatch library) was added, because DX12 doesn't support SPIR-V natively (needs HLSL via SPIRV-Cross) and Metal doesn't support SPIR-V natively (needs MSL via SPIRV-Cross). Vox is a static archive, so its unresolved SPIRV-Cross symbols propagate to whoever links Vox — but Sneeze does not need to know this directly. Vox's `vox-config.cmake` locates SPIRV-Cross at Sneeze's configure time (via `SpirvCross_ROOT`) and exposes the libraries through `vox::vox`'s `INTERFACE_LINK_LIBRARIES`, so `target_link_libraries (Sneeze PUBLIC vox::vox)` transitively pulls in the SPIRV-Cross archives. Sneeze's C++ code does not `#include <spirv_cross/...>` directly; the SPIRV-Cross dependency is purely a link-line concern driven by Vox's internals and resolved by Vox's own config.
 
 **Why build SPIRV-Tools from source (not vcpkg)?** SPIRV-Tools is available in vcpkg (`spirv-tools:x64-windows`), but building from source follows the same pattern as ANARI and Wasmtime: consistent version control, full debug symbols when needed, and no surprises from vcpkg port patches.
 
@@ -299,10 +344,10 @@ Neil Trevett independently recommended this same approach. The decision was made
    - **Windows:** Win32 resources (`.rc` file, loaded via `FindResource`/`LoadResource`)
    - **Linux:** ELF binary embedding via `objcopy` (symbols: `_binary_*_start`, `_binary_*_end`, `_binary_*_size`)
    - **macOS:** Mach-O section embedding via `ld -sectcreate`
-4. **Dispatch** at runtime through ANARI via `COMPUTE_DISPATCH`. The class probes the ANARI device for the `SNEEZE_dispatch_compute` extension using `anariDeviceGetProcAddress`. If the device supports it, the SPIR-V bytecode is passed to the device for native GPU execution. The extension function signature (`PFN_sneeze_dispatch_compute`) accepts device, SPIR-V bytes, workgroup dimensions, buffer bindings (`BUFFER_BINDING` structs with binding index, data pointer, size, read-only flag), and push constants.
-5. **Fallback** to CPU when the ANARI device lacks compute support. `COMPUTE_DISPATCH` maintains a registry of C++ kernel implementations keyed by kernel name. Built-in CPU fallbacks mirror the GLSL logic exactly (e.g., `CpuProximityKernel` for `TEST_PROXIMITY`). Callers can register additional CPU kernels via `RegisterCpuKernel()`. Passing `nullptr` as the ANARI device skips the native check entirely (CPU-only mode).
+4. **Dispatch** at runtime via **Vox** (`MetaversalCorp/Vox`, Apache 2.0). `COMPUTE_DISPATCH` calls `vox::DEVICE::Create(Backend::Auto)` during construction, which picks the best available backend on the host (Vulkan where drivers are present, DX12 on Windows, Metal on macOS, else null). On each `Dispatch()` call, the embedded SPIR-V for the named kernel is handed to Vox: `CreateKernel()` → `CreateBuffer()` for each `BUFFER_BINDING` → `SetData()` uploads → `SetKernel()` + `SetBuffer()` + `SetPushConstants()` + `Dispatch()` + `Finish()` → `GetData()` reads back non-read-only bindings, then the Vox objects are destroyed.
+5. **Fallback** to CPU when Vox returns no device or the GPU path fails (e.g., kernel creation errors, SPIRV-Cross rejects the shader). `COMPUTE_DISPATCH` maintains a registry of C++ kernel implementations keyed by kernel name. Built-in CPU fallbacks mirror the GLSL logic exactly (e.g., `CpuProximityKernel` for `TEST_PROXIMITY`). Callers can register additional CPU kernels via `RegisterCpuKernel()`.
 
-**Current state (2026-04-14):** ANARI v0.15.0 has no native compute primitives in the core spec. The `anariDeviceGetProcAddress` extension mechanism is the designated path. For native GPU dispatch to work, the Filament-based ANARI device must implement the `SNEEZE_dispatch_compute` extension and handle SPIR-V → Filament compute translation. The CPU fallback is fully functional today. ComputeTest.exe exercises the full pipeline end-to-end (20/20 assertions passing, including verified distance computations).
+**Current state (2026-04-17):** Vox is fully integrated into `COMPUTE_DISPATCH`. The dead ANARI compute extension check has been removed. Vox and SPIRV-Cross are part of Sneeze's dependency graph: SPIRV-Cross is a tier-0 dep (no predecessors), Vox is tier-1 (depends on SPIRV-Cross) in `.github/workflows/build-platform.yml`, and both have corresponding `deps/spirv-cross.cmake` / `deps/vox.cmake` files plus top-level `ExternalProject_Add` blocks in `CMakeLists.txt`. Vox itself ships a portable `vox-config.cmake` (hand-written template in `Vox/cmake/vox-config.cmake.in`, upstream commit `e70c5f6`) that performs consumer-side SPIRV-Cross discovery from `SpirvCross_ROOT`, so Sneeze just sets the hint and calls `find_package (Vox CONFIG REQUIRED)` — no `FindVox` / `FindSpirvCross` module lives in Sneeze. `vox::vox` carries DX12 / Metal / Vulkan / SPIRV-Cross transitively, so `src/CMakeLists.txt` only links the target and the platform-specific libs that are *not* Vox's concern (curl, wasmtime, security frameworks). Sneeze's test suite includes `VoxTest.exe` (direct Vox API exercise, parallels the upstream test) and `ComputeTest.exe` (goes through Vox when available, CPU fallback when not). Vox's legacy `ANARIDevice` constructor parameter is kept for source compat but ignored.
 
 **Shader/kernel authoring language — GLSL + glslang (decided):**
 
@@ -334,17 +379,89 @@ glslang is the Khronos reference SPIR-V compiler. GLSL compute shaders (`#versio
 
 **Why nlohmann/json?** General-purpose JSON parsing for both engine and application use. Header-only (no link libraries, no DLLs), MIT license, single-header deployment. Exposed as PUBLIC on the Sneeze target so Artemis can `#include <nlohmann/json.hpp>` without additional CMake configuration. Replaces the ad-hoc string-searching JSON parser used in the updater module.
 
+**Why BoringSSL (not OpenSSL) for the crypto backend?** The `jws/` module needs X.509 parsing, SHA-256, RSA/ECDSA signature verification, and certificate chain validation. OpenSSL and BoringSSL both expose the same API surface for these primitives. BoringSSL was chosen because (1) it has a stricter, better-maintained ASN.1 parser (it rejects malformed X.509 v1 certs that carry v3 extensions — a real defense-in-depth win), (2) it builds cleanly and fast with CMake on all three platforms, (3) it is a single static library with no license-text or runtime DLL distribution concerns, and (4) Google actively maintains it for Chrome / Android / Cronet, which is where most of the JWS ecosystem's battle-testing happens. The trade-off is that BoringSSL has no stable API contract — consumers must pin to a commit. Acceptable: it lives in the depot, and the depot is pinned anyway.
+
+**Why jwt-cpp?** Header-only C++ JWS/JWT library. It does exactly one thing well: takes a payload + private key + algorithm and produces a compact serialization; takes a compact serialization + public key and verifies the signature. It works with both OpenSSL and BoringSSL (since they share API). No link-time dependency, no DLL to ship. We bypass its CMake `find_package(OpenSSL)` glue (it chokes on BoringSSL's non-standard headers) and just copy the headers into the depot with a custom `INSTALL_COMMAND`. Link `src/jws/` directly against BoringSSL; jwt-cpp just provides header templates.
+
+**Why SHA-256 of SPKI as the organizational identifier?** The identity of an organization that signs MSF/MSS files must survive (a) certificate renewals (same key, new expiry date), (b) signing-tool changes, and (c) independent computation by any consumer (engine or HTML viewer). Hashing the `SubjectPublicKeyInfo` (the raw DER public-key blob inside the X.509 cert) satisfies all three: the key is stable across renewals with the same key pair, the hash is deterministic, and both BoringSSL (`i2d_PUBKEY`) and the Web Crypto API (`crypto.subtle.importKey("spki", ...)` with access to raw SPKI bytes via the ASN.1 parser) produce byte-identical SPKI representations. Verified end-to-end: `482cda4c2b6c2a81f46a39ec4232f140b24b439dba4b6040b4b7610506c490b7` is the fingerprint of the test provider cert as computed by the engine, the signing tool, and the HTML viewer.
+
 **Why Halogen (Filament-based ANARI device)?** Halogen (`MetaversalCorp/Halogen`) is an ANARI device implementation (`anari_library_filament`) built on top of Google's Filament rendering engine (`MetaversalCorp/filament`). It provides GPU-accelerated PBR rendering through the ANARI abstraction, replacing helide's CPU ray tracing. Filament was chosen for its production-quality PBR pipeline (clustered forward renderer, Cook-Torrance BRDF, IBL, PCSS shadows, HDR post-processing), cross-platform backend support (OpenGL, Vulkan, Metal), and proven mobile performance (Android, iOS). Halogen is developed by Jonathan Hale (Squareys).
 
-**Halogen two-project build structure.** The SuperBuild has two separate ExternalProject targets:
-1. **`filament`** — clones and builds `MetaversalCorp/filament.git` (the rendering engine fork). On Windows, passes `USE_STATIC_CRT=OFF` and `DIST_DIR=x86_64/md` to produce `/MD`-compatible libraries. Vulkan backend is enabled (`FILAMENT_SUPPORTS_VULKAN=ON`). Samples and tests disabled. Installs to `libs/filament/install/`.
-2. **`halogen`** — clones and builds `MetaversalCorp/Halogen.git` (the ANARI device). Depends on both `anari-sdk` and `filament`. Configured with `-DANARI_ROOT=${LIBS_DIR}/ANARI-SDK/install` and `-DFILAMENT_ROOT=${LIBS_DIR}/filament/install` so it finds both SDKs. Tests disabled (`BUILD_TESTS=OFF`). CRT set to `/MD` via `-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL`. Produces `anari_library_filament.dll`. Installs to `libs/Halogen/install/`.
+**Halogen dependency chain — the CRT isolation strategy.** Because Halogen consumes Filament, and Filament's Debug build on Windows is internally hybrid (compiles `/MDd` but emits `/FAILIFMISMATCH:_ITERATOR_DEBUG_LEVEL=0`, so nothing outside Filament can link against it without disabling checked iterators), we treat the Halogen chain as a Release island regardless of the outer deps configuration. The island is loaded into a Debug Sneeze across the ANARI plain-C ABI (`anariLoadLibrary` + function pointers); no C++ objects or STL containers cross the DLL boundary so Debug-Sneeze loading Release-halogen.dll is safe and is the standard game-engine pattern for third-party DLLs.
 
-**Halogen ANARI target namespacing.** When Halogen consumes the ANARI SDK from an installed package (vs. as a subdirectory), the CMake targets use the `anari::` namespace prefix (`anari::anari`, `anari::anari_backend`, `anari::helium`). Halogen's CMakeLists.txt (commit a88343b) detects which targets exist and sets `ANARI_TARGET`, `ANARI_BACKEND_TARGET`, `HELIUM_TARGET` variables accordingly, supporting both modes.
+The chain has **three** ExternalProject targets, plus a Debug-only shadow:
 
-**Halogen CRT handling.** Halogen's CMakeLists.txt defaults to `/MD` (dynamic CRT) but respects `CMAKE_MSVC_RUNTIME_LIBRARY` if set by the parent build (`NOT DEFINED` guard). The `FindFilament.cmake` module inspects the CRT setting to select the correct Filament lib subdirectory (`md/` vs `mt/` vs `mdd/` vs `mtd/`).
+1. **`filament`** (`deps/filament.cmake`) — clones `MetaversalCorp/filament.git`. **Always built Release**, regardless of outer deps config. On Windows passes `USE_STATIC_CRT=OFF` + `DIST_DIR=x86_64/md` → produces `/MD` libs. Vulkan backend enabled. Samples + tests disabled. Installs to `libs/filament/install/lib/x86_64/md/`. Consumed only by Halogen. The "always Release" pinning is enforced both by `-DCMAKE_BUILD_TYPE=Release` in CMAKE_ARGS **and** by explicit `BUILD_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --config Release` + matching `INSTALL_COMMAND` — because multi-config generators (Visual Studio, Xcode) ignore `CMAKE_BUILD_TYPE` at configure time and `ExternalProject_Add` otherwise inherits the outer `--config Debug` into the inner build.
 
-**Halogen tracks `master`.** The Halogen repo uses `master` as its default branch. Pin to a specific commit hash once the integration stabilizes. The Filament fork tracks `main`.
+2. **`anari-sdk-release`** (`deps/anari-sdk-release.cmake`) — **Debug-only shadow build of ANARI-SDK.** A second ExternalProject over the same `deps/repos/ANARI-SDK` source clone, with distinct `BINARY_DIR` / `INSTALL_DIR` (`libs/ANARI-SDK-release/build`, `libs/ANARI-SDK-release/install`). Pinned to Release via the same `BUILD_COMMAND` / `INSTALL_COMMAND` override pattern as Filament. Only registered when `SNEEZE_CONFIG=Debug` (`deps/CMakeLists.txt` conditionally appends it to `SNEEZE_DEPS`). Produces Release `anari_backend.lib` + `helium.lib` + `anari_library_debug.lib` + `anari_library_sink.lib` + `anari_library_helide.lib` for Halogen to consume. **Exists purely** because Halogen statically links `anari_backend.lib` and `helium.lib`, and in a Debug outer build the regular `anari-sdk` target produces Debug versions of those libs with `MDd_DynamicDebug` / `_ITERATOR_DEBUG_LEVEL=2` — which then `LNK2038`-conflict with Halogen's `MD_DynamicRelease` / `_ITERATOR_DEBUG_LEVEL=0` objects. Adds ~5 min and ~few-hundred-MB to Debug dep builds; zero cost in Release (skipped entirely). Source tree is shared — only the build + install trees are distinct.
+
+3. **`halogen`** (`deps/halogen.cmake`) — clones `MetaversalCorp/Halogen.git`. **Always built Release**, same `BUILD_COMMAND` / `INSTALL_COMMAND` override pattern. CRT set to `/MD` via `-DCMAKE_POLICY_DEFAULT_CMP0091=NEW` + `-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL`. Depends on `filament` + whichever ANARI flavor matches (`anari-sdk` in Release outer builds, `anari-sdk-release` in Debug outer builds). In Debug outer builds, `deps/halogen.cmake` sets `_halogen_anari_root` to `${LIBS_DIR}/ANARI-SDK-release/install`; in Release outer builds, `${LIBS_DIR}/ANARI-SDK/install`. Produces `anari_library_halogen.dll` + its import lib, installs to `libs/Halogen/install/{bin,lib}/`.
+
+**Sneeze itself** links against the *regular* `anari-sdk` install (Debug-matched-to-Sneeze-config anari_static + core headers). It never sees the `-release` shadow — that's a Halogen-internal concern. At runtime, Sneeze loads `anari_library_halogen.dll` via the ANARI loader; the Release halogen.dll happily coexists with a Debug Sneeze.exe because their interaction is a pure-C ABI.
+
+**Halogen must override `anari_DIR`, not just `ANARI_ROOT`.** `find_package(anari CONFIG)` caches `anari_DIR` on first successful resolve. If Halogen's build tree was ever configured against the Debug `ANARI-SDK/install/...` path (even transiently during development), the cache sticks and later passing a new `-DANARI_ROOT=...` is silently ignored — CMake reuses cached `anari_DIR` without re-searching. Halogen.cmake therefore passes **both** `-DANARI_ROOT=${_halogen_anari_root}` *and* `-Danari_DIR=${_halogen_anari_root}/lib/cmake/anari-0.16.0` to force the cache value on every reconfigure. Version number in the path matches ANARI-SDK's install subdir; bump if anari upgrades.
+
+**Halogen tracks `master`.** Pin to a specific commit hash once the integration stabilizes. The Filament fork tracks `main`.
+
+**Verification (2026-04-18):** Full Debug dep build passes end-to-end on Windows. `dumpbin /directives` on the installed libs confirms clean segregation: Sneeze-facing `anari_static.lib` is `MDd_DynamicDebug` / `_IDL=2`; Halogen-facing `ANARI-SDK-release/install/lib/anari_backend.lib`, `helium.lib`, plus `filament/install/lib/x86_64/md/filament.lib` are all `MD_DynamicRelease` / `_IDL=0`; halogen.dll imports `VCRUNTIME140.dll` (Release), not `VCRUNTIME140D.dll` (Debug).
+
+**Vox GPU Compute Library.** Vox (`MetaversalCorp/Vox`, Apache 2.0) is a standalone library that dispatches SPIR-V compute shaders across Vulkan, DX12, and Metal. Created to replace the dead ANARI compute path (ANARI confirmed it will not support compute shaders).
+
+**Vox architecture.** Polymorphic C++ with abstract base classes (`DEVICE`, `BUFFER`, `KERNEL`) and derived implementations per backend (`VULKAN_DEVICE`, `DX12_DEVICE`, `METAL_DEVICE`). Static factory: `DEVICE::Create(Backend::Auto)` selects the best available backend. Callers only see the abstract types.
+
+| Backend | SPIR-V Handling | Cross-compiler | Platform |
+|---------|----------------|----------------|----------|
+| Vulkan  | Native (no translation) | None | Windows, Linux |
+| DX12    | SPIRV-Cross → HLSL → D3DCompile | spirv-cross-hlsl | Windows |
+| Metal   | SPIRV-Cross → MSL → MTLLibrary | spirv-cross-msl | macOS |
+
+**Vox key implementation details (learned during DX12 testing):**
+
+- **SPIRV-Cross binding remapping.** SPIRV-Cross preserves original SPIR-V binding numbers when assigning HLSL registers and MSL buffer indices. Example: `layout(binding = 1) writeonly buffer` becomes `register(u1)` in HLSL (not `u0`). Both the DX12 and Metal backends use SPIRV-Cross reflection (`get_decoration(res.id, spv::DecorationBinding)`, `get_automatic_msl_resource_binding()`) after compilation to build root signatures / set buffer indices at the correct slots.
+- **DX12 root descriptors.** Vox uses root SRV/UAV descriptors (not descriptor tables) for buffer binding. Root SRV works with `ByteAddressBuffer`, root UAV works with `RWByteAddressBuffer` — both of which SPIRV-Cross generates for unbounded storage buffer arrays. This avoids needing a CBV/SRV/UAV descriptor heap entirely.
+- **DX12 three-heap buffer model.** DX12 buffers have three D3D12 resources: upload (CPU→GPU), default (GPU-only), readback (GPU→CPU). `SetData` writes to upload + a CPU shadow buffer. `GetData` returns shadow data before GPU dispatch, readback heap data after. `Finish()` marks buffers as having GPU results.
+- **Metal entry point renaming.** SPIRV-Cross may rename the entry point (e.g., `main` → `main0` in MSL, since `main` is reserved). Vox uses `get_cleansed_entry_point_name()` to get the actual MSL function name.
+- **Vulkan needs no SPIRV-Cross.** Vulkan consumes SPIR-V natively. Descriptor set layout uses 16 hardcoded storage buffer bindings (valid superset) and 128-byte push constant range (Vulkan spec minimum). No binding remapping occurs.
+
+**Vox test status (2026-04-16):** VoxTest.exe passes 14/14 on DX12:
+- Device creation (auto-selects DX12 on Windows)
+- Buffer round-trip (SetData → GetData, 4 floats)
+- Null backend handling (Metal on Windows → nullptr)
+- Full SPIR-V dispatch: `test_proximity.comp` compiled to `.spv` by glslangValidator, loaded at runtime, cross-compiled SPIR-V→HLSL by SPIRV-Cross, compiled to DXBC by D3DCompile, dispatched on GPU with push constants, results verified (3.000, 4.000, 5.000, 1.732). Metal backend untested (needs macOS). Vulkan backend untested on Windows (DX12 preferred by `Backend::Auto`).
+
+**Vox in the depot.** Added as `deps/vox.cmake` with its own `ExternalProject_Add`, included by `deps/CMakeLists.txt` and ordered via `add_dependencies(vox spirv-cross)`. Configured with `-DSpirvCross_ROOT=${LIBS_DIR}/SPIRV-Cross/install` and `-DBUILD_TESTING=OFF`. Source cloned to `deps/repos/Vox/`. Per-config install at `deps/builds/<plat>/<cfg>/libs/Vox/install/`. The old `E:\Dev\Vox` working copy has been deleted — work directly in the depot copy going forward.
+
+### JWS (MSF/MSS Signing and Verification)
+
+The `jws/` module implements [RFC 7515 JSON Web Signature](https://datatracker.ietf.org/doc/html/rfc7515) in compact serialization form, used to sign and verify the two browser-facing service-metadata file formats:
+
+- **`.msf`** (Metaversal Spatial Fabric) — describes a spatial fabric and the services it aggregates
+- **`.mss`** (Metaversal Spatial Service) — describes a single service within a fabric
+
+Both files are signed JSON wrapped as JWS compact serialization (`<header>.<payload>.<signature>`), with the full X.509 certificate chain embedded in the `x5c` header claim. The browser verifies signature + chain before trusting any content.
+
+**JWS stack:**
+
+| Layer | Library | Role |
+|-------|---------|------|
+| X.509 parse, PEM decode, hashing, RSA/ECDSA | BoringSSL | Crypto primitives |
+| Chain validation (trust store, expiry) | BoringSSL (`X509_STORE`) | Platform root trust |
+| JWS compact serialization + signing | jwt-cpp (header-only) | JWS/JWT builder |
+| Payload shape (MSS / MSF) | nlohmann/json | JSON model |
+
+**Key architectural decisions:**
+
+- **Identity = SHA-256 of leaf public key (SPKI).** Not the cert's fingerprint (which changes on renewal) — the public key's. The same org can re-issue certs without changing its identity, as long as the key pair is preserved. Engine and viewer compute this identically.
+- **Algorithms supported.** RS256 / RS384 / RS512 (RSA-PKCS1-v1_5) and ES256 / ES384 / ES512 (ECDSA). The HTML viewer also supports PS256/384/512 (RSA-PSS) via Web Crypto. The Sign CLI defaults to RS256.
+- **Class hierarchy.** `JWS_BASE` owns the sign/verify + chain validation + fingerprint extraction. `JWS_SERVICE` and `JWS_FABRIC` derive from it to add typed accessors on top of the verified JSON payload — they don't re-implement any crypto.
+- **Integrated into the Sneeze static library.** `src/jws/*.cpp` is part of the `Sneeze` CMake target; BoringSSL's `libcrypto` is linked `PUBLIC` and jwt-cpp headers are on the public include interface. Consumers just `target_link_libraries(... Sneeze)` — see `tests/JwsTest` and `tools/SignMsf`. The depot is driven by `deps/boringssl.cmake` + `deps/jwt-cpp.cmake` in Jonathan's superbuild, with matching `src/cmake/FindBoringSSL.cmake` and `src/cmake/FindJwtCpp.cmake` modules.
+
+**Tools produced by the JWS work:**
+
+- **`tools/SignMsf/`** — CLI tool (`SignMsf.exe`) for service providers. Usage: `SignMsf --payload foo.json --key provider-key.pem --cert provider-cert.pem --chain ca-cert.pem --alg RS256 --out foo.mss`. Produces a compact-serialization JWS string ready to publish.
+- **`tools/MsfViewer/`** — fully self-contained, offline HTML/JS viewer (`index.html`). Accepts `.msf`/`.mss` via drag-and-drop, paste, or file picker. Parses the JWS header, decodes each cert in `x5c` using a hand-rolled ASN.1 DER parser (so there's no CDN or bundler dependency), verifies the signature with Web Crypto, computes the leaf fingerprint matching the engine, and displays structured MSS fields with pass/warn/fail status banners. A companion `test-headless.mjs` script (Node `webcrypto`) verifies the same logic without a browser. Ships with `sample-mss.json` and a signed `sample.mss`.
+
+**Test certificates.** `tests/certs/` contains self-signed CA, provider, and expired certs generated by `tests/GenCerts.cpp` (a one-shot utility — `GenCerts.exe` is built once, then the output is committed to the repo). All certs are X.509 v3 (required by BoringSSL).
 
 ### Known Gotchas
 
@@ -359,43 +476,93 @@ glslang is the Khronos reference SPIR-V compiler. GLSL compute shaders (`#versio
 - **libcurl uses Schannel (Windows native SSL).** No OpenSSL dependency. On Linux/macOS, curl would need OpenSSL or the platform's native SSL.
 - **SDL pixel format must match ANARI byte layout (Artemis-side).** ANARI's `ANARI_UFIXED8_RGBA_SRGB` writes R,G,B,A bytes. On little-endian Windows, `SDL_PIXELFORMAT_ABGR8888` matches. This is Artemis's concern, not Sneeze's — the engine has no SDL3 dependency.
 - **Helide does not support texture mapping on implicit sphere geometry.** Texture-mapped planets require a different ANARI device (e.g., VisRTX) or explicit triangle mesh spheres.
-- **Do NOT delete the entire `build/` folder for day-to-day rebuilds.** The SuperBuild stores ExternalProject stamp files in `build/` that track which dependencies have been cloned, configured, built, and installed. Deleting the whole `build/` folder loses those stamps, forcing CMake to re-run all dependency steps (5+ minutes even though `libs/` is intact). Instead, delete only `build/sneeze/` to rebuild just the Sneeze library and tests.
-- **Deleting `libs/` triggers full rebuild.** All dependencies will be re-cloned and re-built (45-90 minutes).
+- **Do NOT delete `deps/builds/<platform>/<config>/build/` for day-to-day rebuilds.** That directory holds the SuperBuild's ExternalProject stamp files (tracking which deps have been cloned, configured, built, and installed). Deleting it loses those stamps, forcing CMake to re-run all dependency steps (5+ minutes even though the `libs/` tree is intact). For a day-to-day rebuild of Sneeze itself, delete only `builds/<platform>/<config>/` and re-run the build script — the deps are untouched.
+- **Deleting `deps/builds/<platform>/<config>/libs/` triggers full rebuild for that config.** All dependencies will be re-configured, re-built, and re-installed (45-90 minutes). Source clones in `deps/repos/` are preserved.
+- **Deleting `deps/repos/` re-clones every dependency** (~2 GB of git history, ~10 minutes). Rarely needed — only when a dep's upstream has force-pushed its tag.
 - **Filament is the heaviest dependency.** First build takes 30-60 minutes. Incremental rebuilds are fast. Both repos use `GIT_SHALLOW ON` in the SuperBuild.
 - **Halogen DLLs must be copied to Artemis output.** Artemis's POST_BUILD step must copy `anari_library_filament.dll` and any Filament shared libraries alongside the executable. This is Artemis-side configuration — not yet implemented.
-- **Halogen/Filament CRT must match.** Filament: `USE_STATIC_CRT=OFF` + `DIST_DIR=x86_64/md`. Halogen: `-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL`. Both produce `/MD` libraries matching Sneeze and Artemis. Without these flags, Filament defaults to `/MT` (static CRT), causing `LNK2038` linker errors.
+- **Halogen/Filament are always built Release.** See the "Halogen dependency chain" section above for the full rationale. In Debug outer builds, Halogen consumes a Release-only shadow of ANARI-SDK (`anari-sdk-release`) instead of the regular (Debug) `anari-sdk` install. Sneeze itself links the regular Debug `anari_static.lib` and loads Release `anari_library_halogen.dll` at runtime via the ANARI plain-C ABI. Do NOT try to "fix" Halogen's CRT to match Debug Sneeze — the fight is against Filament's internal hybrid CRT state and isolation is the winning strategy, not alignment.
+- **`ExternalProject_Add` + multi-config generators ignore `-DCMAKE_BUILD_TYPE=...` in `CMAKE_ARGS`.** Visual Studio / Xcode are multi-config: `CMAKE_BUILD_TYPE` is ignored at configure time, the config is selected at build time via `cmake --build --config <cfg>`. By default, `ExternalProject_Add`'s build step inherits the outer build's `--config`, so a Debug outer build produces a Debug inner build regardless of `-DCMAKE_BUILD_TYPE=Release` in CMAKE_ARGS. Pin the inner config by explicitly overriding `BUILD_COMMAND` + `INSTALL_COMMAND` to pass `--config Release` literally. Used for filament, anari-sdk-release, and halogen.
+- **`find_package(<pkg> CONFIG)` caches `<pkg>_DIR` and skips re-search.** Once `find_package` successfully resolves, the resolved path is written to CMakeCache.txt as `<pkg>_DIR`. On subsequent reconfigures, `find_package` finds the cached value and returns immediately without re-searching — even if the hint variable (`<pkg>_ROOT` or `<PKG>_ROOT`) changed. Passing `-D<pkg>_DIR=...` explicitly overrides the cache. This is exactly why `deps/halogen.cmake` passes `-Danari_DIR=${_halogen_anari_root}/lib/cmake/anari-0.16.0` alongside `-DANARI_ROOT=...` — without the direct override, stale caches from prior configure attempts silently resolve to the wrong ANARI install.
 - **Halogen C++20 vs Sneeze C++17.** Filament compiles with `/std:c++latest`. Since it's an ExternalProject, this is isolated. Sneeze code that includes Filament headers must compile them under C++17. If any public headers use C++20 features, bump Sneeze to C++20 or isolate the includes.
 - **Filament bundles its own spirv-tools/glslang/spirv-cross.** These are built inside Filament's `third_party/` tree. They do not conflict with Sneeze's separate copies.
 - **CMP0144 policy.** `src/CMakeLists.txt` sets `cmake_policy(SET CMP0144 NEW)` to suppress the warning about `ANARI_ROOT` variable being ignored by `find_package`. The policy tells CMake to respect uppercase `<PACKAGENAME>_ROOT` variables.
+- **BoringSSL rejects X.509 v1 certs that carry v3 extensions.** `X509_new()` defaults to version 1; if you add v3 extensions (Basic Constraints, Subject Key Identifier, Key Usage) without calling `X509_set_version(pCert, 2)`, the resulting cert encodes as ASN.1 but is malformed. BoringSSL's `PEM_read_bio_X509` rejects it with `ASN.1 encoding routines:OPENSSL_internal:DECODE_ERROR`. `tests/GenCerts.cpp` explicitly sets version 2 (= X.509 v3) on both the CA and provider certificates. If you write new cert-generation code, do the same.
+- **BoringSSL is picky about PEM line endings.** CRLF-terminated PEM files from Windows sometimes fail to parse. Convert to LF before handing to `PEM_read_bio_X509` if you see mysterious decode errors.
+- **Go and NASM are hard requirements for BoringSSL on Windows.** Without both on PATH, the depot build fails during BoringSSL's CMake configure step. Go is Google's build-and-test tool for the library; NASM compiles the assembly-optimized crypto primitives. `winget install GoLang.Go` handles Go; NASM via winget installs to `C:\Program Files\NASM\` but does not add itself to PATH — add it manually via `[Environment]::SetEnvironmentVariable('Path', "$env:Path;C:\Program Files\NASM", 'User')` (then restart the shell).
+- **Visual Studio Developer PowerShell clobbers user PATH.** `Launch-VsDevShell.ps1` replaces the process PATH with MSVC-specific entries, dropping user-persisted tool paths (Go, NASM, anything else). Symptom: `go version` / `nasm -v` work in a fresh PowerShell but fail in a VS Dev Shell. Fix: in the user's PowerShell profile (`$PROFILE` → `...\Documents\PowerShell\Microsoft.PowerShell_profile.ps1`), after the dev-shell init, re-merge persistent User + Machine PATH entries back into `$env:Path`. This makes Go + NASM (and the rest) available in every shell type. Dean's profile was updated 2026-04-17 to do this; the profile itself is per-user and not in the Sneeze repo.
+- **jwt-cpp's `find_package(OpenSSL)` does not work with BoringSSL.** BoringSSL's headers live in `openssl/` but are versioned differently from OpenSSL and do not include `opensslv.h` in the shape CMake expects. The depot bypasses jwt-cpp's CMake entirely with a custom `INSTALL_COMMAND` that just copies the headers. jwt-cpp is header-only, so no linking happens; `src/jws/` links BoringSSL directly.
+- **`JWS_BASE::Sign()` output format is nested.** The payload JSON is wrapped as `{"data": "<original-json-string>"}` before signing, because jwt-cpp's `set_payload_claim()` expects claim-shaped data. The HTML viewer and `JWS_BASE::Verify()` unwrap this nesting on parse. If you change the payload shape in one place, change it in all three (signing tool, engine verifier, HTML viewer).
+- **`CERT_CHAIN` loads the OS trust store on Windows.** It calls `CertOpenSystemStoreA("ROOT")` and walks every cert into the BoringSSL `X509_STORE`. This means chain validation respects Windows Update's root store updates automatically, but also means tests must use a fully self-signed chain — you can't rely on the cert being "trusted" unless you inject the test CA into the store (tests don't, which is why the untrusted-chain test works as written).
 
 ### Build System
 
-The project uses a **CMake SuperBuild** pattern. The top-level `CMakeLists.txt` uses `ExternalProject_Add` to clone, configure, build, and install all dependencies into `libs/<name>/install/`. The Sneeze project itself is also an `ExternalProject` that depends on all of them.
+The project has **two fully independent CMake trees**, parameterized by `SNEEZE_CONFIG` (Debug/Release) and `SNEEZE_PLATFORM` (e.g., `windows-x64`). There is **no top-level `CMakeLists.txt`** that spans both — that was deliberately removed. Dependencies are cloned once into `deps/repos/<Name>/` (shared across configs) and built+installed per config into `deps/builds/<platform>/<config>/libs/<Name>/`. Sneeze's own artifacts land in `builds/<platform>/<config>/{lib,bin}/`.
 
-- **Top-level CMakeLists.txt** — SuperBuild orchestrator. Defines all dependency targets + the `sneeze` target. All `ExternalProject_Add` declarations are in this single file.
-- **src/CMakeLists.txt** — Sneeze project definition. Finds deps by looking in `libs/<name>/install/`. Includes `add_subdirectory` for tests.
-- **tests/CMakeLists.txt** — Defines individual test executables, links against libs.
-- **Wasmtime** is built via `cargo build --release -p wasmtime-c-api`. Not a CMake project — uses custom `BUILD_COMMAND` and `INSTALL_COMMAND` in ExternalProject. The install script copies source headers, overlays Cargo-generated headers (for `conf.h`), and copies the DLL/lib.
-- **All C/C++ dependencies** are built with CMake and installed to their respective `libs/<name>/install/` prefixes.
-- **vcpkg.json** is provided as an alternative for developers who prefer vcpkg. The `USE_LOCAL_DEPS` option in `src/CMakeLists.txt` switches between SuperBuild paths and vcpkg paths.
+- **deps/CMakeLists.txt** — standalone deps project. `cmake -S deps` builds all deps; `cmake -S deps -DDEP=<name>` builds one (CI path). Never references `src/`. Derives `SNEEZE_CONFIG`, `SNEEZE_PLATFORM`, `SNEEZE_DEP_REPO`, `LIBS_DIR` if not passed explicitly. Applies cross-dep ordering via `add_dependencies(...)`.
+- **deps/*.cmake** — one `ExternalProject_Add` per dep. Single source of truth; included by `deps/CMakeLists.txt`.
+- **src/CMakeLists.txt** — standalone Sneeze project. `cmake -S src`. Finds deps under `${LIBS_DIR}/<Name>/install/`. Forces output to `${SNEEZE_BUILD_ROOT}/lib` and `${SNEEZE_BUILD_ROOT}/bin`. Never references `deps/`.
+- **tests/CMakeLists.txt** — defines individual test executables; pulled in by `src/CMakeLists.txt`, inherits its output dirs.
+- **scripts/build-{windows.ps1,linux.sh,macos.sh}** — the only glue between deps and Sneeze. Default (no flag): plain `cmake --build builds/<plat>/<cfg>/build --config <cfg>` (no dep checks, no configure). `-Deps` / `--deps`: `cmake -S deps` + stamped per-dep build loop. `-All` / `--all`: deps flow, then `cmake -S src` configure, then `cmake --build` on the Sneeze tree. `-Configure` / `--configure`: reconfigure + build Sneeze only (no dep phase). `-Only`, `-List`, `-CleanStamps` imply deps mode. `-Deps`, `-All`, and `-Configure` are mutually exclusive.
+- **scripts/build-deps.sh** — shared bash helper that drives `cmake -S deps` and the per-dep stamped loop on Linux/macOS; invoked by `build-linux.sh` and `build-macos.sh` when in deps mode.
+- **Wasmtime** is built via `cargo build --release -p wasmtime-c-api` regardless of `SNEEZE_CONFIG` (Cargo release mode is always used; the product just gets copied into the config-specific install tree).
+- **All other C/C++ dependencies** are built with CMake using `-DCMAKE_BUILD_TYPE=${SNEEZE_CONFIG}` and installed under their per-config `install/` prefixes.
+- **vcpkg.json** is still provided as an alternative for developers who prefer vcpkg. The `USE_LOCAL_DEPS` option in `src/CMakeLists.txt` switches between `${LIBS_DIR}` paths and vcpkg paths.
 
 ### Build Commands (Quick Reference)
 
-```bash
-# Full build from scratch (first time, ~20-30 min)
-cmake -S . -B build
-cmake --build build --config Release --parallel
+```powershell
+# --- Windows (PowerShell) ---
+# THE day-to-day command -- compile + link Sneeze only, no dep checks (seconds)
+.\scripts\build-windows.ps1                    # Release (default)
+.\scripts\build-windows.ps1 -Config Debug      # Debug
 
-# Day-to-day rebuild (just Sneeze, seconds)
-cmake --build build/sneeze --config Release --parallel
+# Reconfigure + build Sneeze only (e.g., after nuking builds\<plat>\<cfg>\build\)
+.\scripts\build-windows.ps1 -Configure
+.\scripts\build-windows.ps1 -Configure -Config Debug
+
+# First-time setup or nuking a config: build deps + Sneeze (~1-2 hours)
+.\scripts\build-windows.ps1 -All
+.\scripts\build-windows.ps1 -All -Config Debug
+
+# Refresh deps only (upstream dep changed, rare)
+.\scripts\build-windows.ps1 -Deps
+.\scripts\build-windows.ps1 -CleanStamps -Only filament  # implies -Deps
+
+# Run tests (Release; swap 'release' -> 'debug' for Debug builds)
+builds\windows-x64\release\bin\WasmTest.exe
+builds\windows-x64\release\bin\SpvTest.exe
+builds\windows-x64\release\bin\XrTest.exe
+builds\windows-x64\release\bin\NetTest.exe
+builds\windows-x64\release\bin\UiTest.exe
+builds\windows-x64\release\bin\ComputeTest.exe
+builds\windows-x64\release\bin\VoxTest.exe
+builds\windows-x64\release\bin\JwsTest.exe
+```
+
+```bash
+# --- Linux / macOS ---
+# THE day-to-day command -- compile + link Sneeze only, no dep checks (seconds)
+./scripts/build-linux.sh                       # Release (default)
+./scripts/build-linux.sh --config Debug        # Debug
+./scripts/build-macos.sh                       # macOS Release
+
+# Reconfigure + build Sneeze only
+./scripts/build-linux.sh --configure
+./scripts/build-macos.sh --configure --config Debug
+
+# First-time setup or nuking a config: build deps + Sneeze (~1-2 hours)
+./scripts/build-linux.sh --all
+./scripts/build-macos.sh --all --config Debug
+
+# Refresh deps only (rare)
+./scripts/build-linux.sh --deps
+./scripts/build-linux.sh --clean-stamps --only filament  # implies --deps
 
 # Run tests
-build\sneeze\tests\Release\WasmTest.exe
-build\sneeze\tests\Release\SpvTest.exe
-build\sneeze\tests\Release\XrTest.exe
-build\sneeze\tests\Release\NetTest.exe
-build\sneeze\tests\Release\UiTest.exe
-build\sneeze\tests\Release\ComputeTest.exe
+./builds/linux-x64/release/bin/WasmTest
+./builds/linux-x64/release/bin/ComputeTest
+# (etc.)
 ```
 
 ## Proof of Concept — Solar System (COMPLETE)
@@ -435,7 +602,7 @@ Integrate the four remaining core runtime APIs into the build system. The goal i
 | 2 | ~~SPIR-V~~ | **DONE** | SPIRV-Tools + SPIRV-Headers built from source (vulkan-sdk-1.4.341.0). `spirv/SPV_PIPELINE` class (validation only — SPIRV-Cross removed from architecture). SpvTest.exe passes integration tests. |
 | 3 | ~~OpenXR~~ | **DONE** | OpenXR SDK 1.1.58 built from source (static lib). `xr/XR_RUNTIME` class. XrTest.exe passes 10/10 integration tests. |
 | 4 | ~~curl (HTTP client)~~ | **DONE** | libcurl 8.9.1 built from source (static, Schannel SSL). `net/HTTP_CLIENT` class. NetTest.exe passes 20/20 integration tests. |
-| 5 | glslang + SPIR-V compute pipeline | **PENDING** | glslang vulkan-sdk-1.4.341.0 built from source (ENABLE_OPT=OFF, ENABLE_HLSL=OFF). `compute/` module with `GetEmbeddedKernel()` and `COMPUTE_DISPATCH`. CMake compiles `.comp` → `.spv` at build time, embeds via Win32 `.rc` resources. `COMPUTE_DISPATCH` routes through ANARI (`SNEEZE_dispatch_compute` extension via `anariDeviceGetProcAddress`), falls back to CPU when device lacks support. ComputeTest.exe passes 20/20 integration tests. **Remaining:** Native ANARI compute dispatch — requires the Filament-based ANARI device to implement `SNEEZE_dispatch_compute` extension and handle SPIR-V → Filament compute translation. CPU fallback works today. |
+| 5 | ~~glslang + SPIR-V compute pipeline~~ | **DONE** | glslang vulkan-sdk-1.4.341.0 + Vox + SPIRV-Cross all built from source. `compute/COMPUTE_DISPATCH` routes kernels through Vox (`vox::DEVICE::Create(Backend::Auto)`) on DX12 / Metal / Vulkan, CPU fallback when no backend available. CMake compiles `.comp` → `.spv` at build time, embeds via Win32 `.rc` resources on Windows / `objcopy` elsewhere. ComputeTest.exe exercises the full pipeline end-to-end; VoxTest.exe exercises Vox directly through the Sneeze static lib. |
 | 6 | Add VisRTX (GPU-accelerated ANARI device) | **DEFERRED** | Replace helide (CPU ray tracing) with VisRTX (NVIDIA GPU ray tracing ANARI device). No Sneeze code changes — swap the ANARI device, rendering pipeline adapts automatically. Deferred — Filament-based ANARI renderer makes this lower priority; VisRTX requires CUDA + OptiX SDK. |
 | 7 | ~~RmlUi (UI toolkit)~~ | **DONE** | RmlUi 6.2 built from source (static lib, no FreeType). `ui/UI_CONTEXT` class with stub system/render/font interfaces. UiTest.exe passes 20/20 integration tests (init, context lifecycle, document loading, update/render cycle, multi-context). |
 
@@ -486,9 +653,10 @@ SMAP abstracts the network layer so the browser can connect to any spatial fabri
 
 | # | Task | Notes |
 |---|------|-------|
+| 0 | ~~JWS verification for MSF/MSS files~~ | **DONE.** `src/jws/` module implements RFC 7515 JWS sign + verify with BoringSSL + jwt-cpp. `JWS_BASE`, `CERT_CHAIN`, `JWS_SERVICE`, `JWS_FABRIC`. Linked into the Sneeze static library. `SignMsf.exe` CLI tool (`tools/SignMsf/`) gated by `SNEEZE_BUILD_TOOLS` (ON by default on desktop). HTML viewer at `tools/MsfViewer/`. JwsTest wired into CTest (32/32 passing). Organizational identity is SHA-256 of leaf public key (SPKI). |
 | 1 | Design SMAP driver interface | Abstract connection, discovery, and data streaming per architecture doc (Section 10.6) |
 | 2 | Implement `smap/` module with `sneeze::smap` namespace | Driver registration, connection lifecycle, message routing |
-| 3 | Implement first SMAP driver (WebSocket) | Connect to MSF_Map_Svc as the first real fabric |
+| 3 | Implement first SMAP driver (WebSocket) | Connect to MSF_Map_Svc as the first real fabric. Browser fetches `.msf` over HTTPS, verifies via `JWS_FABRIC`, then connects to each service endpoint and verifies its `.mss` via `JWS_SERVICE` before accepting any data. |
 | 4 | Proximity-based discovery prototype | Local proximity triggers fabric connection per architecture doc (Section 5) |
 | 5 | Multi-fabric simultaneous connection | Browser maintains connections to multiple fabrics, each owning SOM branches |
 
@@ -523,9 +691,9 @@ Supporting components that can be developed in parallel with or after the core p
 
 | # | Task | Notes |
 |---|------|-------|
-| 1 | Browser-managed identity (`identity/` module) | Cryptographic credentials, zero-knowledge proofs, no per-service sign-on (Section 13) |
+| 1 | Browser-managed identity (`identity/` module) | Cryptographic credentials, zero-knowledge proofs, no per-service sign-on (Section 13). The organization-identity primitive (SHA-256 of leaf SPKI) is already defined and implemented in `src/jws/CERT_CHAIN::GetLeafFingerprint()`; the `identity/` module will build on that for user identity, not duplicate it. |
 | 2 | Spatial audio (`audio/` module) | Server-side voice mixing, purpose-built codec, 3D spatialization (Section 15) |
-| 3 | SPIR-V compute pipeline (`compute/` module) | GLSL kernels → glslang → SPIR-V → ANARI compute dispatch for physics, proximity, IK, audio DSP. |
+| 3 | SPIR-V compute pipeline (`compute/` module) | GLSL kernels → glslang → SPIR-V → **Vox** GPU compute dispatch for physics, proximity, IK, audio DSP. Vox is integrated into `COMPUTE_DISPATCH` (DX12 / Metal / Vulkan backends). Remaining work is authoring kernels for the specific runtime workloads, not wiring plumbing. |
 | 4 | Content provider SDK | Tools and documentation for fabric/service developers (Section 16) |
 
 ### Unphased / Ongoing
@@ -538,32 +706,113 @@ Supporting components that can be developed in parallel with or after the core p
 | 4 | CI/CD pipeline | Automated builds, test runs on commit |
 | 5 | Extract dependency depot | Move the SuperBuild (all ExternalProject_Add targets) into a standalone repo. Sneeze becomes a pure library project that references pre-built headers and libs via a single `DEPS_ROOT` path variable. See "Planned: Dependency Depot" section below for full design notes. |
 
-### Planned: Dependency Depot
+### Dependency Depot (Implemented)
 
-**Status:** Approved for implementation. Targeting weekend of 2026-04-12.
+**Status:** Implemented, operational, migration complete as of 2026-04-18. The old top-level `CMakeLists.txt` has been deleted; there is no longer a dual build system.
 
-**Problem.** Sneeze's top-level `CMakeLists.txt` is a ~300-line SuperBuild that clones and builds 11 dependencies via `ExternalProject_Add`. Any CMake change that invalidates a stamp file triggers a full rebuild (45-90 minutes). This blocks every developer, even when they're iterating on a one-line engine fix. The SuperBuild machinery has nothing to do with the engine — it's pure dependency management overhead.
+**Model.** Chromium's `depot_tools` / `third_party` separation, adapted for a single-repo layout. Two fully independent CMake trees, no top-level bridge; build scripts in `scripts/` are the sole glue.
 
-**Solution.** Create a new standalone project (repo) that owns the SuperBuild and all dependency sources. This "dependency depot" builds once, producing an install tree of headers and libraries. Sneeze (and Artemis, and any future consumer) points at the depot's output via a single cache variable (`DEPS_ROOT`) and uses `find_package` / direct path references. No ExternalProject in Sneeze at all.
+**Canonical directory layout** (all under `Sneeze/`, all `deps/builds/` + `deps/repos/` + `builds/` are gitignored):
 
-**Model.** Chromium's `depot_tools` / `third_party` separation. Also consistent with Qt's install-then-consume model and Yocto's sysroot concept. Other precedents: LLVM (`-DLLVM_DIR`), Android AOSP (`repo` + prebuilts), Unreal Engine (pre-built engine binaries separate from game projects).
+```
+Sneeze/
+├── deps/
+│   ├── CMakeLists.txt                    Standalone deps project (cmake -S deps)
+│   ├── <dep>.cmake                       One ExternalProject_Add per dep
+│   ├── repos/                            Shared source clones, reused across cfgs
+│   │   ├── ANARI-SDK/
+│   │   ├── Halogen/
+│   │   ├── filament/
+│   │   ├── Vox/
+│   │   └── ... (all other deps)
+│   └── builds/<platform>/<config>/       e.g. windows-x64/{debug,release}/
+│       ├── build/                        Outer deps SuperBuild scratch + EP stamps
+│       │   ├── .dep-stamps/              Script-level per-dep .done markers
+│       │   └── <dep>-prefix/             ExternalProject_Add's internal stamps
+│       └── libs/
+│           ├── <Dep>/{build,install}/    Per-dep inner build + usable install
+│           └── ANARI-SDK-release/{build,install}/   Debug-only Release shadow
+├── src/                                  Standalone Sneeze project (cmake -S src)
+│   └── CMakeLists.txt
+└── builds/<platform>/<config>/           Sneeze's own output
+    ├── build/                            Sneeze CMake scratch
+    ├── lib/                              Sneeze.lib / libSneeze.a
+    └── bin/                              Test executables + CLI tools
+```
 
-**What changes for Sneeze:**
-- Top-level `CMakeLists.txt` shrinks from ~300 lines of ExternalProject orchestration to a simple project definition.
-- `src/CMakeLists.txt` changes `find_package` / `find_library` root hints from `${LIBS_DIR}/<name>/install` to `${DEPS_ROOT}/<name>/install` (or a unified install prefix).
-- No more stamp files, no more `build/<dep>-prefix/` directories, no more risk of accidental full rebuilds.
-- Configure + build time for Sneeze drops to seconds.
+**Platform slugs:** `windows-x64`, `linux-x64`, `linux-arm64`, `macos-arm64`, `macos-x64`, `ios-arm64`, `android-arm64` — must match `Artemis/pkg/manifest.json`. **Config** folder names are lowercased (`debug`/`release`) even though `CMAKE_BUILD_TYPE` is `Debug`/`Release`.
 
-**What changes for developers:**
-- First-time setup becomes two steps: (1) clone and build the depot, (2) clone Sneeze and point `DEPS_ROOT` at the depot output. A wrapper script or meta-repo can reduce this to one step.
-- Day-to-day work never touches the depot. Depot rebuilds only happen when a dependency version changes.
+**Build commands (recommended entry point — the `scripts/build-*` wrappers, which handle stamp bookkeeping and dep ordering):**
 
-**What changes for CI:**
-- Cache the depot build artifact. Only rebuild when a dependency version or build option changes. Sneeze CI runs in seconds.
+```powershell
+# Windows (PowerShell)
+.\scripts\build-windows.ps1                              # Sneeze only, Release (default)
+.\scripts\build-windows.ps1 -Config Debug                # Sneeze only, Debug
+.\scripts\build-windows.ps1 -Configure                   # Reconfigure + build Sneeze
+.\scripts\build-windows.ps1 -Deps                        # Deps only (Release)
+.\scripts\build-windows.ps1 -Deps -Config Debug          # Deps only (Debug)
+.\scripts\build-windows.ps1 -All                         # Deps, then Sneeze
+.\scripts\build-windows.ps1 -Only filament               # Rebuild one dep (implies -Deps)
+.\scripts\build-windows.ps1 -Only filament -CleanStamps  # Force-rebuild one dep
+.\scripts\build-windows.ps1 -List                        # Stamp cache state
+```
 
-**Design questions to resolve at implementation time:**
-- Repo name and location (`E:\Dev\SneezeDepot\`? `E:\Dev\OmbiDeps\`?)
-- Single unified install prefix (`deps/install/`) vs. per-dependency prefixes (`deps/ANARI-SDK/install/`, `deps/Halogen/install/`, etc.) — current layout is per-dependency
-- Whether to use a version manifest file that Sneeze can check at configure time ("you need depot version >= X")
-- Whether Artemis should also point at the depot directly, or continue to get deps transitively through Sneeze
+```bash
+# Linux / macOS (shell)
+./scripts/build-linux.sh                                 # Sneeze only, Release (default)
+./scripts/build-linux.sh --config Debug                  # Sneeze only, Debug
+./scripts/build-linux.sh --configure                     # Reconfigure + build Sneeze
+./scripts/build-linux.sh --deps                          # Deps only
+./scripts/build-linux.sh --all                           # Deps, then Sneeze
+./scripts/build-linux.sh --only filament --clean-stamps
+```
+
+**Mode flags are mutually exclusive:** `-Deps`, `-All`, `-Configure` — only one at a time. `-Only`, `-List`, `-CleanStamps` implicitly enable deps mode. Default (no flags) is Sneeze-only: plain `cmake --build builds/<plat>/<cfg>/build --config <cfg>` with no dep checks, no reconfigure. If the Sneeze build tree doesn't exist yet, the plain-build fails with "CMakeCache.txt missing" and the user must re-run with `-Configure` (or `-All` if deps are also missing).
+
+**Under the hood — direct CMake invocations (used by CI):**
+
+```bash
+# All deps (any platform)
+cmake -S deps -B deps/builds/<plat>/<cfg>/build \
+   -DSNEEZE_CONFIG=<Debug|Release> \
+   -DSNEEZE_PLATFORM=<plat> \
+   -DSNEEZE_DEP_REPO=deps/repos \
+   -DLIBS_DIR=deps/builds/<plat>/<cfg>/libs
+cmake --build deps/builds/<plat>/<cfg>/build --config <cfg>
+
+# Single dep (CI parallelization)
+cmake -S deps -B deps/builds/<plat>/<cfg>/build -DDEP=<name> ...
+cmake --build deps/builds/<plat>/<cfg>/build --target <name> --config <cfg>
+
+# Sneeze
+cmake -S src -B builds/<plat>/<cfg>/build \
+   -DLIBS_DIR=deps/builds/<plat>/<cfg>/libs \
+   -DSNEEZE_CONFIG=<Debug|Release> \
+   -DSNEEZE_PLATFORM=<plat> \
+   -DSNEEZE_BUILD_ROOT=builds/<plat>/<cfg>
+cmake --build builds/<plat>/<cfg>/build --config <cfg>
+```
+
+**Hard separation invariant.** `deps/CMakeLists.txt` never reads from or writes under `src/`, and `src/CMakeLists.txt` never reads from or writes under `deps/` (it only consumes the installed headers + libs via `${LIBS_DIR}/<Name>/install/` paths passed in on the cmake command line). Neither file includes the other. This was a hard requirement: "The Deps branch has its cmakelists file, which handles ONLY files that fall within the deps folder. There shall be nothing in the deps cmakelists file that would ever remotely consider altering any file outside the deps folder. And totally separately, the Sneeze branch has its cmakelists file, which handles ONLY files that fall within the Sneeze folder (EXCLUDING THE deps FOLDER). And NEVER the two shall cross." — Dean, 2026-04-17. The scripts are the only glue: they orchestrate deps build, then Sneeze configure + build, as two separate cmake invocations.
+
+**Script-level stamp system.** `scripts/build-windows.ps1` (and the `scripts/build-deps.sh` bash counterpart) maintain per-dep `.done` marker files under `<DepsBuildDir>/.dep-stamps/`. Once a dep builds successfully, its stamp is written and subsequent runs skip it. `-CleanStamps` removes all stamps; `-CleanStamps -Only <dep>` removes just one. Stamps are orthogonal to `ExternalProject_Add`'s own internal step stamps (download/update/configure/build/install).
+
+**`Invalidate-DepConfigure` helper.** Before invoking `cmake --build --target <dep>`, the scripts explicitly delete `<DepsBuildDir>/<dep>-prefix/src/<dep>-stamp/<Config>/<dep>-configure` — the ExternalProject configure-step stamp. This forces the inner configure to re-run on every invocation, so edits to `deps/<dep>.cmake` (changed CMAKE_ARGS, new BUILD_COMMAND, etc.) take effect without the developer having to manually delete build trees. Without this, a failed build whose configure previously succeeded would reuse the stale cached configure on retry.
+
+**Configuration isolation for the `LNK2038` class of errors:**
+1. Debug and Release live in fully separate trees — `deps/builds/<plat>/{debug,release}/` and `builds/<plat>/{debug,release}/`. No sharing.
+2. Inside Debug, Halogen's chain (filament + halogen + Debug-only `anari-sdk-release` shadow) is pinned to Release while the rest of the deps follow `SNEEZE_CONFIG`. See the "Halogen dependency chain — the CRT isolation strategy" section above for the full mechanism and rationale.
+
+**Source clones are shared.** `deps/repos/<Name>/` is a single git checkout per dep, reused across Debug and Release builds (and across the Release shadow for ANARI-SDK). Saves disk and clone time.
+
+**Caveats:**
+- To force a single dep to re-clone: delete `deps/repos/<name>/` (usually unnecessary — set `GIT_TAG` and let ExternalProject handle it).
+- To force a single dep to fully rebuild: `.\scripts\build-windows.ps1 -Only <name> -CleanStamps -Config <cfg>` (removes the script stamp, Invalidate-DepConfigure clears the EP stamp, next invoke re-configures + rebuilds + reinstalls).
+- Stale CMake caches in inner dep build dirs can silently resolve to wrong paths (see the `find_package` caveat in Known Gotchas). Nuking `deps/builds/<plat>/<cfg>/libs/<Name>/build/` is the escape hatch.
+
+**What changed for developers:**
+- **First build:** run `-All` once per config — deps (~35-90 min) then Sneeze (~1-2 min). Day-to-day work never touches the deps phase.
+- **Day-to-day:** plain `.\scripts\build-windows.ps1` (seconds). No CMake, no dep checks, just compile + link Sneeze.
+- **After editing CMakeLists.txt:** `.\scripts\build-windows.ps1 -Configure` to reconfigure Sneeze only.
+- **After pulling a new dep version:** `.\scripts\build-windows.ps1 -Only <name>` or `-Only <name> -CleanStamps` as appropriate.
 

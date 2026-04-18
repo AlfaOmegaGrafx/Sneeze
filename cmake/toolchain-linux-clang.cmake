@@ -6,8 +6,9 @@
 # Prerequisites (Ubuntu 20.04):
 #   Install clang-14 from apt.llvm.org, then symlink or use versioned names.
 #
-# Usage:
-#   cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-linux-clang.cmake
+# Usage (forwarded by the build scripts; can also be passed directly):
+#   cmake -S deps -B deps/builds/linux-x64/release/build -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-linux-clang.cmake
+#   cmake -S src  -B builds/linux-x64/release/build      -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-linux-clang.cmake
 
 # Use versioned clang if available (apt.llvm.org on older distros), else bare name
 find_program (_clang   NAMES clang clang-14)

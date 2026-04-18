@@ -1,34 +1,139 @@
 #!/usr/bin/env bash
-# Linux x86_64 build — deps + Sneeze
+# Linux build. Auto-detects arch (x64 or arm64).
+#
+# Default: compile + link Sneeze only. Plain `cmake --build` against the
+# Sneeze build tree. No dep checks, no configure step. Fails naturally if
+# the tree or the dep libraries aren't there yet.
+#
+# Flags switch the script into deps mode or deps+Sneeze mode:
+#
+#   --deps         Build the 15 third-party libs into deps/builds/linux-<arch>/<config>/libs/.
+#   --configure    Reconfigure the Sneeze tree (cmake -S src), then build it.
+#                  Use after nuking builds/<plat>/<cfg>/ or on a fresh checkout
+#                  where deps are already built. Deps tree is never touched.
+#   --all          Build deps, then configure + build Sneeze.
+#   --only <dep>   Rebuild a single dep (implies --deps). Forwarded to build-deps.sh.
+#   --list         Show dep stamp cache (implies --deps). Forwarded to build-deps.sh.
+#   --clean-stamps Invalidate stamps (implies --deps). Forwarded to build-deps.sh.
+#
+# The deps tree (deps/CMakeLists.txt) and the Sneeze tree (src/CMakeLists.txt)
+# are two completely independent CMake projects. They share nothing. This
+# script is the only glue: in --all mode it builds deps, then configures +
+# builds Sneeze in a separate CMake invocation.
+#
+# Debug and Release live in fully separate trees under
+# deps/builds/linux-<arch>/{debug,release}/ and builds/linux-<arch>/{debug,release}/,
+# but share a single set of source clones in deps/repos/.
+#
+# Usage:
+#   ./scripts/build-linux.sh                      # Sneeze (Release)
+#   ./scripts/build-linux.sh --config Debug       # Sneeze (Debug)
+#   ./scripts/build-linux.sh --configure          # Reconfigure + build Sneeze
+#   ./scripts/build-linux.sh --deps               # Deps only
+#   ./scripts/build-linux.sh --all                # Deps, then Sneeze
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SNEEZE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-export BUILD_DIR="$SNEEZE_DIR/build-linux"
-export LIBS_DIR="$SNEEZE_DIR/libs-linux"
-
-DEPS_ONLY=0
+CONFIG="Release"
+DEPS=0
+ALL=0
+CONFIGURE=0
+DEPS_FORWARD=0   # --only / --list / --clean-stamps set this
 EXTRA_ARGS=()
-for arg in "$@"; do
-   case "$arg" in
-      --deps-only) DEPS_ONLY=1 ;;
-      *)           EXTRA_ARGS+=("$arg") ;;
+
+while [[ $# -gt 0 ]]; do
+   case "$1" in
+      --deps)         DEPS=1 ;;
+      --all)          ALL=1 ;;
+      --configure)    CONFIGURE=1 ;;
+      --config)       shift; CONFIG="$1" ;;
+      --config=*)     CONFIG="${1#--config=}" ;;
+      --only|--list|--clean-stamps)
+                      DEPS_FORWARD=1; EXTRA_ARGS+=("$1") ;;
+      --only=*)       DEPS_FORWARD=1; EXTRA_ARGS+=("$1") ;;
+      *)              EXTRA_ARGS+=("$1") ;;
    esac
+   shift
 done
 
-echo "==> Linux x86_64 build (clang + libc++)"
+MODE_COUNT=$((DEPS + ALL + CONFIGURE))
+if [[ $MODE_COUNT -gt 1 ]]; then
+   echo "--deps, --all, and --configure are mutually exclusive" >&2
+   exit 1
+fi
 
-"$SCRIPT_DIR/build-deps.sh" \
-   --build-dir "$BUILD_DIR" \
-   --libs-dir "$LIBS_DIR" \
-   -DCMAKE_TOOLCHAIN_FILE="$SNEEZE_DIR/cmake/toolchain-linux-clang.cmake" \
-   "${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}"
+case "$CONFIG" in
+   Debug|Release) : ;;
+   *) echo "--config must be Debug or Release (got '$CONFIG')" >&2; exit 1 ;;
+esac
 
-if [[ $DEPS_ONLY -eq 0 ]]; then
-   JOBS=$(nproc 2>/dev/null || echo 4)
+case "$(uname -m)" in
+   aarch64|arm64) PLATFORM="linux-arm64" ;;
+   *)             PLATFORM="linux-x64" ;;
+esac
+
+CFG_LOWER="$(echo "$CONFIG" | tr '[:upper:]' '[:lower:]')"
+DEPS_BUILD_DIR="$SNEEZE_DIR/deps/builds/$PLATFORM/$CFG_LOWER/build"
+LIBS_DIR="$SNEEZE_DIR/deps/builds/$PLATFORM/$CFG_LOWER/libs"
+SNEEZE_OUT_DIR="$SNEEZE_DIR/builds/$PLATFORM/$CFG_LOWER"
+SNEEZE_BUILD_DIR="$SNEEZE_OUT_DIR/build"
+TOOLCHAIN="$SNEEZE_DIR/cmake/toolchain-linux-clang.cmake"
+
+DEPS_MODE=0
+if [[ $DEPS -eq 1 || $ALL -eq 1 || $DEPS_FORWARD -eq 1 ]]; then
+   DEPS_MODE=1
+fi
+
+SNEEZE_MODE=0
+if [[ $DEPS_MODE -eq 0 || $ALL -eq 1 ]]; then
+   SNEEZE_MODE=1
+fi
+
+# Reconfigure the Sneeze tree before building (implied by --all or --configure).
+RECONFIGURE=0
+if [[ $ALL -eq 1 || $CONFIGURE -eq 1 ]]; then
+   RECONFIGURE=1
+fi
+
+# ---------------------------------------------------------------------------
+# Deps mode
+# ---------------------------------------------------------------------------
+
+if [[ $DEPS_MODE -eq 1 ]]; then
+   echo "==> Linux $PLATFORM deps build ($CONFIG, clang + libc++)"
+
+   "$SCRIPT_DIR/build-deps.sh" \
+      --config "$CONFIG" \
+      --platform "$PLATFORM" \
+      --build-dir "$DEPS_BUILD_DIR" \
+      --libs-dir "$LIBS_DIR" \
+      -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
+      "${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}"
+fi
+
+# ---------------------------------------------------------------------------
+# Sneeze mode -- configure (if --all) + plain `cmake --build`, no dep checks.
+# ---------------------------------------------------------------------------
+
+if [[ $CONFIGURE -eq 1 || $SNEEZE_MODE -eq 1 ]]; then
+   if [[ $RECONFIGURE -eq 1 ]]; then
+      echo ""
+      echo "==> Configuring Sneeze tree at $SNEEZE_BUILD_DIR"
+      cmake -S "$SNEEZE_DIR/src" -B "$SNEEZE_BUILD_DIR" \
+         -DCMAKE_BUILD_TYPE="$CONFIG" \
+         -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
+         -DLIBS_DIR="$LIBS_DIR" \
+         -DSNEEZE_CONFIG="$CONFIG" \
+         -DSNEEZE_PLATFORM="$PLATFORM" \
+         -DSNEEZE_BUILD_ROOT="$SNEEZE_OUT_DIR"
+   fi
+
    echo ""
-   echo "==> Building Sneeze"
-   cmake --build "$BUILD_DIR" --target sneeze --parallel "$JOBS"
-   echo "==> Sneeze Linux build complete"
+   echo "==> Building Sneeze ($PLATFORM, $CONFIG)"
+   cmake --build "$SNEEZE_BUILD_DIR" --config "$CONFIG"
+   echo "==> Sneeze Linux build complete ($CONFIG)"
+   echo "    libSneeze.a -> $SNEEZE_OUT_DIR/lib"
+   echo "    test bins   -> $SNEEZE_OUT_DIR/bin"
 fi

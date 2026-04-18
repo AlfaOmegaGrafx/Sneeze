@@ -1,12 +1,27 @@
 # ---------------------------------------------------------------------------
 # Wasmtime (Rust/Cargo -- custom build, not CMake)
 # ---------------------------------------------------------------------------
+# Always built in Cargo release mode regardless of SNEEZE_CONFIG. Debug
+# Rust builds produce ~500 MB of artifacts and run ~50x slower; Sneeze
+# never needs to step into Wasmtime internals.
 
 # Map CMake target to Rust target triple for cross-compilation.
 # Special value "universal-apple-darwin" triggers a macOS fat-binary build
 # (arm64 + x86_64 built separately, then lipo'd together).
 set (WASMTIME_CARGO_TARGET "" CACHE STRING "Rust target triple for Wasmtime cross-compilation")
 option (WASMTIME_MACOS_UNIVERSAL "Build Wasmtime as a macOS universal (arm64+x86_64) dylib" OFF)
+
+set (_repo "${SNEEZE_DEP_REPO}/Wasmtime")
+if (EXISTS "${_repo}/.git")
+   set (_git_args)
+else ()
+   set (_git_args
+      GIT_REPOSITORY https://github.com/bytecodealliance/wasmtime.git
+      GIT_TAG        v43.0.0
+      GIT_SHALLOW    ON
+      GIT_SUBMODULES ""
+   )
+endif ()
 
 if (WASMTIME_MACOS_UNIVERSAL)
    # Build both arches, lipo into a universal dylib.
@@ -60,11 +75,8 @@ endforeach ()
    message (STATUS "Using cargo: ${CARGO_EXECUTABLE}")
 
    ExternalProject_Add (wasmtime
-      GIT_REPOSITORY   https://github.com/bytecodealliance/wasmtime.git
-      GIT_TAG          v43.0.0
-      GIT_SHALLOW      ON
-      GIT_SUBMODULES   ""
-      SOURCE_DIR       "${LIBS_DIR}/Wasmtime/src"
+      ${_git_args}
+      SOURCE_DIR       "${_repo}"
       BINARY_DIR       "${LIBS_DIR}/Wasmtime/build"
       INSTALL_DIR      "${LIBS_DIR}/Wasmtime/install"
       CONFIGURE_COMMAND ""
@@ -227,11 +239,8 @@ elseif (WASMTIME_CARGO_TARGET MATCHES "aarch64-apple-ios")
 endif ()
 
 ExternalProject_Add (wasmtime
-   GIT_REPOSITORY   https://github.com/bytecodealliance/wasmtime.git
-   GIT_TAG          v43.0.0
-   GIT_SHALLOW      ON
-   GIT_SUBMODULES   ""
-   SOURCE_DIR       "${LIBS_DIR}/Wasmtime/src"
+   ${_git_args}
+   SOURCE_DIR       "${_repo}"
    BINARY_DIR       "${LIBS_DIR}/Wasmtime/build"
    INSTALL_DIR      "${LIBS_DIR}/Wasmtime/install"
    CONFIGURE_COMMAND ""

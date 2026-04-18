@@ -30,6 +30,44 @@ if (NOT DEFINED LIBS_DIR)
    set (LIBS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../libs")
 endif ()
 
+# ---------------------------------------------------------------------------
+# Force output directories
+# ---------------------------------------------------------------------------
+# The build scripts pass SNEEZE_BUILD_ROOT = <repo>/builds/<platform>/<config>.
+# We place Sneeze.lib at <root>/lib and all executables at <root>/bin.
+# Per-config variants (suffixed _DEBUG, _RELEASE, ...) defeat the subfolder
+# that multi-config generators (Visual Studio, Xcode) append by default,
+# since this tree is already keyed by config.
+
+if (NOT DEFINED SNEEZE_BUILD_ROOT)
+   # Direct configure (no wrapper script). Fall back to the CMake binary dir.
+   set (SNEEZE_BUILD_ROOT "${CMAKE_BINARY_DIR}")
+endif ()
+
+# These two are informational -- the build scripts pass them so CMake status
+# output shows which config/platform was requested. Declaring them here also
+# prevents CMake's "manually-specified variables were not used" warning.
+if (NOT DEFINED SNEEZE_CONFIG)
+   set (SNEEZE_CONFIG "${CMAKE_BUILD_TYPE}")
+endif ()
+if (NOT DEFINED SNEEZE_PLATFORM)
+   set (SNEEZE_PLATFORM "unknown")
+endif ()
+
+message (STATUS "Sneeze: platform   = ${SNEEZE_PLATFORM}")
+message (STATUS "Sneeze: config     = ${SNEEZE_CONFIG}")
+message (STATUS "Sneeze: libs dir   = ${LIBS_DIR}")
+message (STATUS "Sneeze: build root = ${SNEEZE_BUILD_ROOT}")
+
+set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${SNEEZE_BUILD_ROOT}/lib")
+set (CMAKE_LIBRARY_OUTPUT_DIRECTORY "${SNEEZE_BUILD_ROOT}/lib")
+set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${SNEEZE_BUILD_ROOT}/bin")
+foreach (_cfg IN ITEMS DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
+   set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${_cfg} "${SNEEZE_BUILD_ROOT}/lib")
+   set (CMAKE_LIBRARY_OUTPUT_DIRECTORY_${_cfg} "${SNEEZE_BUILD_ROOT}/lib")
+   set (CMAKE_RUNTIME_OUTPUT_DIRECTORY_${_cfg} "${SNEEZE_BUILD_ROOT}/bin")
+endforeach ()
+
 # Automatically disable XR on iOS (VisionOS deferred)
 if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
    set (SNEEZE_ENABLE_XR OFF CACHE BOOL "" FORCE)
@@ -80,6 +118,16 @@ if (USE_LOCAL_DEPS)
    find_package (SneezeRmlUi REQUIRED)
    find_package (Glslang REQUIRED)
    find_package (NlohmannJson REQUIRED)
+   find_package (BoringSSL REQUIRED)
+   find_package (JwtCpp REQUIRED)
+
+   # Vox ships its own package config (vox-config.cmake). It performs
+   # consumer-side SPIRV-Cross discovery using SpirvCross_ROOT as a hint,
+   # so we don't need a Sneeze-local FindVox / FindSpirvCross module.
+   set (SpirvCross_ROOT "${LIBS_DIR}/SPIRV-Cross/install")
+   find_package (Vox CONFIG REQUIRED
+      PATHS "${LIBS_DIR}/Vox/install"
+      NO_DEFAULT_PATH)
 else ()
    find_package (spirv_tools REQUIRED CONFIG)
    if (SNEEZE_ENABLE_XR)
@@ -89,6 +137,10 @@ else ()
    find_package (RmlUi REQUIRED)
    find_program (GLSLANG_VALIDATOR glslang REQUIRED)
    find_package (nlohmann_json REQUIRED)
+   # jwt-cpp and BoringSSL have no upstream vcpkg configs that match our
+   # pinned layout; USE_LOCAL_DEPS=OFF requires them on the system include
+   # path already. Users configuring without LOCAL_DEPS must provide
+   # BORINGSSL_INCLUDE / BORINGSSL_CRYPTO_LIB / JWT_CPP_INCLUDE manually.
 endif ()
 
 # ---------------------------------------------------------------------------
@@ -221,6 +273,17 @@ set (UI_HEADERS      ui/UiContext.h)
 set (COMPUTE_SOURCES compute/EmbeddedKernels.cpp compute/ComputeDispatch.cpp)
 set (COMPUTE_HEADERS compute/EmbeddedKernels.h compute/ComputeDispatch.h)
 
+set (JWS_SOURCES
+   jws/JwsBase.cpp
+   jws/JwsFabric.cpp
+   jws/JwsService.cpp
+   jws/CertChain.cpp)
+set (JWS_HEADERS
+   jws/JwsBase.h
+   jws/JwsFabric.h
+   jws/JwsService.h
+   jws/CertChain.h)
+
 # ---------------------------------------------------------------------------
 # Static library
 # ---------------------------------------------------------------------------
@@ -235,6 +298,7 @@ add_library (Sneeze STATIC
    ${NET_SOURCES}       ${NET_HEADERS}
    ${UI_SOURCES}        ${UI_HEADERS}
    ${COMPUTE_SOURCES}   ${COMPUTE_HEADERS}
+   ${JWS_SOURCES}       ${JWS_HEADERS}
    ${KERNEL_EMBED_FILES}
 )
 add_dependencies (Sneeze CompileKernels)
@@ -245,6 +309,8 @@ target_include_directories (Sneeze PUBLIC
    ${CURL_INCLUDE}
    ${RMLUI_INCLUDE}
    ${NLOHMANN_JSON_INCLUDE}
+   ${BORINGSSL_INCLUDE}
+   ${JWT_CPP_INCLUDE}
 )
 if (SNEEZE_ENABLE_WASM)
    target_include_directories (Sneeze PUBLIC ${WASMTIME_INCLUDE})
@@ -278,6 +344,8 @@ target_link_libraries (Sneeze PUBLIC
    ${CURL_LIB}
    ${RMLUI_CORE_LIB}
    ${RMLUI_DEBUGGER_LIB}
+   ${BORINGSSL_CRYPTO_LIB}
+   vox::vox
 )
 
 if (SNEEZE_ENABLE_WASM)
@@ -287,7 +355,9 @@ if (SNEEZE_ENABLE_XR)
    target_link_libraries (Sneeze PUBLIC ${OPENXR_LOADER_LIB})
 endif ()
 
-# Platform-specific system libraries
+# Platform-specific system libraries.
+# DX12 / Metal / Foundation / Vulkan are all pulled in transitively by
+# vox::vox's INTERFACE_LINK_LIBRARIES (see Vox's vox-config.cmake).
 if (WIN32)
    # Wasmtime Windows deps
    target_link_libraries (Sneeze PUBLIC ws2_32 advapi32 userenv ntdll shell32 ole32 bcrypt)
@@ -304,7 +374,6 @@ elseif (APPLE)
 elseif (ANDROID)
    target_link_libraries (Sneeze PUBLIC log android)
 else ()
-   # Linux
    target_link_libraries (Sneeze PUBLIC pthread dl m)
 endif ()
 
@@ -321,6 +390,22 @@ source_group ("xr"       FILES ${XR_SOURCES} ${XR_HEADERS})
 source_group ("net"      FILES ${NET_SOURCES} ${NET_HEADERS})
 source_group ("ui"       FILES ${UI_SOURCES} ${UI_HEADERS})
 source_group ("compute"  FILES ${COMPUTE_SOURCES} ${COMPUTE_HEADERS})
+source_group ("jws"      FILES ${JWS_SOURCES} ${JWS_HEADERS})
+
+# ---------------------------------------------------------------------------
+# Tools (desktop-only CLI utilities built on top of the Sneeze library)
+# ---------------------------------------------------------------------------
+
+if (ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
+   set (_DEFAULT_BUILD_TOOLS OFF)
+else ()
+   set (_DEFAULT_BUILD_TOOLS ON)
+endif ()
+option (SNEEZE_BUILD_TOOLS "Build desktop CLI tools (SignMsf, ...)" ${_DEFAULT_BUILD_TOOLS})
+
+if (SNEEZE_BUILD_TOOLS)
+   add_subdirectory ("${CMAKE_CURRENT_SOURCE_DIR}/../tools/SignMsf" "${CMAKE_CURRENT_BINARY_DIR}/tools/SignMsf")
+endif ()
 
 # ---------------------------------------------------------------------------
 # Tests (separate directory, nested build output under build/tests/)
