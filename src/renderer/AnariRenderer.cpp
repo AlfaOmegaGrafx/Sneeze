@@ -23,7 +23,52 @@
 #include <cstring>
 #include <cstdio>
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
+#if defined(__ANDROID__) || (defined(__APPLE__) && TARGET_OS_IPHONE)
+#define SNEEZE_ANARI_OVERRIDE_LIBDIR 1
+#include <dlfcn.h>
+#endif
+
+#if defined(__ANDROID__)
+#include <android/log.h>
+#define ANARI_LOGE(fmt, ...) __android_log_print (ANDROID_LOG_ERROR, "Sneeze.Anari", fmt, ##__VA_ARGS__)
+#define ANARI_LOGI(fmt, ...) __android_log_print (ANDROID_LOG_INFO,  "Sneeze.Anari", fmt, ##__VA_ARGS__)
+#else
+#define ANARI_LOGE(fmt, ...) std::fprintf (stderr, "ANARI: " fmt "\n", ##__VA_ARGS__)
+#define ANARI_LOGI(fmt, ...) std::fprintf (stdout, "ANARI: " fmt "\n", ##__VA_ARGS__)
+#endif
+
 namespace sneeze { namespace renderer {
+
+#if defined(SNEEZE_ANARI_OVERRIDE_LIBDIR)
+// ANARI's anchor-based lib-path detection uses dlsym(RTLD_DEFAULT, "_anari_anchor")
+// + dladdr to find the dir it should dlopen devices from. That is unreliable when
+// anari_static is linked into the main binary (Android linker-namespace isolation;
+// iOS main-binary dir vs bundle Frameworks/ dir). Resolve the dir ourselves and
+// pass it to anariLoadLibrary via the "name,path/" comma syntax.
+static std::string GetLocalLibDir ()
+{
+   Dl_info info;
+   if (dladdr ((const void*) &GetLocalLibDir, &info) && info.dli_fname)
+   {
+      std::string sPath = info.dli_fname;
+      auto nSlash = sPath.rfind ('/');
+      if (nSlash != std::string::npos)
+      {
+         std::string sDir = sPath.substr (0, nSlash + 1);
+#if defined(__APPLE__) && TARGET_OS_IPHONE
+         // iOS: dylibs are bundled in <App>.app/Frameworks/
+         sDir += "Frameworks/";
+#endif
+         return sDir;
+      }
+   }
+   return std::string ();
+}
+#endif
 
 // ---------------------------------------------------------------------------
 
@@ -55,17 +100,35 @@ bool ANARI_RENDERER::Initialize (int nWidth, int nHeight)
 
    bool bOk = false;
 
-   m_pLibrary = anariLoadLibrary (m_sLibrary.c_str (), nullptr, nullptr);
-   if (!m_pLibrary)
+   std::string sLibraryArg = m_sLibrary;
+#if defined(SNEEZE_ANARI_OVERRIDE_LIBDIR)
+   // Explicitly steer ANARI to the bundled-native-lib dir so it does not rely
+   // on the anchor-symbol fallback, which is unreliable on Android/iOS.
+   std::string sLibDir = GetLocalLibDir ();
+   if (!sLibDir.empty ())
    {
-      std::fprintf (stderr, "ANARI: failed to load library '%s'\n", m_sLibrary.c_str ());
+      sLibraryArg = m_sLibrary + "," + sLibDir;
+      ANARI_LOGI ("lib dir: '%s'", sLibDir.c_str ());
    }
    else
    {
+      ANARI_LOGE ("could not resolve local lib dir via dladdr");
+   }
+#endif
+
+   ANARI_LOGI ("loading library '%s'", sLibraryArg.c_str ());
+   m_pLibrary = anariLoadLibrary (sLibraryArg.c_str (), nullptr, nullptr);
+   if (!m_pLibrary)
+   {
+      ANARI_LOGE ("failed to load library '%s'", sLibraryArg.c_str ());
+   }
+   else
+   {
+      ANARI_LOGI ("creating device 'default'");
       m_pDevice = anariNewDevice (m_pLibrary, "default");
       if (!m_pDevice)
       {
-         std::fprintf (stderr, "ANARI: failed to create device from library '%s'\n", m_sLibrary.c_str ());
+         ANARI_LOGE ("failed to create device from library '%s'", m_sLibrary.c_str ());
          anariUnloadLibrary (m_pLibrary);
          m_pLibrary = nullptr;
       }
