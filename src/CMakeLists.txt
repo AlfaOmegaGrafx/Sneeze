@@ -17,68 +17,74 @@ if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.27")
    cmake_policy (SET CMP0144 NEW)
 endif ()
 file (STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../VERSION" SNEEZE_VER)
-project (Sneeze VERSION ${SNEEZE_VER} LANGUAGES CXX)
+project (Sneeze VERSION ${SNEEZE_VER} LANGUAGES C CXX)
 
 set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option (USE_LOCAL_DEPS "Find dependencies in libs/ (ON) or via vcpkg find_package (OFF)" ON)
+option (SNEEZE_ENABLE_WASM "Enable WebAssembly runtime (Wasmtime)" ON)
+option (SNEEZE_ENABLE_XR   "Enable OpenXR integration" ON)
 
 if (NOT DEFINED LIBS_DIR)
    set (LIBS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../libs")
+endif ()
+
+# Automatically disable XR on iOS (VisionOS deferred)
+if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
+   set (SNEEZE_ENABLE_XR OFF CACHE BOOL "" FORCE)
 endif ()
 
 # ---------------------------------------------------------------------------
 # Dependencies
 # ---------------------------------------------------------------------------
 
-if (USE_LOCAL_DEPS)
-   # ANARI - built from source in libs/
-   set (ANARI_ROOT "${LIBS_DIR}/ANARI-SDK/install")
-   list (APPEND CMAKE_PREFIX_PATH "${ANARI_ROOT}")
-   find_package (anari REQUIRED)
-else ()
-   find_package (anari REQUIRED)
+# ---------------------------------------------------------------------------
+# Find modules live in src/cmake/. For local deps (USE_LOCAL_DEPS=ON, default),
+# they search LIBS_DIR/<dep>/install/. For system deps, standard find_package.
+# ---------------------------------------------------------------------------
+
+list (APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+# Cross-compile: Android/iOS toolchains default CMAKE_FIND_ROOT_PATH_MODE_*
+# to ONLY for PACKAGE/LIBRARY/INCLUDE, which blocks find_package / find_library
+# / find_path from resolving user-set paths outside the sysroot. Set BOTH so
+# LIBS_DIR-backed finds (anari, wasmtime, etc.) can resolve.
+if (ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
+   set (CMAKE_FIND_ROOT_PATH_MODE_PACKAGE BOTH)
+   set (CMAKE_FIND_ROOT_PATH_MODE_LIBRARY BOTH)
+   set (CMAKE_FIND_ROOT_PATH_MODE_INCLUDE BOTH)
 endif ()
 
-# Wasmtime - always from libs/ (not available in vcpkg)
-set (WASMTIME_ROOT "${LIBS_DIR}/Wasmtime/install")
-find_library (WASMTIME_LIB NAMES wasmtime wasmtime.dll PATHS "${WASMTIME_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
-find_path (WASMTIME_INCLUDE wasmtime.h PATHS "${WASMTIME_ROOT}/include" NO_DEFAULT_PATH REQUIRED)
+if (USE_LOCAL_DEPS)
+   set (ANARI_ROOT "${LIBS_DIR}/ANARI-SDK/install")
+   list (APPEND CMAKE_PREFIX_PATH "${ANARI_ROOT}")
+endif ()
+find_package (anari REQUIRED)
+
+if (SNEEZE_ENABLE_WASM)
+   if (USE_LOCAL_DEPS)
+      find_package (Wasmtime REQUIRED)
+   else ()
+      # Wasmtime has no system package — always from LIBS_DIR
+      find_package (Wasmtime REQUIRED)
+   endif ()
+endif ()
 
 if (USE_LOCAL_DEPS)
-   # SPIRV-Tools
-   set (SPIRV_TOOLS_ROOT "${LIBS_DIR}/SPIRV-Tools/install")
-   find_library (SPIRV_TOOLS_LIB SPIRV-Tools PATHS "${SPIRV_TOOLS_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
-   find_library (SPIRV_TOOLS_OPT_LIB SPIRV-Tools-opt PATHS "${SPIRV_TOOLS_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
-   find_path (SPIRV_TOOLS_INCLUDE spirv-tools/libspirv.h PATHS "${SPIRV_TOOLS_ROOT}/include" NO_DEFAULT_PATH REQUIRED)
-
-   # OpenXR
-   set (OPENXR_ROOT "${LIBS_DIR}/OpenXR-SDK/install")
-   find_library (OPENXR_LOADER_LIB openxr_loader PATHS "${OPENXR_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
-   find_path (OPENXR_INCLUDE openxr/openxr.h PATHS "${OPENXR_ROOT}/include" NO_DEFAULT_PATH REQUIRED)
-
-   # curl
-   set (CURL_ROOT "${LIBS_DIR}/curl/install")
-   find_library (CURL_LIB libcurl PATHS "${CURL_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
-   find_path (CURL_INCLUDE curl/curl.h PATHS "${CURL_ROOT}/include" NO_DEFAULT_PATH REQUIRED)
-
-   # RmlUi
-   set (RMLUI_ROOT "${LIBS_DIR}/RmlUi/install")
-   find_library (RMLUI_CORE_LIB rmlui PATHS "${RMLUI_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
-   find_library (RMLUI_DEBUGGER_LIB rmlui_debugger PATHS "${RMLUI_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
-   find_path (RMLUI_INCLUDE RmlUi/Core.h PATHS "${RMLUI_ROOT}/include" NO_DEFAULT_PATH REQUIRED)
-
-   # glslang (build-time tool only)
-   set (GLSLANG_ROOT "${LIBS_DIR}/glslang/install")
-   find_program (GLSLANG_VALIDATOR glslang PATHS "${GLSLANG_ROOT}/bin" NO_DEFAULT_PATH REQUIRED)
-
-   # nlohmann/json (header-only)
-   set (NLOHMANN_JSON_ROOT "${LIBS_DIR}/nlohmann-json/install")
-   find_path (NLOHMANN_JSON_INCLUDE nlohmann/json.hpp PATHS "${NLOHMANN_JSON_ROOT}/include" NO_DEFAULT_PATH REQUIRED)
+   find_package (SpirvTools REQUIRED)
+   if (SNEEZE_ENABLE_XR)
+      find_package (SneezeOpenXR REQUIRED)
+   endif ()
+   find_package (SneezeCurl REQUIRED)
+   find_package (SneezeRmlUi REQUIRED)
+   find_package (Glslang REQUIRED)
+   find_package (NlohmannJson REQUIRED)
 else ()
    find_package (spirv_tools REQUIRED CONFIG)
-   find_package (OpenXR REQUIRED CONFIG)
+   if (SNEEZE_ENABLE_XR)
+      find_package (OpenXR REQUIRED CONFIG)
+   endif ()
    find_package (CURL REQUIRED)
    find_package (RmlUi REQUIRED)
    find_program (GLSLANG_VALIDATOR glslang REQUIRED)
@@ -114,18 +120,71 @@ endforeach ()
 add_custom_target (CompileKernels ALL DEPENDS ${KERNEL_SPV_OUTPUTS})
 
 # ---------------------------------------------------------------------------
-# Generate Win32 resource file for SPIR-V embedding
+# SPIR-V embedding — Win32 .rc or cross-platform generated C source
 # ---------------------------------------------------------------------------
 
-set (KERNEL_RC_FILE "${CMAKE_CURRENT_BINARY_DIR}/kernels.rc")
-file (WRITE "${KERNEL_RC_FILE}" "// Auto-generated by CMake - embeds compiled SPIR-V kernels\n")
-foreach (KERNEL_SRC ${KERNEL_SOURCES})
-   get_filename_component (KERNEL_NAME "${KERNEL_SRC}" NAME_WE)
-   string (TOUPPER "${KERNEL_NAME}" KERNEL_ID)
-   file (APPEND "${KERNEL_RC_FILE}"
-      "${KERNEL_ID} SPV_KERNEL \"${KERNEL_OUTPUT_DIR}/${KERNEL_NAME}.spv\"\n"
-   )
+if (WIN32)
+   set (KERNEL_RC_FILE "${CMAKE_CURRENT_BINARY_DIR}/kernels.rc")
+   file (WRITE "${KERNEL_RC_FILE}" "// Auto-generated by CMake - embeds compiled SPIR-V kernels\n")
+   foreach (KERNEL_SRC ${KERNEL_SOURCES})
+      get_filename_component (KERNEL_NAME "${KERNEL_SRC}" NAME_WE)
+      string (TOUPPER "${KERNEL_NAME}" KERNEL_ID)
+      file (APPEND "${KERNEL_RC_FILE}"
+         "${KERNEL_ID} SPV_KERNEL \"${KERNEL_OUTPUT_DIR}/${KERNEL_NAME}.spv\"\n"
+      )
+   endforeach ()
+   set (KERNEL_EMBED_FILES "${KERNEL_RC_FILE}")
+else ()
+   # Generate a C source file that embeds each SPIR-V binary as a byte array.
+   # A CMake script runs after CompileKernels and reads the .spv files.
+   set (KERNEL_C_FILE "${CMAKE_CURRENT_BINARY_DIR}/kernels_embedded.c")
+   set (KERNEL_EMBED_SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/embed_kernels.cmake")
+
+   # Build the list of kernel names for the embed script
+   set (_kernel_names)
+   foreach (KERNEL_SRC ${KERNEL_SOURCES})
+      get_filename_component (_kn "${KERNEL_SRC}" NAME_WE)
+      list (APPEND _kernel_names "${_kn}")
+   endforeach ()
+
+   file (WRITE "${KERNEL_EMBED_SCRIPT}" [=[
+cmake_minimum_required (VERSION 3.20)
+set (_out "// Auto-generated by CMake — embedded SPIR-V kernels\n")
+string (APPEND _out "#include <stdint.h>\n#include <stddef.h>\n\n")
+set (_reg "")
+foreach (_name ${KERNEL_NAMES})
+   string (TOUPPER "${_name}" _ID)
+   file (READ "${SPV_DIR}/${_name}.spv" _bytes HEX)
+   string (LENGTH "${_bytes}" _hex_len)
+   math (EXPR _byte_count "${_hex_len} / 2")
+   string (REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," _hex_list "${_bytes}")
+   string (APPEND _out "static const uint8_t k_spv_${_ID}[] = {${_hex_list}};\n")
+   string (APPEND _out "static const size_t  k_spv_${_ID}_size = ${_byte_count};\n\n")
+   string (APPEND _reg "{\"${_ID}\", k_spv_${_ID}, k_spv_${_ID}_size},\n")
 endforeach ()
+string (APPEND _out "struct KernelEntry { const char* name; const uint8_t* data; size_t size; };\n")
+string (APPEND _out "const struct KernelEntry g_embedded_kernels[] = {\n${_reg}};\n")
+math (EXPR _count "0")
+foreach (_name ${KERNEL_NAMES})
+   math (EXPR _count "${_count} + 1")
+endforeach ()
+string (APPEND _out "const size_t g_embedded_kernel_count = ${_count};\n")
+file (WRITE "${OUT_FILE}" "${_out}")
+]=])
+
+   add_custom_command (
+      OUTPUT "${KERNEL_C_FILE}"
+      COMMAND ${CMAKE_COMMAND}
+         -DKERNEL_NAMES=${_kernel_names}
+         -DSPV_DIR=${KERNEL_OUTPUT_DIR}
+         -DOUT_FILE=${KERNEL_C_FILE}
+         -P ${KERNEL_EMBED_SCRIPT}
+      DEPENDS ${KERNEL_SPV_OUTPUTS}
+      COMMENT "Generating cross-platform SPIR-V embedding source"
+      VERBATIM
+   )
+   set (KERNEL_EMBED_FILES "${KERNEL_C_FILE}")
+endif ()
 
 # ---------------------------------------------------------------------------
 # Source files by module
@@ -140,14 +199,18 @@ set (RENDERER_HEADERS  renderer/Renderer.h  renderer/AnariRenderer.h)
 set (VIEW_SOURCES    view/CameraOrbit.cpp)
 set (VIEW_HEADERS    view/CameraOrbit.h)
 
-set (WASM_SOURCES    wasm/WasmRuntime.cpp)
-set (WASM_HEADERS    wasm/WasmRuntime.h)
+if (SNEEZE_ENABLE_WASM)
+   set (WASM_SOURCES    wasm/WasmRuntime.cpp)
+   set (WASM_HEADERS    wasm/WasmRuntime.h)
+endif ()
 
 set (SPIRV_SOURCES   spirv/SpvPipeline.cpp)
 set (SPIRV_HEADERS   spirv/SpvPipeline.h)
 
-set (XR_SOURCES      xr/XrRuntime.cpp)
-set (XR_HEADERS      xr/XrRuntime.h)
+if (SNEEZE_ENABLE_XR)
+   set (XR_SOURCES      xr/XrRuntime.cpp)
+   set (XR_HEADERS      xr/XrRuntime.h)
+endif ()
 
 set (NET_SOURCES     net/HttpClient.cpp)
 set (NET_HEADERS     net/HttpClient.h)
@@ -172,41 +235,78 @@ add_library (Sneeze STATIC
    ${NET_SOURCES}       ${NET_HEADERS}
    ${UI_SOURCES}        ${UI_HEADERS}
    ${COMPUTE_SOURCES}   ${COMPUTE_HEADERS}
-   ${KERNEL_RC_FILE}
+   ${KERNEL_EMBED_FILES}
 )
 add_dependencies (Sneeze CompileKernels)
 
 target_include_directories (Sneeze PUBLIC
    ${CMAKE_CURRENT_SOURCE_DIR}
-   ${WASMTIME_INCLUDE}
    ${SPIRV_TOOLS_INCLUDE}
-   ${OPENXR_INCLUDE}
    ${CURL_INCLUDE}
    ${RMLUI_INCLUDE}
    ${NLOHMANN_JSON_INCLUDE}
 )
+if (SNEEZE_ENABLE_WASM)
+   target_include_directories (Sneeze PUBLIC ${WASMTIME_INCLUDE})
+endif ()
+if (SNEEZE_ENABLE_XR)
+   target_include_directories (Sneeze PUBLIC ${OPENXR_INCLUDE})
+endif ()
 
 target_compile_definitions (Sneeze PUBLIC
-   WASM_API_EXTERN=
-   WASI_API_EXTERN=
    CURL_STATICLIB
    RMLUI_STATIC_LIB
    SNEEZE_VERSION="${PROJECT_VERSION}"
 )
+if (SNEEZE_ENABLE_WASM)
+   target_compile_definitions (Sneeze PUBLIC SNEEZE_HAS_WASM WASM_API_EXTERN= WASI_API_EXTERN=)
+endif ()
+if (SNEEZE_ENABLE_XR)
+   target_compile_definitions (Sneeze PUBLIC SNEEZE_HAS_XR)
+endif ()
+
+# helide is anari's CPU-fallback SHARED library; only built for desktop.
+# On Android/iOS, Halogen's filament-backed ANARI library is the renderer.
+if (TARGET anari::anari_library_helide)
+   target_link_libraries (Sneeze PUBLIC anari::anari_library_helide)
+endif ()
 
 target_link_libraries (Sneeze PUBLIC
    anari::anari_static
-   anari::anari_library_helide
-   ${WASMTIME_LIB}
-   ws2_32 advapi32 userenv ntdll shell32 ole32 bcrypt
    ${SPIRV_TOOLS_LIB}
    ${SPIRV_TOOLS_OPT_LIB}
-   ${OPENXR_LOADER_LIB}
    ${CURL_LIB}
-   wldap32 crypt32 normaliz
    ${RMLUI_CORE_LIB}
    ${RMLUI_DEBUGGER_LIB}
 )
+
+if (SNEEZE_ENABLE_WASM)
+   target_link_libraries (Sneeze PUBLIC ${WASMTIME_LIB})
+endif ()
+if (SNEEZE_ENABLE_XR)
+   target_link_libraries (Sneeze PUBLIC ${OPENXR_LOADER_LIB})
+endif ()
+
+# Platform-specific system libraries
+if (WIN32)
+   # Wasmtime Windows deps
+   target_link_libraries (Sneeze PUBLIC ws2_32 advapi32 userenv ntdll shell32 ole32 bcrypt)
+   # curl Windows deps
+   target_link_libraries (Sneeze PUBLIC wldap32 crypt32 normaliz)
+elseif (APPLE)
+   find_library (SECURITY_FW Security)
+   find_library (COREFOUNDATION_FW CoreFoundation)
+   find_library (SYSTEMCONFIGURATION_FW SystemConfiguration)
+   target_link_libraries (Sneeze PUBLIC
+      pthread dl
+      ${SECURITY_FW} ${COREFOUNDATION_FW} ${SYSTEMCONFIGURATION_FW}
+   )
+elseif (ANDROID)
+   target_link_libraries (Sneeze PUBLIC log android)
+else ()
+   # Linux
+   target_link_libraries (Sneeze PUBLIC pthread dl m)
+endif ()
 
 # ---------------------------------------------------------------------------
 # IDE source grouping

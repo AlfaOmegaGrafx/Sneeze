@@ -20,10 +20,17 @@ add_executable (WasmTest WasmRuntimeTest.cpp)
 
 target_include_directories (WasmTest PRIVATE ${WASMTIME_INCLUDE})
 target_compile_definitions (WasmTest PRIVATE WASM_API_EXTERN= WASI_API_EXTERN=)
-target_link_libraries (WasmTest PRIVATE
-   ${WASMTIME_LIB}
-   ws2_32 advapi32 userenv ntdll shell32 ole32 bcrypt
-)
+target_link_libraries (WasmTest PRIVATE ${WASMTIME_LIB})
+if (WIN32)
+   target_link_libraries (WasmTest PRIVATE ws2_32 advapi32 userenv ntdll shell32 ole32 bcrypt)
+elseif (APPLE)
+   target_link_libraries (WasmTest PRIVATE pthread dl)
+elseif (ANDROID)
+   # Android bionic includes pthread in libc — no separate -lpthread
+   target_link_libraries (WasmTest PRIVATE dl m log)
+else ()
+   target_link_libraries (WasmTest PRIVATE pthread dl m)
+endif ()
 
 # ---------------------------------------------------------------------------
 # SPIR-V test executable
@@ -40,16 +47,21 @@ target_link_libraries (SpvTest PRIVATE
 )
 
 # ---------------------------------------------------------------------------
-# OpenXR test executable
+# OpenXR test executable — iOS disables XR (no VR support on iOS)
 # ---------------------------------------------------------------------------
 
-add_executable (XrTest XrRuntimeTest.cpp)
+if (NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+   add_executable (XrTest XrRuntimeTest.cpp)
 
-target_include_directories (XrTest PRIVATE ${OPENXR_INCLUDE})
-target_link_libraries (XrTest PRIVATE
-   ${OPENXR_LOADER_LIB}
-   advapi32
-)
+   target_include_directories (XrTest PRIVATE ${OPENXR_INCLUDE})
+   target_link_libraries (XrTest PRIVATE ${OPENXR_LOADER_LIB})
+   if (WIN32)
+      target_link_libraries (XrTest PRIVATE advapi32)
+   elseif (ANDROID)
+      # openxr_loader uses Android AssetManager + logging
+      target_link_libraries (XrTest PRIVATE android log)
+   endif ()
+endif ()
 
 # ---------------------------------------------------------------------------
 # curl test executable
@@ -59,10 +71,34 @@ add_executable (NetTest HttpClientTest.cpp)
 
 target_include_directories (NetTest PRIVATE ${CURL_INCLUDE})
 target_compile_definitions (NetTest PRIVATE CURL_STATICLIB)
-target_link_libraries (NetTest PRIVATE
-   ${CURL_LIB}
-   ws2_32 wldap32 crypt32 normaliz advapi32
-)
+target_link_libraries (NetTest PRIVATE ${CURL_LIB})
+if (WIN32)
+   target_link_libraries (NetTest PRIVATE ws2_32 wldap32 crypt32 normaliz advapi32)
+elseif (APPLE)
+   find_library (_NET_SECURITY_FW Security)
+   find_library (_NET_CF_FW CoreFoundation)
+   find_library (_NET_SC_FW SystemConfiguration)
+   target_link_libraries (NetTest PRIVATE pthread
+      ${_NET_SECURITY_FW} ${_NET_CF_FW} ${_NET_SC_FW})
+elseif (ANDROID)
+   # curl on Android links against our OpenSSL artifact; no system OpenSSL
+   # search needed. pthread is in libc.
+   set (_ANDROID_OPENSSL "${LIBS_DIR}/openssl/install")
+   target_link_libraries (NetTest PRIVATE
+      "${_ANDROID_OPENSSL}/lib/libssl.a"
+      "${_ANDROID_OPENSSL}/lib/libcrypto.a"
+      dl log)
+else ()
+   find_package (OpenSSL QUIET)
+   find_package (ZLIB QUIET)
+   if (OpenSSL_FOUND)
+      target_link_libraries (NetTest PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+   endif ()
+   if (ZLIB_FOUND)
+      target_link_libraries (NetTest PRIVATE ZLIB::ZLIB)
+   endif ()
+   target_link_libraries (NetTest PRIVATE pthread dl)
+endif ()
 
 # ---------------------------------------------------------------------------
 # RmlUi test executable
@@ -83,18 +119,9 @@ target_link_libraries (UiTest PRIVATE
 
 set (SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 
-add_executable (ComputeTest
-   ComputeTest.cpp
-   ${SRC_DIR}/compute/EmbeddedKernels.cpp
-   ${SRC_DIR}/compute/EmbeddedKernels.h
-   ${SRC_DIR}/compute/ComputeDispatch.cpp
-   ${SRC_DIR}/compute/ComputeDispatch.h
-   ${KERNEL_RC_FILE}
-)
-add_dependencies (ComputeTest CompileKernels)
-
+add_executable (ComputeTest ComputeTest.cpp)
 target_include_directories (ComputeTest PRIVATE ${SRC_DIR})
-target_link_libraries (ComputeTest PRIVATE anari::anari_static)
+target_link_libraries (ComputeTest PRIVATE Sneeze anari::anari_static)
 
 # ---------------------------------------------------------------------------
 # Copy runtime DLLs to test output directories

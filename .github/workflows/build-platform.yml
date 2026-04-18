@@ -1,0 +1,345 @@
+name: Build Platform (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      platform:
+        required: true
+        type: string
+        description: "Platform name for artifact prefix and cache keys"
+      runs-on:
+        required: true
+        type: string
+        description: "Runner label"
+      cmake-args:
+        required: true
+        type: string
+        description: "Platform-specific CMake args (space-separated)"
+      rust-targets:
+        required: false
+        type: string
+        default: ""
+        description: "Rust targets to install (comma-separated, empty = no rust)"
+      system-deps:
+        required: false
+        type: string
+        default: ""
+        description: "apt-get packages to install (Linux only)"
+      setup-ndk:
+        required: false
+        type: boolean
+        default: false
+        description: "Install Android NDK"
+      filament-host-artifact:
+        required: false
+        type: string
+        default: ""
+        description: "Artifact name with Filament host tools for cross-compile (e.g. linux-filament)"
+
+jobs:
+  tier0:
+    runs-on: ${{ inputs.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        dep: [spirv-headers, anari-sdk, openxr-sdk, openssl, rmlui, nlohmann-json, wasmtime, filament]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps
+        if: inputs.system-deps != ''
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ inputs.system-deps }}
+
+      - name: Setup Android NDK
+        if: inputs.setup-ndk
+        uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r27c
+
+      # CMake target names (lowercase) differ from ExternalProject dir names
+      # (mixed case, matching upstream repos). This map bridges the two for
+      # cache paths and artifact uploads. If the SuperBuild dirs were renamed
+      # to lowercase, this step could be removed and matrix.dep used directly.
+      - name: Resolve dep dir name
+        id: dir
+        shell: bash
+        run: |
+          case "${{ matrix.dep }}" in
+            spirv-headers) DIR=SPIRV-Headers ;;
+            spirv-tools)   DIR=SPIRV-Tools ;;
+            anari-sdk)     DIR=ANARI-SDK ;;
+            openxr-sdk)    DIR=OpenXR-SDK ;;
+            rmlui)         DIR=RmlUi ;;
+            wasmtime)      DIR=Wasmtime ;;
+            halogen)       DIR=Halogen ;;
+            *)             DIR="${{ matrix.dep }}" ;;
+          esac
+          echo "name=$DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Cache ${{ matrix.dep }}
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: libs-${{ inputs.platform }}/${{ steps.dir.outputs.name }}
+          key: ${{ inputs.platform }}-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt', format('deps/{0}.cmake', matrix.dep), 'deps/CMakeLists.txt') }}
+
+      - name: Install Rust
+        if: matrix.dep == 'wasmtime' && steps.cache.outputs.cache-hit != 'true' && inputs.rust-targets != ''
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ inputs.rust-targets }}
+
+      - name: Download Filament host tools
+        if: matrix.dep == 'filament' && inputs.filament-host-artifact != '' && steps.cache.outputs.cache-hit != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.filament-host-artifact }}
+          path: filament-host
+
+      - name: Build ${{ matrix.dep }}
+        if: steps.cache.outputs.cache-hit != 'true'
+        env:
+          ANDROID_NDK_ROOT: ${{ steps.ndk.outputs.ndk-path || '' }}
+        run: |
+          CMAKE_ARGS="${{ inputs.cmake-args }}"
+          CMAKE_ARGS="${CMAKE_ARGS//\$ANDROID_NDK_ROOT/$ANDROID_NDK_ROOT}"
+          # Toolchain paths are relative to repo root — make absolute
+          CMAKE_ARGS="${CMAKE_ARGS//cmake\/toolchain/${{ github.workspace }}/cmake/toolchain}"
+
+          if [ "${{ matrix.dep }}" = "filament" ] && [ -d "filament-host" ]; then
+            HOST_TOOLS=$(find filament-host -name "ImportExecutables-Release.cmake" -print -quit 2>/dev/null)
+            if [ -n "$HOST_TOOLS" ]; then
+              # ImportExecutables-Release.cmake bakes in absolute host-build
+              # paths (e.g. .../libs-macos/filament/build/tools/cmgen/cmgen).
+              # Rewrite those to point into our filament-host download dir so
+              # the imported targets resolve on this runner.
+              # -E (ERE) is required because BSD sed on macOS runners doesn't
+              # support \| alternation in BRE.
+              sed -i.bak -E \
+                "s#/(home|Users)/runner/work/[^/]*/[^/]*/libs-[a-z]*#${{ github.workspace }}/filament-host#g" \
+                "$HOST_TOOLS"
+              # GH Actions upload-artifact strips execute bits — restore for
+              # filament host tools (matc, cmgen, resgen, filamesh, ...).
+              find filament-host -path '*/tools/*' -type f ! -name '*.cmake' -exec chmod +x {} +
+              CMAKE_ARGS="$CMAKE_ARGS -DIMPORT_EXECUTABLES_HOST_FILE=${{ github.workspace }}/$HOST_TOOLS"
+            fi
+          fi
+
+          cmake -S deps -B build -GNinja \
+            -DDEP=${{ matrix.dep }} \
+            -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} \
+            $CMAKE_ARGS
+          cmake --build build --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
+
+      - name: Upload dep artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.platform }}-${{ matrix.dep }}
+          path: libs-${{ inputs.platform }}
+          retention-days: 3
+
+  tier1:
+    needs: tier0
+    if: ${{ !cancelled() }}
+    runs-on: ${{ inputs.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dep: spirv-tools
+          - dep: halogen
+          - dep: curl
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps
+        if: inputs.system-deps != ''
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ inputs.system-deps }}
+
+      - name: Setup Android NDK
+        if: inputs.setup-ndk
+        uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r27c
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ${{ inputs.platform }}-*
+          path: dep-artifacts
+
+      - name: Arrange artifacts
+        run: |
+          mkdir -p libs-${{ inputs.platform }}
+          for d in dep-artifacts/${{ inputs.platform }}-*/*; do
+            [ -d "$d" ] && cp -a "$d" libs-${{ inputs.platform }}/ 2>/dev/null || true
+          done
+          # GH Actions upload-artifact strips execute bits — restore for bin/ tools
+          find libs-${{ inputs.platform }} -path '*/install/bin/*' -type f -exec chmod +x {} +
+          echo "Available deps:" && ls libs-${{ inputs.platform }}/
+
+      # halogen compiles filament materials via matc. On cross-compile the
+      # target-platform filament install has no matc — inject the host one.
+      - name: Download Filament host tools for halogen cross-compile
+        if: matrix.dep == 'halogen' && inputs.filament-host-artifact != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.filament-host-artifact }}
+          path: filament-host
+
+      - name: Stage host matc for halogen
+        if: matrix.dep == 'halogen' && inputs.filament-host-artifact != ''
+        run: |
+          MATC=$(find filament-host -name matc -type f -print -quit 2>/dev/null || true)
+          if [ -n "$MATC" ]; then
+            mkdir -p libs-${{ inputs.platform }}/filament/install/bin
+            cp "$MATC" libs-${{ inputs.platform }}/filament/install/bin/matc
+            chmod +x libs-${{ inputs.platform }}/filament/install/bin/matc
+            echo "Staged host matc at libs-${{ inputs.platform }}/filament/install/bin/matc"
+          fi
+
+      - name: Build ${{ matrix.dep }}
+        env:
+          ANDROID_NDK_ROOT: ${{ steps.ndk.outputs.ndk-path || '' }}
+        run: |
+          CMAKE_ARGS="${{ inputs.cmake-args }}"
+          CMAKE_ARGS="${CMAKE_ARGS//\$ANDROID_NDK_ROOT/$ANDROID_NDK_ROOT}"
+          CMAKE_ARGS="${CMAKE_ARGS//cmake\/toolchain/${{ github.workspace }}/cmake/toolchain}"
+          cmake -S deps -B build -GNinja \
+            -DDEP=${{ matrix.dep }} \
+            -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} \
+            $CMAKE_ARGS
+          cmake --build build --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
+
+      - name: Upload dep artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.platform }}-${{ matrix.dep }}
+          path: libs-${{ inputs.platform }}
+          retention-days: 3
+
+  tier2:
+    needs: tier1
+    if: ${{ !cancelled() }}
+    runs-on: ${{ inputs.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dep: glslang
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps
+        if: inputs.system-deps != ''
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ inputs.system-deps }}
+
+      - name: Setup Android NDK
+        if: inputs.setup-ndk
+        uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r27c
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ${{ inputs.platform }}-*
+          path: .
+          merge-multiple: true
+
+      - name: Build ${{ matrix.dep }}
+        env:
+          ANDROID_NDK_ROOT: ${{ steps.ndk.outputs.ndk-path || '' }}
+        run: |
+          CMAKE_ARGS="${{ inputs.cmake-args }}"
+          CMAKE_ARGS="${CMAKE_ARGS//\$ANDROID_NDK_ROOT/$ANDROID_NDK_ROOT}"
+          # Toolchain paths are relative to repo root — make absolute
+          CMAKE_ARGS="${CMAKE_ARGS//cmake\/toolchain/${{ github.workspace }}/cmake/toolchain}"
+          echo "Available deps:" && ls libs-${{ inputs.platform }}/ || true
+          cmake -S deps -B build -GNinja \
+            -DDEP=${{ matrix.dep }} \
+            -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} \
+            $CMAKE_ARGS
+          cmake --build build --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
+
+      - name: Upload dep artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.platform }}-${{ matrix.dep }}
+          path: libs-${{ inputs.platform }}
+          retention-days: 3
+
+  sneeze:
+    needs: [tier0, tier1, tier2]
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
+    runs-on: ${{ inputs.runs-on }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps
+        if: inputs.system-deps != ''
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ inputs.system-deps }}
+
+      - name: Setup Android NDK
+        if: inputs.setup-ndk
+        uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r27c
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ${{ inputs.platform }}-*
+          path: dep-artifacts
+
+      - name: Arrange artifacts
+        run: |
+          mkdir -p libs-${{ inputs.platform }}
+          for d in dep-artifacts/${{ inputs.platform }}-*/*; do
+            [ -d "$d" ] && cp -a "$d" libs-${{ inputs.platform }}/ 2>/dev/null || true
+          done
+          # GH Actions upload-artifact strips execute bits — restore for bin/ tools
+          find libs-${{ inputs.platform }} -path '*/install/bin/*' -type f -exec chmod +x {} +
+          echo "Available deps:" && ls libs-${{ inputs.platform }}/
+
+      - name: Install Rust
+        if: inputs.rust-targets != ''
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ inputs.rust-targets }}
+
+      # Build Sneeze directly from src/, NOT via SuperBuild. The SuperBuild
+      # would re-run ExternalProject update steps for all deps even when
+      # they're already installed from artifacts. Building src/ directly
+      # uses find_package/find_library against the pre-built LIBS_DIR.
+      - name: Build Sneeze
+        env:
+          ANDROID_NDK_ROOT: ${{ steps.ndk.outputs.ndk-path || '' }}
+        run: |
+          CMAKE_ARGS="${{ inputs.cmake-args }}"
+          CMAKE_ARGS="${CMAKE_ARGS//\$ANDROID_NDK_ROOT/$ANDROID_NDK_ROOT}"
+          # Toolchain paths are relative to repo root — make absolute
+          CMAKE_ARGS="${CMAKE_ARGS//cmake\/toolchain/${{ github.workspace }}/cmake/toolchain}"
+          cmake -S src -B build-sneeze -GNinja \
+            -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} \
+            -DSNEEZE_ENABLE_WASM=ON \
+            $CMAKE_ARGS
+          cmake --build build-sneeze --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
+
+      - name: Run tests
+        if: ${{ !inputs.setup-ndk }}
+        run: |
+          cd build-sneeze
+          ctest --output-on-failure --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu) || true

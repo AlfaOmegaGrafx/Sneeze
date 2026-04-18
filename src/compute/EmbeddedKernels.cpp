@@ -17,6 +17,16 @@
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#else
+#include <cstring>
+
+// Provided by the generated kernels_embedded.c
+extern "C"
+{
+   struct KernelEntry { const char* name; const uint8_t* data; size_t size; };
+   extern const KernelEntry g_embedded_kernels[];
+   extern const size_t g_embedded_kernel_count;
+}
 #endif
 
 namespace sneeze
@@ -41,6 +51,16 @@ KERNEL_DATA GetEmbeddedKernel (const char* szName)
             pResult.pBytes = static_cast<const uint8_t*> (LockResource (pLoaded));
             pResult.nSize  = SizeofResource (pModule, pResource);
          }
+      }
+   }
+#else
+   for (size_t i = 0; i < g_embedded_kernel_count; ++i)
+   {
+      if (std::strcmp (g_embedded_kernels[i].name, szName) == 0)
+      {
+         pResult.pBytes = g_embedded_kernels[i].data;
+         pResult.nSize  = g_embedded_kernels[i].size;
+         break;
       }
    }
 #endif
