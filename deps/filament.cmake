@@ -104,3 +104,20 @@ ExternalProject_Add (filament
    INSTALL_COMMAND  ${CMAKE_COMMAND} --build <BINARY_DIR> --config Release --target install
    PATCH_COMMAND ${FILAMENT_PATCH_COMMAND}
 )
+
+# Host filament builds generate ImportExecutables-Release.cmake in the
+# source tree via export(TARGETS ... FILE ${IMPORT_EXECUTABLES}), where
+# ${IMPORT_EXECUTABLES} resolves to ${CMAKE_SOURCE_DIR}//ImportExecutables-Release.cmake.
+# Cross-compile targets (iOS, Android) need this file from a host build
+# artifact, but the file lives outside LIBS_DIR so it was never included
+# in uploaded artifacts. Copy it into the install tree so artifact
+# packaging picks it up naturally.
+if (NOT CMAKE_CROSSCOMPILING)
+   ExternalProject_Add_Step (filament stage_import_executables
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+         "${_repo}/ImportExecutables-Release.cmake"
+         "${LIBS_DIR}/filament/install/ImportExecutables-Release.cmake"
+      DEPENDEES install
+      COMMENT "Staging ImportExecutables-Release.cmake into filament install tree"
+   )
+endif ()
