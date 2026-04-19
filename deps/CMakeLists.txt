@@ -180,13 +180,6 @@ if (SNEEZE_ENABLE_XR)
    list (APPEND SNEEZE_DEPS openxr-sdk)
 endif ()
 
-# anari-sdk-release is a Release-only shadow of anari-sdk, consumed only by
-# Halogen (always Release). In Release outer builds the regular anari-sdk is
-# already Release so Halogen uses that; we only need the shadow in Debug.
-if (SNEEZE_CONFIG STREQUAL "Debug")
-   list (APPEND SNEEZE_DEPS anari-sdk-release)
-endif ()
-
 # ---------------------------------------------------------------------------
 # Mode selection: single dep (CI) or all deps (scripts / dev).
 # ---------------------------------------------------------------------------
@@ -215,15 +208,9 @@ else ()
    add_dependencies (glslang     spirv-tools)
    add_dependencies (vox         spirv-cross)
 
-   # Halogen (always Release) needs a Release filament and a Release
-   # anari_backend. In Debug outer builds that Release anari comes from the
-   # anari-sdk-release shadow; in Release builds the regular anari-sdk is
-   # already Release.
-   if (SNEEZE_CONFIG STREQUAL "Debug")
-      add_dependencies (halogen anari-sdk-release filament)
-   else ()
-      add_dependencies (halogen anari-sdk filament)
-   endif ()
+   # Halogen links against the regular anari-sdk + filament, both matching
+   # the outer SNEEZE_CONFIG.
+   add_dependencies (halogen anari-sdk filament)
 
    # curl's Android branch links BoringSSL as its TLS/crypto backend.
    if (ANDROID)

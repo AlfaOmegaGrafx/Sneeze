@@ -97,17 +97,10 @@ $DepsOrdered = @(
    'spirv-cross'     # no deps (SPIR-V -> HLSL for Vox)
    'vox'             # -> spirv-cross
    'wasmtime'        # no deps (Cargo, slow)
-   'filament'        # always Release (consumed only by halogen)
+   'filament'        # consumed only by halogen
 )
 
-# Debug-only shadow: Release anari_backend for halogen to link without
-# inheriting filament's Debug-hybrid CRT contamination. In Release outer
-# builds the regular anari-sdk is already Release so halogen uses that.
-if ($Config -eq 'Debug') {
-   $DepsOrdered += 'anari-sdk-release'
-}
-
-$DepsOrdered += 'halogen'   # always Release -> filament, anari-sdk[-release]
+$DepsOrdered += 'halogen'   # -> filament, anari-sdk
 
 # ---------------------------------------------------------------------------
 # Stamp helpers
