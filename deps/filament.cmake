@@ -38,6 +38,14 @@ set (FILAMENT_GCC_ARGS)
 
 if (WIN32)
    set (FILAMENT_CRT_ARGS -DUSE_STATIC_CRT=OFF -DDIST_DIR=x86_64/md)
+   # Filament's FILAMENT_SHORTEN_MSVC_COMPILATION appends /D_ITERATOR_DEBUG_LEVEL=0
+   # to Debug, which mismatches every downstream consumer (Halogen, Sneeze) that
+   # doesn't also set it. Disable the shortening on Debug so filament's Debug
+   # CRT matches standard /MDd + _ITERATOR_DEBUG_LEVEL=2. Losing /MP is a minor
+   # one-time dep-build speed cost; the CRT match is what matters.
+   if (SNEEZE_CONFIG STREQUAL "Debug")
+      list (APPEND FILAMENT_CRT_ARGS -DFILAMENT_SHORTEN_MSVC_COMPILATION=OFF)
+   endif ()
 endif ()
 
 set (_repo "${SNEEZE_DEP_REPO}/filament")
@@ -66,25 +74,13 @@ if (IMPORT_EXECUTABLES_HOST_FILE AND EXISTS "${IMPORT_EXECUTABLES_HOST_FILE}")
    )
 endif ()
 
-# Filament is always built Release regardless of the outer deps config.
-#
-# Rationale: only Halogen consumes filament, and filament.lib (Debug) on
-# Windows is shipped in a hybrid CRT state (/MDd + -D_ITERATOR_DEBUG_LEVEL=0)
-# that nothing else can link against without matching it exactly -- pulling
-# that contamination up through anari_backend and into Sneeze itself would
-# force Sneeze Debug to disable checked iterators. Pinning to Release avoids
-# the contagion entirely: halogen links Release filament + Release anari,
-# ships as anari_library_halogen.dll, and is loaded across the ANARI plain-C
-# ABI regardless of whether Sneeze is Debug or Release.
-#
-# Nothing else consumes filament, so losing Debug-buildable filament has no
-# practical impact -- you can't step into filament internals anyway.
-# NOTE: Multi-config generators (Visual Studio, Xcode) ignore CMAKE_BUILD_TYPE
-# entirely -- config is chosen at build time via `cmake --build --config`.
-# ExternalProject_Add by default inherits the outer config into the inner
-# build, so a Debug outer deps build would produce a Debug filament.lib even
-# with CMAKE_BUILD_TYPE=Release in CMAKE_ARGS. Override BUILD_COMMAND and
-# INSTALL_COMMAND to pin the inner build to Release explicitly.
+# Filament tracks the outer SNEEZE_CONFIG. On Windows we force standard
+# /MDd + _ITERATOR_DEBUG_LEVEL=2 for Debug (see FILAMENT_CRT_ARGS above) so
+# Halogen Debug can link against filament Debug without the old hybrid-CRT
+# contagion. NOTE: Multi-config generators (Visual Studio, Xcode) ignore
+# CMAKE_BUILD_TYPE entirely -- config is chosen at build time via
+# `cmake --build --config`. Pin BUILD_COMMAND / INSTALL_COMMAND to the outer
+# SNEEZE_CONFIG explicitly so ExternalProject doesn't inherit a stale value.
 ExternalProject_Add (filament
    ${_git_args}
    SOURCE_DIR       "${_repo}"
@@ -92,7 +88,7 @@ ExternalProject_Add (filament
    INSTALL_DIR      "${LIBS_DIR}/filament/install"
    CMAKE_ARGS
       -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-      -DCMAKE_BUILD_TYPE=Release
+      -DCMAKE_BUILD_TYPE=${SNEEZE_CONFIG}
       -DFILAMENT_BUILD_TESTING=OFF
       -DFILAMENT_SKIP_SAMPLES=ON
       -DFILAMENT_SKIP_SDL2=ON
@@ -100,8 +96,8 @@ ExternalProject_Add (filament
       ${FILAMENT_BACKEND_ARGS}
       ${FILAMENT_CRT_ARGS}
       ${CROSS_COMPILE_ARGS}
-   BUILD_COMMAND    ${CMAKE_COMMAND} --build <BINARY_DIR> --config Release
-   INSTALL_COMMAND  ${CMAKE_COMMAND} --build <BINARY_DIR> --config Release --target install
+   BUILD_COMMAND    ${CMAKE_COMMAND} --build <BINARY_DIR> --config ${SNEEZE_CONFIG}
+   INSTALL_COMMAND  ${CMAKE_COMMAND} --build <BINARY_DIR> --config ${SNEEZE_CONFIG} --target install
    PATCH_COMMAND ${FILAMENT_PATCH_COMMAND}
 )
 

@@ -54,14 +54,7 @@ DEPS_ORDERED=(
    filament              # always Release (consumed only by halogen)
 )
 
-# Debug-only shadow: Release anari_backend for halogen to link without
-# inheriting filament's Debug-hybrid CRT contamination. In Release outer
-# builds the regular anari-sdk is already Release so halogen uses that.
-if [[ "$CONFIG" == "Debug" ]]; then
-   DEPS_ORDERED+=(anari-sdk-release)
-fi
-
-DEPS_ORDERED+=(halogen)   # always Release -> filament, anari-sdk[-release]
+DEPS_ORDERED+=(halogen)   # -> filament, anari-sdk
 
 # ---------------------------------------------------------------------------
 # Parse args

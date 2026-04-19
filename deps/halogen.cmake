@@ -1,13 +1,11 @@
-# Halogen is always built Release regardless of the outer deps config.
-#
-# Halogen ships as anari_library_halogen.dll, loaded by ANARI across a plain-C
-# ABI (anariLoadLibrary + function pointers). No C++ objects or STL containers
-# cross the DLL boundary, so Sneeze Debug (/MDd) can load a Release halogen.dll
-# with no issue. This is the standard game-engine pattern for third-party
-# thirdparty DLLs (Unreal's third-party libs, Unity's native plugins, etc).
-#
-# By pinning Halogen to Release we avoid filament's hybrid-CRT contagion --
-# see deps/filament.cmake for the full explanation.
+# Halogen tracks the outer SNEEZE_CONFIG. Halogen still ships as
+# anari_library_halogen.dll and crosses the ANARI plain-C ABI, so Sneeze
+# Debug loading a Release halogen.dll (or vice versa) continues to work --
+# but building Debug Halogen (with matching symbols + full STL iterator
+# debugging) is useful when actually stepping into halogen code. This
+# used to be blocked by filament's hybrid-CRT Debug build; that is fixed
+# in deps/filament.cmake by disabling FILAMENT_SHORTEN_MSVC_COMPILATION
+# on Debug.
 
 # Select rendering backend per platform. Vulkan everywhere except iOS because
 # halogen's iOS path doesn't link bluevk/bluegl.
@@ -21,9 +19,11 @@ endif ()
 
 if (WIN32)
    set (FILAMENT_CRT_ARGS -DUSE_STATIC_CRT=OFF -DDIST_DIR=x86_64/md)
+   # MSVC_RUNTIME_LIBRARY via generator expression so inner multi-config
+   # picks /MDd for Debug and /MD for Release, matching filament's CRT.
    set (MSVC_CRT_ARGS
       -DCMAKE_POLICY_DEFAULT_CMP0091=NEW
-      -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL)
+      "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 endif ()
 
 # Cross-compile: the Android/iOS toolchain restricts find_package to the
@@ -33,21 +33,9 @@ if (ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
    set (HALOGEN_FIND_ARGS -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH)
 endif ()
 
-# Pick the ANARI install Halogen should consume. In Release outer builds the
-# regular anari-sdk install is already Release -- reuse it. In Debug outer
-# builds, use the anari-sdk-release shadow (see deps/anari-sdk-release.cmake).
-if (SNEEZE_CONFIG STREQUAL "Debug")
-   set (_halogen_anari_root "${LIBS_DIR}/ANARI-SDK-release/install")
-else ()
-   set (_halogen_anari_root "${LIBS_DIR}/ANARI-SDK/install")
-endif ()
-
-# Pass anari_DIR directly, not just ANARI_ROOT. find_package(anari CONFIG)
-# caches anari_DIR on first resolve; if a prior configure (pre-release-shadow)
-# cached Debug ANARI-SDK's path, a later reconfigure skips re-searching even
-# when we pass a new ANARI_ROOT. Forcing anari_DIR on every configure makes
-# the location unambiguous and cache-invalidation-proof. Version number
-# matches anari-sdk's installed subdir and will need a bump if anari upgrades.
+# Halogen links against the regular anari-sdk install -- matches SNEEZE_CONFIG
+# (Debug anari when building Debug, Release anari when building Release).
+set (_halogen_anari_root "${LIBS_DIR}/ANARI-SDK/install")
 set (_halogen_anari_dir "${_halogen_anari_root}/lib/cmake/anari-0.16.0")
 
 set (_repo "${SNEEZE_DEP_REPO}/Halogen")
@@ -61,9 +49,9 @@ else ()
    )
 endif ()
 
-# NOTE: multi-config generators ignore CMAKE_BUILD_TYPE; we must pin the
-# inner config via BUILD_COMMAND / INSTALL_COMMAND. See deps/filament.cmake
-# for the full explanation.
+# NOTE: multi-config generators ignore CMAKE_BUILD_TYPE; pin the inner
+# config via BUILD_COMMAND / INSTALL_COMMAND so ExternalProject doesn't
+# inherit a stale value.
 ExternalProject_Add (halogen
    ${_git_args}
    SOURCE_DIR       "${_repo}"
@@ -71,7 +59,7 @@ ExternalProject_Add (halogen
    INSTALL_DIR      "${LIBS_DIR}/Halogen/install"
    CMAKE_ARGS
       -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-      -DCMAKE_BUILD_TYPE=Release
+      -DCMAKE_BUILD_TYPE=${SNEEZE_CONFIG}
       -DBUILD_TESTS=OFF
       ${MSVC_CRT_ARGS}
       ${HALOGEN_FIND_ARGS}
@@ -80,6 +68,6 @@ ExternalProject_Add (halogen
       -DFILAMENT_ROOT=${LIBS_DIR}/filament/install
       -DFILAMENT_SDK_DIR=${LIBS_DIR}/filament/install
       ${CROSS_COMPILE_ARGS}
-   BUILD_COMMAND    ${CMAKE_COMMAND} --build <BINARY_DIR> --config Release
-   INSTALL_COMMAND  ${CMAKE_COMMAND} --build <BINARY_DIR> --config Release --target install
+   BUILD_COMMAND    ${CMAKE_COMMAND} --build <BINARY_DIR> --config ${SNEEZE_CONFIG}
+   INSTALL_COMMAND  ${CMAKE_COMMAND} --build <BINARY_DIR> --config ${SNEEZE_CONFIG} --target install
 )
