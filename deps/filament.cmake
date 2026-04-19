@@ -59,16 +59,31 @@ else ()
    )
 endif ()
 
-# Cross-compile: copy host-built ImportExecutables-Release.cmake into filament's
-# source root (via PATCH_COMMAND, runs after clone, before configure).
-# Filament's top-level CMake resolves IMPORT_EXECUTABLES as
-#   ${FILAMENT}/${IMPORT_EXECUTABLES_DIR}/ImportExecutables-Release.cmake
-# with IMPORT_EXECUTABLES_DIR empty by default -- so placing the file at
-# ${FILAMENT}/ImportExecutables-Release.cmake satisfies the include().
-set (FILAMENT_PATCH_COMMAND "")
+# Filament patches applied via PATCH_COMMAND (runs after clone, before
+# configure). Chained: cross-compile staging + inliner merge-return fix.
+#
+# 1. Cross-compile: copy host-built ImportExecutables-Release.cmake into
+#    filament's source root. Filament's top-level CMake resolves
+#    IMPORT_EXECUTABLES as ${FILAMENT}/${IMPORT_EXECUTABLES_DIR}/ImportExecutables-Release.cmake
+#    with IMPORT_EXECUTABLES_DIR empty by default -- placing the file at
+#    ${FILAMENT}/ImportExecutables-Release.cmake satisfies the include().
+#
+# 2. SPIR-V inliner needs merge-return on the non-Metal path too. Filament
+#    upstream omits it because of Tint (WebGPU) breakage; we don't target
+#    WebGPU, so we can safely add it. Silences the ~12k
+#    "could not be inlined because the return instruction is not at the
+#    end of the function" warnings per Halogen material compile AND lets
+#    the inliner actually do its job -- every subsequent spirv-opt pass
+#    then has less SPIR-V to chew through. Meaningful speedup on matc.
+set (FILAMENT_PATCH_COMMAND
+   ${CMAKE_COMMAND}
+      -DREPO_DIR=${_repo}
+      -DPATCH_DIR=${CMAKE_CURRENT_LIST_DIR}/patches
+      -P ${CMAKE_CURRENT_LIST_DIR}/patches/apply-filament-patches.cmake
+)
 if (IMPORT_EXECUTABLES_HOST_FILE AND EXISTS "${IMPORT_EXECUTABLES_HOST_FILE}")
-   set (FILAMENT_PATCH_COMMAND
-      ${CMAKE_COMMAND} -E copy
+   list (APPEND FILAMENT_PATCH_COMMAND
+      COMMAND ${CMAKE_COMMAND} -E copy
          "${IMPORT_EXECUTABLES_HOST_FILE}"
          "${_repo}/ImportExecutables-Release.cmake"
    )
