@@ -11,6 +11,33 @@ set (BORINGSSL_INSTALL_DIR "${LIBS_DIR}/boringssl/install")
 set (BORINGSSL_EXTRA_ARGS)
 if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
    list (APPEND BORINGSSL_EXTRA_ARGS -DOPENSSL_NO_ASM=1)
+   # On iOS, CMake defaults MACOSX_BUNDLE=ON for every executable, but
+   # BoringSSL's install(TARGETS bssl ...) doesn't specify a BUNDLE
+   # DESTINATION, so configure dies with:
+   #   install TARGETS given no BUNDLE DESTINATION for MACOSX_BUNDLE
+   #   executable target "bssl".
+   # We don't ship bssl (Sneeze only needs libcrypto.a + libssl.a from
+   # the install), so disable bundle packaging for iOS sub-targets.
+   list (APPEND BORINGSSL_EXTRA_ARGS -DCMAKE_MACOSX_BUNDLE=OFF)
+endif ()
+
+# Windows: BoringSSL's CMakeLists does enable_language(ASM_NASM) without
+# probing common install paths, so nasm has to be on PATH or explicitly
+# passed. Winget's default NASM install drops nasm.exe under
+# %LOCALAPPDATA%/bin/NASM/, which is not on PATH out of the box. Look for
+# it in the usual places and forward the absolute path if found.
+if (WIN32 AND NOT CMAKE_CROSSCOMPILING)
+   find_program (NASM_EXECUTABLE nasm
+      HINTS
+         "$ENV{LOCALAPPDATA}/bin/NASM"
+         "$ENV{ProgramFiles}/NASM"
+         "$ENV{ProgramFiles\(x86\)}/NASM"
+   )
+   if (NASM_EXECUTABLE)
+      list (APPEND BORINGSSL_EXTRA_ARGS
+         -DCMAKE_ASM_NASM_COMPILER=${NASM_EXECUTABLE})
+      message (STATUS "BoringSSL: using NASM at ${NASM_EXECUTABLE}")
+   endif ()
 endif ()
 
 set (_repo "${SNEEZE_DEP_REPO}/boringssl")
