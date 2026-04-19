@@ -155,6 +155,6 @@ if [[ $FRESH -eq 1 || $SNEEZE_MODE -eq 1 ]]; then
    echo "==> Building Sneeze ($PLATFORM, $CONFIG)"
    cmake --build "$SNEEZE_BUILD_DIR" --config "$CONFIG"
    echo "==> Sneeze macOS build complete ($CONFIG)"
-   echo "    libSneeze.a -> $SNEEZE_OUT_DIR/lib"
-   echo "    test bins   -> $SNEEZE_OUT_DIR/bin"
+   echo "    libSneeze.a -> $SNEEZE_OUT_DIR/install/lib"
+   echo "    test bins   -> $SNEEZE_OUT_DIR/install/bin"
 fi

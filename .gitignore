@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # deps/repos/                shared source clones (one per dep)
 # deps/builds/<plat>/<cfg>/  per-config dep scratch + install trees
-# builds/<plat>/<cfg>/       Sneeze's own CMake scratch, lib/, bin/
+# builds/<plat>/<cfg>/       Sneeze's own CMake scratch (build/) + install/{bin,lib}
 
 deps/repos/
 deps/builds/

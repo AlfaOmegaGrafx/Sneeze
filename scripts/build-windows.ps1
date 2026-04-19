@@ -274,6 +274,6 @@ if ($Fresh -or $SneezeMode) {
       exit 1
    }
    Write-Host "==> Sneeze Windows build complete ($Config)"
-   Write-Host "    Sneeze.lib -> $SneezeOutDir\lib"
-   Write-Host "    test .exes -> $SneezeOutDir\bin"
+   Write-Host "    Sneeze.lib -> $SneezeOutDir\install\lib"
+   Write-Host "    test .exes -> $SneezeOutDir\install\bin"
 }

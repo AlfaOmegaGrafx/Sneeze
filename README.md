@@ -173,8 +173,11 @@ Stamp-cached — only missing deps rebuild. Useful when an upstream dep changed 
 
 - `deps/builds/<platform>/<config>/libs/` — installed dep headers + libraries
 - `deps/builds/<platform>/<config>/build/` — deps CMake scratch + stamp files
-- `builds/<platform>/<config>/lib/` — `Sneeze.lib` / `libSneeze.a`
-- `builds/<platform>/<config>/bin/` — test executables and tools
+- `builds/<platform>/<config>/build/` — Sneeze CMake scratch
+- `builds/<platform>/<config>/install/lib/` — `Sneeze.lib` / `libSneeze.a`
+- `builds/<platform>/<config>/install/bin/` — test executables and tools
+
+The `install/` wrapper mirrors each dep's `libs/<Name>/install/{bin,lib}` so the Sneeze output tree is structurally symmetric with the deps output tree.
 
 ### What the script actually does
 
@@ -188,31 +191,31 @@ The three modes:
 
 ## Verifying the Build
 
-After the script finishes, the static library lives in `builds/<platform>/<config>/lib/` and test executables in `builds/<platform>/<config>/bin/`. Substitute the slug and config that matches your run.
+After the script finishes, the static library lives in `builds/<platform>/<config>/install/lib/` and test executables in `builds/<platform>/<config>/install/bin/`. Substitute the slug and config that matches your run.
 
 **Windows (Release):**
 ```powershell
-dir builds\windows-x64\release\lib\Sneeze.lib
-dir builds\windows-x64\release\bin\WasmTest.exe
+dir builds\windows-x64\release\install\lib\Sneeze.lib
+dir builds\windows-x64\release\install\bin\WasmTest.exe
 ```
 
 **Linux (Release, x64):**
 ```bash
-ls builds/linux-x64/release/lib/libSneeze.a
-ls builds/linux-x64/release/bin/WasmTest
+ls builds/linux-x64/release/install/lib/libSneeze.a
+ls builds/linux-x64/release/install/bin/WasmTest
 ```
 
 **macOS (Release, Apple Silicon):**
 ```bash
-ls builds/macos-arm64/release/lib/libSneeze.a
-ls builds/macos-arm64/release/bin/WasmTest
+ls builds/macos-arm64/release/install/lib/libSneeze.a
+ls builds/macos-arm64/release/install/bin/WasmTest
 ```
 
 Run the tests to confirm each subsystem links and initializes:
 
 **Windows:**
 ```powershell
-$bin = "builds\windows-x64\release\bin"
+$bin = "builds\windows-x64\release\install\bin"
 & "$bin\WasmTest.exe"
 & "$bin\SpvTest.exe"
 & "$bin\XrTest.exe"
@@ -225,7 +228,7 @@ $bin = "builds\windows-x64\release\bin"
 
 **Linux / macOS:**
 ```bash
-bin=builds/linux-x64/release/bin         # or builds/macos-arm64/release/bin
+bin=builds/linux-x64/release/install/bin    # or builds/macos-arm64/release/install/bin
 "$bin"/WasmTest
 "$bin"/SpvTest
 "$bin"/XrTest

@@ -34,10 +34,12 @@ endif ()
 # Force output directories
 # ---------------------------------------------------------------------------
 # The build scripts pass SNEEZE_BUILD_ROOT = <repo>/builds/<platform>/<config>.
-# We place Sneeze.lib at <root>/lib and all executables at <root>/bin.
-# Per-config variants (suffixed _DEBUG, _RELEASE, ...) defeat the subfolder
-# that multi-config generators (Visual Studio, Xcode) append by default,
-# since this tree is already keyed by config.
+# We place Sneeze.lib at <root>/install/lib and all executables at
+# <root>/install/bin -- mirroring each dep's <root>/libs/<Name>/install/{bin,lib}
+# layout so the Sneeze output tree is structurally symmetric with the deps
+# output tree. Per-config variants (suffixed _DEBUG, _RELEASE, ...) defeat
+# the subfolder that multi-config generators (Visual Studio, Xcode) append
+# by default, since this tree is already keyed by config.
 
 if (NOT DEFINED SNEEZE_BUILD_ROOT)
    # Direct configure (no wrapper script). Fall back to the CMake binary dir.
@@ -59,13 +61,13 @@ message (STATUS "Sneeze: config     = ${SNEEZE_CONFIG}")
 message (STATUS "Sneeze: libs dir   = ${LIBS_DIR}")
 message (STATUS "Sneeze: build root = ${SNEEZE_BUILD_ROOT}")
 
-set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${SNEEZE_BUILD_ROOT}/lib")
-set (CMAKE_LIBRARY_OUTPUT_DIRECTORY "${SNEEZE_BUILD_ROOT}/lib")
-set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${SNEEZE_BUILD_ROOT}/bin")
+set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${SNEEZE_BUILD_ROOT}/install/lib")
+set (CMAKE_LIBRARY_OUTPUT_DIRECTORY "${SNEEZE_BUILD_ROOT}/install/lib")
+set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${SNEEZE_BUILD_ROOT}/install/bin")
 foreach (_cfg IN ITEMS DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
-   set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${_cfg} "${SNEEZE_BUILD_ROOT}/lib")
-   set (CMAKE_LIBRARY_OUTPUT_DIRECTORY_${_cfg} "${SNEEZE_BUILD_ROOT}/lib")
-   set (CMAKE_RUNTIME_OUTPUT_DIRECTORY_${_cfg} "${SNEEZE_BUILD_ROOT}/bin")
+   set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${_cfg} "${SNEEZE_BUILD_ROOT}/install/lib")
+   set (CMAKE_LIBRARY_OUTPUT_DIRECTORY_${_cfg} "${SNEEZE_BUILD_ROOT}/install/lib")
+   set (CMAKE_RUNTIME_OUTPUT_DIRECTORY_${_cfg} "${SNEEZE_BUILD_ROOT}/install/bin")
 endforeach ()
 
 # Automatically disable XR on iOS (VisionOS deferred)

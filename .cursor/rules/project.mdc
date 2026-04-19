@@ -64,8 +64,9 @@ Sneeze/
 │   --- Generated at build time, gitignored ---
 ├── builds/<platform>/<config>/
 │   ├── build/             Sneeze CMake scratch
-│   ├── lib/               Sneeze.lib / libSneeze.a
-│   └── bin/               Test executables + CLI tools (SignMsf, ...)
+│   └── install/           Mirrors each dep's libs/<Name>/install/{bin,lib}
+│       ├── lib/           Sneeze.lib / libSneeze.a
+│       └── bin/           Test executables + CLI tools (SignMsf, ...)
 ├── vcpkg.json             Alternative vcpkg manifest
 ├── README.md
 ├── LICENSE                Apache 2.0
@@ -107,12 +108,12 @@ All paths are relative to the repository root (`Sneeze/`):
 
 - **Source code:** `src/`
 - **Test code:** `tests/`
-- **Sneeze build output:** `builds/<platform>/<config>/` — `lib/` for `Sneeze.lib`/`libSneeze.a`, `bin/` for test executables (gitignored)
+- **Sneeze build output:** `builds/<platform>/<config>/` — `build/` for CMake scratch, `install/lib/` for `Sneeze.lib`/`libSneeze.a`, `install/bin/` for test executables and CLI tools. The `install/` wrapper mirrors each dep's `libs/<Name>/install/{bin,lib}` layout for full symmetry (gitignored).
 - **Dependency source clones:** `deps/repos/<Name>/` — one shared clone per dep, reused across configs (gitignored)
 - **Dependency build/install trees:** `deps/builds/<platform>/<config>/libs/<Name>/` — each has `build/` (scratch) and `install/` (usable artifacts) (gitignored)
 - **Two isolated CMake trees, no top-level bridge:**
   - `deps/CMakeLists.txt` — standalone deps project. Knows only about `deps/`. Invoked as `cmake -S deps`. All-deps mode by default; `-DDEP=<name>` for single-dep CI builds. Iterates `deps/*.cmake` and declares `add_dependencies(...)` ordering.
-  - `src/CMakeLists.txt` — standalone Sneeze project. Knows only about `src/` and `tests/`. Invoked as `cmake -S src`. Finds deps in `${LIBS_DIR}/<Name>/install/`, forces output into `${SNEEZE_BUILD_ROOT}/lib` and `${SNEEZE_BUILD_ROOT}/bin`.
+  - `src/CMakeLists.txt` — standalone Sneeze project. Knows only about `src/` and `tests/`. Invoked as `cmake -S src`. Finds deps in `${LIBS_DIR}/<Name>/install/`, forces output into `${SNEEZE_BUILD_ROOT}/install/lib` and `${SNEEZE_BUILD_ROOT}/install/bin` (symmetric with each dep's `install/{bin,lib}` layout).
   - **Neither CMakeLists ever references the other branch.** The scripts are the only glue.
 - **Per-dep CMake files:** `deps/*.cmake` — single source of truth. One `ExternalProject_Add` per dep; included by `deps/CMakeLists.txt` and unchanged for CI's single-dep path.
 - **Test build:** `tests/CMakeLists.txt` (defines all test executables; pulled in by `src/CMakeLists.txt`)
@@ -515,11 +516,11 @@ Both files are signed JSON wrapped as JWS compact serialization (`<header>.<payl
 
 ### Build System
 
-The project has **two fully independent CMake trees**, parameterized by `SNEEZE_CONFIG` (Debug/Release) and `SNEEZE_PLATFORM` (e.g., `windows-x64`). There is **no top-level `CMakeLists.txt`** that spans both — that was deliberately removed. Dependencies are cloned once into `deps/repos/<Name>/` (shared across configs) and built+installed per config into `deps/builds/<platform>/<config>/libs/<Name>/`. Sneeze's own artifacts land in `builds/<platform>/<config>/{lib,bin}/`.
+The project has **two fully independent CMake trees**, parameterized by `SNEEZE_CONFIG` (Debug/Release) and `SNEEZE_PLATFORM` (e.g., `windows-x64`). There is **no top-level `CMakeLists.txt`** that spans both — that was deliberately removed. Dependencies are cloned once into `deps/repos/<Name>/` (shared across configs) and built+installed per config into `deps/builds/<platform>/<config>/libs/<Name>/`. Sneeze's own artifacts land in `builds/<platform>/<config>/install/{lib,bin}/` — the `install/` wrapper mirrors each dep's `libs/<Name>/install/{bin,lib}` layout for full symmetry.
 
 - **deps/CMakeLists.txt** — standalone deps project. `cmake -S deps` builds all deps; `cmake -S deps -DDEP=<name>` builds one (CI path). Never references `src/`. Derives `SNEEZE_CONFIG`, `SNEEZE_PLATFORM`, `SNEEZE_DEP_REPO`, `LIBS_DIR` if not passed explicitly. Applies cross-dep ordering via `add_dependencies(...)`.
 - **deps/*.cmake** — one `ExternalProject_Add` per dep. Single source of truth; included by `deps/CMakeLists.txt`.
-- **src/CMakeLists.txt** — standalone Sneeze project. `cmake -S src`. Finds deps under `${LIBS_DIR}/<Name>/install/`. Forces output to `${SNEEZE_BUILD_ROOT}/lib` and `${SNEEZE_BUILD_ROOT}/bin`. Never references `deps/`.
+- **src/CMakeLists.txt** — standalone Sneeze project. `cmake -S src`. Finds deps under `${LIBS_DIR}/<Name>/install/`. Forces output to `${SNEEZE_BUILD_ROOT}/install/lib` and `${SNEEZE_BUILD_ROOT}/install/bin` (symmetric with each dep's `install/{bin,lib}`). Never references `deps/`.
 - **tests/CMakeLists.txt** — defines individual test executables; pulled in by `src/CMakeLists.txt`, inherits its output dirs.
 - **scripts/build-{windows.ps1,linux.sh,macos.sh}** — the only glue between deps and Sneeze. Default (no flag): plain `cmake --build builds/<plat>/<cfg>/build --config <cfg>` (no dep checks, no configure). `-Deps` / `--deps`: `cmake -S deps` + stamped per-dep build loop. `-All` / `--all`: deps flow, then `cmake -S src` configure, then `cmake --build` on the Sneeze tree. `-Fresh` / `--fresh`: passes `cmake --fresh` (CMake 3.24+) to wipe `CMakeCache.txt` + `CMakeFiles/` before reconfiguring, then builds Sneeze. Deps phase is skipped entirely. Renamed from the earlier `-Configure` to avoid collision with the `-Config Debug|Release` flag that sits next to it on every command line, and to match the real semantics (`cmake --fresh` is the underlying primitive). Use `-Fresh` when you want to be certain stale cache values (anari_DIR, compiler paths, toolchain tweaks) are gone; `-All`'s reconfigure stays non-destructive (idempotent cache update). `-Only`, `-List`, `-CleanStamps` imply deps mode. `-Deps`, `-All`, and `-Fresh` are mutually exclusive.
 - **scripts/build-deps.sh** — shared bash helper that drives `cmake -S deps` and the per-dep stamped loop on Linux/macOS; invoked by `build-linux.sh` and `build-macos.sh` when in deps mode.
@@ -578,8 +579,8 @@ builds\windows-x64\release\bin\JwsTest.exe
 ./scripts/build-linux.sh --clean-stamps --only filament  # implies --deps
 
 # Run tests
-./builds/linux-x64/release/bin/WasmTest
-./builds/linux-x64/release/bin/ComputeTest
+./builds/linux-x64/release/install/bin/WasmTest
+./builds/linux-x64/release/install/bin/ComputeTest
 # (etc.)
 ```
 
@@ -753,8 +754,9 @@ Sneeze/
 │   └── CMakeLists.txt
 └── builds/<platform>/<config>/           Sneeze's own output
     ├── build/                            Sneeze CMake scratch
-    ├── lib/                              Sneeze.lib / libSneeze.a
-    └── bin/                              Test executables + CLI tools
+    └── install/                          Mirrors libs/<Dep>/install/ above
+        ├── lib/                          Sneeze.lib / libSneeze.a
+        └── bin/                          Test executables + CLI tools
 ```
 
 **Platform slugs:** `windows-x64`, `linux-x64`, `linux-arm64`, `macos-arm64`, `macos-x64`, `ios-arm64`, `android-arm64` — must match `Artemis/pkg/manifest.json`. **Config** folder names are lowercased (`debug`/`release`) even though `CMAKE_BUILD_TYPE` is `Debug`/`Release`.
