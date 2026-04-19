@@ -144,7 +144,7 @@ jobs:
           path: |
             libs-${{ inputs.platform }}/**
             !libs-${{ inputs.platform }}/*/build/**
-            libs-${{ inputs.platform }}/filament/build/ImportExecutables-*.cmake
+            libs-${{ inputs.platform }}/filament/build/tools/**
           retention-days: 3
 
   tier1:
@@ -232,7 +232,7 @@ jobs:
           path: |
             libs-${{ inputs.platform }}/**
             !libs-${{ inputs.platform }}/*/build/**
-            libs-${{ inputs.platform }}/filament/build/ImportExecutables-*.cmake
+            libs-${{ inputs.platform }}/filament/build/tools/**
           retention-days: 3
 
   tier2:
@@ -290,7 +290,7 @@ jobs:
           path: |
             libs-${{ inputs.platform }}/**
             !libs-${{ inputs.platform }}/*/build/**
-            libs-${{ inputs.platform }}/filament/build/ImportExecutables-*.cmake
+            libs-${{ inputs.platform }}/filament/build/tools/**
           retention-days: 3
 
   sneeze:
