@@ -154,7 +154,7 @@ Add `-Config Debug` / `--config Debug` to any of these for a Debug build. Debug 
 ./scripts/build-macos.sh --config Debug        # Debug
 ```
 
-No dep checks, no configure step — this is a plain `cmake --build` against the Sneeze tree. If deps aren't there it will fail at link time; if the Sneeze tree itself doesn't exist yet (fresh checkout, rename, cache corruption), CMake will complain about a missing `CMakeCache.txt`. Fix by running with `-Configure` / `--configure` (reconfigures Sneeze only) or `-All` / `--all` (also builds deps first).
+No dep checks, no configure step — this is a plain `cmake --build` against the Sneeze tree. If deps aren't there it will fail at link time; if the Sneeze tree itself doesn't exist yet (fresh checkout, rename, cache corruption), CMake will complain about a missing `CMakeCache.txt`. Fix by running with `-Fresh` / `--fresh` (reconfigures Sneeze only) or `-All` / `--all` (also builds deps first).
 
 ### Rare — refresh deps only (no Sneeze)
 
@@ -311,14 +311,14 @@ Default (no flag) builds Sneeze only. Mode flags and the convenience flags that 
 |----------------------|----------------------|---------|
 | *(none)* | *(none)* | Build Sneeze only — fast, no dep checks |
 | `-Deps` | `--deps` | Build dependencies only — Sneeze is not touched |
-| `-Configure` | `--configure` | Reconfigure the Sneeze tree, then build it — deps tree not touched |
+| `-Fresh` | `--fresh` | Reconfigure the Sneeze tree **from scratch** (passes `cmake --fresh`, wiping `CMakeCache.txt` + `CMakeFiles/`), then build it. Deps tree not touched. Requires CMake >= 3.24. |
 | `-All` | `--all` | Build dependencies, then configure + build Sneeze |
 | `-Config Debug\|Release` | `--config Debug\|Release` | Build configuration (default: Release) |
 | `-Only <dep>` | `--only <dep>` | Rebuild one dep (implies deps mode) |
 | `-List` | `--list` | Show dep order + cached/pending status (implies deps mode) |
 | `-CleanStamps` | `--clean-stamps` | Invalidate stamps, all or just `-Only <dep>` (implies deps mode) |
 
-`-Deps`, `-Configure`, and `-All` are mutually exclusive.
+`-Deps`, `-Fresh`, and `-All` are mutually exclusive.
 
 ---
 
@@ -435,7 +435,7 @@ All dependencies are built from source by the deps tree (`deps/CMakeLists.txt` +
 
 | Dependency | Version | Repository | Purpose |
 |------------|---------|------------|---------|
-| ANARI-SDK | next_release | [KhronosGroup/ANARI-SDK](https://github.com/KhronosGroup/ANARI-SDK) | Rendering abstraction API + helide CPU ray tracer |
+| ANARI-SDK | next_release | [KhronosGroup/ANARI-SDK](https://github.com/KhronosGroup/ANARI-SDK) | Rendering abstraction API (core loader + backend headers; no bundled devices) |
 | Wasmtime | v43.0.0 | [bytecodealliance/wasmtime](https://github.com/bytecodealliance/wasmtime) | WebAssembly sandbox runtime |
 | SPIRV-Headers | vulkan-sdk-1.4.341.0 | [KhronosGroup/SPIRV-Headers](https://github.com/KhronosGroup/SPIRV-Headers) | SPIR-V spec headers (dep of SPIRV-Tools) |
 | SPIRV-Tools | vulkan-sdk-1.4.341.0 | [KhronosGroup/SPIRV-Tools](https://github.com/KhronosGroup/SPIRV-Tools) | SPIR-V assembler, validator, optimizer |
@@ -465,7 +465,7 @@ All dependencies are built from source by the deps tree (`deps/CMakeLists.txt` +
 | `nasm` command not found | NASM not installed or not on PATH | `winget install NASM.NASM` (Windows), `brew install nasm` (macOS Intel), or `sudo apt install nasm` (Linux). On Windows, you may need to add the install directory to PATH. |
 | Wasmtime build fails with "cmake not found" | Cargo's build system needs cmake on PATH (not just installed) | Add cmake's directory to your system PATH |
 | BoringSSL build fails with "Go not found" | Go not installed | Install Go (see Prerequisites) and restart your terminal |
-| ANARI "failed to load helide library" | `anari_library_helide.dll` not next to the application executable | The application's post-build step should copy it. Copy from `deps/builds/<platform>/<config>/libs/ANARI-SDK/install/bin/` if needed. |
+| ANARI "failed to load halogen library" | `anari_library_halogen.dll` not next to the application executable | The application's post-build step should copy it from `deps/builds/<platform>/<config>/libs/Halogen/install/bin/`. |
 | OpenXR test prints "failed to find active runtime" | No VR runtime installed (SteamVR, Oculus, etc.) | Expected on machines without a headset. The test handles this gracefully. |
 | NetTest fails with connection errors | No internet connection | The HTTP tests make live requests. Expected to fail offline. |
 | `python` opens the Microsoft Store | Windows Store alias is intercepting | Settings > Apps > Advanced app settings > App execution aliases — turn off `python.exe` and `python3.exe` |

@@ -37,7 +37,7 @@ namespace sneeze { namespace renderer {
 class ANARI_RENDERER : public RENDERER
 {
 public:
-   explicit ANARI_RENDERER (const std::string& sLibrary = "helide");
+   explicit ANARI_RENDERER (const std::string& sLibrary);
    ~ANARI_RENDERER () override;
 
    bool Initialize (int nWidth, int nHeight) override;

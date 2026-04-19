@@ -126,7 +126,7 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 | Module | Namespace | Purpose | Phase |
 |--------|-----------|---------|-------|
 | `core/` | `sneeze::core` | Foundational types (Epoch, Vec3, Quat) used by all modules | PoC |
-| `renderer/` | `sneeze::renderer` | Abstract rendering interface + ANARI/helide implementation | PoC |
+| `renderer/` | `sneeze::renderer` | Abstract rendering interface + ANARI implementation (device chosen by caller — Halogen in production) | PoC |
 | `view/` | `sneeze::view` | Camera orbit controller (decoupled from windowing — takes raw input deltas) | PoC |
 | `som/` | `sneeze::som` | Scene Object Model (future) | 4 |
 | `smap/` | `sneeze::smap` | SMAP driver layer (future) | 5 |
@@ -146,7 +146,7 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 |-------|--------|---------|
 | `EPOCH` | `core` | Julian date calculations, time propagation |
 | `RENDERER` | `renderer` | Abstract rendering interface (pure virtual) |
-| `HELIDE_RENDERER` | `renderer` | Concrete ANARI/helide implementation of RENDERER |
+| `ANARI_RENDERER` | `renderer` | Concrete ANARI implementation of RENDERER. Constructor takes a library name string (e.g. `"halogen"`) and calls `anariLoadLibrary(name)` at runtime — the class is device-agnostic. No default; caller must specify. |
 | `CAMERA_ORBIT` | `view` | Orbit camera parameters (theta, phi, distance, target) |
 | `UpdateCameraOrbit` | `view` | Applies raw input deltas (nDX, nDY, dScrollY, mouse buttons) to CAMERA_ORBIT |
 | `WASM_RUNTIME` | `wasm` | Wasmtime engine + store lifecycle (init/shutdown) |
@@ -161,7 +161,7 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 | `JWS_SERVICE` | `jws` | Derived from `JWS_BASE`. Typed accessors for MSS payloads: `GetNamespace()`, `GetOrganization()`, `GetServices()`, `GetModules()`, `GetSuccessor()`. Strongly-typed `MSS_SERVICE` and `MSS_MODULE` structs. |
 | `JWS_FABRIC` | `jws` | Derived from `JWS_BASE`. Stubbed accessors for MSF payloads (`GetServiceRefs()`). The MSF payload schema is not yet fully defined — this class is a placeholder until the format stabilizes. |
 
-**Naming note:** The concrete renderer class is `HELIDE_RENDERER`, not `ANARI_RENDERER`. The ANARI SDK reserves `ANARI_*` as enum constants (e.g. `ANARI_RENDERER`, `ANARI_CAMERA`), so our class name avoids that prefix to prevent collisions.
+**Naming note:** The concrete renderer class is `sneeze::renderer::ANARI_RENDERER`. The ANARI SDK's `ANARI_*` enum constants (e.g. `ANARI_RENDERER`, `ANARI_CAMERA`) live in the global namespace, so scoping ours inside `sneeze::renderer` avoids collision without needing a backend-specific class name. (An earlier iteration called the class `HELIDE_RENDERER` to dodge the collision; the namespace fix replaced that and lets the class carry a neutral name that reflects its device-agnostic nature.)
 
 ### Test Executables
 
@@ -258,7 +258,7 @@ These conventions carry over from the existing JavaScript codebase:
 - **3-space indentation.** Not 2, not 4, never tabs.
 - **Allman brace style.** Opening `{` on its own line.
 - **Hungarian notation.** All variables carry type prefixes: `p` pointer/object, `d` double/float, `n` number, `s` string, `b` bool, `a` array, `tm` time, `fn` function.
-- **Types, classes, constants: ALL CAPS.** `EPOCH`, `CELESTIAL`, `ORBIT`, `RMCOBJECT`, `HELIDE_RENDERER`.
+- **Types, classes, constants: ALL CAPS.** `EPOCH`, `CELESTIAL`, `ORBIT`, `RMCOBJECT`, `ANARI_RENDERER`.
 - **Functions: Capital first letter.** `ComputeAll()`, `FindChild()`, `SolveKepler()`.
 - **Single return at end.** One `return` statement, last line of function.
 - **Cross-language invariance.** Class names and algorithms must remain identical across JS and C++ implementations.
@@ -283,7 +283,7 @@ All dependencies are built from source automatically by the CMake SuperBuild. No
 
 | Dependency | Version | Repository | Purpose |
 |------------|---------|------------|---------|
-| ANARI-SDK | v0.15.0 | [KhronosGroup/ANARI-SDK](https://github.com/KhronosGroup/ANARI-SDK) | Rendering abstraction API + helide CPU ray tracer + Embree |
+| ANARI-SDK | next_release (0.16.x) | [KhronosGroup/ANARI-SDK](https://github.com/KhronosGroup/ANARI-SDK) | Rendering abstraction API. Built with `BUILD_HELIDE_DEVICE=OFF` — Halogen is the sole renderer. Helide + Embree were removed from the build (path-length pressure on Windows + no longer consumed anywhere). |
 | Wasmtime | v43.0.0 | [bytecodealliance/wasmtime](https://github.com/bytecodealliance/wasmtime) | WebAssembly sandbox runtime (built via Cargo) |
 | SPIRV-Tools | vulkan-sdk-1.4.341.0 | [KhronosGroup/SPIRV-Tools](https://github.com/KhronosGroup/SPIRV-Tools) | SPIR-V assembler, validator, optimizer |
 | SPIRV-Headers | vulkan-sdk-1.4.341.0 | [KhronosGroup/SPIRV-Headers](https://github.com/KhronosGroup/SPIRV-Headers) | SPIR-V specification headers (build dep of SPIRV-Tools) |
@@ -293,7 +293,7 @@ All dependencies are built from source automatically by the CMake SuperBuild. No
 | glslang | vulkan-sdk-1.4.341.0 | [KhronosGroup/glslang](https://github.com/KhronosGroup/glslang) | GLSL-to-SPIR-V compiler (build-time only) |
 | nlohmann/json | v3.11.3 | [nlohmann/json](https://github.com/nlohmann/json) | Header-only JSON parsing library (MIT license) |
 | Filament | main | [MetaversalCorp/filament](https://github.com/MetaversalCorp/filament) | PBR rendering engine — Metaversal fork of Google Filament (Apache 2.0) |
-| Halogen | master | [MetaversalCorp/Halogen](https://github.com/MetaversalCorp/Halogen) | ANARI device (`anari_library_filament`) built on Filament — GPU-accelerated PBR rendering through ANARI |
+| Halogen | master | [MetaversalCorp/Halogen](https://github.com/MetaversalCorp/Halogen) | ANARI device (`anari_library_halogen.dll`) built on Filament — GPU-accelerated PBR rendering through ANARI. Sole renderer (helide retired). |
 | SPIRV-Cross | vulkan-sdk-1.4.341.0 | [KhronosGroup/SPIRV-Cross](https://github.com/KhronosGroup/SPIRV-Cross) | SPIR-V → HLSL/MSL/GLSL cross-compiler. Used by Vox; Sneeze links the static archives (core + hlsl / msl + glsl) to satisfy Vox's unresolved references. |
 | Vox | main | [MetaversalCorp/Vox](https://github.com/MetaversalCorp/Vox) | Standalone GPU compute dispatch library. Accepts SPIR-V, dispatches on Vulkan (native), DX12 (via SPIRV-Cross→HLSL), or Metal (via SPIRV-Cross→MSL). Wired into `compute/COMPUTE_DISPATCH`; replaces the dead ANARI compute path. |
 | BoringSSL | main | [google/boringssl](https://github.com/google/boringssl) | Cryptographic backend: X.509 parsing, PEM decoding, SHA-256, RSA/ECDSA signing and verification, `X509_STORE` chain validation. Built statically (`BUILD_SHARED_LIBS=OFF`). Used by the `jws/` module. |
@@ -373,9 +373,28 @@ glslang is the Khronos reference SPIR-V compiler. GLSL compute shaders (`#versio
 
 **Why Schannel (not OpenSSL)?** On Windows, Schannel is the native SSL/TLS implementation — it uses the Windows certificate store, requires no CA bundle management, and has zero additional dependencies. OpenSSL would add a ~5 MB dependency and require distributing `libssl.dll` and `libcrypto.dll`. For cross-platform builds, the SSL backend would be platform-appropriate (OpenSSL on Linux, Secure Transport on macOS).
 
-**Why build ANARI from source (not vcpkg)?** The vcpkg `anari` port installs only the base ANARI library (API headers and loader). It does **not** include the **helide** rendering device (the CPU ray tracer Sneeze needs). Helide must be built from the ANARI SDK source. The SuperBuild builds the full SDK including helide and its Embree dependency.
+**Why build ANARI from source (not vcpkg)?** We need the `anari_backend` + `helium` libs that Halogen statically links against, and we need to control the CRT configuration of the install tree (see the Halogen CRT isolation section below). The vcpkg `anari` port installs only the loader, provides no per-config CRT control, and bundles ABI decisions we can't override. Source-build gives us both, and the build is fast now that helide + Embree are disabled.
 
-**ANARI static linking.** ANARI core (`anari::anari_static`) is linked statically into Sneeze. The helide device (`anari_library_helide.dll`) remains a dynamic library because the ANARI SDK builds it as a shared plugin — this is by design in the SDK and cannot be changed without vendor modifications. At runtime, `HELIDE_RENDERER` creates the device directly via `anariNewHelideDevice()` rather than dynamically loading a library. Helide is temporary — it will be replaced by Halogen's `anari_library_filament` device.
+**Helide is no longer built.** The former Phase-1 renderer (`anari_library_helide.dll`, ANARI's reference CPU ray tracer on Embree) has been retired. `deps/anari-sdk.cmake` and `deps/anari-sdk-release.cmake` both pass `-DBUILD_HELIDE_DEVICE=OFF`. Rationale: (a) Halogen (`anari_library_halogen.dll`, Filament-based, GPU) has replaced helide as the production renderer everywhere — no code path in Sneeze or Artemis loads helide anymore; (b) helide pulls in Embree, which generates deeply nested install paths that exceed Windows' 260-char `MAX_PATH` limit for any Sneeze checkout not rooted at a very short prefix; (c) disabling it shaves noticeable time off both dep builds. The `ANARI_RENDERER` class is device-agnostic — its constructor takes a library name string and loads it via `anariLoadLibrary(name)` — so callers simply pass `"halogen"` instead of `"helide"`. No C++ code in Sneeze needed to change.
+
+**Also dropped the default in `ANARI_RENDERER`'s constructor.** Before: `explicit ANARI_RENDERER (const std::string& sLibrary = "helide")`. After: `explicit ANARI_RENDERER (const std::string& sLibrary)` — no default, caller must specify. This prevents a stale `"helide"` default from silently picking a device that no longer exists, and matches the fact that the class is genuinely device-agnostic — there is no "default" renderer anymore. Artemis already explicitly passes `"halogen"` in `main.cpp`, so no Artemis-side code change needed. The old dead conditional `if (TARGET anari::anari_library_helide) target_link_libraries(Sneeze PUBLIC anari::anari_library_helide)` was also removed from `src/CMakeLists.txt` since the target no longer exists.
+
+**Confirmed ANARI install tree contents post-helide-disable.** Running `.\scripts\build-windows.ps1 -Deps -Config Release -Only anari-sdk -CleanStamps` (after nuking the existing install dir) produces exactly 11 artifacts in both `bin/` and `lib/`:
+
+| Artifact | Role |
+|---|---|
+| `anari.dll` + `anari.lib` | ANARI core loader (shared — unused at runtime since Sneeze links `anari_static`) |
+| `anari_static.lib` | ANARI core (static) — this is what Sneeze links |
+| `anari_backend.lib` + `helium.lib` | Device-implementation libs Halogen statically links against |
+| `anari_library_debug.{dll,lib}` | Tiny built-in "debug forwarder" device (logs ANARI calls; NOT helide) |
+| `anari_library_sink.{dll,lib}` | Tiny built-in "null sink" device (no-op; NOT helide) |
+| `anari_test_scenes.{dll,lib}` | Test scene generator utility |
+
+Absent (as intended): `anari_library_helide.*`, `embree*`, `tbb*`. All three install trees (Release `ANARI-SDK/`, Debug `ANARI-SDK/`, Debug `ANARI-SDK-release/`) are identical in shape. `anari_test_scenes` is still built; it's harmless (nothing links it at the moment) but could be turned off later with a `-DANARI_INSTALL_TEST_SCENES=OFF` or similar if we ever care.
+
+**Artemis-side helide cleanup.** `Artemis/src/CMakeLists.txt` had stale POST_BUILD copy and `install(FILES ...)` rules for `libanari_library_helide.dylib` (macOS) and `libanari_library_helide.so` (Linux). Both were removed. Windows branch was already clean. Artemis now copies only `wasmtime.dll` + `anari_library_halogen.dll` (plus platform-equivalents) alongside the executable.
+
+**ANARI static linking.** ANARI core (`anari::anari_static`) is linked statically into Sneeze. ANARI device libraries (Halogen, etc.) are always built as shared plugins by design in the SDK — not something we can change. At runtime, `ANARI_RENDERER` calls `anariLoadLibrary(sLibrary.c_str())` to load the chosen device DLL; on Windows that's `anari_library_<name>.dll`, which Artemis's POST_BUILD step copies from `${SNEEZE_LIBS_DIR}/Halogen/install/bin/` into the Artemis output directory.
 
 **Why nlohmann/json?** General-purpose JSON parsing for both engine and application use. Header-only (no link libraries, no DLLs), MIT license, single-header deployment. Exposed as PUBLIC on the Sneeze target so Artemis can `#include <nlohmann/json.hpp>` without additional CMake configuration. Replaces the ad-hoc string-searching JSON parser used in the updater module.
 
@@ -385,7 +404,7 @@ glslang is the Khronos reference SPIR-V compiler. GLSL compute shaders (`#versio
 
 **Why SHA-256 of SPKI as the organizational identifier?** The identity of an organization that signs MSF/MSS files must survive (a) certificate renewals (same key, new expiry date), (b) signing-tool changes, and (c) independent computation by any consumer (engine or HTML viewer). Hashing the `SubjectPublicKeyInfo` (the raw DER public-key blob inside the X.509 cert) satisfies all three: the key is stable across renewals with the same key pair, the hash is deterministic, and both BoringSSL (`i2d_PUBKEY`) and the Web Crypto API (`crypto.subtle.importKey("spki", ...)` with access to raw SPKI bytes via the ASN.1 parser) produce byte-identical SPKI representations. Verified end-to-end: `482cda4c2b6c2a81f46a39ec4232f140b24b439dba4b6040b4b7610506c490b7` is the fingerprint of the test provider cert as computed by the engine, the signing tool, and the HTML viewer.
 
-**Why Halogen (Filament-based ANARI device)?** Halogen (`MetaversalCorp/Halogen`) is an ANARI device implementation (`anari_library_filament`) built on top of Google's Filament rendering engine (`MetaversalCorp/filament`). It provides GPU-accelerated PBR rendering through the ANARI abstraction, replacing helide's CPU ray tracing. Filament was chosen for its production-quality PBR pipeline (clustered forward renderer, Cook-Torrance BRDF, IBL, PCSS shadows, HDR post-processing), cross-platform backend support (OpenGL, Vulkan, Metal), and proven mobile performance (Android, iOS). Halogen is developed by Jonathan Hale (Squareys).
+**Why Halogen (Filament-based ANARI device)?** Halogen (`MetaversalCorp/Halogen`) is an ANARI device implementation (`anari_library_halogen.dll`) built on top of Google's Filament rendering engine (`MetaversalCorp/filament`). It provides GPU-accelerated PBR rendering through the ANARI abstraction and is Sneeze's sole renderer (helide was retired once Halogen reached parity). Filament was chosen for its production-quality PBR pipeline (clustered forward renderer, Cook-Torrance BRDF, IBL, PCSS shadows, HDR post-processing), cross-platform backend support (OpenGL, Vulkan, Metal), and proven mobile performance (Android, iOS). Halogen is developed by Jonathan Hale (Squareys).
 
 **Halogen dependency chain — the CRT isolation strategy.** Because Halogen consumes Filament, and Filament's Debug build on Windows is internally hybrid (compiles `/MDd` but emits `/FAILIFMISMATCH:_ITERATOR_DEBUG_LEVEL=0`, so nothing outside Filament can link against it without disabling checked iterators), we treat the Halogen chain as a Release island regardless of the outer deps configuration. The island is loaded into a Debug Sneeze across the ANARI plain-C ABI (`anariLoadLibrary` + function pointers); no C++ objects or STL containers cross the DLL boundary so Debug-Sneeze loading Release-halogen.dll is safe and is the standard game-engine pattern for third-party DLLs.
 
@@ -393,7 +412,7 @@ The chain has **three** ExternalProject targets, plus a Debug-only shadow:
 
 1. **`filament`** (`deps/filament.cmake`) — clones `MetaversalCorp/filament.git`. **Always built Release**, regardless of outer deps config. On Windows passes `USE_STATIC_CRT=OFF` + `DIST_DIR=x86_64/md` → produces `/MD` libs. Vulkan backend enabled. Samples + tests disabled. Installs to `libs/filament/install/lib/x86_64/md/`. Consumed only by Halogen. The "always Release" pinning is enforced both by `-DCMAKE_BUILD_TYPE=Release` in CMAKE_ARGS **and** by explicit `BUILD_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --config Release` + matching `INSTALL_COMMAND` — because multi-config generators (Visual Studio, Xcode) ignore `CMAKE_BUILD_TYPE` at configure time and `ExternalProject_Add` otherwise inherits the outer `--config Debug` into the inner build.
 
-2. **`anari-sdk-release`** (`deps/anari-sdk-release.cmake`) — **Debug-only shadow build of ANARI-SDK.** A second ExternalProject over the same `deps/repos/ANARI-SDK` source clone, with distinct `BINARY_DIR` / `INSTALL_DIR` (`libs/ANARI-SDK-release/build`, `libs/ANARI-SDK-release/install`). Pinned to Release via the same `BUILD_COMMAND` / `INSTALL_COMMAND` override pattern as Filament. Only registered when `SNEEZE_CONFIG=Debug` (`deps/CMakeLists.txt` conditionally appends it to `SNEEZE_DEPS`). Produces Release `anari_backend.lib` + `helium.lib` + `anari_library_debug.lib` + `anari_library_sink.lib` + `anari_library_helide.lib` for Halogen to consume. **Exists purely** because Halogen statically links `anari_backend.lib` and `helium.lib`, and in a Debug outer build the regular `anari-sdk` target produces Debug versions of those libs with `MDd_DynamicDebug` / `_ITERATOR_DEBUG_LEVEL=2` — which then `LNK2038`-conflict with Halogen's `MD_DynamicRelease` / `_ITERATOR_DEBUG_LEVEL=0` objects. Adds ~5 min and ~few-hundred-MB to Debug dep builds; zero cost in Release (skipped entirely). Source tree is shared — only the build + install trees are distinct.
+2. **`anari-sdk-release`** (`deps/anari-sdk-release.cmake`) — **Debug-only shadow build of ANARI-SDK.** A second ExternalProject over the same `deps/repos/ANARI-SDK` source clone, with distinct `BINARY_DIR` / `INSTALL_DIR` (`libs/ANARI-SDK-release/build`, `libs/ANARI-SDK-release/install`). Pinned to Release via the same `BUILD_COMMAND` / `INSTALL_COMMAND` override pattern as Filament. Only registered when `SNEEZE_CONFIG=Debug` (`deps/CMakeLists.txt` conditionally appends it to `SNEEZE_DEPS`). Produces Release `anari_backend.lib` + `helium.lib` + `anari_library_debug.lib` + `anari_library_sink.lib` for Halogen to consume. (Helide is disabled here too — Halogen does not link it.) **Exists purely** because Halogen statically links `anari_backend.lib` and `helium.lib`, and in a Debug outer build the regular `anari-sdk` target produces Debug versions of those libs with `MDd_DynamicDebug` / `_ITERATOR_DEBUG_LEVEL=2` — which then `LNK2038`-conflict with Halogen's `MD_DynamicRelease` / `_ITERATOR_DEBUG_LEVEL=0` objects. Adds ~5 min and ~few-hundred-MB to Debug dep builds; zero cost in Release (skipped entirely). Source tree is shared — only the build + install trees are distinct.
 
 3. **`halogen`** (`deps/halogen.cmake`) — clones `MetaversalCorp/Halogen.git`. **Always built Release**, same `BUILD_COMMAND` / `INSTALL_COMMAND` override pattern. CRT set to `/MD` via `-DCMAKE_POLICY_DEFAULT_CMP0091=NEW` + `-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL`. Depends on `filament` + whichever ANARI flavor matches (`anari-sdk` in Release outer builds, `anari-sdk-release` in Debug outer builds). In Debug outer builds, `deps/halogen.cmake` sets `_halogen_anari_root` to `${LIBS_DIR}/ANARI-SDK-release/install`; in Release outer builds, `${LIBS_DIR}/ANARI-SDK/install`. Produces `anari_library_halogen.dll` + its import lib, installs to `libs/Halogen/install/{bin,lib}/`.
 
@@ -475,12 +494,11 @@ Both files are signed JSON wrapped as JWS compact serialization (`<header>.<payl
 - **RmlUi requires a font engine interface.** `UiContext.cpp` registers a `STUB_FONT_ENGINE` with dummy metrics. "No font face defined" warnings are expected and cosmetic.
 - **libcurl uses Schannel (Windows native SSL).** No OpenSSL dependency. On Linux/macOS, curl would need OpenSSL or the platform's native SSL.
 - **SDL pixel format must match ANARI byte layout (Artemis-side).** ANARI's `ANARI_UFIXED8_RGBA_SRGB` writes R,G,B,A bytes. On little-endian Windows, `SDL_PIXELFORMAT_ABGR8888` matches. This is Artemis's concern, not Sneeze's — the engine has no SDL3 dependency.
-- **Helide does not support texture mapping on implicit sphere geometry.** Texture-mapped planets require a different ANARI device (e.g., VisRTX) or explicit triangle mesh spheres.
 - **Do NOT delete `deps/builds/<platform>/<config>/build/` for day-to-day rebuilds.** That directory holds the SuperBuild's ExternalProject stamp files (tracking which deps have been cloned, configured, built, and installed). Deleting it loses those stamps, forcing CMake to re-run all dependency steps (5+ minutes even though the `libs/` tree is intact). For a day-to-day rebuild of Sneeze itself, delete only `builds/<platform>/<config>/` and re-run the build script — the deps are untouched.
 - **Deleting `deps/builds/<platform>/<config>/libs/` triggers full rebuild for that config.** All dependencies will be re-configured, re-built, and re-installed (45-90 minutes). Source clones in `deps/repos/` are preserved.
 - **Deleting `deps/repos/` re-clones every dependency** (~2 GB of git history, ~10 minutes). Rarely needed — only when a dep's upstream has force-pushed its tag.
 - **Filament is the heaviest dependency.** First build takes 30-60 minutes. Incremental rebuilds are fast. Both repos use `GIT_SHALLOW ON` in the SuperBuild.
-- **Halogen DLLs must be copied to Artemis output.** Artemis's POST_BUILD step must copy `anari_library_filament.dll` and any Filament shared libraries alongside the executable. This is Artemis-side configuration — not yet implemented.
+- **Halogen DLL must be copied to Artemis output.** Artemis's POST_BUILD step copies `anari_library_halogen.dll` from `${SNEEZE_LIBS_DIR}/Halogen/install/bin/` alongside the executable (same step also copies `wasmtime.dll`). Filament itself has no separate runtime DLL at the Sneeze/Artemis boundary — the `anari_library_halogen.dll` statically links the bits of Filament it needs.
 - **Halogen/Filament are always built Release.** See the "Halogen dependency chain" section above for the full rationale. In Debug outer builds, Halogen consumes a Release-only shadow of ANARI-SDK (`anari-sdk-release`) instead of the regular (Debug) `anari-sdk` install. Sneeze itself links the regular Debug `anari_static.lib` and loads Release `anari_library_halogen.dll` at runtime via the ANARI plain-C ABI. Do NOT try to "fix" Halogen's CRT to match Debug Sneeze — the fight is against Filament's internal hybrid CRT state and isolation is the winning strategy, not alignment.
 - **`ExternalProject_Add` + multi-config generators ignore `-DCMAKE_BUILD_TYPE=...` in `CMAKE_ARGS`.** Visual Studio / Xcode are multi-config: `CMAKE_BUILD_TYPE` is ignored at configure time, the config is selected at build time via `cmake --build --config <cfg>`. By default, `ExternalProject_Add`'s build step inherits the outer build's `--config`, so a Debug outer build produces a Debug inner build regardless of `-DCMAKE_BUILD_TYPE=Release` in CMAKE_ARGS. Pin the inner config by explicitly overriding `BUILD_COMMAND` + `INSTALL_COMMAND` to pass `--config Release` literally. Used for filament, anari-sdk-release, and halogen.
 - **`find_package(<pkg> CONFIG)` caches `<pkg>_DIR` and skips re-search.** Once `find_package` successfully resolves, the resolved path is written to CMakeCache.txt as `<pkg>_DIR`. On subsequent reconfigures, `find_package` finds the cached value and returns immediately without re-searching — even if the hint variable (`<pkg>_ROOT` or `<PKG>_ROOT`) changed. Passing `-D<pkg>_DIR=...` explicitly overrides the cache. This is exactly why `deps/halogen.cmake` passes `-Danari_DIR=${_halogen_anari_root}/lib/cmake/anari-0.16.0` alongside `-DANARI_ROOT=...` — without the direct override, stale caches from prior configure attempts silently resolve to the wrong ANARI install.
@@ -503,7 +521,7 @@ The project has **two fully independent CMake trees**, parameterized by `SNEEZE_
 - **deps/*.cmake** — one `ExternalProject_Add` per dep. Single source of truth; included by `deps/CMakeLists.txt`.
 - **src/CMakeLists.txt** — standalone Sneeze project. `cmake -S src`. Finds deps under `${LIBS_DIR}/<Name>/install/`. Forces output to `${SNEEZE_BUILD_ROOT}/lib` and `${SNEEZE_BUILD_ROOT}/bin`. Never references `deps/`.
 - **tests/CMakeLists.txt** — defines individual test executables; pulled in by `src/CMakeLists.txt`, inherits its output dirs.
-- **scripts/build-{windows.ps1,linux.sh,macos.sh}** — the only glue between deps and Sneeze. Default (no flag): plain `cmake --build builds/<plat>/<cfg>/build --config <cfg>` (no dep checks, no configure). `-Deps` / `--deps`: `cmake -S deps` + stamped per-dep build loop. `-All` / `--all`: deps flow, then `cmake -S src` configure, then `cmake --build` on the Sneeze tree. `-Configure` / `--configure`: reconfigure + build Sneeze only (no dep phase). `-Only`, `-List`, `-CleanStamps` imply deps mode. `-Deps`, `-All`, and `-Configure` are mutually exclusive.
+- **scripts/build-{windows.ps1,linux.sh,macos.sh}** — the only glue between deps and Sneeze. Default (no flag): plain `cmake --build builds/<plat>/<cfg>/build --config <cfg>` (no dep checks, no configure). `-Deps` / `--deps`: `cmake -S deps` + stamped per-dep build loop. `-All` / `--all`: deps flow, then `cmake -S src` configure, then `cmake --build` on the Sneeze tree. `-Fresh` / `--fresh`: passes `cmake --fresh` (CMake 3.24+) to wipe `CMakeCache.txt` + `CMakeFiles/` before reconfiguring, then builds Sneeze. Deps phase is skipped entirely. Renamed from the earlier `-Configure` to avoid collision with the `-Config Debug|Release` flag that sits next to it on every command line, and to match the real semantics (`cmake --fresh` is the underlying primitive). Use `-Fresh` when you want to be certain stale cache values (anari_DIR, compiler paths, toolchain tweaks) are gone; `-All`'s reconfigure stays non-destructive (idempotent cache update). `-Only`, `-List`, `-CleanStamps` imply deps mode. `-Deps`, `-All`, and `-Fresh` are mutually exclusive.
 - **scripts/build-deps.sh** — shared bash helper that drives `cmake -S deps` and the per-dep stamped loop on Linux/macOS; invoked by `build-linux.sh` and `build-macos.sh` when in deps mode.
 - **Wasmtime** is built via `cargo build --release -p wasmtime-c-api` regardless of `SNEEZE_CONFIG` (Cargo release mode is always used; the product just gets copied into the config-specific install tree).
 - **All other C/C++ dependencies** are built with CMake using `-DCMAKE_BUILD_TYPE=${SNEEZE_CONFIG}` and installed under their per-config `install/` prefixes.
@@ -518,8 +536,8 @@ The project has **two fully independent CMake trees**, parameterized by `SNEEZE_
 .\scripts\build-windows.ps1 -Config Debug      # Debug
 
 # Reconfigure + build Sneeze only (e.g., after nuking builds\<plat>\<cfg>\build\)
-.\scripts\build-windows.ps1 -Configure
-.\scripts\build-windows.ps1 -Configure -Config Debug
+.\scripts\build-windows.ps1 -Fresh
+.\scripts\build-windows.ps1 -Fresh -Config Debug
 
 # First-time setup or nuking a config: build deps + Sneeze (~1-2 hours)
 .\scripts\build-windows.ps1 -All
@@ -548,8 +566,8 @@ builds\windows-x64\release\bin\JwsTest.exe
 ./scripts/build-macos.sh                       # macOS Release
 
 # Reconfigure + build Sneeze only
-./scripts/build-linux.sh --configure
-./scripts/build-macos.sh --configure --config Debug
+./scripts/build-linux.sh --fresh
+./scripts/build-macos.sh --fresh --config Debug
 
 # First-time setup or nuking a config: build deps + Sneeze (~1-2 hours)
 ./scripts/build-linux.sh --all
@@ -570,10 +588,10 @@ builds\windows-x64\release\bin\JwsTest.exe
 Phase 1 ported the existing Solar System simulation (`E:\Dev\SolarSystem\`) from JavaScript/Three.js to C++/ANARI as a disposable proof of concept. The solar system exercises the ANARI rendering pipeline end-to-end (multiple objects, real-time updates, camera controls) while establishing the module structure, build system, and coding conventions that the full browser will use. The astro module and solar system code will be removed as the browser progresses — it exists only to validate the stack, not as permanent functionality.
 
 ### What Phase 1 Delivered
-- Native C++ executable rendering the solar system via ANARI (helide CPU ray tracer)
+- Native C++ executable rendering the solar system via ANARI (originally helide CPU ray tracer; cut over to Halogen PBR once it landed)
 - Orbital mechanics as browser-level C++ computation (Kepler solver, precession, frame conversions)
 - Embedded planet/star/moon data for the full solar system (Sun + 9 planet systems + bodies)
-- Abstract RENDERER interface with concrete HELIDE_RENDERER implementation
+- Abstract RENDERER interface with concrete ANARI_RENDERER implementation (device chosen by caller)
 - Camera orbit controller decoupled from windowing (raw input deltas)
 - Module structure ready for the full browser
 
@@ -582,7 +600,7 @@ Phase 1 ported the existing Solar System simulation (`E:\Dev\SolarSystem\`) from
 - No HUD or on-screen labels
 - ~~Orbit curves rendering imperfectly~~ — **FIXED 2026-04-10:** Trails now render as partial arcs (75% of orbit) anchored to each planet's current position, matching the JS behavior. Controlled by `TRAIL_SEGMENTS` (256) and `TRAIL_FRACTION` (0.75) constants in `main.cpp`.
 - No animation speed controls in the UI (code supports +/- keys but no visual feedback)
-- Sphere bodies have no texture mapping (helide doesn't support textures on implicit sphere primitives — requires triangle mesh geometry or a different ANARI device)
+- Sphere bodies have no texture mapping yet — needs material/texture support wired through Halogen's PBR pipeline
 - These are Phase 2 refinements on a working foundation
 
 ### Source Material (external references)
@@ -603,7 +621,7 @@ Integrate the four remaining core runtime APIs into the build system. The goal i
 | 3 | ~~OpenXR~~ | **DONE** | OpenXR SDK 1.1.58 built from source (static lib). `xr/XR_RUNTIME` class. XrTest.exe passes 10/10 integration tests. |
 | 4 | ~~curl (HTTP client)~~ | **DONE** | libcurl 8.9.1 built from source (static, Schannel SSL). `net/HTTP_CLIENT` class. NetTest.exe passes 20/20 integration tests. |
 | 5 | ~~glslang + SPIR-V compute pipeline~~ | **DONE** | glslang vulkan-sdk-1.4.341.0 + Vox + SPIRV-Cross all built from source. `compute/COMPUTE_DISPATCH` routes kernels through Vox (`vox::DEVICE::Create(Backend::Auto)`) on DX12 / Metal / Vulkan, CPU fallback when no backend available. CMake compiles `.comp` → `.spv` at build time, embeds via Win32 `.rc` resources on Windows / `objcopy` elsewhere. ComputeTest.exe exercises the full pipeline end-to-end; VoxTest.exe exercises Vox directly through the Sneeze static lib. |
-| 6 | Add VisRTX (GPU-accelerated ANARI device) | **DEFERRED** | Replace helide (CPU ray tracing) with VisRTX (NVIDIA GPU ray tracing ANARI device). No Sneeze code changes — swap the ANARI device, rendering pipeline adapts automatically. Deferred — Filament-based ANARI renderer makes this lower priority; VisRTX requires CUDA + OptiX SDK. |
+| 6 | Add VisRTX (NVIDIA ray-traced ANARI device) | **DEFERRED** | Alternative GPU ANARI device (ray tracing on NVIDIA via OptiX) alongside the Halogen/Filament rasterizer. No Sneeze code changes — just another value to pass to `ANARI_RENDERER("visrtx")`. Deferred — Halogen covers production rendering; VisRTX requires CUDA + OptiX SDK. |
 | 7 | ~~RmlUi (UI toolkit)~~ | **DONE** | RmlUi 6.2 built from source (static lib, no FreeType). `ui/UI_CONTEXT` class with stub system/render/font interfaces. UiTest.exe passes 20/20 integration tests (init, context lifecycle, document loading, update/render cycle, multi-context). |
 
 ### Phase 2 — Implement RmlUI Elements
@@ -700,7 +718,7 @@ Supporting components that can be developed in parallel with or after the core p
 
 | # | Task | Notes |
 |---|------|-------|
-| 1 | GPU-accelerated ANARI device | Replace helide with a Vulkan/Metal/DX12 ANARI device for production frame rates |
+| 1 | ~~GPU-accelerated ANARI device~~ | **DONE.** Halogen (Filament-backed, `anari_library_halogen.dll`) is the production renderer. Helide retired. VisRTX remains a deferred alternative for NVIDIA ray-tracing workloads. |
 | 2 | Performance profiling and optimization | Frame time budgets, SOM traversal cost, ANARI submission overhead |
 | 3 | Test framework | Unit tests for core/astro math, integration tests for renderer |
 | 4 | CI/CD pipeline | Automated builds, test runs on commit |
@@ -748,7 +766,7 @@ Sneeze/
 # Windows (PowerShell)
 .\scripts\build-windows.ps1                              # Sneeze only, Release (default)
 .\scripts\build-windows.ps1 -Config Debug                # Sneeze only, Debug
-.\scripts\build-windows.ps1 -Configure                   # Reconfigure + build Sneeze
+.\scripts\build-windows.ps1 -Fresh                       # Reconfigure + build Sneeze
 .\scripts\build-windows.ps1 -Deps                        # Deps only (Release)
 .\scripts\build-windows.ps1 -Deps -Config Debug          # Deps only (Debug)
 .\scripts\build-windows.ps1 -All                         # Deps, then Sneeze
@@ -761,13 +779,13 @@ Sneeze/
 # Linux / macOS (shell)
 ./scripts/build-linux.sh                                 # Sneeze only, Release (default)
 ./scripts/build-linux.sh --config Debug                  # Sneeze only, Debug
-./scripts/build-linux.sh --configure                     # Reconfigure + build Sneeze
+./scripts/build-linux.sh --fresh                         # Reconfigure + build Sneeze
 ./scripts/build-linux.sh --deps                          # Deps only
 ./scripts/build-linux.sh --all                           # Deps, then Sneeze
 ./scripts/build-linux.sh --only filament --clean-stamps
 ```
 
-**Mode flags are mutually exclusive:** `-Deps`, `-All`, `-Configure` — only one at a time. `-Only`, `-List`, `-CleanStamps` implicitly enable deps mode. Default (no flags) is Sneeze-only: plain `cmake --build builds/<plat>/<cfg>/build --config <cfg>` with no dep checks, no reconfigure. If the Sneeze build tree doesn't exist yet, the plain-build fails with "CMakeCache.txt missing" and the user must re-run with `-Configure` (or `-All` if deps are also missing).
+**Mode flags are mutually exclusive:** `-Deps`, `-All`, `-Fresh` — only one at a time. `-Only`, `-List`, `-CleanStamps` implicitly enable deps mode. Default (no flags) is Sneeze-only: plain `cmake --build builds/<plat>/<cfg>/build --config <cfg>` with no dep checks, no reconfigure. If the Sneeze build tree doesn't exist yet, the plain-build fails with "CMakeCache.txt missing" and the user must re-run with `-Fresh` (or `-All` if deps are also missing).
 
 **Under the hood — direct CMake invocations (used by CI):**
 
@@ -813,6 +831,9 @@ cmake --build builds/<plat>/<cfg>/build --config <cfg>
 **What changed for developers:**
 - **First build:** run `-All` once per config — deps (~35-90 min) then Sneeze (~1-2 min). Day-to-day work never touches the deps phase.
 - **Day-to-day:** plain `.\scripts\build-windows.ps1` (seconds). No CMake, no dep checks, just compile + link Sneeze.
-- **After editing CMakeLists.txt:** `.\scripts\build-windows.ps1 -Configure` to reconfigure Sneeze only.
+- **After editing CMakeLists.txt:** `.\scripts\build-windows.ps1 -Fresh` to reconfigure Sneeze only.
+- **What `-Fresh` actually does (precisely):** passes `cmake --fresh` (3.24+), which wipes `CMakeCache.txt` + the `CMakeFiles/` directory before rerunning configure. It does **not** delete compiled `.obj` / `.lib` / `.dll` outputs. In practice you usually *get* a full Sneeze rebuild anyway because CMake regenerates the `.vcxproj` files and MSBuild's up-to-date check treats the regenerated projects as modified — but this is a side effect, not an explicit clean. Scope is always Sneeze-only; the 15 dependency libs under `deps/builds/` are never touched by `-Fresh`. For a true from-zero rebuild of everything: `-Deps -CleanStamps` then `-All -Fresh`, or nuke `builds/` + `deps/builds/` and start over.
 - **After pulling a new dep version:** `.\scripts\build-windows.ps1 -Only <name>` or `-Only <name> -CleanStamps` as appropriate.
+
+**Recommended daily workflow on Windows — use Visual Studio, not the scripts.** Once `-All` has produced a configured Sneeze tree, the CMake machinery has already generated a full `.sln` at `builds\windows-x64\<config>\build\Sneeze.sln`. For day-to-day "I edited a `.cpp`, rebuild" work, open the solution in Visual Studio and use F7 — incremental builds are faster than re-invoking the scripts, and you get the debugger, breakpoints, IntelliSense, Error List, and the rest of the IDE for free. The scripts exist for the cases Visual Studio can't solve: CI, Linux/macOS builds, fresh-checkout smoke tests, and reconfigure after editing `CMakeLists.txt` (which is what `-Fresh` is for). The rule of thumb: **fresh-checkout / config-changes / cross-platform → scripts; daily editing → `.sln` in VS.** Same deal on macOS with the Xcode project CMake produces, and on Linux with Ninja/Make + your editor of choice. CMake's command-line UX is legitimately rough; nobody should have to live in it day-to-day.
 

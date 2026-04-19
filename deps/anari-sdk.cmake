@@ -4,11 +4,12 @@ if (WIN32)
       -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>DLL)
 endif ()
 
-if (ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
-   set (ANARI_HELIDE_ARG -DBUILD_HELIDE_DEVICE=OFF)
-else ()
-   set (ANARI_HELIDE_ARG -DBUILD_HELIDE_DEVICE=ON)
-endif ()
+# Helide is the ANARI SDK's reference CPU ray tracer (built on Embree). Sneeze
+# no longer ships or loads it -- Halogen (filament-based, GPU-accelerated) is
+# the sole renderer. Disabling helide also skips the Embree build, which
+# produces deeply nested install paths that exceed Windows' 260-char MAX_PATH
+# on any checkout not rooted at a very short prefix.
+set (ANARI_HELIDE_ARG -DBUILD_HELIDE_DEVICE=OFF)
 
 set (_repo "${SNEEZE_DEP_REPO}/ANARI-SDK")
 if (EXISTS "${_repo}/.git")

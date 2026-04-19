@@ -20,11 +20,10 @@ if (WIN32)
       -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL)
 endif ()
 
-if (ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
-   set (ANARI_HELIDE_ARG -DBUILD_HELIDE_DEVICE=OFF)
-else ()
-   set (ANARI_HELIDE_ARG -DBUILD_HELIDE_DEVICE=ON)
-endif ()
+# Halogen only links anari_backend + helium from this shadow install -- it has
+# no dependency on helide -- so we skip building helide here too. See
+# deps/anari-sdk.cmake for the full rationale.
+set (ANARI_HELIDE_ARG -DBUILD_HELIDE_DEVICE=OFF)
 
 set (_repo "${SNEEZE_DEP_REPO}/ANARI-SDK")
 if (EXISTS "${_repo}/.git")

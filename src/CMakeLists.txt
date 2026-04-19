@@ -331,12 +331,6 @@ if (SNEEZE_ENABLE_XR)
    target_compile_definitions (Sneeze PUBLIC SNEEZE_HAS_XR)
 endif ()
 
-# helide is anari's CPU-fallback SHARED library; only built for desktop.
-# On Android/iOS, Halogen's filament-backed ANARI library is the renderer.
-if (TARGET anari::anari_library_helide)
-   target_link_libraries (Sneeze PUBLIC anari::anari_library_helide)
-endif ()
-
 target_link_libraries (Sneeze PUBLIC
    anari::anari_static
    ${SPIRV_TOOLS_LIB}

@@ -8,9 +8,10 @@
 # Flags switch the script into deps mode or deps+Sneeze mode:
 #
 #   --deps         Build the 15 third-party libs into deps/builds/macos-<arch>/<config>/libs/.
-#   --configure    Reconfigure the Sneeze tree (cmake -S src), then build it.
-#                  Use after nuking builds/<plat>/<cfg>/ or on a fresh checkout
-#                  where deps are already built. Deps tree is never touched.
+#   --fresh        Reconfigure the Sneeze tree from scratch (cmake -S src --fresh),
+#                  then build it. Wipes CMakeCache.txt + CMakeFiles/ so stale
+#                  cached values (compiler paths, find_package results, etc.)
+#                  can't linger. Deps tree is never touched. Requires CMake >= 3.24.
 #   --all          Build deps, then configure + build Sneeze.
 #   --only <dep>   Rebuild a single dep (implies --deps). Forwarded to build-deps.sh.
 #   --list         Show dep stamp cache (implies --deps). Forwarded to build-deps.sh.
@@ -30,7 +31,7 @@
 # Usage:
 #   ./scripts/build-macos.sh                      # Sneeze (Release)
 #   ./scripts/build-macos.sh --config Debug       # Sneeze (Debug)
-#   ./scripts/build-macos.sh --configure          # Reconfigure + build Sneeze
+#   ./scripts/build-macos.sh --fresh              # Reconfigure + build Sneeze
 #   ./scripts/build-macos.sh --deps               # Deps only
 #   ./scripts/build-macos.sh --all                # Deps, then Sneeze
 #   ./scripts/build-macos.sh --only curl          # Rebuild one dep
@@ -43,7 +44,7 @@ SNEEZE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIG="Release"
 DEPS=0
 ALL=0
-CONFIGURE=0
+FRESH=0
 DEPS_FORWARD=0
 EXTRA_ARGS=()
 
@@ -51,7 +52,7 @@ while [[ $# -gt 0 ]]; do
    case "$1" in
       --deps)         DEPS=1 ;;
       --all)          ALL=1 ;;
-      --configure)    CONFIGURE=1 ;;
+      --fresh)        FRESH=1 ;;
       --config)       shift; CONFIG="$1" ;;
       --config=*)     CONFIG="${1#--config=}" ;;
       --only|--list|--clean-stamps)
@@ -62,9 +63,9 @@ while [[ $# -gt 0 ]]; do
    shift
 done
 
-MODE_COUNT=$((DEPS + ALL + CONFIGURE))
+MODE_COUNT=$((DEPS + ALL + FRESH))
 if [[ $MODE_COUNT -gt 1 ]]; then
-   echo "--deps, --all, and --configure are mutually exclusive" >&2
+   echo "--deps, --all, and --fresh are mutually exclusive" >&2
    exit 1
 fi
 
@@ -104,9 +105,9 @@ if [[ $DEPS_MODE -eq 0 || $ALL -eq 1 ]]; then
    SNEEZE_MODE=1
 fi
 
-# Reconfigure the Sneeze tree before building (implied by --all or --configure).
+# Reconfigure the Sneeze tree before building (implied by --all or --fresh).
 RECONFIGURE=0
-if [[ $ALL -eq 1 || $CONFIGURE -eq 1 ]]; then
+if [[ $ALL -eq 1 || $FRESH -eq 1 ]]; then
    RECONFIGURE=1
 fi
 
@@ -130,11 +131,18 @@ fi
 # Sneeze mode -- configure (if --all) + plain `cmake --build`, no dep checks.
 # ---------------------------------------------------------------------------
 
-if [[ $CONFIGURE -eq 1 || $SNEEZE_MODE -eq 1 ]]; then
+if [[ $FRESH -eq 1 || $SNEEZE_MODE -eq 1 ]]; then
    if [[ $RECONFIGURE -eq 1 ]]; then
+      # --fresh (CMake 3.24+) wipes CMakeCache.txt + CMakeFiles/ before
+      # reconfiguring -- makes --fresh the explicit "start over" path while
+      # --all keeps the idempotent cache update for normal reconfigures.
+      FRESH_ARG=()
+      if [[ $FRESH -eq 1 ]]; then FRESH_ARG=(--fresh); fi
+
       echo ""
       echo "==> Configuring Sneeze tree at $SNEEZE_BUILD_DIR"
       cmake -S "$SNEEZE_DIR/src" -B "$SNEEZE_BUILD_DIR" \
+         "${FRESH_ARG[@]+"${FRESH_ARG[@]}"}" \
          -DCMAKE_BUILD_TYPE="$CONFIG" \
          "${MACOS_ARGS[@]}" \
          -DLIBS_DIR="$LIBS_DIR" \

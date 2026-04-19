@@ -7,9 +7,11 @@
 # Flags switch the script into deps mode, reconfigure mode, or deps+Sneeze mode:
 #
 #   -Deps         Build the 15 third-party libs into deps/builds/windows-x64/<config>/libs/.
-#   -Configure    Reconfigure the Sneeze tree (cmake -S src), then build it.
-#                 Use after nuking builds/<plat>/<cfg>/ or on a fresh checkout
-#                 where deps are already built. Deps tree is never touched.
+#   -Fresh        Reconfigure the Sneeze tree from scratch (cmake -S src --fresh),
+#                 then build it. Wipes CMakeCache.txt + CMakeFiles/ so stale
+#                 cached values (anari_DIR, compiler paths, toolchain tweaks,
+#                 etc.) can't linger. Deps tree is never touched. Requires
+#                 CMake >= 3.24 (VS 2022 ships 3.28+, so effectively everyone).
 #   -All          Build deps, then configure + build Sneeze.
 #   -Only <dep>   Rebuild a single dep (implies -Deps).
 #   -List         Show dep stamp cache (implies -Deps).
@@ -27,7 +29,7 @@
 # Usage:
 #   .\scripts\build-windows.ps1                       # Sneeze (Release)
 #   .\scripts\build-windows.ps1 -Config Debug         # Sneeze (Debug)
-#   .\scripts\build-windows.ps1 -Configure            # Reconfigure + build Sneeze
+#   .\scripts\build-windows.ps1 -Fresh                # Reconfigure + build Sneeze
 #   .\scripts\build-windows.ps1 -Deps                 # Deps only
 #   .\scripts\build-windows.ps1 -All                  # Deps, then Sneeze
 #   .\scripts\build-windows.ps1 -Only filament        # Rebuild one dep
@@ -44,16 +46,16 @@ param (
    [switch]   $List,
    [switch]   $Deps,
    [switch]   $All,
-   [switch]   $Configure,
+   [switch]   $Fresh,
    [Parameter (ValueFromRemainingArguments = $true)]
    [string[]] $CMakeExtraArgs
 )
 
 $ErrorActionPreference = 'Stop'
 
-$modeCount = @($Deps, $All, $Configure) | Where-Object { $_ } | Measure-Object | Select-Object -ExpandProperty Count
+$modeCount = @($Deps, $All, $Fresh) | Where-Object { $_ } | Measure-Object | Select-Object -ExpandProperty Count
 if ($modeCount -gt 1) {
-   Write-Error '-Deps, -All, and -Configure are mutually exclusive'
+   Write-Error '-Deps, -All, and -Fresh are mutually exclusive'
    exit 1
 }
 
@@ -75,8 +77,8 @@ $StampDir = Join-Path $DepsBuildDir '.dep-stamps'
 # Any of these flags => deps mode.
 $DepsMode   = [bool]($Deps -or $All -or $Only -or $List -or $CleanStamps)
 $SneezeMode = [bool]((-not $DepsMode) -or $All)
-# Reconfigure the Sneeze tree before building (implied by -All or -Configure).
-$Reconfigure = [bool]($All -or $Configure)
+# Reconfigure the Sneeze tree before building (implied by -All or -Fresh).
+$Reconfigure = [bool]($All -or $Fresh)
 
 # ---------------------------------------------------------------------------
 # Dependency graph -- order matters (deps before dependents).
@@ -240,12 +242,12 @@ if ($DepsMode) {
 # Sneeze mode -- configure (if -All) + plain `cmake --build`, no dep checks.
 # ---------------------------------------------------------------------------
 
-if ($Configure -or $SneezeMode) {
-   # -Configure or -All: reconfigure the Sneeze tree from src/CMakeLists.txt
-   # before building. Default (no -All, no -Configure): skip configure; rely
+if ($Fresh -or $SneezeMode) {
+   # -Fresh or -All: reconfigure the Sneeze tree from src/CMakeLists.txt
+   # before building. Default (no -All, no -Fresh): skip configure; rely
    # on an already-configured tree. If the tree doesn't exist, `cmake --build`
    # will fail with a clear "CMakeCache.txt is missing" error -- the user
-   # should re-run with -Configure (or -All if deps are also missing).
+   # should re-run with -Fresh (or -All if deps are also missing).
    if ($Reconfigure) {
       Write-Host ''
       Write-Host "==> Configuring Sneeze tree at $SneezeBuildDir"
@@ -258,6 +260,11 @@ if ($Configure -or $SneezeMode) {
          "-DSNEEZE_PLATFORM=$Platform"
          "-DSNEEZE_BUILD_ROOT=$SneezeOutDir"
       )
+
+      # -Fresh maps to `cmake --fresh` (CMake 3.24+): wipes CMakeCache.txt +
+      # CMakeFiles/ before reconfiguring. -All's reconfigure stays normal
+      # (idempotent cache update) -- -Fresh is the explicit "start over" path.
+      if ($Fresh) { $sneezeConfigureArgs += '--fresh' }
 
       & cmake @sneezeConfigureArgs
       if ($LASTEXITCODE -ne 0) {
