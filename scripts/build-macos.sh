@@ -13,9 +13,11 @@
 #                  cached values (compiler paths, find_package results, etc.)
 #                  can't linger. Deps tree is never touched. Requires CMake >= 3.24.
 #   --all          Build deps, then configure + build Sneeze.
-#   --only <dep>   Rebuild a single dep (implies --deps). Forwarded to build-deps.sh.
+#   --only <dep>   Build a single dep (implies --deps). Forwarded to build-deps.sh.
 #   --list         Show dep stamp cache (implies --deps). Forwarded to build-deps.sh.
-#   --clean-stamps Invalidate stamps (implies --deps). Forwarded to build-deps.sh.
+#   --rebuild      Full-scrub rebuild of dep(s) (implies --deps). Forwarded to
+#                  build-deps.sh. Combined with --only: scrubs one dep. Alone:
+#                  scrubs the entire per-config dep root.
 #
 # The deps tree (deps/CMakeLists.txt) and the Sneeze tree (src/CMakeLists.txt)
 # are two completely independent CMake projects. They share nothing. This
@@ -55,7 +57,7 @@ while [[ $# -gt 0 ]]; do
       --fresh)        FRESH=1 ;;
       --config)       shift; CONFIG="$1" ;;
       --config=*)     CONFIG="${1#--config=}" ;;
-      --only|--list|--clean-stamps)
+      --only|--list|--rebuild)
                       DEPS_FORWARD=1; EXTRA_ARGS+=("$1") ;;
       --only=*)       DEPS_FORWARD=1; EXTRA_ARGS+=("$1") ;;
       *)              EXTRA_ARGS+=("$1") ;;

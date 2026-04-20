@@ -3,9 +3,13 @@
 #
 # Each dep: configure once -> cmake --build --target <dep> -> stamp on success.
 # Stamps live in $BUILD_DIR/.dep-stamps/<dep>.done
-# Re-run = skip stamped deps. --clean-stamps to force rebuild all.
+# Re-run = skip stamped deps. --rebuild to full-scrub rebuild (see below).
 # --only <dep> to build a single dep.
 # --list to show dep order and status.
+# --rebuild (alone or with --only) wipes build outputs + all stamps.
+#   Source clones in deps/repos/ are preserved. With --only: scrubs one dep
+#   (script stamp + ExternalProject prefix + libs/<dep>/). Without --only:
+#   scrubs the entire per-config dep root.
 #
 # Expected invocation is via build-linux.sh / build-macos.sh which pick the
 # per-config directories. To invoke directly, pass --config, --platform,
@@ -14,7 +18,8 @@
 # Usage:
 #   ./scripts/build-deps.sh [options]
 #   ./scripts/build-deps.sh --only wasmtime
-#   ./scripts/build-deps.sh --only filament --clean-stamps
+#   ./scripts/build-deps.sh --only filament --rebuild
+#   ./scripts/build-deps.sh --rebuild
 #   ./scripts/build-deps.sh --list
 
 set -euo pipefail
@@ -28,7 +33,7 @@ BUILD_DIR="${BUILD_DIR:-}"
 LIBS_DIR="${LIBS_DIR:-}"
 DEP_REPO="${DEP_REPO:-$SNEEZE_DIR/deps/repos}"
 
-CLEAN_STAMPS=0
+REBUILD=0
 ONLY=""
 LIST_ONLY=0
 CMAKE_EXTRA_ARGS=()
@@ -62,7 +67,7 @@ DEPS_ORDERED+=(halogen)   # -> filament, anari-sdk
 
 while [[ $# -gt 0 ]]; do
    case "$1" in
-      --clean-stamps) CLEAN_STAMPS=1 ;;
+      --rebuild)      REBUILD=1 ;;
       --only)         shift; ONLY="$1" ;;
       --list)         LIST_ONLY=1 ;;
       --config)       shift; CONFIG="$1" ;;
@@ -129,6 +134,20 @@ invalidate_dep_configure() {
    rm -f "$BUILD_DIR/$1-prefix/src/$1-stamp/$CONFIG/$1-configure"
 }
 
+# --rebuild: full scrub of a single dep's build state. Source clone in
+# deps/repos/<dep>/ is preserved.
+# Wipes:
+#   1. Script-level .done stamp.
+#   2. ExternalProject prefix dir: holds every EP stamp (download/update/
+#      patch/configure/build/install), logs, tmp/. Nuking forces the full
+#      EP chain to re-run top-to-bottom on next build.
+#   3. Per-dep build + install trees under libs/<dep>/.
+remove_dep_state() {
+   unstamp "$1"
+   rm -rf "$BUILD_DIR/$1-prefix"
+   rm -rf "$LIBS_DIR/$1"
+}
+
 list_deps() {
    for dep in "${DEPS_ORDERED[@]}"; do
       local status="pending"
@@ -148,16 +167,20 @@ if [[ $LIST_ONLY -eq 1 ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Clean stamps
+# Rebuild (scrub build state before configure)
 # ---------------------------------------------------------------------------
 
-if [[ $CLEAN_STAMPS -eq 1 ]]; then
+if [[ $REBUILD -eq 1 ]]; then
    if [[ -n "$ONLY" ]]; then
-      unstamp "$ONLY"
-      echo "Cleared stamp: $ONLY"
+      remove_dep_state "$ONLY"
+      echo "Scrubbed: $ONLY (stamp, EP prefix, build/, install/)"
    else
-      rm -rf "$STAMP_DIR"
-      echo "All stamps cleared"
+      # Nuke the entire per-config dep root: outer deps CMake build tree
+      # + every dep's libs/<dep>/ + all stamps. Source clones untouched.
+      # DEP_ROOT is the shared parent of BUILD_DIR and LIBS_DIR.
+      DEP_ROOT="$(dirname "$BUILD_DIR")"
+      rm -rf "$DEP_ROOT"
+      echo "Scrubbed: $DEP_ROOT"
    fi
 fi
 

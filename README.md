@@ -264,19 +264,19 @@ Just run the script with no flags. It's a plain `cmake --build` against the pre-
 
 ### One dependency changed upstream
 
-Clear that dep's stamp and rerun in deps mode — every other dep stays cached. Stamps are per-config, so clearing Release doesn't touch Debug.
+Full-scrub rebuild that one dep — every other dep stays cached. `-Rebuild` wipes the dep's build tree, install tree, and all stamps (script + ExternalProject). The source clone in `deps/repos/` is preserved. Rebuilds are per-config, so rebuilding Release doesn't touch Debug.
 
 **Windows:**
 ```powershell
-.\scripts\build-windows.ps1 -CleanStamps -Only filament
+.\scripts\build-windows.ps1 -Only filament -Rebuild
 ```
 
 **Linux / macOS:**
 ```bash
-./scripts/build-linux.sh --clean-stamps --only filament
+./scripts/build-linux.sh --only filament --rebuild
 ```
 
-(Any of `-Only` / `-CleanStamps` / `-List` implies `-Deps` mode — the script won't touch Sneeze.)
+(Any of `-Only` / `-Rebuild` / `-List` implies `-Deps` mode — the script won't touch Sneeze.)
 
 ### You want to inspect which deps are cached
 
@@ -290,21 +290,21 @@ Clear that dep's stamp and rerun in deps mode — every other dep stays cached. 
 
 ### Nuclear option — full rebuild of one config
 
-Delete the dep and Sneeze trees for that config and rerun with `-All`. Source clones in `deps/repos/` are preserved, so no re-download.
-
-**Linux / macOS:**
-```bash
-rm -rf deps/builds/linux-x64/release builds/linux-x64/release
-./scripts/build-linux.sh --all --config Release
-```
+`-Rebuild` alone wipes the entire per-config dep root, then re-runs the full deps build. Combine with `-Fresh` to also reconfigure the Sneeze tree from scratch. Source clones in `deps/repos/` are preserved — no re-download.
 
 **Windows:**
 ```powershell
-Remove-Item -Recurse -Force deps\builds\windows-x64\release, builds\windows-x64\release
-.\scripts\build-windows.ps1 -All -Config Release
+.\scripts\build-windows.ps1 -Rebuild -Config Release
+.\scripts\build-windows.ps1 -Fresh   -Config Release
 ```
 
-To wipe *everything* including the shared source clones, remove `deps/repos/` too.
+**Linux / macOS:**
+```bash
+./scripts/build-linux.sh --rebuild --config Release
+./scripts/build-linux.sh --fresh   --config Release
+```
+
+To wipe *everything* including the shared source clones, delete `deps/repos/` manually too.
 
 ### Build-script flags at a glance
 
@@ -317,9 +317,9 @@ Default (no flag) builds Sneeze only. Mode flags and the convenience flags that 
 | `-Fresh` | `--fresh` | Reconfigure the Sneeze tree **from scratch** (passes `cmake --fresh`, wiping `CMakeCache.txt` + `CMakeFiles/`), then build it. Deps tree not touched. Requires CMake >= 3.24. |
 | `-All` | `--all` | Build dependencies, then configure + build Sneeze |
 | `-Config Debug\|Release` | `--config Debug\|Release` | Build configuration (default: Release) |
-| `-Only <dep>` | `--only <dep>` | Rebuild one dep (implies deps mode) |
+| `-Only <dep>` | `--only <dep>` | Build one dep if not cached (implies deps mode) |
 | `-List` | `--list` | Show dep order + cached/pending status (implies deps mode) |
-| `-CleanStamps` | `--clean-stamps` | Invalidate stamps, all or just `-Only <dep>` (implies deps mode) |
+| `-Rebuild` | `--rebuild` | Full-scrub rebuild — wipes build outputs + stamps. With `-Only <dep>`: one dep. Alone: entire per-config dep root. Source clones preserved (implies deps mode). |
 
 `-Deps`, `-Fresh`, and `-All` are mutually exclusive.
 
@@ -474,7 +474,7 @@ All dependencies are built from source by the deps tree (`deps/CMakeLists.txt` +
 | `python` opens the Microsoft Store | Windows Store alias is intercepting | Settings > Apps > Advanced app settings > App execution aliases — turn off `python.exe` and `python3.exe` |
 | Build takes extremely long on first run | Wasmtime Rust compilation + Filament C++ compilation dominate | Normal — each is ~30 minutes on a fast machine. Subsequent runs skip both. Use `--list` to see stamp status. |
 | One dep fails but others succeeded | Stamp caching — only the failed dep needs re-running | Fix the underlying issue (missing tool, network blip), then rerun with `--only <dep>` |
-| You pulled a dep update from upstream and the script still skips it | Stamp files are by dep name, not content hash | `--clean-stamps --only <dep>` forces that one to rebuild. Stamps are per-config — clearing Release does not affect Debug. |
+| You pulled a dep update from upstream and the script still skips it | Stamp files are by dep name, not content hash | `--rebuild --only <dep>` forces that one to rebuild from scratch. Rebuilds are per-config — rebuilding Release does not affect Debug. |
 | `LNK2038 _ITERATOR_DEBUG_LEVEL mismatch` | You linked a Release Sneeze against Debug deps (or vice versa) | Debug and Release live in fully separate trees; this only happens if you manually mixed `LIBS_DIR` paths. Check that the `-Config` you passed to the build script matches the config your consumer is using. |
 | Wasmtime rebuilds when I switch to Debug even though nothing in Rust changed | Wasmtime is built in Cargo release mode regardless of `SNEEZE_CONFIG`, but its install tree lives per-config | Each config gets its own copy under `deps/builds/<platform>/<config>/libs/Wasmtime/`. A Debug Rust build would be ~50x slower and ~10x larger, so Cargo stays in `--release` mode — but the install tree is duplicated so `find_package(Wasmtime)` works cleanly per config. |
 

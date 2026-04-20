@@ -13,9 +13,12 @@
 #                 etc.) can't linger. Deps tree is never touched. Requires
 #                 CMake >= 3.24 (VS 2022 ships 3.28+, so effectively everyone).
 #   -All          Build deps, then configure + build Sneeze.
-#   -Only <dep>   Rebuild a single dep (implies -Deps).
+#   -Only <dep>   Build a single dep (implies -Deps).
 #   -List         Show dep stamp cache (implies -Deps).
-#   -CleanStamps  Invalidate stamps (implies -Deps).
+#   -Rebuild      Full-scrub rebuild of dep(s) (implies -Deps). Wipes build
+#                 outputs + all stamps; source clones in deps/repos/ are
+#                 preserved. Combined with -Only: scrubs one dep. Alone:
+#                 scrubs the entire per-config dep root.
 #
 # The deps tree (deps/CMakeLists.txt) and the Sneeze tree (src/CMakeLists.txt)
 # are two completely independent CMake projects. They share nothing. This
@@ -27,14 +30,15 @@
 # but share a single set of source clones in deps/repos/.
 #
 # Usage:
-#   .\scripts\build-windows.ps1                       # Sneeze (Release)
-#   .\scripts\build-windows.ps1 -Config Debug         # Sneeze (Debug)
-#   .\scripts\build-windows.ps1 -Fresh                # Reconfigure + build Sneeze
-#   .\scripts\build-windows.ps1 -Deps                 # Deps only
-#   .\scripts\build-windows.ps1 -All                  # Deps, then Sneeze
-#   .\scripts\build-windows.ps1 -Only filament        # Rebuild one dep
-#   .\scripts\build-windows.ps1 -Only filament -CleanStamps
-#   .\scripts\build-windows.ps1 -List                 # Stamp cache state
+#   .\scripts\build-windows.ps1                        # Sneeze (Release)
+#   .\scripts\build-windows.ps1 -Config Debug          # Sneeze (Debug)
+#   .\scripts\build-windows.ps1 -Fresh                 # Reconfigure + build Sneeze
+#   .\scripts\build-windows.ps1 -Deps                  # Deps only (cached ones skipped)
+#   .\scripts\build-windows.ps1 -All                   # Deps, then Sneeze
+#   .\scripts\build-windows.ps1 -Only filament         # Build one dep (cached = skip)
+#   .\scripts\build-windows.ps1 -Only filament -Rebuild  # Full-scrub rebuild of one dep
+#   .\scripts\build-windows.ps1 -Rebuild               # Full-scrub rebuild of all deps
+#   .\scripts\build-windows.ps1 -List                  # Stamp cache state
 
 [CmdletBinding()]
 param (
@@ -42,7 +46,7 @@ param (
    [string]   $Config = 'Release',
    [string]   $Platform = 'windows-x64',
    [string]   $Only,
-   [switch]   $CleanStamps,
+   [switch]   $Rebuild,
    [switch]   $List,
    [switch]   $Deps,
    [switch]   $All,
@@ -75,7 +79,7 @@ $SneezeBuildDir = Join-Path $SneezeOutDir 'build'
 $StampDir = Join-Path $DepsBuildDir '.dep-stamps'
 
 # Any of these flags => deps mode.
-$DepsMode   = [bool]($Deps -or $All -or $Only -or $List -or $CleanStamps)
+$DepsMode   = [bool]($Deps -or $All -or $Only -or $List -or $Rebuild)
 $SneezeMode = [bool]((-not $DepsMode) -or $All)
 # Reconfigure the Sneeze tree before building (implied by -All or -Fresh).
 $Reconfigure = [bool]($All -or $Fresh)
@@ -132,6 +136,20 @@ function Invalidate-DepConfigure ([string] $Dep) {
    Remove-Item -Force -ErrorAction SilentlyContinue $stamp
 }
 
+# -Rebuild: full scrub of a single dep's build state. Source clone in
+# deps/repos/<dep>/ is preserved.
+# Wipes:
+#   1. Script-level .done stamp.
+#   2. ExternalProject prefix dir: holds every EP stamp (download/update/
+#      patch/configure/build/install), logs, tmp/. Nuking forces the full
+#      EP chain to re-run top-to-bottom on next build.
+#   3. Per-dep build + install trees under libs/<dep>/.
+function Remove-DepState ([string] $Dep) {
+   Clear-Stamped $Dep
+   Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $DepsBuildDir "$Dep-prefix")
+   Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $LibsDir $Dep)
+}
+
 function Show-DepList {
    foreach ($dep in $DepsOrdered) {
       $status = if (Test-Stamped $dep) { 'cached' } else { 'pending' }
@@ -154,13 +172,15 @@ if ($List) {
 # ---------------------------------------------------------------------------
 
 if ($DepsMode) {
-   if ($CleanStamps) {
+   if ($Rebuild) {
       if ($Only) {
-         Clear-Stamped $Only
-         Write-Host "Cleared stamp: $Only"
+         Remove-DepState $Only
+         Write-Host "Scrubbed: $Only (stamp, EP prefix, build/, install/)"
       } else {
-         Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $StampDir
-         Write-Host 'All stamps cleared'
+         # Nuke the entire per-config dep root: outer deps CMake build tree
+         # + every dep's libs/<dep>/ + all stamps. Source clones untouched.
+         Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $DepRoot
+         Write-Host "Scrubbed: $DepRoot"
       }
    }
 
