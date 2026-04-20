@@ -127,6 +127,18 @@ bool ANARI_RENDERER::Initialize (int nWidth, int nHeight)
    m_nHeight = nHeight;
    m_aPixels.resize (nWidth * nHeight, 0);
 
+#if defined(__ANDROID__)
+   // Filament's DEFAULT backend on Android is OpenGL, whose engine init panics
+   // unless a JavaVM* was captured via JNI_OnLoad. Halogen's .so is dlopen'd by
+   // the ANARI runtime (not Java's System.loadLibrary), so JNI_OnLoad never
+   // fires. Force Vulkan: it uses VK_KHR_android_surface on a raw
+   // ANativeWindow* (supplied via HALOGEN_NATIVE_SURFACE below) — no JNI.
+   // Halogen reads FILAMENT_BACKEND in its initDevice(); the equivalent
+   // anariSetParameter("backend","vulkan") path is bypassed because Halogen
+   // doesn't promote staged params before reading them.
+   setenv ("FILAMENT_BACKEND", "vulkan", 0);
+#endif
+
    bool bOk = false;
 
    std::string sLibraryArg = m_sLibrary;
