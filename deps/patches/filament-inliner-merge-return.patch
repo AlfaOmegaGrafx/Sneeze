@@ -1,23 +1,29 @@
-Add CreateMergeReturnPass before CreateInlineExhaustivePass on the non-Metal
-optimizer pipeline.
+Enable CreateMergeReturnPass unconditionally in the performance optimizer
+pipeline (not just for Metal).
 
-Upstream filament skips merge-return for non-Metal because it breaks Tint
-conversion (WebGPU output). Sneeze/Halogen doesn't target WebGPU, so we can
-safely enable merge-return across all targets. Result: the SPIR-V inliner
-actually inlines non-tail-return functions instead of leaving 12k call sites
-un-inlined and emitting one "could not be inlined" warning per site. Matc's
-material compile becomes quieter AND meaningfully faster on Halogen's
-materials (every later pass processes less SPIR-V).
+Upstream filament only runs CreateMergeReturnPass when TargetApi is METAL,
+because MergeReturn breaks Tint conversion (WebGPU output) and has historically
+tripped bugs on some AMD macOS and Adreno drivers. Sneeze/Halogen doesn't target
+WebGPU and isn't affected by those specific driver issues, so we enable the pass
+for every target. Result: the SPIR-V inliner (CreateInlineExhaustivePass, run
+immediately after) actually inlines non-tail-return functions instead of
+leaving thousands of call sites un-inlined and emitting one "could not be
+inlined" warning per site. Material compiles become quieter, downstream passes
+process smaller SPIR-V, and shipped shader binaries are smaller and more
+portable across mobile drivers that can't re-inline what desktop drivers can.
 
-Target: libs/filamat/src/GLSLPostProcessor.cpp, non-Metal optimizer pipeline.
+Target: libs/filamat/src/GLSLPostProcessor.cpp, registerPerformancePasses (the
+non-Metal optimizer pipeline used for regular material compiles). NOT
+registerSizePasses -- that's a separate, rarely-used size-optimization pipeline.
 
 --- a/libs/filamat/src/GLSLPostProcessor.cpp
 +++ b/libs/filamat/src/GLSLPostProcessor.cpp
-@@ -1118,6 +1118,7 @@ std::shared_ptr<Optimizer> GLSLPostProcessor::createOptimizer(
+@@ -1073,7 +1073,7 @@ void GLSLPostProcessor::registerPerformancePasses(Optimizer& optimizer, Config c
  
      RegisterPass(CreateWrapOpKillPass());
      RegisterPass(CreateDeadBranchElimPass());
+-    RegisterPass(CreateMergeReturnPass(), MaterialBuilder::TargetApi::METAL);
 +    RegisterPass(CreateMergeReturnPass());
      RegisterPass(CreateInlineExhaustivePass());
-     RegisterPass(CreateEliminateDeadFunctionsPass());
+     RegisterPass(CreateAggressiveDCEPass());
      RegisterPass(CreatePrivateToLocalPass());
