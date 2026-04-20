@@ -1,0 +1,23 @@
+Add CreateMergeReturnPass before CreateInlineExhaustivePass on the non-Metal
+optimizer pipeline.
+
+Upstream filament skips merge-return for non-Metal because it breaks Tint
+conversion (WebGPU output). Sneeze/Halogen doesn't target WebGPU, so we can
+safely enable merge-return across all targets. Result: the SPIR-V inliner
+actually inlines non-tail-return functions instead of leaving 12k call sites
+un-inlined and emitting one "could not be inlined" warning per site. Matc's
+material compile becomes quieter AND meaningfully faster on Halogen's
+materials (every later pass processes less SPIR-V).
+
+Target: libs/filamat/src/GLSLPostProcessor.cpp, non-Metal optimizer pipeline.
+
+--- a/libs/filamat/src/GLSLPostProcessor.cpp
++++ b/libs/filamat/src/GLSLPostProcessor.cpp
+@@ -1118,6 +1118,7 @@ std::shared_ptr<Optimizer> GLSLPostProcessor::createOptimizer(
+
+     RegisterPass(CreateWrapOpKillPass());
+     RegisterPass(CreateDeadBranchElimPass());
++    RegisterPass(CreateMergeReturnPass());
+     RegisterPass(CreateInlineExhaustivePass());
+     RegisterPass(CreateEliminateDeadFunctionsPass());
+     RegisterPass(CreatePrivateToLocalPass());
