@@ -52,34 +52,28 @@ set (_repo "${SNEEZE_DEP_REPO}/filament")
 if (EXISTS "${_repo}/.git")
    set (_git_args)
 else ()
+   # Pinned to v1.71.0 + our SPIR-V inliner merge-return patch on
+   # MetaversalCorp/filament fork. The patch lets CreateInlineExhaustivePass
+   # actually inline non-tail-return functions (upstream skips that outside
+   # the Metal pipeline because of Tint/WebGPU concerns that don't apply to
+   # us). Material compiles run quieter and downstream spirv-opt passes do
+   # less work. See https://github.com/MetaversalCorp/filament fork tag.
    set (_git_args
       GIT_REPOSITORY https://github.com/MetaversalCorp/filament.git
-      GIT_TAG        main
+      GIT_TAG        mvc/v1.71.0-inliner-patch
       GIT_SHALLOW    ON
    )
 endif ()
 
-# Filament patches applied via PATCH_COMMAND (runs once after clone, before
-# configure -- stamp-gated by ExternalProject, so not re-run on reconfigure).
-#
-# 1. SPIR-V inliner needs merge-return on the non-Metal path too. Filament
-#    upstream omits it because of Tint (WebGPU) breakage; we don't target
-#    WebGPU, so we can safely add it. Silences the ~12k "could not be
-#    inlined because the return instruction is not at the end of the
-#    function" warnings per Halogen material compile AND lets the inliner
-#    actually do its job -- every subsequent spirv-opt pass then has less
-#    SPIR-V to chew through. Meaningful speedup on matc.
-# 2. Cross-compile: copy host-built ImportExecutables-Release.cmake into
-#    filament's source root. Filament's top-level CMake resolves
-#    IMPORT_EXECUTABLES as ${FILAMENT}/${IMPORT_EXECUTABLES_DIR}/ImportExecutables-Release.cmake
-#    with IMPORT_EXECUTABLES_DIR empty by default -- placing the file at
-#    ${FILAMENT}/ImportExecutables-Release.cmake satisfies the include().
-set (FILAMENT_PATCH_COMMAND
-   git -C "${_repo}" apply "${CMAKE_CURRENT_LIST_DIR}/patches/filament-inliner-merge-return.patch"
-)
+# Cross-compile: copy host-built ImportExecutables-Release.cmake into
+# filament's source root. Filament's top-level CMake resolves
+# IMPORT_EXECUTABLES as ${FILAMENT}/${IMPORT_EXECUTABLES_DIR}/ImportExecutables-Release.cmake
+# with IMPORT_EXECUTABLES_DIR empty by default -- placing the file at
+# ${FILAMENT}/ImportExecutables-Release.cmake satisfies the include().
+set (FILAMENT_PATCH_COMMAND "")
 if (IMPORT_EXECUTABLES_HOST_FILE AND EXISTS "${IMPORT_EXECUTABLES_HOST_FILE}")
-   list (APPEND FILAMENT_PATCH_COMMAND
-      COMMAND ${CMAKE_COMMAND} -E copy
+   set (FILAMENT_PATCH_COMMAND
+      ${CMAKE_COMMAND} -E copy
          "${IMPORT_EXECUTABLES_HOST_FILE}"
          "${_repo}/ImportExecutables-Release.cmake"
    )
