@@ -482,4 +482,4 @@ All dependencies are built from source by the deps tree (`deps/CMakeLists.txt` +
 
 ## License
 
-Apache License 2.0 — see individual source files for the full header.
+Apache License 2.0 — see individual source files for the full header..
