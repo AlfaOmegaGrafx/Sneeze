@@ -38,18 +38,12 @@ set (FILAMENT_GCC_ARGS)
 
 if (WIN32)
    set (FILAMENT_CRT_ARGS -DUSE_STATIC_CRT=OFF -DDIST_DIR=x86_64/md)
-   # Filament's FILAMENT_SHORTEN_MSVC_COMPILATION does two unrelated things:
-   # it adds /MP (parallel compile across source files) AND it appends
-   # /D_ITERATOR_DEBUG_LEVEL=0 to Debug, which mismatches every downstream
-   # consumer (Halogen, Sneeze) that uses standard /MDd + IDL=2. We want /MP
-   # but not the IDL=0. Disable the shortening option and re-inject /MP via
-   # CMAKE_CXX_FLAGS ourselves. Without /MP, MSBuild serializes ~thousand
-   # source files across one core -- the difference is tens of minutes.
+   # Filament's FILAMENT_SHORTEN_MSVC_COMPILATION appends /D_ITERATOR_DEBUG_LEVEL=0
+   # to Debug, which mismatches every downstream consumer (Halogen, Sneeze) that
+   # doesn't also set it. Disable the shortening on Debug so filament's Debug
+   # CRT matches standard /MDd + _ITERATOR_DEBUG_LEVEL=2.
    if (SNEEZE_CONFIG STREQUAL "Debug")
-      list (APPEND FILAMENT_CRT_ARGS
-         -DFILAMENT_SHORTEN_MSVC_COMPILATION=OFF
-         "-DCMAKE_CXX_FLAGS=/MP"
-         "-DCMAKE_C_FLAGS=/MP")
+      list (APPEND FILAMENT_CRT_ARGS -DFILAMENT_SHORTEN_MSVC_COMPILATION=OFF)
    endif ()
 endif ()
 
