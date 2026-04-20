@@ -38,13 +38,18 @@ set (FILAMENT_GCC_ARGS)
 
 if (WIN32)
    set (FILAMENT_CRT_ARGS -DUSE_STATIC_CRT=OFF -DDIST_DIR=x86_64/md)
-   # Filament's FILAMENT_SHORTEN_MSVC_COMPILATION appends /D_ITERATOR_DEBUG_LEVEL=0
-   # to Debug, which mismatches every downstream consumer (Halogen, Sneeze) that
-   # doesn't also set it. Disable the shortening on Debug so filament's Debug
-   # CRT matches standard /MDd + _ITERATOR_DEBUG_LEVEL=2. Losing /MP is a minor
-   # one-time dep-build speed cost; the CRT match is what matters.
+   # Filament's FILAMENT_SHORTEN_MSVC_COMPILATION does two unrelated things:
+   # it adds /MP (parallel compile across source files) AND it appends
+   # /D_ITERATOR_DEBUG_LEVEL=0 to Debug, which mismatches every downstream
+   # consumer (Halogen, Sneeze) that uses standard /MDd + IDL=2. We want /MP
+   # but not the IDL=0. Disable the shortening option and re-inject /MP via
+   # CMAKE_CXX_FLAGS ourselves. Without /MP, MSBuild serializes ~thousand
+   # source files across one core -- the difference is tens of minutes.
    if (SNEEZE_CONFIG STREQUAL "Debug")
-      list (APPEND FILAMENT_CRT_ARGS -DFILAMENT_SHORTEN_MSVC_COMPILATION=OFF)
+      list (APPEND FILAMENT_CRT_ARGS
+         -DFILAMENT_SHORTEN_MSVC_COMPILATION=OFF
+         "-DCMAKE_CXX_FLAGS=/MP"
+         "-DCMAKE_C_FLAGS=/MP")
    endif ()
 endif ()
 
@@ -79,6 +84,63 @@ if (IMPORT_EXECUTABLES_HOST_FILE AND EXISTS "${IMPORT_EXECUTABLES_HOST_FILE}")
    )
 endif ()
 
+# Debug Filament builds on Windows are dominated by matc (material compiler)
+# runtime, because matc gets built Debug -- and Debug matc runs roughly 10x
+# slower than Release matc. For Debug native builds, stand up a second
+# Filament build that produces Release host tools only, and have the main
+# Debug build import them instead of rebuilding them Debug:
+#   1. Release-only host-tools build into a side dir. Only matc/cmgen/etc.
+#      get built; FILAMENT_EXPORT_PREBUILT_EXECUTABLES_DIR writes an
+#      ImportExecutables-Prebuilt.cmake that records their paths.
+#   2. The main Debug build imports those targets via
+#      FILAMENT_IMPORT_PREBUILT_EXECUTABLES_DIR, so material compilation uses
+#      the Release tools while the library itself stays Debug-instrumented.
+# Always on for Debug native builds -- roughly doubles disk / first-configure
+# time but cuts total Debug dep-build time by a large margin, which matters
+# far more in practice. Skipped when cross-compiling (host artifact already
+# provides ImportExecutables-Release.cmake via IMPORT_EXECUTABLES_HOST_FILE).
+set (_host_tools_import_args)
+set (_filament_deps)
+if (SNEEZE_CONFIG STREQUAL "Debug" AND NOT CMAKE_CROSSCOMPILING)
+   # Filament's IMPORT_EXECUTABLES path is always ${FILAMENT_SOURCE}/${DIR}/
+   # ImportExecutables-<TYPE>.cmake, with "${DIR}" joined naively, so passing
+   # an absolute path here produces garbage (filament/C:/...). Use "." so the
+   # export/import file lives in the filament source root -- same slot the
+   # cross-compile IMPORT_EXECUTABLES_HOST_FILE path uses.
+   ExternalProject_Add (filament-host-tools
+      ${_git_args}
+      SOURCE_DIR       "${_repo}"
+      BINARY_DIR       "${LIBS_DIR}/filament-host-tools/build"
+      INSTALL_DIR      "${LIBS_DIR}/filament-host-tools/install"
+      CMAKE_ARGS
+         -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+         -DCMAKE_BUILD_TYPE=Release
+         -DFILAMENT_BUILD_TESTING=OFF
+         -DFILAMENT_SKIP_SAMPLES=ON
+         -DFILAMENT_SKIP_SDL2=ON
+         -DFILAMENT_ENABLE_MATDBG=OFF
+         -DFILAMENT_EXPORT_PREBUILT_EXECUTABLES_DIR=.
+         ${FILAMENT_BACKEND_ARGS}
+         -DUSE_STATIC_CRT=OFF -DDIST_DIR=x86_64/md
+         ${CROSS_COMPILE_ARGS}
+      # Build only the host tools we need (matc dominates). The other targets
+      # in the export list are cheap but we still restrict explicitly so a
+      # future filament change doesn't balloon this stage.
+      BUILD_COMMAND    ${CMAKE_COMMAND} --build <BINARY_DIR> --config Release
+                          --target matc --target cmgen --target filamesh
+                          --target mipgen --target resgen --target uberz
+                          --target glslminifier
+      # No install needed -- only the exported ImportExecutables-Prebuilt.cmake
+      # in the filament source root matters.
+      INSTALL_COMMAND  ""
+      PATCH_COMMAND ${FILAMENT_PATCH_COMMAND}
+   )
+   set (_host_tools_import_args
+      -DFILAMENT_IMPORT_PREBUILT_EXECUTABLES_DIR=.
+   )
+   set (_filament_deps DEPENDS filament-host-tools)
+endif ()
+
 # Filament tracks the outer SNEEZE_CONFIG. On Windows we force standard
 # /MDd + _ITERATOR_DEBUG_LEVEL=2 for Debug (see FILAMENT_CRT_ARGS above) so
 # Halogen Debug can link against filament Debug without the old hybrid-CRT
@@ -100,10 +162,12 @@ ExternalProject_Add (filament
       -DFILAMENT_ENABLE_MATDBG=OFF
       ${FILAMENT_BACKEND_ARGS}
       ${FILAMENT_CRT_ARGS}
+      ${_host_tools_import_args}
       ${CROSS_COMPILE_ARGS}
    BUILD_COMMAND    ${CMAKE_COMMAND} --build <BINARY_DIR> --config ${SNEEZE_CONFIG}
    INSTALL_COMMAND  ${CMAKE_COMMAND} --build <BINARY_DIR> --config ${SNEEZE_CONFIG} --target install
    PATCH_COMMAND ${FILAMENT_PATCH_COMMAND}
+   ${_filament_deps}
 )
 
 # Host filament builds generate ImportExecutables-Release.cmake in the
