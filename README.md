@@ -137,6 +137,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-windows.ps1 -All
 
 Add `-Config Debug` / `--config Debug` to any of these for a Debug build. Debug and Release live in separate trees, so running both populates both side-by-side.
 
+> **Debug requires Release filament first.** Halogen's Debug build uses the Release `matc` binary (Debug `matc` is 10–100x slower and makes a fresh Halogen Debug build take hours). Run the Release deps flow before the Debug deps flow on any given platform — `-All` / `--all` above builds Release by default, so the usual first-time sequence (Release first, then Debug) just works. If you try to build Debug Halogen without Release `matc` on disk, configure halts with the exact command to run first.
+
 ### Every day after that — build Sneeze (seconds)
 
 ```powershell

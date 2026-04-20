@@ -33,6 +33,41 @@ if (ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
    set (HALOGEN_FIND_ARGS -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH)
 endif ()
 
+# Debug Halogen's material compilation is dominated by matc runtime. Debug
+# matc on Windows runs roughly 10-100x slower than Release matc
+# (unoptimized codegen + MSVC _ITERATOR_DEBUG_LEVEL=2 on the SPIR-V
+# optimizer's std::vector<uint32_t>-heavy passes). Preset FILAMENT_MATC to
+# the Release filament's matc so Halogen's find_program(FILAMENT_MATC matc
+# HINTS ...) picks up the Release binary -- find_program is a no-op when
+# the cache variable is already set. Release matc links the Release CRT
+# (MSVCP140.dll, not MSVCP140D.dll) so it runs standalone regardless of
+# the outer config's toolset state.
+#
+# Release filament is thus a prerequisite for Debug Halogen, enforced
+# here at configure time with a clear build-this-first hint.
+set (HALOGEN_MATC_ARGS)
+if (SNEEZE_CONFIG STREQUAL "Debug" AND NOT CMAKE_CROSSCOMPILING)
+   get_filename_component (_sneeze_build_root "${LIBS_DIR}/../.." ABSOLUTE)
+   set (_release_matc
+      "${_sneeze_build_root}/release/libs/filament/install/bin/matc${CMAKE_EXECUTABLE_SUFFIX}")
+   if (NOT EXISTS "${_release_matc}")
+      if (WIN32)
+         set (_build_hint "scripts/build-windows.ps1 -Deps -Only filament -Config Release")
+      elseif (APPLE)
+         set (_build_hint "scripts/build-macos.sh --deps --only filament --config Release")
+      else ()
+         set (_build_hint "scripts/build-linux.sh --deps --only filament --config Release")
+      endif ()
+      message (FATAL_ERROR
+         "Halogen Debug requires Release filament to be built first.\n"
+         "Expected matc at:\n"
+         "  ${_release_matc}\n"
+         "Run:\n"
+         "  ${_build_hint}")
+   endif ()
+   list (APPEND HALOGEN_MATC_ARGS -DFILAMENT_MATC=${_release_matc})
+endif ()
+
 # Halogen links against the regular anari-sdk install -- matches SNEEZE_CONFIG
 # (Debug anari when building Debug, Release anari when building Release).
 set (_halogen_anari_root "${LIBS_DIR}/ANARI-SDK/install")
@@ -69,6 +104,7 @@ ExternalProject_Add (halogen
       -DBUILD_TESTS=OFF
       ${MSVC_CRT_ARGS}
       ${HALOGEN_FIND_ARGS}
+      ${HALOGEN_MATC_ARGS}
       -DANARI_ROOT=${_halogen_anari_root}
       -Danari_DIR=${_halogen_anari_dir}
       -DFILAMENT_ROOT=${LIBS_DIR}/filament/install
