@@ -17,10 +17,39 @@ if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.27")
    cmake_policy (SET CMP0144 NEW)
 endif ()
 file (STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../VERSION" SNEEZE_VER)
+
+# Limit multi-config generators (VS, Xcode, Ninja Multi-Config) to the two
+# configs we actually support. The path generalization block below uses
+# $<LOWER_CASE:$<CONFIG>> in INTERFACE_INCLUDE_DIRECTORIES on imported
+# targets, and CMake validates those paths against every entry in
+# CMAKE_CONFIGURATION_TYPES at generate time. Default VS values include
+# MinSizeRel and RelWithDebInfo, which resolve to deps paths that don't
+# exist on disk (the deps trees are only built for debug and release).
+# Must be set BEFORE project() so it takes effect for this build.
+set (CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING
+   "Semicolon separated list of supported configuration types" FORCE)
+
 project (Sneeze VERSION ${SNEEZE_VER} LANGUAGES C CXX)
 
 set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# ---------------------------------------------------------------------------
+# Release PDBs (MSVC)
+# ---------------------------------------------------------------------------
+# Generate PDB symbol files for Release builds so crash dumps and attach-to-
+# process debugging can resolve symbols against optimized binaries. /Zi emits
+# debug info into .obj; /DEBUG tells the linker to produce a .pdb next to the
+# binary. /DEBUG alone silently disables /OPT:REF and /OPT:ICF -- we force them
+# back on so codegen and binary size stay identical to a no-PDB Release build.
+if (MSVC)
+   add_compile_options ($<$<CONFIG:Release>:/Zi>)
+   add_link_options    (
+      $<$<CONFIG:Release>:/DEBUG>
+      $<$<CONFIG:Release>:/OPT:REF>
+      $<$<CONFIG:Release>:/OPT:ICF>
+   )
+endif ()
 
 option (USE_LOCAL_DEPS "Find dependencies in libs/ (ON) or via vcpkg find_package (OFF)" ON)
 option (SNEEZE_ENABLE_WASM "Enable WebAssembly runtime (Wasmtime)" ON)
@@ -33,41 +62,56 @@ endif ()
 # ---------------------------------------------------------------------------
 # Force output directories
 # ---------------------------------------------------------------------------
-# The build scripts pass SNEEZE_BUILD_ROOT = <repo>/builds/<platform>/<config>.
-# We place Sneeze.lib at <root>/install/lib and all executables at
-# <root>/install/bin -- mirroring each dep's <root>/libs/<Name>/install/{bin,lib}
-# layout so the Sneeze output tree is structurally symmetric with the deps
-# output tree. Per-config variants (suffixed _DEBUG, _RELEASE, ...) defeat
-# the subfolder that multi-config generators (Visual Studio, Xcode) append
-# by default, since this tree is already keyed by config.
+# The build scripts pass SNEEZE_BUILD_ROOT = <repo>/builds/<platform>.
+# Outputs land in <root>/install/<config>/{bin,lib} where <config> is the
+# active build config (debug/release), resolved at BUILD time so a single
+# multi-config CMake tree (Visual Studio / Xcode / Ninja Multi-Config) can
+# produce both Debug and Release binaries into distinct install trees.
 
 if (NOT DEFINED SNEEZE_BUILD_ROOT)
    # Direct configure (no wrapper script). Fall back to the CMake binary dir.
    set (SNEEZE_BUILD_ROOT "${CMAKE_BINARY_DIR}")
 endif ()
 
-# These two are informational -- the build scripts pass them so CMake status
-# output shows which config/platform was requested. Declaring them here also
-# prevents CMake's "manually-specified variables were not used" warning.
-if (NOT DEFINED SNEEZE_CONFIG)
-   set (SNEEZE_CONFIG "${CMAKE_BUILD_TYPE}")
+# SNEEZE_CONFIG names the config used to resolve find_package during THIS
+# configure (the deps tree is still per-config). It is NOT the config binaries
+# are emitted for -- that is decided per `cmake --build --config`. Precedence:
+#   1. Caller passes -DSNEEZE_CONFIG=<cfg>.
+#   2. CMAKE_BUILD_TYPE (single-config generators).
+#   3. Derive from LIBS_DIR's .../{debug,release}/libs/... segment.
+#   4. Default: release.
+if (NOT DEFINED SNEEZE_CONFIG OR SNEEZE_CONFIG STREQUAL "")
+   if (CMAKE_BUILD_TYPE)
+      set (SNEEZE_CONFIG "${CMAKE_BUILD_TYPE}")
+   elseif (LIBS_DIR MATCHES "/(debug|release|relwithdebinfo|minsizerel)/")
+      set (SNEEZE_CONFIG "${CMAKE_MATCH_1}")
+   else ()
+      set (SNEEZE_CONFIG "Release")
+   endif ()
 endif ()
 if (NOT DEFINED SNEEZE_PLATFORM)
    set (SNEEZE_PLATFORM "unknown")
 endif ()
 
-message (STATUS "Sneeze: platform   = ${SNEEZE_PLATFORM}")
-message (STATUS "Sneeze: config     = ${SNEEZE_CONFIG}")
-message (STATUS "Sneeze: libs dir   = ${LIBS_DIR}")
-message (STATUS "Sneeze: build root = ${SNEEZE_BUILD_ROOT}")
+string (TOLOWER "${SNEEZE_CONFIG}" SNEEZE_CONFIG_LC)
 
-set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${SNEEZE_BUILD_ROOT}/install/lib")
-set (CMAKE_LIBRARY_OUTPUT_DIRECTORY "${SNEEZE_BUILD_ROOT}/install/lib")
-set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${SNEEZE_BUILD_ROOT}/install/bin")
+message (STATUS "Sneeze: platform      = ${SNEEZE_PLATFORM}")
+message (STATUS "Sneeze: find config   = ${SNEEZE_CONFIG}")
+message (STATUS "Sneeze: libs dir      = ${LIBS_DIR}")
+message (STATUS "Sneeze: build root    = ${SNEEZE_BUILD_ROOT}")
+
+# Per-config output dirs. Generator expression $<LOWER_CASE:$<CONFIG>> resolves
+# at build time, so Debug and Release get their own install trees. Also set
+# the generator-level default so single-config generators without an explicit
+# per-config value still land in the right place.
+set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${SNEEZE_BUILD_ROOT}/install/$<LOWER_CASE:$<CONFIG>>/lib")
+set (CMAKE_LIBRARY_OUTPUT_DIRECTORY "${SNEEZE_BUILD_ROOT}/install/$<LOWER_CASE:$<CONFIG>>/lib")
+set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${SNEEZE_BUILD_ROOT}/install/$<LOWER_CASE:$<CONFIG>>/bin")
 foreach (_cfg IN ITEMS DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
-   set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${_cfg} "${SNEEZE_BUILD_ROOT}/install/lib")
-   set (CMAKE_LIBRARY_OUTPUT_DIRECTORY_${_cfg} "${SNEEZE_BUILD_ROOT}/install/lib")
-   set (CMAKE_RUNTIME_OUTPUT_DIRECTORY_${_cfg} "${SNEEZE_BUILD_ROOT}/install/bin")
+   string (TOLOWER "${_cfg}" _cfg_lc)
+   set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${_cfg} "${SNEEZE_BUILD_ROOT}/install/${_cfg_lc}/lib")
+   set (CMAKE_LIBRARY_OUTPUT_DIRECTORY_${_cfg} "${SNEEZE_BUILD_ROOT}/install/${_cfg_lc}/lib")
+   set (CMAKE_RUNTIME_OUTPUT_DIRECTORY_${_cfg} "${SNEEZE_BUILD_ROOT}/install/${_cfg_lc}/bin")
 endforeach ()
 
 # Automatically disable XR on iOS (VisionOS deferred)
@@ -143,6 +187,218 @@ else ()
    # pinned layout; USE_LOCAL_DEPS=OFF requires them on the system include
    # path already. Users configuring without LOCAL_DEPS must provide
    # BORINGSSL_INCLUDE / BORINGSSL_CRYPTO_LIB / JWT_CPP_INCLUDE manually.
+endif ()
+
+# ---------------------------------------------------------------------------
+# Dual-config path generalization
+# ---------------------------------------------------------------------------
+# find_package + find_library resolved absolute paths against LIBS_DIR, which
+# contains the SNEEZE_CONFIG_LC segment (e.g. "/release/"). To let ONE CMake
+# tree build both Debug and Release (VS/Xcode/Ninja MC dropdown), we rewrite
+# that config segment to a generator expression that expands at build time.
+# At configure time LIBS_DIR still resolves to whichever config we configured
+# against; at build time, Debug builds pull from deps/builds/<plat>/debug/libs,
+# Release from .../release/libs.
+#
+# REQUIREMENT: both configs' dep trees must already be built on disk before
+# the `cmake --build --config <cfg>` invocation. This is the programmer's
+# responsibility (build-*.ps1 / build-*.sh handles it for both configs).
+
+if (USE_LOCAL_DEPS)
+   set (_sneeze_cfg_seg     "/${SNEEZE_CONFIG_LC}/")
+   set (_sneeze_cfg_gen     "/$<LOWER_CASE:$<CONFIG>>/")
+   set (_sneeze_cfg_debug   "/debug/")
+   set (_sneeze_cfg_release "/release/")
+
+   # Given a path that was naively string-substituted to target a different
+   # config, return the actual on-disk path. Handles Sneeze's debug-suffix
+   # deps: libcurl -> libcurl-d, openxr_loader -> openxr_loaderd,
+   # spirv-cross-core -> spirv-cross-cored, etc. Falls back to the input.
+   function (_sneeze_resolve_variant in_path out_var)
+      if (EXISTS "${in_path}")
+         set (${out_var} "${in_path}" PARENT_SCOPE)
+         return ()
+      endif ()
+      foreach (_suffix IN ITEMS "d" "-d")
+         string (REGEX REPLACE "\\.lib$" "${_suffix}.lib" _alt "${in_path}")
+         if (EXISTS "${_alt}")
+            set (${out_var} "${_alt}" PARENT_SCOPE)
+            return ()
+         endif ()
+      endforeach ()
+      string (REGEX REPLACE "([^/\\\\])-d\\.lib$" "\\1.lib" _alt "${in_path}")
+      if (EXISTS "${_alt}")
+         set (${out_var} "${_alt}" PARENT_SCOPE)
+         return ()
+      endif ()
+      string (REGEX REPLACE "([^/\\\\])d\\.lib$" "\\1.lib" _alt "${in_path}")
+      if (EXISTS "${_alt}")
+         set (${out_var} "${_alt}" PARENT_SCOPE)
+         return ()
+      endif ()
+      set (${out_var} "${in_path}" PARENT_SCOPE)
+   endfunction ()
+
+   # Build a per-config library path expression from an existing absolute
+   # path that points into one of the config trees.
+   function (_sneeze_make_dual_lib in_path out_var)
+      string (REPLACE "${_sneeze_cfg_seg}" "${_sneeze_cfg_debug}"   _d_path "${in_path}")
+      string (REPLACE "${_sneeze_cfg_seg}" "${_sneeze_cfg_release}" _r_path "${in_path}")
+      _sneeze_resolve_variant ("${_d_path}" _d)
+      _sneeze_resolve_variant ("${_r_path}" _r)
+      set (${out_var} "$<IF:$<CONFIG:Debug>,${_d},${_r}>" PARENT_SCOPE)
+   endfunction ()
+
+   # Rewrite scalar path variables. Library paths get a $<IF:$<CONFIG:Debug>...>
+   # generator expression to accommodate Debug filename suffixes (e.g.
+   # libcurl-d.lib vs libcurl.lib). Include dirs and other paths get a
+   # simple segment replacement.
+   foreach (_v IN ITEMS
+      SPIRV_TOOLS_INCLUDE  SPIRV_TOOLS_LIB  SPIRV_TOOLS_OPT_LIB
+      CURL_INCLUDE         CURL_LIB
+      RMLUI_INCLUDE        RMLUI_CORE_LIB   RMLUI_DEBUGGER_LIB
+      NLOHMANN_JSON_INCLUDE
+      BORINGSSL_INCLUDE    BORINGSSL_CRYPTO_LIB
+      JWT_CPP_INCLUDE
+      WASMTIME_INCLUDE     WASMTIME_LIB
+      OPENXR_INCLUDE       OPENXR_LOADER_LIB
+   )
+      if (DEFINED ${_v})
+         set (_val "${${_v}}")
+         if (_val MATCHES "\\.(lib|a|so|dylib)$" AND _val MATCHES "${_sneeze_cfg_seg}")
+            _sneeze_make_dual_lib ("${_val}" _new)
+            set (${_v} "${_new}")
+         else ()
+            string (REPLACE "${_sneeze_cfg_seg}" "${_sneeze_cfg_gen}" _new "${_val}")
+            set (${_v} "${_new}")
+         endif ()
+      endif ()
+   endforeach ()
+
+   # Rewrite imported targets (anari + vox). Walk each target's INTERFACE_*
+   # properties and its transitive INTERFACE_LINK_LIBRARIES, setting both
+   # IMPORTED_LOCATION_DEBUG and IMPORTED_LOCATION_RELEASE from the single
+   # path we currently have. Generator expressions go into include dirs and
+   # INTERFACE_LINK_LIBRARIES entries that are raw paths.
+
+   function (_sneeze_dualize_target tgt)
+      if (NOT TARGET ${tgt})
+         return ()
+      endif ()
+      get_target_property (_aliased ${tgt} ALIASED_TARGET)
+      if (_aliased)
+         set (tgt "${_aliased}")
+      endif ()
+
+      get_property (_already GLOBAL PROPERTY _SNEEZE_DUALIZED_${tgt} SET)
+      if (_already)
+         return ()
+      endif ()
+      set_property (GLOBAL PROPERTY _SNEEZE_DUALIZED_${tgt} TRUE)
+
+      get_target_property (_type ${tgt} TYPE)
+
+      # Walk transitive deps first.
+      foreach (_prop IN ITEMS INTERFACE_LINK_LIBRARIES IMPORTED_LINK_DEPENDENT_LIBRARIES)
+         get_target_property (_deps ${tgt} ${_prop})
+         if (_deps)
+            foreach (_d IN LISTS _deps)
+               # Strip generator expressions like $<LINK_ONLY:foo>
+               string (REGEX REPLACE "^\\\$<[^:]+:(.*)>$" "\\1" _d_clean "${_d}")
+               if (TARGET ${_d_clean})
+                  _sneeze_dualize_target (${_d_clean})
+               endif ()
+            endforeach ()
+         endif ()
+      endforeach ()
+
+      # Per-config IMPORTED_LOCATION_* on library targets.
+      if (_type MATCHES "LIBRARY")
+         set (_ref "")
+         foreach (_prop IN ITEMS
+            IMPORTED_LOCATION_RELEASE IMPORTED_LOCATION_DEBUG
+            IMPORTED_LOCATION_RELWITHDEBINFO IMPORTED_LOCATION_MINSIZEREL
+            IMPORTED_LOCATION_NOCONFIG IMPORTED_LOCATION)
+            get_target_property (_v ${tgt} ${_prop})
+            if (_v)
+               set (_ref "${_v}")
+               break ()
+            endif ()
+         endforeach ()
+         if (_ref AND _ref MATCHES "${_sneeze_cfg_seg}")
+            string (REPLACE "${_sneeze_cfg_seg}" "${_sneeze_cfg_debug}"   _d_raw "${_ref}")
+            string (REPLACE "${_sneeze_cfg_seg}" "${_sneeze_cfg_release}" _r_raw "${_ref}")
+            _sneeze_resolve_variant ("${_d_raw}" _d)
+            _sneeze_resolve_variant ("${_r_raw}" _r)
+            set_target_properties (${tgt} PROPERTIES
+               IMPORTED_LOCATION_DEBUG   "${_d}"
+               IMPORTED_LOCATION_RELEASE "${_r}"
+               IMPORTED_CONFIGURATIONS   "Debug;Release")
+         endif ()
+
+         # Similarly IMPORTED_IMPLIB_* (Windows shared libs have both a .dll
+         # IMPORTED_LOCATION and a .lib IMPORTED_IMPLIB).
+         set (_ref "")
+         foreach (_prop IN ITEMS
+            IMPORTED_IMPLIB_RELEASE IMPORTED_IMPLIB_DEBUG
+            IMPORTED_IMPLIB_RELWITHDEBINFO IMPORTED_IMPLIB_MINSIZEREL
+            IMPORTED_IMPLIB_NOCONFIG IMPORTED_IMPLIB)
+            get_target_property (_v ${tgt} ${_prop})
+            if (_v)
+               set (_ref "${_v}")
+               break ()
+            endif ()
+         endforeach ()
+         if (_ref AND _ref MATCHES "${_sneeze_cfg_seg}")
+            string (REPLACE "${_sneeze_cfg_seg}" "${_sneeze_cfg_debug}"   _d_raw "${_ref}")
+            string (REPLACE "${_sneeze_cfg_seg}" "${_sneeze_cfg_release}" _r_raw "${_ref}")
+            _sneeze_resolve_variant ("${_d_raw}" _d)
+            _sneeze_resolve_variant ("${_r_raw}" _r)
+            set_target_properties (${tgt} PROPERTIES
+               IMPORTED_IMPLIB_DEBUG   "${_d}"
+               IMPORTED_IMPLIB_RELEASE "${_r}")
+         endif ()
+      endif ()
+
+      # INTERFACE_INCLUDE_DIRECTORIES: generator expression is fine here.
+      get_target_property (_inc ${tgt} INTERFACE_INCLUDE_DIRECTORIES)
+      if (_inc)
+         set (_inc_new "")
+         foreach (_p IN LISTS _inc)
+            string (REPLACE "${_sneeze_cfg_seg}" "${_sneeze_cfg_gen}" _p_new "${_p}")
+            list (APPEND _inc_new "${_p_new}")
+         endforeach ()
+         set_target_properties (${tgt} PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${_inc_new}")
+      endif ()
+
+      # INTERFACE_LINK_LIBRARIES entries that are raw filesystem paths
+      # (not target names). Rewrite each such entry to a generator expression.
+      # Library paths (.lib/.a/.so/.dylib) get a $<IF:$<CONFIG:Debug>...>
+      # expression so per-config filename suffixes resolve correctly.
+      get_target_property (_ilinks ${tgt} INTERFACE_LINK_LIBRARIES)
+      if (_ilinks)
+         set (_ilinks_new "")
+         foreach (_l IN LISTS _ilinks)
+            if (_l MATCHES "${_sneeze_cfg_seg}")
+               if (_l MATCHES "\\.(lib|a|so|dylib)$")
+                  _sneeze_make_dual_lib ("${_l}" _l_new)
+               else ()
+                  string (REPLACE "${_sneeze_cfg_seg}" "${_sneeze_cfg_gen}" _l_new "${_l}")
+               endif ()
+               list (APPEND _ilinks_new "${_l_new}")
+            else ()
+               list (APPEND _ilinks_new "${_l}")
+            endif ()
+         endforeach ()
+         set_target_properties (${tgt} PROPERTIES INTERFACE_LINK_LIBRARIES "${_ilinks_new}")
+      endif ()
+   endfunction ()
+
+   foreach (_tgt IN ITEMS anari::anari_static vox::vox)
+      if (TARGET ${_tgt})
+         _sneeze_dualize_target (${_tgt})
+      endif ()
+   endforeach ()
 endif ()
 
 # ---------------------------------------------------------------------------

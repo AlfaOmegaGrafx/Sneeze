@@ -6,7 +6,7 @@
 #
 # Usage (forwarded by the build scripts; can also be passed directly):
 #   cmake -S deps -B deps/builds/linux-arm64/release/build -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-aarch64-linux.cmake
-#   cmake -S src  -B builds/linux-arm64/release/build      -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-aarch64-linux.cmake
+#   cmake -S src  -B builds/linux-arm64/build              -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-aarch64-linux.cmake -G "Ninja Multi-Config"
 
 set (CMAKE_SYSTEM_NAME    Linux)
 set (CMAKE_SYSTEM_PROCESSOR aarch64)

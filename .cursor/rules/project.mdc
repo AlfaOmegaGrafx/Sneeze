@@ -62,11 +62,11 @@ Sneeze/
 ├── cmake/                 Cross-compilation toolchain files
 ├── .github/workflows/     CI (uses cmake -S deps and cmake -S src directly)
 │   --- Generated at build time, gitignored ---
-├── builds/<platform>/<config>/
-│   ├── build/             Sneeze CMake scratch
-│   └── install/           Mirrors each dep's libs/<Name>/install/{bin,lib}
-│       ├── lib/           Sneeze.lib / libSneeze.a
-│       └── bin/           Test executables + CLI tools (SignMsf, ...)
+├── builds/<platform>/                Single multi-config Sneeze tree
+│   ├── build/                        CMake scratch (one tree drives Debug + Release)
+│   └── install/<config>/             Per-config outputs (<config> = debug | release)
+│       ├── lib/                      Sneeze.lib / libSneeze.a
+│       └── bin/                      Test executables + CLI tools (SignMsf, ...)
 ├── vcpkg.json             Alternative vcpkg manifest
 ├── README.md
 ├── LICENSE                Apache 2.0
@@ -108,12 +108,12 @@ All paths are relative to the repository root (`Sneeze/`):
 
 - **Source code:** `src/`
 - **Test code:** `tests/`
-- **Sneeze build output:** `builds/<platform>/<config>/` — `build/` for CMake scratch, `install/lib/` for `Sneeze.lib`/`libSneeze.a`, `install/bin/` for test executables and CLI tools. The `install/` wrapper mirrors each dep's `libs/<Name>/install/{bin,lib}` layout for full symmetry (gitignored).
+- **Sneeze build output:** `builds/<platform>/` — single multi-config tree. `build/` is the CMake scratch (one directory carries both Debug and Release); `install/<config>/lib/` holds `Sneeze.lib`/`libSneeze.a`; `install/<config>/bin/` holds test executables and CLI tools. The `install/<config>/` wrapper mirrors each dep's `libs/<Name>/install/{bin,lib}` layout for full symmetry (gitignored). Use the Visual Studio generator on Windows and the Ninja Multi-Config generator on Linux/macOS so one `cmake -S src -B builds/<platform>/build` call covers both configs and `cmake --build … --config <config>` selects at build time.
 - **Dependency source clones:** `deps/repos/<Name>/` — one shared clone per dep, reused across configs (gitignored)
 - **Dependency build/install trees:** `deps/builds/<platform>/<config>/libs/<Name>/` — each has `build/` (scratch) and `install/` (usable artifacts) (gitignored)
 - **Two isolated CMake trees, no top-level bridge:**
   - `deps/CMakeLists.txt` — standalone deps project. Knows only about `deps/`. Invoked as `cmake -S deps`. All-deps mode by default; `-DDEP=<name>` for single-dep CI builds. Iterates `deps/*.cmake` and declares `add_dependencies(...)` ordering.
-  - `src/CMakeLists.txt` — standalone Sneeze project. Knows only about `src/` and `tests/`. Invoked as `cmake -S src`. Finds deps in `${LIBS_DIR}/<Name>/install/`, forces output into `${SNEEZE_BUILD_ROOT}/install/lib` and `${SNEEZE_BUILD_ROOT}/install/bin` (symmetric with each dep's `install/{bin,lib}` layout).
+  - `src/CMakeLists.txt` — standalone Sneeze project. Knows only about `src/` and `tests/`. Invoked as `cmake -S src`. Finds deps in `${LIBS_DIR}/<Name>/install/`, forces output into `${SNEEZE_BUILD_ROOT}/install/$<LOWER_CASE:$<CONFIG>>/{lib,bin}` via generator expressions on the output-directory variables — Debug and Release land in separate `install/{debug,release}/` siblings emitted from a single multi-config build tree (symmetric with each dep's per-config `install/{bin,lib}` layout).
   - **Neither CMakeLists ever references the other branch.** The scripts are the only glue.
 - **Per-dep CMake files:** `deps/*.cmake` — single source of truth. One `ExternalProject_Add` per dep; included by `deps/CMakeLists.txt` and unchanged for CI's single-dep path.
 - **Test build:** `tests/CMakeLists.txt` (defines all test executables; pulled in by `src/CMakeLists.txt`)
@@ -514,7 +514,7 @@ Both files are signed JSON wrapped as JWS compact serialization (`<header>.<payl
 - **RmlUi requires a font engine interface.** `UiContext.cpp` registers a `STUB_FONT_ENGINE` with dummy metrics. "No font face defined" warnings are expected and cosmetic.
 - **libcurl uses Schannel (Windows native SSL).** No OpenSSL dependency. On Linux/macOS, curl would need OpenSSL or the platform's native SSL.
 - **SDL pixel format must match ANARI byte layout (Artemis-side).** ANARI's `ANARI_UFIXED8_RGBA_SRGB` writes R,G,B,A bytes. On little-endian Windows, `SDL_PIXELFORMAT_ABGR8888` matches. This is Artemis's concern, not Sneeze's — the engine has no SDL3 dependency.
-- **Do NOT delete `deps/builds/<platform>/<config>/build/` for day-to-day rebuilds.** That directory holds the SuperBuild's ExternalProject stamp files (tracking which deps have been cloned, configured, built, and installed). Deleting it loses those stamps, forcing CMake to re-run all dependency steps (5+ minutes even though the `libs/` tree is intact). For a day-to-day rebuild of Sneeze itself, delete only `builds/<platform>/<config>/` and re-run the build script — the deps are untouched.
+- **Do NOT delete `deps/builds/<platform>/<config>/build/` for day-to-day rebuilds.** That directory holds the SuperBuild's ExternalProject stamp files (tracking which deps have been cloned, configured, built, and installed). Deleting it loses those stamps, forcing CMake to re-run all dependency steps (5+ minutes even though the `libs/` tree is intact). `-Rebuild` uses `cmake --build --target clean --config <cfg>` against the existing `builds/<platform>/build/` tree to drop the current config's compiled artifacts, then wipes `builds/<platform>/install/<cfg>/`. This keeps the configured CMake state intact (`CMakeCache.txt`, `CMakeFiles/`, generated `.sln`/`.vcxproj`) so an open Visual Studio solution doesn't need to reload, and leaves the non-selected config's intermediates + install tree alone. A Release rebuild cannot destroy a Debug install (and vice versa), and the deps tree is never touched. If `-Rebuild` runs against a tree that has never been configured, the script falls back to a full configure + build.
 - **Deleting `deps/builds/<platform>/<config>/libs/` triggers full rebuild for that config.** All dependencies will be re-configured, re-built, and re-installed (45-90 minutes). Source clones in `deps/repos/` are preserved.
 - **Deleting `deps/repos/` re-clones every dependency** (~2 GB of git history, ~10 minutes). Rarely needed — only when a dep's upstream has force-pushed its tag.
 - **Filament is the heaviest dependency.** First Release build takes 15-30 minutes; first Debug build ~25-45 minutes. Incremental rebuilds are fast. Both repos use `GIT_SHALLOW ON`. **A full Debug Halogen workflow requires both configs to be built** — Release filament's `matc.exe` is imported by Debug Halogen (see Halogen dep-chain section). The usual first-time sequence is Release-then-Debug; `-All` / `--all` defaults to Release, so running it once for each config in that order "just works."
@@ -536,13 +536,13 @@ Both files are signed JSON wrapped as JWS compact serialization (`<header>.<payl
 
 ### Build System
 
-The project has **two fully independent CMake trees**, parameterized by `SNEEZE_CONFIG` (Debug/Release) and `SNEEZE_PLATFORM` (e.g., `windows-x64`). There is **no top-level `CMakeLists.txt`** that spans both — that was deliberately removed. Dependencies are cloned once into `deps/repos/<Name>/` (shared across configs) and built+installed per config into `deps/builds/<platform>/<config>/libs/<Name>/`. Sneeze's own artifacts land in `builds/<platform>/<config>/install/{lib,bin}/` — the `install/` wrapper mirrors each dep's `libs/<Name>/install/{bin,lib}` layout for full symmetry.
+The project has **two fully independent CMake trees**, parameterized by `SNEEZE_CONFIG` (Debug/Release) and `SNEEZE_PLATFORM` (e.g., `windows-x64`). There is **no top-level `CMakeLists.txt`** that spans both — that was deliberately removed. Dependencies are cloned once into `deps/repos/<Name>/` (shared across configs) and built+installed per config into `deps/builds/<platform>/<config>/libs/<Name>/` (per-config, since each dep is a separate `ExternalProject_Add` build that picks up `CMAKE_BUILD_TYPE` at configure time). Sneeze itself is a **single multi-config tree** at `builds/<platform>/build/` that emits into `builds/<platform>/install/{debug,release}/{lib,bin}/` — the `install/<config>/` wrapper mirrors each dep's `libs/<Name>/install/{bin,lib}` layout for full symmetry. On Windows this means `Sneeze.sln` opens once and the Debug ↔ Release dropdown in the IDE toolbar Just Works; on Linux/macOS the Ninja Multi-Config generator gives the same single-tree-two-configs behavior via `cmake --build --config`.
 
 - **deps/CMakeLists.txt** — standalone deps project. `cmake -S deps` builds all deps; `cmake -S deps -DDEP=<name>` builds one (CI path). Never references `src/`. Derives `SNEEZE_CONFIG`, `SNEEZE_PLATFORM`, `SNEEZE_DEP_REPO`, `LIBS_DIR` if not passed explicitly. Applies cross-dep ordering via `add_dependencies(...)`.
 - **deps/*.cmake** — one `ExternalProject_Add` per dep. Single source of truth; included by `deps/CMakeLists.txt`.
-- **src/CMakeLists.txt** — standalone Sneeze project. `cmake -S src`. Finds deps under `${LIBS_DIR}/<Name>/install/`. Forces output to `${SNEEZE_BUILD_ROOT}/install/lib` and `${SNEEZE_BUILD_ROOT}/install/bin` (symmetric with each dep's `install/{bin,lib}`). Never references `deps/`.
-- **tests/CMakeLists.txt** — defines individual test executables; pulled in by `src/CMakeLists.txt`, inherits its output dirs.
-- **scripts/build-{windows.ps1,linux.sh,macos.sh}** — the only glue between deps and Sneeze. Default (no flag): plain `cmake --build builds/<plat>/<cfg>/build --config <cfg>` (no dep checks, no configure). `-Deps` / `--deps`: `cmake -S deps` + stamped per-dep build loop. `-All` / `--all`: deps flow, then `cmake -S src` configure, then `cmake --build` on the Sneeze tree. `-Fresh` / `--fresh`: passes `cmake --fresh` (CMake 3.24+) to wipe `CMakeCache.txt` + `CMakeFiles/` before reconfiguring, then builds Sneeze. Deps phase is skipped entirely. Renamed from the earlier `-Configure` to avoid collision with the `-Config Debug|Release` flag that sits next to it on every command line, and to match the real semantics (`cmake --fresh` is the underlying primitive). Use `-Fresh` when you want to be certain stale cache values (anari_DIR, compiler paths, toolchain tweaks) are gone; `-All`'s reconfigure stays non-destructive (idempotent cache update). `-Rebuild` / `--rebuild` is a **modifier, not a mode**: it composes with whatever target set the real mode flags pick out, and it **never crosses the src ↔ deps wall on its own**. Alone → wipe + rebuild the Sneeze tree (`builds/<plat>/<cfg>/`). With `-Only <dep>` → scrub + rebuild that one dep. With `-Deps` → scrub + rebuild the entire per-config dep root. With `-All` → scrub + rebuild deps, then scrub + rebuild Sneeze. Source clones in `deps/repos/` are always preserved. `-Only` and `-List` imply deps mode; `-Rebuild` does NOT. `-Deps`, `-All`, and `-Fresh` are mutually exclusive; `-Rebuild` composes with any of them.
+- **src/CMakeLists.txt** — standalone Sneeze project. `cmake -S src`. Finds deps under `${LIBS_DIR}/<Name>/install/`. Forces `CMAKE_{ARCHIVE,LIBRARY,RUNTIME}_OUTPUT_DIRECTORY` (and the per-config `_DEBUG` / `_RELEASE` variants) to `${SNEEZE_BUILD_ROOT}/install/$<LOWER_CASE:$<CONFIG>>/{lib,bin}` so one build tree produces both configs into separate sibling `install/` trees (symmetric with each dep's `install/{bin,lib}`). `CMAKE_CONFIGURATION_TYPES` is pinned to `Debug;Release` **before** `project()` to keep VS/Xcode/Ninja-Multi-Config from probing `MinSizeRel`/`RelWithDebInfo` paths that don't exist in `deps/builds/<plat>/`. Never references `deps/`.
+- **tests/CMakeLists.txt** — defines individual test executables; pulled in by `src/CMakeLists.txt`, inherits its multi-config output dirs.
+- **scripts/build-{windows.ps1,linux.sh,macos.sh}** — the only glue between deps and Sneeze. Default (no flag): plain `cmake --build builds/<plat>/build --config <cfg>` (no dep checks, no configure). `-Deps` / `--deps`: `cmake -S deps` + stamped per-dep build loop against the per-config dep tree. `-All` / `--all`: deps flow, then `cmake -S src -B builds/<plat>/build` configure (Visual Studio generator on Windows, Ninja Multi-Config on Linux/macOS), then `cmake --build … --config <cfg>` to emit that config. `-Fresh` / `--fresh`: passes `cmake --fresh` (CMake 3.24+) to wipe `CMakeCache.txt` + `CMakeFiles/` before reconfiguring, then builds Sneeze. Deps phase is skipped entirely. Renamed from the earlier `-Configure` to avoid collision with the `-Config Debug|Release` flag that sits next to it on every command line, and to match the real semantics (`cmake --fresh` is the underlying primitive). Use `-Fresh` when you want to be certain stale cache values (anari_DIR, compiler paths, toolchain tweaks) are gone; `-All`'s reconfigure stays non-destructive (idempotent cache update). `-Rebuild` / `--rebuild` is a **modifier, not a mode**: it composes with whatever target set the real mode flags pick out, and it **never crosses the src ↔ deps wall on its own**. Alone → wipe + rebuild the Sneeze tree (`builds/<plat>/`, which includes both configs' install siblings and the shared `build/`). With `-Only <dep>` → scrub + rebuild that one dep. With `-Deps` → scrub + rebuild the entire per-config dep root. With `-All` → scrub + rebuild deps, then scrub + rebuild Sneeze. Source clones in `deps/repos/` are always preserved. `-Only` and `-List` imply deps mode; `-Rebuild` does NOT. `-Deps`, `-All`, and `-Fresh` are mutually exclusive; `-Rebuild` composes with any of them.
 - **scripts/build-deps.sh** — shared bash helper that drives `cmake -S deps` and the per-dep stamped loop on Linux/macOS; invoked by `build-linux.sh` and `build-macos.sh` when in deps mode.
 - **Wasmtime** is built via `cargo build --release -p wasmtime-c-api` regardless of `SNEEZE_CONFIG` (Cargo release mode is always used; the product just gets copied into the config-specific install tree).
 - **All other C/C++ dependencies** are built with CMake using `-DCMAKE_BUILD_TYPE=${SNEEZE_CONFIG}` and installed under their per-config `install/` prefixes.
@@ -571,14 +571,14 @@ The project has **two fully independent CMake trees**, parameterized by `SNEEZE_
 .\scripts\build-windows.ps1 -Rebuild                    # full-scrub SNEEZE ONLY (no deps touched)
 
 # Run tests (Release; swap 'release' -> 'debug' for Debug builds)
-builds\windows-x64\release\bin\WasmTest.exe
-builds\windows-x64\release\bin\SpvTest.exe
-builds\windows-x64\release\bin\XrTest.exe
-builds\windows-x64\release\bin\NetTest.exe
-builds\windows-x64\release\bin\UiTest.exe
-builds\windows-x64\release\bin\ComputeTest.exe
-builds\windows-x64\release\bin\VoxTest.exe
-builds\windows-x64\release\bin\JwsTest.exe
+builds\windows-x64\install\release\bin\WasmTest.exe
+builds\windows-x64\install\release\bin\SpvTest.exe
+builds\windows-x64\install\release\bin\XrTest.exe
+builds\windows-x64\install\release\bin\NetTest.exe
+builds\windows-x64\install\release\bin\UiTest.exe
+builds\windows-x64\install\release\bin\ComputeTest.exe
+builds\windows-x64\install\release\bin\VoxTest.exe
+builds\windows-x64\install\release\bin\JwsTest.exe
 ```
 
 ```bash
@@ -603,8 +603,8 @@ builds\windows-x64\release\bin\JwsTest.exe
 ./scripts/build-linux.sh --rebuild                      # full-scrub SNEEZE ONLY (no deps touched)
 
 # Run tests
-./builds/linux-x64/release/install/bin/WasmTest
-./builds/linux-x64/release/install/bin/ComputeTest
+./builds/linux-x64/install/release/bin/WasmTest
+./builds/linux-x64/install/release/bin/ComputeTest
 # (etc.)
 ```
 
@@ -776,14 +776,14 @@ Sneeze/
 │           └── <Dep>/{build,install}/    Per-dep inner build + usable install
 ├── src/                                  Standalone Sneeze project (cmake -S src)
 │   └── CMakeLists.txt
-└── builds/<platform>/<config>/           Sneeze's own output
-    ├── build/                            Sneeze CMake scratch
-    └── install/                          Mirrors libs/<Dep>/install/ above
+└── builds/<platform>/                    Sneeze's own output (single multi-config tree)
+    ├── build/                            Sneeze CMake scratch — one tree, both configs
+    └── install/<config>/                 Per-config install; mirrors libs/<Dep>/install/
         ├── lib/                          Sneeze.lib / libSneeze.a
         └── bin/                          Test executables + CLI tools
 ```
 
-**Platform slugs:** `windows-x64`, `linux-x64`, `linux-arm64`, `macos-arm64`, `macos-x64`, `ios-arm64`, `android-arm64` — must match `Artemis/pkg/manifest.json`. **Config** folder names are lowercased (`debug`/`release`) even though `CMAKE_BUILD_TYPE` is `Debug`/`Release`.
+**Platform slugs:** `windows-x64`, `linux-x64`, `linux-arm64`, `macos-arm64`, `macos-x64`, `ios-arm64`, `android-arm64` — must match `Artemis/pkg/manifest.json`. **Config** folder names are lowercased (`debug`/`release`) even though `CMAKE_BUILD_TYPE` is `Debug`/`Release`. **Single Sneeze build tree, two configs:** `builds/<platform>/build/` carries both Debug and Release; emission to `install/<config>/` is chosen per `cmake --build --config`. The deps side stays per-config because each dep is built by its own `ExternalProject_Add` invocation against a pinned `CMAKE_BUILD_TYPE`.
 
 **Build commands (recommended entry point — the `scripts/build-*` wrappers, which handle stamp bookkeeping and dep ordering):**
 
@@ -816,7 +816,7 @@ Sneeze/
 ./scripts/build-linux.sh --all --rebuild                 # full-scrub deps + Sneeze
 ```
 
-**Mode flags are mutually exclusive:** `-Deps`, `-All`, `-Fresh` — only one at a time. `-Only` and `-List` implicitly enable deps mode. `-Rebuild` is a **modifier, not a mode** — it composes with whichever target set the other flags pick, and on its own (no `-Deps`/`-Only`/`-All`) it operates on Sneeze alone and never touches `deps/`. Default (no flags) is Sneeze-only: plain `cmake --build builds/<plat>/<cfg>/build --config <cfg>` with no dep checks, no reconfigure. If the Sneeze build tree doesn't exist yet, the plain-build fails with "CMakeCache.txt missing" and the user must re-run with `-Fresh` (or `-All` if deps are also missing).
+**Mode flags are mutually exclusive:** `-Deps`, `-All`, `-Fresh` — only one at a time. `-Only` and `-List` implicitly enable deps mode. `-Rebuild` is a **modifier, not a mode** — it composes with whichever target set the other flags pick, and on its own (no `-Deps`/`-Only`/`-All`) it operates on Sneeze alone and never touches `deps/`. Default (no flags) is Sneeze-only: plain `cmake --build builds/<plat>/build --config <cfg>` with no dep checks, no reconfigure. If the Sneeze build tree doesn't exist yet, the plain-build fails with "CMakeCache.txt missing" and the user must re-run with `-Fresh` (or `-All` if deps are also missing).
 
 **Under the hood — direct CMake invocations (used by CI):**
 
@@ -833,13 +833,14 @@ cmake --build deps/builds/<plat>/<cfg>/build --config <cfg>
 cmake -S deps -B deps/builds/<plat>/<cfg>/build -DDEP=<name> ...
 cmake --build deps/builds/<plat>/<cfg>/build --target <name> --config <cfg>
 
-# Sneeze
-cmake -S src -B builds/<plat>/<cfg>/build \
+# Sneeze (single multi-config tree; pass the Multi-Config generator on Unix)
+cmake -S src -B builds/<plat>/build \
+   -G "Ninja Multi-Config" \                             # omit on Windows (VS is default)
    -DLIBS_DIR=deps/builds/<plat>/<cfg>/libs \
-   -DSNEEZE_CONFIG=<Debug|Release> \
+   -DSNEEZE_CONFIG=<Debug|Release> \                     # seeds find_package
    -DSNEEZE_PLATFORM=<plat> \
-   -DSNEEZE_BUILD_ROOT=builds/<plat>/<cfg>
-cmake --build builds/<plat>/<cfg>/build --config <cfg>
+   -DSNEEZE_BUILD_ROOT=builds/<plat>
+cmake --build builds/<plat>/build --config <cfg>
 ```
 
 **Hard separation invariant.** `deps/CMakeLists.txt` never reads from or writes under `src/`, and `src/CMakeLists.txt` never reads from or writes under `deps/` (it only consumes the installed headers + libs via `${LIBS_DIR}/<Name>/install/` paths passed in on the cmake command line). Neither file includes the other. This was a hard requirement: "The Deps branch has its cmakelists file, which handles ONLY files that fall within the deps folder. There shall be nothing in the deps cmakelists file that would ever remotely consider altering any file outside the deps folder. And totally separately, the Sneeze branch has its cmakelists file, which handles ONLY files that fall within the Sneeze folder (EXCLUDING THE deps FOLDER). And NEVER the two shall cross." — Dean, 2026-04-17. The scripts are the only glue: they orchestrate deps build, then Sneeze configure + build, as two separate cmake invocations.
@@ -850,18 +851,20 @@ cmake --build builds/<plat>/<cfg>/build --config <cfg>
 
 | Invocation | Deps touched? | Sneeze touched? | What happens |
 |---|---|---|---|
-| `-Rebuild` alone | no | yes | Wipe `builds/<plat>/<cfg>/` (build + install), reconfigure, build Sneeze |
+| `-Rebuild` alone | no | yes | Wipe `builds/<plat>/` (shared `build/` + both configs' `install/`), reconfigure, build Sneeze |
 | `-Rebuild -Only <dep>` | that one dep | no | Scrub script stamp + EP prefix + `libs/<dep>/`; rebuild it |
 | `-Rebuild -Deps` | all deps | no | Wipe entire per-config dep root (`deps/builds/<plat>/<cfg>/`); rebuild every dep |
 | `-Rebuild -All` | all deps | yes | Deps scrub + rebuild, then Sneeze scrub + rebuild |
 
-Source clones in `deps/repos/<dep>/` are **always** preserved — filament alone takes 10+ min to re-clone, and local dev work on a clone should never be silently blown away. Deps-side scrub is implemented by the `Remove-DepState` helper (PowerShell) / `remove_dep_state` (bash); Sneeze-side scrub is a plain `Remove-Item`/`rm -rf` on `builds/<plat>/<cfg>/`.
+Source clones in `deps/repos/<dep>/` are **always** preserved — filament alone takes 10+ min to re-clone, and local dev work on a clone should never be silently blown away. Deps-side scrub is implemented by the `Remove-DepState` helper (PowerShell) / `remove_dep_state` (bash); Sneeze-side scrub is a plain `Remove-Item`/`rm -rf` on `builds/<plat>/` (which wipes BOTH configs' install dirs, since the Sneeze tree is now a single multi-config tree).
 
 Replaces the earlier `-CleanStamps` flag, which only cleared the script-level stamp and left the ExternalProject state stale — a false-friend flag that Dean rightly flagged as confusing. **Historical note (2026-04-20):** an earlier revision of the scripts treated `-Rebuild` as implying deps mode, so `.\scripts\build-windows.ps1 -Rebuild -Config Debug` would silently wipe the entire dep root. That reached back across the src ↔ deps wall (a violation of the hard-separation invariant) and burned a colleague's evening when it blew away an hour+ of dep builds. Fixed by demoting `-Rebuild` to a pure modifier: it can now only touch `deps/` when `-Deps`, `-Only`, or `-All` is explicitly on the command line.
 
 **`Invalidate-DepConfigure` helper.** Before invoking `cmake --build --target <dep>`, the scripts explicitly delete `<DepsBuildDir>/<dep>-prefix/src/<dep>-stamp/<Config>/<dep>-configure` — the ExternalProject configure-step stamp. This forces the inner configure to re-run on every invocation, so edits to `deps/<dep>.cmake` (changed CMAKE_ARGS, new BUILD_COMMAND, etc.) take effect without the developer having to manually delete build trees. Without this, a failed build whose configure previously succeeded would reuse the stale cached configure on retry.
 
-**Configuration isolation.** Debug and Release live in fully separate trees — `deps/builds/<plat>/{debug,release}/` and `builds/<plat>/{debug,release}/`. No sharing of build outputs across configs. Every dep (including Filament + Halogen, post-PR-#15) tracks `SNEEZE_CONFIG`. The historical `LNK2038` mismatches between Halogen + Sneeze are now prevented by `deps/filament.cmake` disabling `FILAMENT_SHORTEN_MSVC_COMPILATION` on Debug and `deps/halogen.cmake` pinning `CMAKE_MSVC_RUNTIME_LIBRARY` per-config. See the "Halogen dependency chain" section above for details.
+**Configuration isolation (deps).** Debug and Release live in fully separate **deps** trees — `deps/builds/<plat>/{debug,release}/`. No sharing of build outputs across configs. Every dep (including Filament + Halogen, post-PR-#15) tracks `SNEEZE_CONFIG`. The historical `LNK2038` mismatches between Halogen + Sneeze are now prevented by `deps/filament.cmake` disabling `FILAMENT_SHORTEN_MSVC_COMPILATION` on Debug and `deps/halogen.cmake` pinning `CMAKE_MSVC_RUNTIME_LIBRARY` per-config. See the "Halogen dependency chain" section above for details.
+
+**Multi-config build (Sneeze standalone + Artemis consumer).** `src/CMakeLists.txt` carries a path generalization block that rewrites every dep path variable and every imported target (transitive across `anari::anari_static` + `vox::vox`) so they resolve at build time against `$<LOWER_CASE:$<CONFIG>>` instead of the single `SNEEZE_CONFIG` used at configure time. This lets **both** (a) Sneeze's standalone build at `builds/<plat>/build/` and (b) Artemis's consumer tree (via `add_subdirectory`) produce Debug and Release from a single CMake tree — one `.sln` on Windows (VS dropdown flips configs), Ninja Multi-Config on Linux/macOS, `cmake --build … --config <cfg>` to pick which config emits. `CMAKE_CONFIGURATION_TYPES` is pinned to `Debug;Release` *before* `project()` so VS/Xcode/Ninja-MC don't probe `MinSizeRel` / `RelWithDebInfo` paths that don't exist under `deps/builds/<plat>/`. The rewriter has a `_sneeze_resolve_variant` helper that probes disk for Debug-suffix filename variants (`libcurl-d.lib`, `openxr_loaderd.lib`, `spirv-cross-cored.lib`) because simple `/release/` ↔ `/debug/` substitution doesn't handle those name changes. Active whenever `USE_LOCAL_DEPS` is on (the default for both standalone and consumer). Output dirs (`CMAKE_{ARCHIVE,LIBRARY,RUNTIME}_OUTPUT_DIRECTORY` and their `_DEBUG` / `_RELEASE` variants) all point into `${SNEEZE_BUILD_ROOT}/install/$<LOWER_CASE:$<CONFIG>>/{lib,bin}`, keeping the two configs in sibling install trees under a shared build root.
 
 **Source clones are shared.** `deps/repos/<Name>/` is a single git checkout per dep, reused across Debug and Release builds. Saves disk and clone time.
 
@@ -877,5 +880,5 @@ Replaces the earlier `-CleanStamps` flag, which only cleared the script-level st
 - **What `-Fresh` actually does (precisely):** passes `cmake --fresh` (3.24+), which wipes `CMakeCache.txt` + the `CMakeFiles/` directory before rerunning configure. It does **not** delete compiled `.obj` / `.lib` / `.dll` outputs. In practice you usually *get* a full Sneeze rebuild anyway because CMake regenerates the `.vcxproj` files and MSBuild's up-to-date check treats the regenerated projects as modified — but this is a side effect, not an explicit clean. Scope is always Sneeze-only; the 15 dependency libs under `deps/builds/` are never touched by `-Fresh`. For a true from-zero rebuild of everything: `-All -Rebuild` in one shot (scrubs + rebuilds deps then scrubs + rebuilds Sneeze).
 - **After pulling a new dep version:** `.\scripts\build-windows.ps1 -Only <name> -Rebuild` forces that one dep to rebuild from scratch while every other dep stays cached.
 
-**Recommended daily workflow on Windows — use Visual Studio, not the scripts.** Once `-All` has produced a configured Sneeze tree, the CMake machinery has already generated a full `.sln` at `builds\windows-x64\<config>\build\Sneeze.sln`. For day-to-day "I edited a `.cpp`, rebuild" work, open the solution in Visual Studio and use F7 — incremental builds are faster than re-invoking the scripts, and you get the debugger, breakpoints, IntelliSense, Error List, and the rest of the IDE for free. The scripts exist for the cases Visual Studio can't solve: CI, Linux/macOS builds, fresh-checkout smoke tests, and reconfigure after editing `CMakeLists.txt` (which is what `-Fresh` is for). The rule of thumb: **fresh-checkout / config-changes / cross-platform → scripts; daily editing → `.sln` in VS.** Same deal on macOS with the Xcode project CMake produces, and on Linux with Ninja/Make + your editor of choice. CMake's command-line UX is legitimately rough; nobody should have to live in it day-to-day.
+**Recommended daily workflow on Windows — use Visual Studio, not the scripts.** Once `-All` has produced a configured Sneeze tree, the CMake machinery has already generated a full `.sln` at `builds\windows-x64\build\Sneeze.sln` (single file, multi-config). For day-to-day "I edited a `.cpp`, rebuild" work, open the solution in Visual Studio and use F7 — incremental builds are faster than re-invoking the scripts, and you get the debugger, breakpoints, IntelliSense, Error List, and the rest of the IDE for free. The Debug ↔ Release dropdown in the toolbar flips configs without reopening; outputs land in `install\debug\{bin,lib}` or `install\release\{bin,lib}` accordingly. The scripts exist for the cases Visual Studio can't solve: CI, Linux/macOS builds, fresh-checkout smoke tests, and reconfigure after editing `CMakeLists.txt` (which is what `-Fresh` is for). The rule of thumb: **fresh-checkout / config-changes / cross-platform → scripts; daily editing → `.sln` in VS.** Same deal on macOS with the Xcode project CMake produces, and on Linux with Ninja Multi-Config + your editor of choice. CMake's command-line UX is legitimately rough; nobody should have to live in it day-to-day.
 

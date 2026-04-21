@@ -4,6 +4,19 @@
 # Sneeze build tree. No dep checks, no configure step. Fails naturally if
 # the tree or the dep libraries aren't there yet.
 #
+# The Sneeze src tree is a SINGLE multi-config tree at
+#   builds/windows-x64/build/
+# that emits Debug or Release into
+#   builds/windows-x64/install/{debug,release}/{bin,lib}/
+# depending on the -Config flag (which drives `cmake --build --config`).
+# Opening builds/windows-x64/build/Sneeze.sln in Visual Studio and flipping
+# the Debug/Release dropdown Just Works -- both configs build against their
+# respective deps trees without any reconfigure.
+#
+# The DEPS trees stay per-config (deps/builds/windows-x64/{debug,release}/)
+# and both must be built on disk before you can flip the VS dropdown to a
+# config whose deps don't exist yet.
+#
 # Flags switch the script into deps mode, reconfigure mode, or deps+Sneeze mode:
 #
 #   -Deps         Build the 15 third-party libs into deps/builds/windows-x64/<config>/libs/.
@@ -37,9 +50,11 @@
 # script is the only glue: in -All mode it builds deps, then configures +
 # builds Sneeze in a separate CMake invocation.
 #
-# Debug and Release live in fully separate trees under
-# deps/builds/windows-x64/{debug,release}/ and builds/windows-x64/{debug,release}/,
-# but share a single set of source clones in deps/repos/.
+# Debug and Release live in fully separate DEPS trees under
+# deps/builds/windows-x64/{debug,release}/ but share a single Sneeze build
+# tree at builds/windows-x64/build/ and distinct install trees at
+# builds/windows-x64/install/{debug,release}/. Source clones in deps/repos/
+# are shared across configs.
 #
 # Usage:
 #   .\scripts\build-windows.ps1                        # Sneeze (Release)
@@ -87,8 +102,10 @@ $DepRepo        = Join-Path $DepsSourceDir 'repos'
 $DepRoot        = Join-Path $DepsSourceDir "builds/$Platform/$ConfigLower"
 $DepsBuildDir   = Join-Path $DepRoot 'build'
 $LibsDir        = Join-Path $DepRoot 'libs'
-$SneezeOutDir   = Join-Path $SneezeDir "builds/$Platform/$ConfigLower"
-$SneezeBuildDir = Join-Path $SneezeOutDir 'build'
+# Single multi-config Sneeze tree. -Config only drives `cmake --build --config`.
+$SneezeOutDir     = Join-Path $SneezeDir "builds/$Platform"
+$SneezeBuildDir   = Join-Path $SneezeOutDir 'build'
+$SneezeInstallDir = Join-Path $SneezeOutDir "install/$ConfigLower"
 
 $StampDir = Join-Path $DepsBuildDir '.dep-stamps'
 
@@ -99,10 +116,17 @@ $StampDir = Join-Path $DepsBuildDir '.dep-stamps'
 # (-List is read-only and handled via its own early exit below.)
 $DepsMode   = [bool]($Deps -or $All -or $Only -or $List)
 $SneezeMode = [bool]((-not $DepsMode) -or $All)
-# Reconfigure the Sneeze tree before building. Implied by -All, -Fresh, or
-# -Rebuild when Sneeze is in scope (the Sneeze tree gets scrubbed in that
-# case and needs a fresh configure to exist at all).
-$Reconfigure = [bool]($All -or $Fresh -or ($Rebuild -and $SneezeMode))
+# Reconfigure the Sneeze tree before building. Implied by -All and -Fresh.
+# -Rebuild does NOT force reconfigure any more: it cleans via `cmake --build
+# --target clean` which preserves the configured tree (CMakeCache, CMakeFiles,
+# .sln/.vcxproj), so the IDE doesn't lose state. Exception: if -Rebuild targets
+# Sneeze but the tree has never been configured, fall back to configuring it --
+# otherwise the subsequent build would fail with a cryptic "CMakeCache.txt
+# missing" error.
+$Reconfigure = [bool]($All -or $Fresh)
+if ($Rebuild -and $SneezeMode -and -not (Test-Path (Join-Path $SneezeBuildDir 'CMakeCache.txt'))) {
+   $Reconfigure = $true
+}
 
 # ---------------------------------------------------------------------------
 # Dependency graph -- order matters (deps before dependents).
@@ -276,15 +300,24 @@ if ($DepsMode) {
 # ---------------------------------------------------------------------------
 
 if ($Fresh -or $SneezeMode) {
-   # -Rebuild with Sneeze in scope: scrub the entire Sneeze output tree
-   # (build/ + install/) before reconfiguring. Source under src/ is not
-   # touched -- only the generated output under builds/<platform>/<config>/.
-   # Forces a full reconfigure + from-scratch compile of every source file
-   # regardless of prior state.
+   # -Rebuild with Sneeze in scope: clean only the CURRENT config's compiled
+   # artifacts via `cmake --build --target clean --config <cfg>`. This preserves
+   # the configured CMake tree (CMakeCache.txt, CMakeFiles/, generated .sln and
+   # .vcxproj) so Visual Studio doesn't lose IDE state, and it preserves the
+   # OTHER config's intermediates and install tree. The selected config's
+   # install/<cfg>/ is also wiped so stale binaries don't survive the rebuild.
    if ($Rebuild -and $SneezeMode) {
-      Write-Host ''
-      Write-Host "==> Scrubbing Sneeze tree at $SneezeOutDir"
-      Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $SneezeOutDir
+      if (Test-Path (Join-Path $SneezeBuildDir 'CMakeCache.txt')) {
+         Write-Host ''
+         Write-Host "==> Cleaning Sneeze $Config build artifacts"
+         & cmake --build $SneezeBuildDir --target clean --config $Config
+         if ($LASTEXITCODE -ne 0) {
+            Write-Error 'Sneeze clean failed'
+            exit 1
+         }
+      }
+      Write-Host "==> Scrubbing Sneeze $Config install: $SneezeInstallDir"
+      Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $SneezeInstallDir
    }
 
    # -Fresh or -All: reconfigure the Sneeze tree from src/CMakeLists.txt
@@ -325,6 +358,6 @@ if ($Fresh -or $SneezeMode) {
       exit 1
    }
    Write-Host "==> Sneeze Windows build complete ($Config)"
-   Write-Host "    Sneeze.lib -> $SneezeOutDir\install\lib"
-   Write-Host "    test .exes -> $SneezeOutDir\install\bin"
+   Write-Host "    Sneeze.lib -> $SneezeInstallDir\lib"
+   Write-Host "    test .exes -> $SneezeInstallDir\bin"
 }

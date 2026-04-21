@@ -6,8 +6,8 @@ Sneeze builds as a **static library** (`Sneeze.lib` on Windows, `libSneeze.a` el
 
 Building Sneeze conceptually has two phases, keyed by `(platform, config)`:
 
-1. **Deps** — build every third-party library from source into `deps/builds/<platform>/<config>/libs/`. Slow, one-time (~1–2 hours on a fresh machine).
-2. **Sneeze** — compile + link the Sneeze static library into `builds/<platform>/<config>/`. Fast, every edit (seconds).
+1. **Deps** — build every third-party library from source into `deps/builds/<platform>/<config>/libs/`. Slow, one-time (~1–2 hours on a fresh machine). Per-config trees (`debug/` and `release/` are independent).
+2. **Sneeze** — compile + link the Sneeze static library. Single multi-config tree at `builds/<platform>/build/` with per-config outputs at `builds/<platform>/install/{debug,release}/{bin,lib}/`. Fast, every edit (seconds). On Windows, `Sneeze.sln` opens once and both Debug and Release build from the IDE dropdown.
 
 One script per platform drives both. By default it runs phase 2 — that's the 99% command. Pass `-All` / `--all` for both phases (first-time setup), or `-Deps` / `--deps` for phase 1 only (dep refresh). Details in [Quick Start](#quick-start).
 
@@ -173,51 +173,51 @@ Stamp-cached — only missing deps rebuild. Useful when an upstream dep changed 
 
 ### Build artifacts
 
-- `deps/builds/<platform>/<config>/libs/` — installed dep headers + libraries
-- `deps/builds/<platform>/<config>/build/` — deps CMake scratch + stamp files
-- `builds/<platform>/<config>/build/` — Sneeze CMake scratch
-- `builds/<platform>/<config>/install/lib/` — `Sneeze.lib` / `libSneeze.a`
-- `builds/<platform>/<config>/install/bin/` — test executables and tools
+- `deps/builds/<platform>/<config>/libs/` — installed dep headers + libraries (per-config)
+- `deps/builds/<platform>/<config>/build/` — deps CMake scratch + stamp files (per-config)
+- `builds/<platform>/build/` — Sneeze CMake scratch (single multi-config tree)
+- `builds/<platform>/install/<config>/lib/` — `Sneeze.lib` / `libSneeze.a`
+- `builds/<platform>/install/<config>/bin/` — test executables and tools
 
-The `install/` wrapper mirrors each dep's `libs/<Name>/install/{bin,lib}` so the Sneeze output tree is structurally symmetric with the deps output tree.
+The Sneeze side is a single multi-config tree (Visual Studio, Xcode, or Ninja Multi-Config): one `build/` directory carries both Debug and Release, and the `install/{debug,release}/` siblings receive whichever config is selected at build time via `cmake --build --config`. The deps side remains per-config — Debug and Release dep trees are independent. The `install/` wrapper mirrors each dep's `libs/<Name>/install/{bin,lib}` so the Sneeze output tree stays structurally symmetric with the deps output tree.
 
 ### What the script actually does
 
 The three modes:
 
-- **Default (Sneeze)** — one call to `cmake --build builds/<platform>/<config>/build --config <config>`. No deps work, no configure, no probing. Fails naturally if the tree or libs aren't there.
+- **Default (Sneeze)** — one call to `cmake --build builds/<platform>/build --config <config>`. No deps work, no configure, no probing. Fails naturally if the tree or libs aren't there.
 - **`-Deps` / `--deps`** — configure the deps tree via `cmake -S deps -B deps/builds/<platform>/<config>/build -D...`, then for each dep in order run `cmake --build <build-dir> --target <dep> --config <config>`. On success, drop a stamp file at `<build-dir>/.dep-stamps/<dep>.done` so the next run skips it. The Sneeze tree is *not* touched.
-- **`-All` / `--all`** — deps flow (above), then `cmake -S src -B builds/<platform>/<config>/build -D...` to configure the Sneeze tree, then `cmake --build …` to build it. The two `cmake -S` invocations are separate; the deps tree and the Sneeze tree never see each other.
+- **`-All` / `--all`** — deps flow (above), then `cmake -S src -B builds/<platform>/build -D...` to configure the single multi-config Sneeze tree (using the Visual Studio generator on Windows, Ninja Multi-Config on Linux/macOS), then `cmake --build … --config <config>` to emit that config. The two `cmake -S` invocations are separate; the deps tree and the Sneeze tree never see each other.
 
 ---
 
 ## Verifying the Build
 
-After the script finishes, the static library lives in `builds/<platform>/<config>/install/lib/` and test executables in `builds/<platform>/<config>/install/bin/`. Substitute the slug and config that matches your run.
+After the script finishes, the static library lives in `builds/<platform>/install/<config>/lib/` and test executables in `builds/<platform>/install/<config>/bin/`. Substitute the slug and config that matches your run.
 
 **Windows (Release):**
 ```powershell
-dir builds\windows-x64\release\install\lib\Sneeze.lib
-dir builds\windows-x64\release\install\bin\WasmTest.exe
+dir builds\windows-x64\install\release\lib\Sneeze.lib
+dir builds\windows-x64\install\release\bin\WasmTest.exe
 ```
 
 **Linux (Release, x64):**
 ```bash
-ls builds/linux-x64/release/install/lib/libSneeze.a
-ls builds/linux-x64/release/install/bin/WasmTest
+ls builds/linux-x64/install/release/lib/libSneeze.a
+ls builds/linux-x64/install/release/bin/WasmTest
 ```
 
 **macOS (Release, Apple Silicon):**
 ```bash
-ls builds/macos-arm64/release/install/lib/libSneeze.a
-ls builds/macos-arm64/release/install/bin/WasmTest
+ls builds/macos-arm64/install/release/lib/libSneeze.a
+ls builds/macos-arm64/install/release/bin/WasmTest
 ```
 
 Run the tests to confirm each subsystem links and initializes:
 
 **Windows:**
 ```powershell
-$bin = "builds\windows-x64\release\install\bin"
+$bin = "builds\windows-x64\install\release\bin"
 & "$bin\WasmTest.exe"
 & "$bin\SpvTest.exe"
 & "$bin\XrTest.exe"
@@ -230,7 +230,7 @@ $bin = "builds\windows-x64\release\install\bin"
 
 **Linux / macOS:**
 ```bash
-bin=builds/linux-x64/release/install/bin    # or builds/macos-arm64/release/install/bin
+bin=builds/linux-x64/install/release/bin    # or builds/macos-arm64/install/release/bin
 "$bin"/WasmTest
 "$bin"/SpvTest
 "$bin"/XrTest
@@ -296,7 +296,7 @@ Full-scrub rebuild that one dep — every other dep stays cached. `-Rebuild` wip
 
 | Invocation (Windows shown; bash is identical with lowercase `--` flags) | Deps touched? | Sneeze touched? | What happens |
 |---|---|---|---|
-| `-Rebuild` | no | yes | Wipe `builds/<platform>/<config>/`, reconfigure, build Sneeze |
+| `-Rebuild` | no | yes | Run `cmake --build --target clean --config <cfg>` against the existing `builds/<platform>/build/` tree (cleans only the current config's compiled artifacts) and wipe `builds/<platform>/install/<cfg>/`. Preserves `CMakeCache.txt`, `CMakeFiles/`, and the generated `.sln`/`.vcxproj`, so an open Visual Studio solution doesn't need to reload. The other config's install tree and intermediates are untouched. If the tree has never been configured, falls back to a full configure + build. |
 | `-Rebuild -Only filament` | that one dep | no | Scrub + rebuild one dep |
 | `-Rebuild -Deps` | all deps | no | Scrub + rebuild every dep |
 | `-Rebuild -All` | all deps | yes | Scrub + rebuild deps, then scrub + rebuild Sneeze |
@@ -355,7 +355,7 @@ If you just want to build Sneeze and get on with your life, the previous section
 The repo has **two completely independent CMake projects** and no top-level that spans both:
 
 - **`deps/CMakeLists.txt`** — the deps project. Knows only about files under `deps/`. Its only job is to orchestrate the third-party library builds: it includes every `deps/<name>.cmake`, sets up cross-dep ordering with `add_dependencies(...)`, and otherwise gets out of the way. Never references `src/`, never writes outside `deps/`.
-- **`src/CMakeLists.txt`** — the Sneeze project. Knows only about files under `src/` and `tests/`. It `find_package()`s every installed dep under `${LIBS_DIR}/<Name>/install/` and produces `Sneeze.lib` + test executables. Never references `deps/`, never writes outside `builds/<platform>/<config>/`.
+- **`src/CMakeLists.txt`** — the Sneeze project. Knows only about files under `src/` and `tests/`. It `find_package()`s every installed dep under `${LIBS_DIR}/<Name>/install/` and produces `Sneeze.lib` + test executables. Never references `deps/`, never writes outside `builds/<platform>/`. Single multi-config tree: emits Debug into `install/debug/{bin,lib}` and Release into `install/release/{bin,lib}` using `$<LOWER_CASE:$<CONFIG>>` generator expressions on the output directory variables.
 
 The scripts in `scripts/` are the only glue between the two. In `-All` / `--all` mode, a script builds the deps tree, then invokes CMake a second time on the Sneeze tree. Neither CMakeLists ever sees the other.
 
@@ -443,13 +443,14 @@ Sneeze/
 │   └── toolchain-aarch64-linux.cmake
 │
 │   --- Generated at build time, gitignored ---
-└── builds/<platform>/<config>/
-    ├── build/                 Sneeze CMake scratch
-    ├── lib/                   Sneeze.lib / libSneeze.a
-    └── bin/                   test executables + CLI tools (SignMsf, ...)
+└── builds/<platform>/
+    ├── build/                 Sneeze CMake scratch (single multi-config tree)
+    └── install/<config>/
+        ├── lib/               Sneeze.lib / libSneeze.a
+        └── bin/               test executables + CLI tools (SignMsf, ...)
 ```
 
-`<platform>` uses Artemis manifest slugs: `windows-x64`, `linux-x64`, `linux-arm64`, `macos-arm64`, `macos-x64`, `ios-arm64`, `android-arm64`. `<config>` is `debug` or `release`.
+`<platform>` uses Artemis manifest slugs: `windows-x64`, `linux-x64`, `linux-arm64`, `macos-arm64`, `macos-x64`, `ios-arm64`, `android-arm64`. `<config>` is `debug` or `release`. The Sneeze build tree is single-multi-config: one `build/` at `builds/<platform>/` drives both configs; each config lands in its own `install/<config>/` sibling. The deps tree remains per-config under `deps/builds/<platform>/<config>/`.
 
 ---
 

@@ -5,6 +5,18 @@
 # Sneeze build tree. No dep checks, no configure step. Fails naturally if
 # the tree or the dep libraries aren't there yet.
 #
+# The Sneeze src tree is a SINGLE multi-config tree at
+#   builds/linux-<arch>/build/
+# that emits Debug or Release into
+#   builds/linux-<arch>/install/{debug,release}/{bin,lib}/
+# depending on the --config flag (which drives `cmake --build --config`).
+# Uses the Ninja Multi-Config generator so one build tree carries both
+# configurations and --config just selects at build time.
+#
+# The DEPS trees stay per-config (deps/builds/linux-<arch>/{debug,release}/)
+# and both must be built on disk before you can build a config whose deps
+# don't exist yet.
+#
 # Flags switch the script into deps mode or deps+Sneeze mode:
 #
 #   --deps         Build the 15 third-party libs into deps/builds/linux-<arch>/<config>/libs/.
@@ -35,9 +47,11 @@
 # script is the only glue: in --all mode it builds deps, then configures +
 # builds Sneeze in a separate CMake invocation.
 #
-# Debug and Release live in fully separate trees under
-# deps/builds/linux-<arch>/{debug,release}/ and builds/linux-<arch>/{debug,release}/,
-# but share a single set of source clones in deps/repos/.
+# Debug and Release live in fully separate DEPS trees under
+# deps/builds/linux-<arch>/{debug,release}/ but share a single Sneeze build
+# tree at builds/linux-<arch>/build/ and distinct install trees at
+# builds/linux-<arch>/install/{debug,release}/. Source clones in deps/repos/
+# are shared across configs.
 #
 # Usage:
 #   ./scripts/build-linux.sh                      # Sneeze (Release)
@@ -92,8 +106,10 @@ esac
 CFG_LOWER="$(echo "$CONFIG" | tr '[:upper:]' '[:lower:]')"
 DEPS_BUILD_DIR="$SNEEZE_DIR/deps/builds/$PLATFORM/$CFG_LOWER/build"
 LIBS_DIR="$SNEEZE_DIR/deps/builds/$PLATFORM/$CFG_LOWER/libs"
-SNEEZE_OUT_DIR="$SNEEZE_DIR/builds/$PLATFORM/$CFG_LOWER"
+# Single multi-config Sneeze tree. --config only drives `cmake --build --config`.
+SNEEZE_OUT_DIR="$SNEEZE_DIR/builds/$PLATFORM"
 SNEEZE_BUILD_DIR="$SNEEZE_OUT_DIR/build"
+SNEEZE_INSTALL_DIR="$SNEEZE_OUT_DIR/install/$CFG_LOWER"
 TOOLCHAIN="$SNEEZE_DIR/cmake/toolchain-linux-clang.cmake"
 
 # --rebuild is a modifier, not a mode: it does NOT imply deps-targeting.
@@ -116,10 +132,18 @@ if [[ $DEPS_MODE -eq 1 && $REBUILD -eq 1 ]]; then
    EXTRA_ARGS+=(--rebuild)
 fi
 
-# Reconfigure the Sneeze tree before building. Implied by --all, --fresh,
-# or --rebuild when Sneeze is in scope (tree is wiped, needs fresh configure).
+# Reconfigure the Sneeze tree before building. Implied by --all and --fresh.
+# --rebuild does NOT force reconfigure any more: it cleans via `cmake --build
+# --target clean` which preserves the configured tree (CMakeCache, CMakeFiles,
+# generated project files), so the IDE doesn't lose state. Exception: if
+# --rebuild targets Sneeze but the tree has never been configured, fall back to
+# configuring it -- otherwise the subsequent build would fail with a cryptic
+# "CMakeCache.txt missing" error.
 RECONFIGURE=0
-if [[ $ALL -eq 1 || $FRESH -eq 1 || ($REBUILD -eq 1 && $SNEEZE_MODE -eq 1) ]]; then
+if [[ $ALL -eq 1 || $FRESH -eq 1 ]]; then
+   RECONFIGURE=1
+fi
+if [[ $REBUILD -eq 1 && $SNEEZE_MODE -eq 1 && ! -f "$SNEEZE_BUILD_DIR/CMakeCache.txt" ]]; then
    RECONFIGURE=1
 fi
 
@@ -144,13 +168,20 @@ fi
 # ---------------------------------------------------------------------------
 
 if [[ $FRESH -eq 1 || $SNEEZE_MODE -eq 1 ]]; then
-   # --rebuild with Sneeze in scope: scrub the entire Sneeze output tree
-   # (build/ + install/) before reconfiguring. Source under src/ is not
-   # touched -- only the generated output under builds/<platform>/<config>/.
+   # --rebuild with Sneeze in scope: clean only the CURRENT config's compiled
+   # artifacts via `cmake --build --target clean --config <cfg>`. This preserves
+   # the configured CMake tree (CMakeCache.txt, CMakeFiles/, generated project
+   # files) so the IDE doesn't lose state, and it preserves the OTHER config's
+   # intermediates and install tree. The selected config's install/<cfg>/ is
+   # also wiped so stale binaries don't survive the rebuild.
    if [[ $REBUILD -eq 1 && $SNEEZE_MODE -eq 1 ]]; then
-      echo ""
-      echo "==> Scrubbing Sneeze tree at $SNEEZE_OUT_DIR"
-      rm -rf "$SNEEZE_OUT_DIR"
+      if [[ -f "$SNEEZE_BUILD_DIR/CMakeCache.txt" ]]; then
+         echo ""
+         echo "==> Cleaning Sneeze $CONFIG build artifacts"
+         cmake --build "$SNEEZE_BUILD_DIR" --target clean --config "$CONFIG"
+      fi
+      echo "==> Scrubbing Sneeze $CONFIG install: $SNEEZE_INSTALL_DIR"
+      rm -rf "$SNEEZE_INSTALL_DIR"
    fi
 
    if [[ $RECONFIGURE -eq 1 ]]; then
@@ -162,9 +193,13 @@ if [[ $FRESH -eq 1 || $SNEEZE_MODE -eq 1 ]]; then
 
       echo ""
       echo "==> Configuring Sneeze tree at $SNEEZE_BUILD_DIR"
+      # Ninja Multi-Config: one build tree, both Debug and Release selectable
+      # via `cmake --build --config`. --config here seeds SNEEZE_CONFIG so
+      # find_package resolves against the right deps tree at configure time;
+      # actual emission per invocation is decided by --build --config below.
       cmake -S "$SNEEZE_DIR/src" -B "$SNEEZE_BUILD_DIR" \
+         -G "Ninja Multi-Config" \
          "${FRESH_ARG[@]+"${FRESH_ARG[@]}"}" \
-         -DCMAKE_BUILD_TYPE="$CONFIG" \
          -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
          -DLIBS_DIR="$LIBS_DIR" \
          -DSNEEZE_CONFIG="$CONFIG" \
@@ -176,6 +211,6 @@ if [[ $FRESH -eq 1 || $SNEEZE_MODE -eq 1 ]]; then
    echo "==> Building Sneeze ($PLATFORM, $CONFIG)"
    cmake --build "$SNEEZE_BUILD_DIR" --config "$CONFIG"
    echo "==> Sneeze Linux build complete ($CONFIG)"
-   echo "    libSneeze.a -> $SNEEZE_OUT_DIR/install/lib"
-   echo "    test bins   -> $SNEEZE_OUT_DIR/install/bin"
+   echo "    libSneeze.a -> $SNEEZE_INSTALL_DIR/lib"
+   echo "    test bins   -> $SNEEZE_INSTALL_DIR/bin"
 fi
