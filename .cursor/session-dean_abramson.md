@@ -240,3 +240,94 @@ Marathon multi-day session fixing the Debug Halogen material-compile time from *
 **Docs updated:** `README.md` (the paragraph above), `.cursor/rules/project.mdc` (extended the Halogen dep-chain section with the `FILAMENT_MATC` override paragraph, "Abandoned approaches" subsection, and a 2026-04-20 entry in the Historical note; updated the "Halogen Debug spam" Known Gotcha to reflect the fix; updated the "Filament is the heaviest dependency" entry to note both configs are required for a Debug Halogen workflow).
 
 **Dean commits the repo himself** (per standing rule).
+
+---
+
+## 2026-04-19 (Sunday, later) — MSF viewer walk-through + `-Rebuild` demoted to a pure modifier
+
+### MSF / MSS verification path end-to-end (no code changes — Dean drove this himself)
+
+Dean picked back up the MSF tooling work (the C++ `SignMsf.exe` tool and the `MsfViewer/index.html` self-contained web viewer that we'd written last week but never exercised). Full walkthrough:
+
+1. **`SignMsf.exe`** — signed `tools/MsfViewer/sample-mss.json` with `tests/certs/provider-key.pem` + `provider-cert.pem` + `ca-cert.pem` chain. Produced `sample.mss` JWS blob on first try. No issues.
+2. **`test-headless.mjs`** — Node script that mirrors the viewer's JS logic (parses JWS → decodes header/payload → walks the X.509 chain with hand-rolled ASN.1 → verifies the signature via `webcrypto.subtle`). Ran clean against the signed `.mss`: chain validated, signature verified, payload decoded.
+3. **Web viewer** — Dean opened `MsfViewer/index.html` in a browser, loaded `sample.mss`. The page rendered the three JWS blocks (header / payload / signature+cert-chain), flagged "Signature verified" green, and pretty-printed the MSS payload. Dean then walked me through his mental model of the verification to confirm his understanding:
+   - Header + payload are base64url-encoded JSON. The third block is the signature over `header.payload`, not a digest of anything else.
+   - Browser recomputes the digest of `header.payload` locally, decrypts the signature with the leaf cert's public key, compares — that's signature verification, not trust.
+   - Trust is a separate layer: the browser needs two pieces of identity from a verified signature — **who signed it** (SHA-256 of the leaf cert's SPKI = the organizational identity primitive) and **what namespace they claim** (from the MSS payload). Together with the persona the user chose when they installed the service, that forms the **persona + key + namespace** identity triple. This is the core browser trust model and Dean had it dialed in.
+4. Discussed adding a `--verify` / `--dump` mode to `SignMsf.exe` so `sign → dump` is a single-binary round-trip. **Deferred** — not blocking.
+
+No source, doc, or build changes from this phase. Verification that the end-to-end JWS path (C++ signer → web verifier → Node verifier) produces identical results, and that the trust model as designed matches what the viewer actually implements.
+
+### The `-Rebuild` incident — and the fix
+
+Mid-session Dean stepped away to help a colleague install the new build flow (post-Halogen fix). Colleague had painstakingly hand-built the entire Debug dep tree (~1 hour of filament + halogen), then ran:
+
+```powershell
+.\scripts\build-windows.ps1 -rebuild -Config Debug
+```
+
+…expecting it to rebuild Sneeze. **The script wiped the entire per-config dep tree** (`deps/builds/windows-x64/debug/`) and started rebuilding every dep from scratch. An hour of work gone.
+
+I initially framed this as a "UX failure" — Dean shut that down hard: this was a **breach of the project's absolute invariant**, the one Dean has restated most often and most forcefully since 2026-04-17:
+
+> "The deps and the src are in entirely separate, distinct, and in no way related areas that were utterly and completely untouchable between them. The deps are the deps and the src is the src. End of story, full stop." — Dean
+
+The invariant already holds at the `CMakeLists.txt` layer (`deps/CMakeLists.txt` and `src/CMakeLists.txt` never reference each other's trees). The scripts are the only glue — and this one had quietly violated the rule: the old logic lumped `-Rebuild` into `$DepsMode`, so `-Rebuild` alone meant "deps mode + scrub".
+
+**Dean's exact redefinition** (captured from chat verbatim so we don't drift again):
+- `-Rebuild` is a **modifier, not a mode**. It forces a full rebuild of whatever target(s) the *other* flags pick out, regardless of prior state.
+- The deps folder (`deps/builds/<platform>/<config>/`) may **only** be modified when `-Deps`, `-Only`, or `-All` is explicitly on the command line.
+- If none of those is present, the implicit target is **Sneeze**. In that case, `-Rebuild` wipes `builds/<platform>/<config>/` (both `build/` and `install/` — all generated output, source under `src/` is never touched), reconfigures, rebuilds. Deps are untouched.
+
+Behavior matrix that now holds:
+
+| Invocation | Deps touched? | Sneeze touched? |
+|---|---|---|
+| *(none)* | no | incremental build |
+| `-Fresh` | no | reconfigure + build |
+| `-Rebuild` | **no** | **wipe `builds/<plat>/<cfg>/`, reconfigure, build** *(new)* |
+| `-Deps` | build | no |
+| `-Deps -Rebuild` | wipe all, rebuild all | no |
+| `-Only <dep>` | build that dep | no |
+| `-Only <dep> -Rebuild` | wipe + rebuild that dep | no |
+| `-All` | build | configure + build |
+| `-All -Rebuild` | wipe + rebuild all | wipe + rebuild |
+
+### Execution
+
+- **`scripts/build-windows.ps1`** — removed `$Rebuild` from the `$DepsMode` expression; added `$Reconfigure = $All -or $Fresh -or ($Rebuild -and $SneezeMode)`; added a Sneeze-tree scrub block (`Remove-Item -Recurse -Force $SneezeOutDir`) inside the Sneeze branch, gated on `($Rebuild -and $SneezeMode)`. The existing deps-scrub block (`Remove-DepState` / wipe `$DepRoot`) stayed put — but now only fires when `$DepsMode` is true, which `-Rebuild` alone no longer triggers. Top-of-file docstring rewritten: new "HARD RULE" paragraph explicitly naming the src↔deps wall, new usage matrix, new example lines.
+- **`scripts/build-linux.sh`** + **`scripts/build-macos.sh`** — same semantics in bash. Split `--rebuild` out of the `--only|--list|--rebuild) DEPS_FORWARD=1` case; new `REBUILD=0` variable; conditional `EXTRA_ARGS+=(--rebuild)` only when `DEPS_MODE=1`; Sneeze-tree `rm -rf "$SNEEZE_OUT_DIR"` gated on `REBUILD=1 && SNEEZE_MODE=1` before the reconfigure step. `RECONFIGURE` now includes the `(REBUILD=1 && SNEEZE_MODE=1)` case. Docstrings rewritten to match.
+- **`scripts/build-deps.sh`** — no changes. This is a deps-only helper (never invoked for Sneeze), so its internal `--rebuild` semantics (scrub-one-with-`--only`, scrub-all-without) stay as-is. It's always in deps context by construction.
+- **`README.md`** — reworded the "`-Only`/`-Rebuild`/`-List` implies `-Deps`" line (only the first and last do now). Replaced the "Nuclear option" subsection with a new "**`-Rebuild` is a modifier, not a mode**" subsection containing the full behavior matrix + four worked examples (`-Rebuild`, `-Rebuild -Only filament`, `-Rebuild -Deps`, `-Rebuild -All`) for both PowerShell and bash. Updated the flags-at-a-glance table row for `-Rebuild` accordingly.
+- **`.cursor/rules/project.mdc`** — rewrote the long `scripts/build-{...}` bullet in "Dependency Depot Architecture" with the new matrix; updated both quick-reference command blocks (Windows + Linux); updated the "Mode flags are mutually exclusive" explanatory paragraph to call out `-Rebuild` as a modifier; replaced the `**-Rebuild` / `--rebuild` — the full-scrub rebuild flag**` paragraph with a full behavior-matrix table and a new historical note about tonight's incident (colleague-evening-burned story preserved so future me doesn't re-introduce the bug).
+
+### Why the fix is right
+
+Two layers of defense:
+
+1. **Parse-level.** `-Rebuild` alone can't enter the deps-mode block: `$DepsMode` is false. The deps-scrub code is physically unreachable without a `-Deps`/`-Only`/`-All` on the command line. Not a "try not to" — an "impossible to".
+2. **Code-level.** The Sneeze-tree scrub is inside the Sneeze branch, gated on `$SneezeMode` — it can only wipe `builds/<plat>/<cfg>/`, never anything under `deps/`. The two scrub paths are in completely separate branches with no shared fall-through.
+
+This mirrors the CMakeLists-level invariant: `deps/CMakeLists.txt` and `src/CMakeLists.txt` never include or reference each other. The scripts — the one piece of glue that knows about both — now obey the same wall.
+
+### Verification
+
+Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (both with and without `-Rebuild`) against a populated Debug tree. Deps untouched on every run; Sneeze tree scrubbed + reconfigured + rebuilt cleanly. Behavior matches the matrix above. Shipping.
+
+### Loose ends / non-goals
+
+- Did not touch `Invalidate-DepConfigure` or the stamp system — those are orthogonal and still work correctly.
+- The MSS verify-mode for `SignMsf.exe` is still on Dean's wishlist but explicitly deferred.
+- Did not test the new scripts on Linux or macOS (no machines available tonight); logic is textbook parallel to the PowerShell version but a Linux/macOS smoke test on the next boot would be prudent. Should be zero-cost to run since it's a no-op in the happy `-All` / `-Deps` path.
+
+### Files changed (for commit)
+
+- `scripts/build-windows.ps1`
+- `scripts/build-linux.sh`
+- `scripts/build-macos.sh`
+- `README.md`
+- `.cursor/rules/project.mdc`
+- `.cursor/session-dean_abramson.md` (this entry)
+
+**Dean commits the repo himself** (per standing rule).

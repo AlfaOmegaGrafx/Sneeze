@@ -13,12 +13,24 @@
 #                 etc.) can't linger. Deps tree is never touched. Requires
 #                 CMake >= 3.24 (VS 2022 ships 3.28+, so effectively everyone).
 #   -All          Build deps, then configure + build Sneeze.
-#   -Only <dep>   Build a single dep (implies -Deps).
-#   -List         Show dep stamp cache (implies -Deps).
-#   -Rebuild      Full-scrub rebuild of dep(s) (implies -Deps). Wipes build
-#                 outputs + all stamps; source clones in deps/repos/ are
-#                 preserved. Combined with -Only: scrubs one dep. Alone:
-#                 scrubs the entire per-config dep root.
+#   -Only <dep>   Build a single dep (implies deps-targeting).
+#   -List         Show dep stamp cache.
+#   -Rebuild      Modifier: force a full rebuild of whatever target(s) are
+#                 selected by the other flags, regardless of prior build state.
+#                 NEVER crosses the src <-> deps wall on its own. Matrix:
+#                   -Rebuild                  scrub + rebuild Sneeze only
+#                   -Rebuild -Deps            scrub + rebuild all deps
+#                   -Rebuild -Only <dep>      scrub + rebuild one dep
+#                   -Rebuild -All             scrub + rebuild deps, then Sneeze
+#                 Source clones in deps/repos/ are never scrubbed.
+#
+# HARD RULE: the deps folder (deps/builds/<platform>/<config>/) may only be
+# modified when -Deps, -Only, or -All is present on the command line. A
+# Sneeze-only invocation (anything else, including -Fresh or -Rebuild alone)
+# cannot touch a single bit inside deps/. This parallels the CMakeLists-level
+# invariant: deps/CMakeLists.txt and src/CMakeLists.txt never include or
+# reference each other's trees. The scripts are the only glue, and they obey
+# the same wall.
 #
 # The deps tree (deps/CMakeLists.txt) and the Sneeze tree (src/CMakeLists.txt)
 # are two completely independent CMake projects. They share nothing. This
@@ -37,7 +49,9 @@
 #   .\scripts\build-windows.ps1 -All                   # Deps, then Sneeze
 #   .\scripts\build-windows.ps1 -Only filament         # Build one dep (cached = skip)
 #   .\scripts\build-windows.ps1 -Only filament -Rebuild  # Full-scrub rebuild of one dep
-#   .\scripts\build-windows.ps1 -Rebuild               # Full-scrub rebuild of all deps
+#   .\scripts\build-windows.ps1 -Rebuild               # Full-scrub rebuild of Sneeze only
+#   .\scripts\build-windows.ps1 -Deps -Rebuild         # Full-scrub rebuild of all deps
+#   .\scripts\build-windows.ps1 -All -Rebuild          # Full-scrub rebuild of deps + Sneeze
 #   .\scripts\build-windows.ps1 -List                  # Stamp cache state
 
 [CmdletBinding()]
@@ -78,11 +92,17 @@ $SneezeBuildDir = Join-Path $SneezeOutDir 'build'
 
 $StampDir = Join-Path $DepsBuildDir '.dep-stamps'
 
-# Any of these flags => deps mode.
-$DepsMode   = [bool]($Deps -or $All -or $Only -or $List -or $Rebuild)
+# Only these flags => deps mode. -Rebuild is a modifier, not a mode: it
+# composes with whatever target set is selected by the real mode flags.
+# HARD RULE: if none of -Deps, -Only, or -All is set, the deps folder must
+# never be touched -- regardless of what -Rebuild / -Fresh are doing.
+# (-List is read-only and handled via its own early exit below.)
+$DepsMode   = [bool]($Deps -or $All -or $Only -or $List)
 $SneezeMode = [bool]((-not $DepsMode) -or $All)
-# Reconfigure the Sneeze tree before building (implied by -All or -Fresh).
-$Reconfigure = [bool]($All -or $Fresh)
+# Reconfigure the Sneeze tree before building. Implied by -All, -Fresh, or
+# -Rebuild when Sneeze is in scope (the Sneeze tree gets scrubbed in that
+# case and needs a fresh configure to exist at all).
+$Reconfigure = [bool]($All -or $Fresh -or ($Rebuild -and $SneezeMode))
 
 # ---------------------------------------------------------------------------
 # Dependency graph -- order matters (deps before dependents).
@@ -256,6 +276,17 @@ if ($DepsMode) {
 # ---------------------------------------------------------------------------
 
 if ($Fresh -or $SneezeMode) {
+   # -Rebuild with Sneeze in scope: scrub the entire Sneeze output tree
+   # (build/ + install/) before reconfiguring. Source under src/ is not
+   # touched -- only the generated output under builds/<platform>/<config>/.
+   # Forces a full reconfigure + from-scratch compile of every source file
+   # regardless of prior state.
+   if ($Rebuild -and $SneezeMode) {
+      Write-Host ''
+      Write-Host "==> Scrubbing Sneeze tree at $SneezeOutDir"
+      Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $SneezeOutDir
+   }
+
    # -Fresh or -All: reconfigure the Sneeze tree from src/CMakeLists.txt
    # before building. Default (no -All, no -Fresh): skip configure; rely
    # on an already-configured tree. If the tree doesn't exist, `cmake --build`

@@ -542,7 +542,7 @@ The project has **two fully independent CMake trees**, parameterized by `SNEEZE_
 - **deps/*.cmake** — one `ExternalProject_Add` per dep. Single source of truth; included by `deps/CMakeLists.txt`.
 - **src/CMakeLists.txt** — standalone Sneeze project. `cmake -S src`. Finds deps under `${LIBS_DIR}/<Name>/install/`. Forces output to `${SNEEZE_BUILD_ROOT}/install/lib` and `${SNEEZE_BUILD_ROOT}/install/bin` (symmetric with each dep's `install/{bin,lib}`). Never references `deps/`.
 - **tests/CMakeLists.txt** — defines individual test executables; pulled in by `src/CMakeLists.txt`, inherits its output dirs.
-- **scripts/build-{windows.ps1,linux.sh,macos.sh}** — the only glue between deps and Sneeze. Default (no flag): plain `cmake --build builds/<plat>/<cfg>/build --config <cfg>` (no dep checks, no configure). `-Deps` / `--deps`: `cmake -S deps` + stamped per-dep build loop. `-All` / `--all`: deps flow, then `cmake -S src` configure, then `cmake --build` on the Sneeze tree. `-Fresh` / `--fresh`: passes `cmake --fresh` (CMake 3.24+) to wipe `CMakeCache.txt` + `CMakeFiles/` before reconfiguring, then builds Sneeze. Deps phase is skipped entirely. Renamed from the earlier `-Configure` to avoid collision with the `-Config Debug|Release` flag that sits next to it on every command line, and to match the real semantics (`cmake --fresh` is the underlying primitive). Use `-Fresh` when you want to be certain stale cache values (anari_DIR, compiler paths, toolchain tweaks) are gone; `-All`'s reconfigure stays non-destructive (idempotent cache update). `-Rebuild` / `--rebuild`: full-scrub rebuild of dep(s) — wipes build outputs + all stamps (script + ExternalProject); source clones in `deps/repos/` are preserved. With `-Only`: scrubs one dep. Alone: scrubs the entire per-config dep root. `-Only`, `-List`, `-Rebuild` imply deps mode. `-Deps`, `-All`, and `-Fresh` are mutually exclusive.
+- **scripts/build-{windows.ps1,linux.sh,macos.sh}** — the only glue between deps and Sneeze. Default (no flag): plain `cmake --build builds/<plat>/<cfg>/build --config <cfg>` (no dep checks, no configure). `-Deps` / `--deps`: `cmake -S deps` + stamped per-dep build loop. `-All` / `--all`: deps flow, then `cmake -S src` configure, then `cmake --build` on the Sneeze tree. `-Fresh` / `--fresh`: passes `cmake --fresh` (CMake 3.24+) to wipe `CMakeCache.txt` + `CMakeFiles/` before reconfiguring, then builds Sneeze. Deps phase is skipped entirely. Renamed from the earlier `-Configure` to avoid collision with the `-Config Debug|Release` flag that sits next to it on every command line, and to match the real semantics (`cmake --fresh` is the underlying primitive). Use `-Fresh` when you want to be certain stale cache values (anari_DIR, compiler paths, toolchain tweaks) are gone; `-All`'s reconfigure stays non-destructive (idempotent cache update). `-Rebuild` / `--rebuild` is a **modifier, not a mode**: it composes with whatever target set the real mode flags pick out, and it **never crosses the src ↔ deps wall on its own**. Alone → wipe + rebuild the Sneeze tree (`builds/<plat>/<cfg>/`). With `-Only <dep>` → scrub + rebuild that one dep. With `-Deps` → scrub + rebuild the entire per-config dep root. With `-All` → scrub + rebuild deps, then scrub + rebuild Sneeze. Source clones in `deps/repos/` are always preserved. `-Only` and `-List` imply deps mode; `-Rebuild` does NOT. `-Deps`, `-All`, and `-Fresh` are mutually exclusive; `-Rebuild` composes with any of them.
 - **scripts/build-deps.sh** — shared bash helper that drives `cmake -S deps` and the per-dep stamped loop on Linux/macOS; invoked by `build-linux.sh` and `build-macos.sh` when in deps mode.
 - **Wasmtime** is built via `cargo build --release -p wasmtime-c-api` regardless of `SNEEZE_CONFIG` (Cargo release mode is always used; the product just gets copied into the config-specific install tree).
 - **All other C/C++ dependencies** are built with CMake using `-DCMAKE_BUILD_TYPE=${SNEEZE_CONFIG}` and installed under their per-config `install/` prefixes.
@@ -566,8 +566,9 @@ The project has **two fully independent CMake trees**, parameterized by `SNEEZE_
 
 # Refresh deps only (upstream dep changed, rare)
 .\scripts\build-windows.ps1 -Deps
-.\scripts\build-windows.ps1 -Only filament -Rebuild     # full-scrub one dep (implies -Deps)
-.\scripts\build-windows.ps1 -Rebuild                    # full-scrub all deps (implies -Deps)
+.\scripts\build-windows.ps1 -Only filament -Rebuild     # full-scrub one dep
+.\scripts\build-windows.ps1 -Deps -Rebuild              # full-scrub all deps
+.\scripts\build-windows.ps1 -Rebuild                    # full-scrub SNEEZE ONLY (no deps touched)
 
 # Run tests (Release; swap 'release' -> 'debug' for Debug builds)
 builds\windows-x64\release\bin\WasmTest.exe
@@ -597,8 +598,9 @@ builds\windows-x64\release\bin\JwsTest.exe
 
 # Refresh deps only (rare)
 ./scripts/build-linux.sh --deps
-./scripts/build-linux.sh --only filament --rebuild      # full-scrub one dep (implies --deps)
-./scripts/build-linux.sh --rebuild                      # full-scrub all deps (implies --deps)
+./scripts/build-linux.sh --only filament --rebuild      # full-scrub one dep
+./scripts/build-linux.sh --deps --rebuild               # full-scrub all deps
+./scripts/build-linux.sh --rebuild                      # full-scrub SNEEZE ONLY (no deps touched)
 
 # Run tests
 ./builds/linux-x64/release/install/bin/WasmTest
@@ -795,7 +797,9 @@ Sneeze/
 .\scripts\build-windows.ps1 -All                         # Deps, then Sneeze
 .\scripts\build-windows.ps1 -Only filament               # Build one dep if not cached (implies -Deps)
 .\scripts\build-windows.ps1 -Only filament -Rebuild      # Full-scrub rebuild of one dep
-.\scripts\build-windows.ps1 -Rebuild                     # Full-scrub rebuild of all deps
+.\scripts\build-windows.ps1 -Deps -Rebuild               # Full-scrub rebuild of all deps
+.\scripts\build-windows.ps1 -Rebuild                     # Full-scrub rebuild of SNEEZE ONLY (deps untouched)
+.\scripts\build-windows.ps1 -All -Rebuild                # Full-scrub rebuild of deps + Sneeze
 .\scripts\build-windows.ps1 -List                        # Stamp cache state
 ```
 
@@ -806,11 +810,13 @@ Sneeze/
 ./scripts/build-linux.sh --fresh                         # Reconfigure + build Sneeze
 ./scripts/build-linux.sh --deps                          # Deps only
 ./scripts/build-linux.sh --all                           # Deps, then Sneeze
-./scripts/build-linux.sh --only filament --rebuild      # full-scrub one dep
-./scripts/build-linux.sh --rebuild                       # full-scrub all deps
+./scripts/build-linux.sh --only filament --rebuild       # full-scrub one dep
+./scripts/build-linux.sh --deps --rebuild                # full-scrub all deps
+./scripts/build-linux.sh --rebuild                       # full-scrub SNEEZE ONLY (deps untouched)
+./scripts/build-linux.sh --all --rebuild                 # full-scrub deps + Sneeze
 ```
 
-**Mode flags are mutually exclusive:** `-Deps`, `-All`, `-Fresh` — only one at a time. `-Only`, `-List`, `-Rebuild` implicitly enable deps mode. Default (no flags) is Sneeze-only: plain `cmake --build builds/<plat>/<cfg>/build --config <cfg>` with no dep checks, no reconfigure. If the Sneeze build tree doesn't exist yet, the plain-build fails with "CMakeCache.txt missing" and the user must re-run with `-Fresh` (or `-All` if deps are also missing).
+**Mode flags are mutually exclusive:** `-Deps`, `-All`, `-Fresh` — only one at a time. `-Only` and `-List` implicitly enable deps mode. `-Rebuild` is a **modifier, not a mode** — it composes with whichever target set the other flags pick, and on its own (no `-Deps`/`-Only`/`-All`) it operates on Sneeze alone and never touches `deps/`. Default (no flags) is Sneeze-only: plain `cmake --build builds/<plat>/<cfg>/build --config <cfg>` with no dep checks, no reconfigure. If the Sneeze build tree doesn't exist yet, the plain-build fails with "CMakeCache.txt missing" and the user must re-run with `-Fresh` (or `-All` if deps are also missing).
 
 **Under the hood — direct CMake invocations (used by CI):**
 
@@ -840,7 +846,18 @@ cmake --build builds/<plat>/<cfg>/build --config <cfg>
 
 **Script-level stamp system.** `scripts/build-windows.ps1` (and the `scripts/build-deps.sh` bash counterpart) maintain per-dep `.done` marker files under `<DepsBuildDir>/.dep-stamps/`. Once a dep builds successfully, its stamp is written and subsequent runs skip it. Stamps are orthogonal to `ExternalProject_Add`'s own internal step stamps (download/update/patch/configure/build/install).
 
-**`-Rebuild` / `--rebuild` — the full-scrub rebuild flag.** The single, unambiguous "I don't care what state this dep's build was in, start over" escape hatch. Wipes the script-level `.done` stamp + the ExternalProject prefix dir (every EP stamp including patch/configure/build/install, plus logs and tmp) + the per-dep `libs/<dep>/{build,install}/` trees. The source clone in `deps/repos/<dep>/` is preserved — filament alone takes 10+ min to re-clone, and local dev work on a clone should never be silently blown away. With `-Only <dep>`: scrubs one dep. Alone: wipes the entire per-config dep root (`deps/builds/<plat>/<cfg>/`) and lets the outer CMake regenerate everything. Replaces the earlier `-CleanStamps` flag, which only cleared the script-level stamp and left the ExternalProject state stale — a false-friend flag that Dean rightly flagged as confusing. The helper function is `Remove-DepState` (PowerShell) / `remove_dep_state` (bash).
+**`-Rebuild` / `--rebuild` — the full-scrub rebuild *modifier*.** The single, unambiguous "I don't care what state this was in, start over" escape hatch. Applies to whatever target set the other flags pick out. **Never crosses the src ↔ deps wall on its own.** Behavior matrix:
+
+| Invocation | Deps touched? | Sneeze touched? | What happens |
+|---|---|---|---|
+| `-Rebuild` alone | no | yes | Wipe `builds/<plat>/<cfg>/` (build + install), reconfigure, build Sneeze |
+| `-Rebuild -Only <dep>` | that one dep | no | Scrub script stamp + EP prefix + `libs/<dep>/`; rebuild it |
+| `-Rebuild -Deps` | all deps | no | Wipe entire per-config dep root (`deps/builds/<plat>/<cfg>/`); rebuild every dep |
+| `-Rebuild -All` | all deps | yes | Deps scrub + rebuild, then Sneeze scrub + rebuild |
+
+Source clones in `deps/repos/<dep>/` are **always** preserved — filament alone takes 10+ min to re-clone, and local dev work on a clone should never be silently blown away. Deps-side scrub is implemented by the `Remove-DepState` helper (PowerShell) / `remove_dep_state` (bash); Sneeze-side scrub is a plain `Remove-Item`/`rm -rf` on `builds/<plat>/<cfg>/`.
+
+Replaces the earlier `-CleanStamps` flag, which only cleared the script-level stamp and left the ExternalProject state stale — a false-friend flag that Dean rightly flagged as confusing. **Historical note (2026-04-20):** an earlier revision of the scripts treated `-Rebuild` as implying deps mode, so `.\scripts\build-windows.ps1 -Rebuild -Config Debug` would silently wipe the entire dep root. That reached back across the src ↔ deps wall (a violation of the hard-separation invariant) and burned a colleague's evening when it blew away an hour+ of dep builds. Fixed by demoting `-Rebuild` to a pure modifier: it can now only touch `deps/` when `-Deps`, `-Only`, or `-All` is explicitly on the command line.
 
 **`Invalidate-DepConfigure` helper.** Before invoking `cmake --build --target <dep>`, the scripts explicitly delete `<DepsBuildDir>/<dep>-prefix/src/<dep>-stamp/<Config>/<dep>-configure` — the ExternalProject configure-step stamp. This forces the inner configure to re-run on every invocation, so edits to `deps/<dep>.cmake` (changed CMAKE_ARGS, new BUILD_COMMAND, etc.) take effect without the developer having to manually delete build trees. Without this, a failed build whose configure previously succeeded would reuse the stale cached configure on retry.
 
@@ -857,7 +874,7 @@ cmake --build builds/<plat>/<cfg>/build --config <cfg>
 - **First build:** run `-All` once per config — deps (~35-90 min) then Sneeze (~1-2 min). Day-to-day work never touches the deps phase.
 - **Day-to-day:** plain `.\scripts\build-windows.ps1` (seconds). No CMake, no dep checks, just compile + link Sneeze.
 - **After editing CMakeLists.txt:** `.\scripts\build-windows.ps1 -Fresh` to reconfigure Sneeze only.
-- **What `-Fresh` actually does (precisely):** passes `cmake --fresh` (3.24+), which wipes `CMakeCache.txt` + the `CMakeFiles/` directory before rerunning configure. It does **not** delete compiled `.obj` / `.lib` / `.dll` outputs. In practice you usually *get* a full Sneeze rebuild anyway because CMake regenerates the `.vcxproj` files and MSBuild's up-to-date check treats the regenerated projects as modified — but this is a side effect, not an explicit clean. Scope is always Sneeze-only; the 15 dependency libs under `deps/builds/` are never touched by `-Fresh`. For a true from-zero rebuild of everything: `-Rebuild` (deps side) then `-Fresh` (Sneeze side).
+- **What `-Fresh` actually does (precisely):** passes `cmake --fresh` (3.24+), which wipes `CMakeCache.txt` + the `CMakeFiles/` directory before rerunning configure. It does **not** delete compiled `.obj` / `.lib` / `.dll` outputs. In practice you usually *get* a full Sneeze rebuild anyway because CMake regenerates the `.vcxproj` files and MSBuild's up-to-date check treats the regenerated projects as modified — but this is a side effect, not an explicit clean. Scope is always Sneeze-only; the 15 dependency libs under `deps/builds/` are never touched by `-Fresh`. For a true from-zero rebuild of everything: `-All -Rebuild` in one shot (scrubs + rebuilds deps then scrubs + rebuilds Sneeze).
 - **After pulling a new dep version:** `.\scripts\build-windows.ps1 -Only <name> -Rebuild` forces that one dep to rebuild from scratch while every other dep stays cached.
 
 **Recommended daily workflow on Windows — use Visual Studio, not the scripts.** Once `-All` has produced a configured Sneeze tree, the CMake machinery has already generated a full `.sln` at `builds\windows-x64\<config>\build\Sneeze.sln`. For day-to-day "I edited a `.cpp`, rebuild" work, open the solution in Visual Studio and use F7 — incremental builds are faster than re-invoking the scripts, and you get the debugger, breakpoints, IntelliSense, Error List, and the rest of the IDE for free. The scripts exist for the cases Visual Studio can't solve: CI, Linux/macOS builds, fresh-checkout smoke tests, and reconfigure after editing `CMakeLists.txt` (which is what `-Fresh` is for). The rule of thumb: **fresh-checkout / config-changes / cross-platform → scripts; daily editing → `.sln` in VS.** Same deal on macOS with the Xcode project CMake produces, and on Linux with Ninja/Make + your editor of choice. CMake's command-line UX is legitimately rough; nobody should have to live in it day-to-day.

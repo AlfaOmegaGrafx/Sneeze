@@ -278,7 +278,7 @@ Full-scrub rebuild that one dep — every other dep stays cached. `-Rebuild` wip
 ./scripts/build-linux.sh --only filament --rebuild
 ```
 
-(Any of `-Only` / `-Rebuild` / `-List` implies `-Deps` mode — the script won't touch Sneeze.)
+(`-Only` and `-List` imply deps mode; the script won't touch Sneeze. `-Rebuild` is a *modifier* — it composes with whichever target set you pick, and it will NEVER cross the src ↔ deps wall on its own.)
 
 ### You want to inspect which deps are cached
 
@@ -290,23 +290,42 @@ Full-scrub rebuild that one dep — every other dep stays cached. `-Rebuild` wip
 ./scripts/build-linux.sh --list
 ```
 
-### Nuclear option — full rebuild of one config
+### `-Rebuild` is a modifier, not a mode
 
-`-Rebuild` alone wipes the entire per-config dep root, then re-runs the full deps build. Combine with `-Fresh` to also reconfigure the Sneeze tree from scratch. Source clones in `deps/repos/` are preserved — no re-download.
+`-Rebuild` is the universal "I don't care what state it was in — build it fresh" lever. It composes with whatever target set the other flags pick out, and it **never crosses the src ↔ deps wall on its own**. The deps folder can only be scrubbed when `-Deps`, `-Only`, or `-All` is explicitly on the command line.
 
-**Windows:**
+| Invocation (Windows shown; bash is identical with lowercase `--` flags) | Deps touched? | Sneeze touched? | What happens |
+|---|---|---|---|
+| `-Rebuild` | no | yes | Wipe `builds/<platform>/<config>/`, reconfigure, build Sneeze |
+| `-Rebuild -Only filament` | that one dep | no | Scrub + rebuild one dep |
+| `-Rebuild -Deps` | all deps | no | Scrub + rebuild every dep |
+| `-Rebuild -All` | all deps | yes | Scrub + rebuild deps, then scrub + rebuild Sneeze |
+
+**Rebuild just Sneeze** (common: you pulled src changes and want a clean build from scratch):
 ```powershell
-.\scripts\build-windows.ps1 -Rebuild -Config Release
-.\scripts\build-windows.ps1 -Fresh   -Config Release
+.\scripts\build-windows.ps1 -Rebuild -Config Debug
 ```
-
-**Linux / macOS:**
 ```bash
-./scripts/build-linux.sh --rebuild --config Release
-./scripts/build-linux.sh --fresh   --config Release
+./scripts/build-linux.sh --rebuild --config Debug
 ```
 
-To wipe *everything* including the shared source clones, delete `deps/repos/` manually too.
+**Rebuild the entire per-config dep root:**
+```powershell
+.\scripts\build-windows.ps1 -Deps -Rebuild -Config Release
+```
+```bash
+./scripts/build-linux.sh --deps --rebuild --config Release
+```
+
+**Rebuild deps *and* Sneeze from scratch:**
+```powershell
+.\scripts\build-windows.ps1 -All -Rebuild -Config Release
+```
+```bash
+./scripts/build-linux.sh --all --rebuild --config Release
+```
+
+Source clones in `deps/repos/` are preserved across all forms of `-Rebuild` — no re-download. To wipe those too, delete `deps/repos/` manually.
 
 ### Build-script flags at a glance
 
@@ -321,9 +340,9 @@ Default (no flag) builds Sneeze only. Mode flags and the convenience flags that 
 | `-Config Debug\|Release` | `--config Debug\|Release` | Build configuration (default: Release) |
 | `-Only <dep>` | `--only <dep>` | Build one dep if not cached (implies deps mode) |
 | `-List` | `--list` | Show dep order + cached/pending status (implies deps mode) |
-| `-Rebuild` | `--rebuild` | Full-scrub rebuild — wipes build outputs + stamps. With `-Only <dep>`: one dep. Alone: entire per-config dep root. Source clones preserved (implies deps mode). |
+| `-Rebuild` | `--rebuild` | **Modifier.** Force a full rebuild of whichever target(s) the other flags select, regardless of prior state. Alone → Sneeze. With `-Deps` / `-Only` / `-All` → scrubs + rebuilds the matching deps. NEVER touches deps unless a deps flag is explicitly present. Source clones preserved. |
 
-`-Deps`, `-Fresh`, and `-All` are mutually exclusive.
+`-Deps`, `-Fresh`, and `-All` are mutually exclusive. `-Rebuild` is not a mode — it composes with any of the above.
 
 ---
 
