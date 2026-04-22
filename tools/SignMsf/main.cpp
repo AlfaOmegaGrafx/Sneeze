@@ -12,12 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// SignMsf — JWS signing CLI tool for .msf/.mss files.
+// SignMsf — JWS signing and verification CLI tool for .msf files.
 //
+// Sign:
 //   SignMsf --payload <json> --key <key.pem> --cert <cert.pem>
-//           [--chain <intermediate.pem>] [--alg RS256] --out <output.mss>
+//           [--chain <intermediate.pem>] [--alg RS256] --out <output.msf>
+//
+// Verify / dump:
+//   SignMsf --verify <file.msf> [--trust <ca.pem>]
 
-#include "../../src/jws/JwsBase.h"
+#include "../../src/msf/MsfFile.h"
 
 #include <cstdio>
 #include <cstring>
@@ -29,8 +33,8 @@
 
 static std::string ReadFile (const char* sPath)
 {
-   std::ifstream ifs (sPath, std::ios::binary);
    std::string sResult;
+   std::ifstream ifs (sPath, std::ios::binary);
    if (ifs.is_open ())
    {
       std::ostringstream oss;
@@ -42,8 +46,8 @@ static std::string ReadFile (const char* sPath)
 
 static bool WriteFile (const char* sPath, const std::string& sData)
 {
-   std::ofstream ofs (sPath, std::ios::binary);
    bool bOk = false;
+   std::ofstream ofs (sPath, std::ios::binary);
    if (ofs.is_open ())
    {
       ofs.write (sData.data (), (std::streamsize) sData.size ());
@@ -55,22 +59,186 @@ static bool WriteFile (const char* sPath, const std::string& sData)
 static void PrintUsage ()
 {
    std::cerr
-      << "Usage: SignMsf --payload <json-file> --key <private-key.pem>\n"
-      << "               --cert <leaf-cert.pem> [--chain <intermediate.pem>]\n"
-      << "               [--alg RS256] --out <output.mss>\n";
+      << "Usage:\n"
+      << "  Sign:    SignMsf --payload <json> --key <key.pem> --cert <cert.pem>\n"
+      << "                   [--chain <intermediate.pem>] [--alg RS256] --out <file.msf>\n"
+      << "\n"
+      << "  Verify:  SignMsf --verify <file.msf> [--trust <ca.pem>]\n";
 }
+
+// ---------------------------------------------------------------------------
+// Verify mode
+// ---------------------------------------------------------------------------
+
+static void PrintCertChain (const sneeze::msf::MSF_FILE& msf)
+{
+   const auto& aCerts = msf.GetCertInfos ();
+
+   for (size_t i = 0; i < aCerts.size (); ++i)
+   {
+      const auto& cert = aCerts[i];
+      const char* sLabel = cert.bIsCA ? "CA" : "Leaf";
+
+      std::cout << "\n";
+      std::cout << "  Certificate [" << i << "] (" << sLabel << ")\n";
+      std::cout << "    Subject:    " << cert.sSubject << "\n";
+      std::cout << "    Issuer:     " << cert.sIssuer << "\n";
+      std::cout << "    Serial:     " << cert.sSerial << "\n";
+      std::cout << "    Not Before: " << cert.sNotBefore << "\n";
+      std::cout << "    Not After:  " << cert.sNotAfter << "\n";
+      std::cout << "    Key:        " << cert.sKeyType << " " << cert.nKeyBits << "-bit\n";
+   }
+}
+
+static int DoVerify (const char* sMsfPath,
+                     const std::vector<const char*>& aTrustPaths)
+{
+   int nResult = 1;
+
+   std::string sJws = ReadFile (sMsfPath);
+   if (sJws.empty ())
+   {
+      std::cerr << "Error: cannot read file: " << sMsfPath << "\n";
+   }
+   else
+   {
+      sneeze::msf::MSF_FILE msf;
+
+      for (const char* sTrustPath : aTrustPaths)
+      {
+         std::string sPem = ReadFile (sTrustPath);
+         if (!sPem.empty ())
+            msf.AddTrustedCert (sPem);
+         else
+            std::cerr << "Warning: cannot read trust cert: " << sTrustPath << "\n";
+      }
+
+      if (!msf.Parse (sJws))
+      {
+         std::cerr << "Error: failed to parse JWS from " << sMsfPath << "\n";
+      }
+      else
+      {
+         msf.VerifySignature ();
+         msf.VerifyChain ();
+
+         std::cout << "File:        " << sMsfPath << "\n";
+         std::cout << "Algorithm:   " << msf.GetAlgorithm () << "\n";
+         std::cout << "Fingerprint: " << msf.GetFingerprint () << "\n";
+
+         std::string sSuccessor = msf.GetSuccessor ();
+         if (!sSuccessor.empty ())
+            std::cout << "Successor:   " << sSuccessor << "\n";
+
+         if (msf.IsSignatureValid ()  &&  msf.IsChainTrusted ())
+         {
+            std::cout << "Signature:   VERIFIED\n";
+            nResult = 0;
+         }
+         else
+         {
+            std::cout << "Signature:   FAILED\n";
+            if (!msf.GetSignatureError ().empty ())
+               std::cerr << "Sig error:   " << msf.GetSignatureError () << "\n";
+            if (!msf.GetChainError ().empty ())
+               std::cerr << "Chain error: " << msf.GetChainError () << "\n";
+         }
+
+         std::cout << "\n--- Certificate Chain ---";
+         PrintCertChain (msf);
+
+         std::cout << "\n--- Payload ---\n\n";
+         nlohmann::json payload = msf.GetPayload ();
+         if (!payload.is_null ())
+            std::cout << payload.dump (3) << "\n";
+         else
+            std::cout << "(empty)\n";
+      }
+   }
+
+   return nResult;
+}
+
+// ---------------------------------------------------------------------------
+// Sign mode
+// ---------------------------------------------------------------------------
+
+static int DoSign (const char* sPayloadPath, const char* sKeyPath,
+                   const std::vector<const char*>& aCertPaths,
+                   const std::string& sAlgorithm, const char* sOutPath)
+{
+   int nResult = 1;
+
+   std::string sPayload = ReadFile (sPayloadPath);
+   std::string sKey     = ReadFile (sKeyPath);
+
+   if (sPayload.empty ())
+      std::cerr << "Error: cannot read payload file: " << sPayloadPath << "\n";
+   else if (sKey.empty ())
+      std::cerr << "Error: cannot read key file: " << sKeyPath << "\n";
+   else
+   {
+      sneeze::msf::MSF_FILE msf;
+
+      msf.SetPayload (nlohmann::json::parse (sPayload));
+
+      bool bCertsOk = true;
+      for (const char* sPath : aCertPaths)
+      {
+         std::string sCert = ReadFile (sPath);
+         if (sCert.empty ())
+         {
+            std::cerr << "Error: cannot read certificate file: " << sPath << "\n";
+            bCertsOk = false;
+            break;
+         }
+         msf.AddCert (sCert);
+      }
+
+      if (bCertsOk)
+      {
+         std::string sJws = msf.Sign (sKey, sAlgorithm);
+         if (sJws.empty ())
+         {
+            std::cerr << "Error: signing failed\n";
+         }
+         else if (!WriteFile (sOutPath, sJws))
+         {
+            std::cerr << "Error: cannot write output file: " << sOutPath << "\n";
+         }
+         else
+         {
+            std::cout << "Signed " << sOutPath << " (" << sJws.size () << " bytes)\n";
+            nResult = 0;
+         }
+      }
+   }
+
+   return nResult;
+}
+
+// ---------------------------------------------------------------------------
+// main
+// ---------------------------------------------------------------------------
 
 int main (int nArgc, char** aArgv)
 {
    const char* sPayloadPath = nullptr;
    const char* sKeyPath     = nullptr;
    const char* sOutPath     = nullptr;
+   const char* sVerifyPath  = nullptr;
    std::string sAlgorithm   = "RS256";
    std::vector<const char*> aCertPaths;
+   std::vector<const char*> aTrustPaths;
+   bool bBadArgs = false;
 
-   for (int i = 1; i < nArgc; ++i)
+   for (int i = 1; i < nArgc  &&  !bBadArgs; ++i)
    {
-      if (strcmp (aArgv[i], "--payload") == 0  &&  i + 1 < nArgc)
+      if (strcmp (aArgv[i], "--verify") == 0  &&  i + 1 < nArgc)
+         sVerifyPath = aArgv[++i];
+      else if (strcmp (aArgv[i], "--trust") == 0  &&  i + 1 < nArgc)
+         aTrustPaths.push_back (aArgv[++i]);
+      else if (strcmp (aArgv[i], "--payload") == 0  &&  i + 1 < nArgc)
          sPayloadPath = aArgv[++i];
       else if (strcmp (aArgv[i], "--key") == 0  &&  i + 1 < nArgc)
          sKeyPath = aArgv[++i];
@@ -85,56 +253,20 @@ int main (int nArgc, char** aArgv)
       else
       {
          std::cerr << "Unknown argument: " << aArgv[i] << "\n";
-         PrintUsage ();
-         return 1;
+         bBadArgs = true;
       }
    }
 
-   if (!sPayloadPath  ||  !sKeyPath  ||  aCertPaths.empty ()  ||  !sOutPath)
-   {
+   int nResult = 1;
+
+   if (bBadArgs)
       PrintUsage ();
-      return 1;
-   }
+   else if (sVerifyPath)
+      nResult = DoVerify (sVerifyPath, aTrustPaths);
+   else if (!sPayloadPath  ||  !sKeyPath  ||  aCertPaths.empty ()  ||  !sOutPath)
+      PrintUsage ();
+   else
+      nResult = DoSign (sPayloadPath, sKeyPath, aCertPaths, sAlgorithm, sOutPath);
 
-   std::string sPayload = ReadFile (sPayloadPath);
-   if (sPayload.empty ())
-   {
-      std::cerr << "Error: cannot read payload file: " << sPayloadPath << "\n";
-      return 1;
-   }
-
-   std::string sKey = ReadFile (sKeyPath);
-   if (sKey.empty ())
-   {
-      std::cerr << "Error: cannot read key file: " << sKeyPath << "\n";
-      return 1;
-   }
-
-   std::vector<std::string> aCertChain;
-   for (const char* sPath : aCertPaths)
-   {
-      std::string sCert = ReadFile (sPath);
-      if (sCert.empty ())
-      {
-         std::cerr << "Error: cannot read certificate file: " << sPath << "\n";
-         return 1;
-      }
-      aCertChain.push_back (sCert);
-   }
-
-   std::string sJws = sneeze::jws::JWS_BASE::Sign (sPayload, sKey, aCertChain, sAlgorithm);
-   if (sJws.empty ())
-   {
-      std::cerr << "Error: signing failed\n";
-      return 1;
-   }
-
-   if (!WriteFile (sOutPath, sJws))
-   {
-      std::cerr << "Error: cannot write output file: " << sOutPath << "\n";
-      return 1;
-   }
-
-   std::cout << "Signed " << sOutPath << " (" << sJws.size () << " bytes)\n";
-   return 0;
+   return nResult;
 }

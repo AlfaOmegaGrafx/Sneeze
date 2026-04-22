@@ -13,7 +13,7 @@ alwaysApply: true
 
 The project produces two components:
 
-- **Sneeze** — the Metaverse Browser Engine (MBE). A standalone, reusable engine library (static `.lib`). Analogous to Blink in the web browser world. Owns all third-party dependencies (Wasmtime, SPIRV-Tools, OpenXR, curl, RmlUi, ANARI, nlohmann/json, Filament, Halogen, BoringSSL, jwt-cpp) and the engine modules that wrap them (`wasm/`, `spirv/`, `xr/`, `net/`, `ui/`, `core/`, `compute/`, `jws/`, and future `som/`, `smap/`, `identity/`, `audio/`). All test executables (WasmTest, SpvTest, XrTest, NetTest, UiTest, ComputeTest, JwsTest) belong to Sneeze. Another team could build a different metaverse browser on top of Sneeze without touching Artemis.
+- **Sneeze** — the Metaverse Browser Engine (MBE). A standalone, reusable engine library (static `.lib`). Analogous to Blink in the web browser world. Owns all third-party dependencies (Wasmtime, SPIRV-Tools, OpenXR, curl, RmlUi, ANARI, nlohmann/json, Filament, Halogen, BoringSSL, jwt-cpp) and the engine modules that wrap them (`wasm/`, `spirv/`, `xr/`, `net/`, `ui/`, `core/`, `compute/`, `msf/`, and future `som/`, `smap/`, `identity/`, `audio/`). All test executables (WasmTest, SpvTest, XrTest, NetTest, UiTest, ComputeTest, JwsTest) belong to Sneeze. Another team could build a different metaverse browser on top of Sneeze without touching Artemis.
 
 - **Artemis** — the metaverse browser application. The single `.exe`. Analogous to Chrome/Chromium. A thin application layer that consumes Sneeze: window management (`canvas/`), user chrome, and `main()`. Owns SDL3 (windowing/input is application-level, not engine-level). The disposable solar system demo (`astro/`) also belongs here. Artemis is **not open source** — proprietary copyright headers.
 
@@ -45,7 +45,7 @@ Sneeze/
 │   ├── net/               HTTP client (libcurl)
 │   ├── ui/                RmlUi HTML/CSS UI toolkit
 │   ├── compute/           SPIR-V kernel embedding + dispatch (Vox GPU, CPU fallback)
-│   └── jws/               JWS signing/verification for MSF/MSS file formats
+│   └── msf/               MSF file signing/verification (JWS compact serialization)
 ├── tests/                 Test source (pulled in by src/CMakeLists.txt)
 │   ├── CMakeLists.txt
 │   ├── certs/             Self-signed X.509 v3 test certificates (CA, provider, expired)
@@ -137,7 +137,7 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 | `net/` | `sneeze::net` | HTTP client (libcurl 8.9.1, static, Schannel SSL) | 1 |
 | `ui/` | `sneeze::ui` | UI toolkit (RmlUi 6.2, HTML/CSS retained-mode, stub renderer) | 1 |
 | `compute/` | `sneeze::compute` | SPIR-V kernel embedding, retrieval, and dispatch via ANARI (CPU fallback when device lacks compute extension) | 1 |
-| `jws/` | `sneeze::jws` | JWS (RFC 7515) signing and verification for MSF/MSS file formats. BoringSSL + jwt-cpp. Part of the Sneeze static library; consumed by `JwsTest`, `SignMsf`, and (eventually) the SMAP driver. | 5 |
+| `msf/` | `sneeze::msf` | MSF file signing and verification (RFC 7515 JWS compact serialization). BoringSSL + jwt-cpp. Part of the Sneeze static library; consumed by `JwsTest`, `SignMsf`, and (eventually) the SMAP driver. | 5 |
 | `identity/` | `sneeze::identity` | Browser-managed identity (future) | — |
 | `audio/` | `sneeze::audio` | Spatial audio mixing (future) | — |
 
@@ -157,10 +157,11 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 | `UI_CONTEXT` | `ui` | RmlUi lifecycle (init/shutdown). Provides stub system, render, and font engine interfaces. Real ANARI rendering deferred to SOM phase. |
 | `GetEmbeddedKernel()` | `compute` | Retrieves SPIR-V bytecode embedded in the executable via Win32 resources. Returns pointer + size. |
 | `COMPUTE_DISPATCH` | `compute` | Dispatches SPIR-V compute kernels via **Vox** (`vox::DEVICE::Create(Backend::Auto)` picks Vulkan / DX12 / Metal at construction). Falls back to registered CPU kernels when no GPU backend is available or Vox rejects the kernel. Built-in CPU fallback for `TEST_PROXIMITY`. The legacy `ANARIDevice` constructor parameter is retained for source compatibility but ignored. |
-| `JWS_BASE` | `jws` | Shared core for JWS sign + verify. Static `Sign()` produces compact serialization with embedded `x5c` chain; instance `Verify()` validates the chain, checks the signature against the leaf's public key (via jwt-cpp), returns a `JWS_RESULT` struct (payload JSON, fingerprint, successor fingerprint, algorithm, error string). Supports RS256/384/512 and ES256/384/512. |
-| `CERT_CHAIN` | `jws` | X.509 chain validation via BoringSSL's `X509_STORE`. Loads the Windows ROOT certificate store on Windows (`CertOpenSystemStoreA` + `CertEnumCertificatesInStore`), `X509_STORE_set_default_paths()` on Linux/macOS. Computes the leaf certificate's **public-key fingerprint** — `SHA-256(i2d_PUBKEY(leaf))` — which is the organizational identity used across the browser, the signing tool, and the HTML viewer. |
-| `JWS_SERVICE` | `jws` | Derived from `JWS_BASE`. Typed accessors for MSS payloads: `GetNamespace()`, `GetOrganization()`, `GetServices()`, `GetModules()`, `GetSuccessor()`. Strongly-typed `MSS_SERVICE` and `MSS_MODULE` structs. |
-| `JWS_FABRIC` | `jws` | Derived from `JWS_BASE`. Stubbed accessors for MSF payloads (`GetServiceRefs()`). The MSF payload schema is not yet fully defined — this class is a placeholder until the format stabilizes. |
+| `MSF_FILE` | `msf` | Single class for the full MSF file lifecycle: parse, sign, verify signature, verify chain, manage certificates, and access typed payload fields. Replaces the former `JWS_BASE` / `JWS_SERVICE` / `JWS_FABRIC` hierarchy. Parse is separated from verification — `Parse()` populates payload, cert info, and fingerprint; `VerifySignature()` and `VerifyChain()` are explicit follow-up calls. Composition path: `SetPayload()` / typed setters + `AddCert()` + `Sign()`. Supports RS256/384/512, ES256/384/512. Non-copyable, non-movable. |
+| `CERT_CHAIN` | `msf` | X.509 chain validation via BoringSSL's `X509_STORE`. Loads the Windows ROOT certificate store on Windows (`CertOpenSystemStoreA` + `CertEnumCertificatesInStore`), `X509_STORE_set_default_paths()` on Linux/macOS. Computes the leaf certificate's **public-key fingerprint** — `SHA-256(i2d_PUBKEY(leaf))` — which is the organizational identity used across the browser, the signing tool, and the HTML viewer. Also exposes 5 public static utility methods (`DecodeInfoDerBase64`, `DecodeInfoPem`, `ComputeFingerprint`, `ExtractPublicKeyPem`, `PemToDerBase64`) that encapsulate all BoringSSL-dependent certificate operations, so `MSF_FILE` has no direct BoringSSL dependency. |
+| `MSF_SERVICE` | `msf` | Struct: `sName`, `sType`, `sEndpoint`, `aModuleKeys`. Describes a service within an MSF payload. |
+| `MSF_MODULE` | `msf` | Struct: `sUrl`, `sSha256`. Describes a WASM/SPIR-V module referenced by an MSF payload. |
+| `CERT_INFO` | `msf` | Struct: `sSubject`, `sIssuer`, `sSerial`, `sNotBefore`, `sNotAfter`, `bIsCA`. Parsed certificate metadata returned by `MSF_FILE::GetCertInfos()`. |
 
 **Naming note:** The concrete renderer class is `sneeze::renderer::ANARI_RENDERER`. The ANARI SDK's `ANARI_*` enum constants (e.g. `ANARI_RENDERER`, `ANARI_CAMERA`) live in the global namespace, so scoping ours inside `sneeze::renderer` avoids collision without needing a backend-specific class name. (An earlier iteration called the class `HELIDE_RENDERER` to dodge the collision; the namespace fix replaced that and lets the class carry a neutral name that reflects its device-agnostic nature.)
 
@@ -216,17 +217,19 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 | Update cycle | `Context.Update()` + `Context.Render()` complete without crash. Proves the layout engine and render dispatch pipeline are functional (stub renderer receives calls). |
 | Multiple contexts | Two simultaneous contexts with distinct names, both create and destroy cleanly. Proves multi-context architecture works. |
 
-**JwsTest.exe** — JWS signing + verification integration test suite (`tests/JwsTest.cpp`). 32 assertions across 7 test groups, all passing. Wired into `tests/CMakeLists.txt` (linked against the Sneeze library) and registered with CTest (`WORKING_DIRECTORY` set to the repo root so the `tests/certs/` fixtures resolve):
+**JwsTest.exe** — MSF file signing + verification integration test suite (`tests/JwsTest.cpp`). 42 assertions across 9 test groups, all passing. Wired into `tests/CMakeLists.txt` (linked against the Sneeze library) and registered with CTest (`WORKING_DIRECTORY` set to the repo root so the `tests/certs/` fixtures resolve):
 
 | Test | What it proves |
 |------|---------------|
-| Sign + Verify round-trip | `JWS_BASE::Sign()` produces a valid JWS compact serialization with embedded `x5c` chain; `Verify()` validates the chain through `CERT_CHAIN`, extracts the leaf's public key, checks the signature (RS256), and returns the correct fingerprint. |
-| JWS_SERVICE payload parsing | MSS payload (namespace, organization, services, modules, successor) is signed and verified; typed accessors return all fields correctly; `MSS_SERVICE` and `MSS_MODULE` structs parse nested fields (endpoint, type, sha256). |
+| Sign + Verify round-trip | `MSF_FILE::Sign()` produces a valid JWS compact serialization with embedded `x5c` chain; `VerifySignature()` validates the signature against the leaf's public key (RS256); `VerifyChain()` validates the chain through `CERT_CHAIN`; correct fingerprint is extracted. |
+| MSF_FILE payload parsing | MSF payload (namespace, organization, services, modules, successor) is signed and verified; typed accessors return all fields correctly; `MSF_SERVICE` and `MSF_MODULE` structs parse nested fields (endpoint, type, sha256). |
 | Tampered payload rejected | Flipping a character in the payload segment causes verification to fail with a non-empty error message. |
 | Expired certificate rejected | A cert with `notAfter = now - 1s` is rejected by BoringSSL's `X509_STORE_CTX` with `"certificate has expired"`. |
 | Untrusted chain rejected | A JWS signed by a cert chain whose root is not in the verifier's trust store is rejected with `"self signed certificate in certificate chain"`. |
 | Fingerprint stability | Two independent verifications of the same JWS produce byte-identical fingerprints — identity is deterministic. |
 | Malformed JWS rejected | Empty string, garbage, and one-segment inputs all produce non-empty error messages without crashing. |
+| Parse populates data without verification | `Parse()` alone (no `VerifySignature()`/`VerifyChain()`) still populates namespace, fingerprint, and cert count — verification is an explicit opt-in step. |
+| Composition round-trip | `MSF_FILE` composition path (`SetPayload` + `AddCert` + `Sign`) produces a JWS that a separate `MSF_FILE` instance can parse and verify; namespace, organization, service, and module fields round-trip correctly. |
 
 **Note:** The HTML/JS viewer at `tools/MsfViewer/index.html` computes the same fingerprint (SHA-256 of SPKI) using the browser's Web Crypto API. Engine and viewer produce byte-identical fingerprints for the same leaf certificate — confirmed end-to-end against `sample.mss`.
 
@@ -297,7 +300,7 @@ All dependencies are built from source automatically by the CMake SuperBuild. No
 | Halogen | master | [MetaversalCorp/Halogen](https://github.com/MetaversalCorp/Halogen) | ANARI device (`anari_library_halogen.dll`) built on Filament — GPU-accelerated PBR rendering through ANARI. Sole renderer (helide retired). |
 | SPIRV-Cross | vulkan-sdk-1.4.341.0 | [KhronosGroup/SPIRV-Cross](https://github.com/KhronosGroup/SPIRV-Cross) | SPIR-V → HLSL/MSL/GLSL cross-compiler. Used by Vox; Sneeze links the static archives (core + hlsl / msl + glsl) to satisfy Vox's unresolved references. |
 | Vox | main | [MetaversalCorp/Vox](https://github.com/MetaversalCorp/Vox) | Standalone GPU compute dispatch library. Accepts SPIR-V, dispatches on Vulkan (native), DX12 (via SPIRV-Cross→HLSL), or Metal (via SPIRV-Cross→MSL). Wired into `compute/COMPUTE_DISPATCH`; replaces the dead ANARI compute path. |
-| BoringSSL | main | [google/boringssl](https://github.com/google/boringssl) | Cryptographic backend: X.509 parsing, PEM decoding, SHA-256, RSA/ECDSA signing and verification, `X509_STORE` chain validation. Built statically (`BUILD_SHARED_LIBS=OFF`). Used by the `jws/` module. |
+| BoringSSL | main | [google/boringssl](https://github.com/google/boringssl) | Cryptographic backend: X.509 parsing, PEM decoding, SHA-256, RSA/ECDSA signing and verification, `X509_STORE` chain validation. Built statically (`BUILD_SHARED_LIBS=OFF`). Used by the `msf/` module. |
 | jwt-cpp | v0.7.0 | [Thalhammer/jwt-cpp](https://github.com/Thalhammer/jwt-cpp) | Header-only C++ library for JWS/JWT creation and verification. BoringSSL-compatible. Installed into the depot via a custom header-copy `INSTALL_COMMAND` (bypassing its problematic `FindOpenSSL` integration since no linking is required). |
 
 **Build-time prerequisites (installed by the developer):**
@@ -399,9 +402,9 @@ Absent (as intended): `anari_library_helide.*`, `embree*`, `tbb*`. Both install 
 
 **Why nlohmann/json?** General-purpose JSON parsing for both engine and application use. Header-only (no link libraries, no DLLs), MIT license, single-header deployment. Exposed as PUBLIC on the Sneeze target so Artemis can `#include <nlohmann/json.hpp>` without additional CMake configuration. Replaces the ad-hoc string-searching JSON parser used in the updater module.
 
-**Why BoringSSL (not OpenSSL) for the crypto backend?** The `jws/` module needs X.509 parsing, SHA-256, RSA/ECDSA signature verification, and certificate chain validation. OpenSSL and BoringSSL both expose the same API surface for these primitives. BoringSSL was chosen because (1) it has a stricter, better-maintained ASN.1 parser (it rejects malformed X.509 v1 certs that carry v3 extensions — a real defense-in-depth win), (2) it builds cleanly and fast with CMake on all three platforms, (3) it is a single static library with no license-text or runtime DLL distribution concerns, and (4) Google actively maintains it for Chrome / Android / Cronet, which is where most of the JWS ecosystem's battle-testing happens. The trade-off is that BoringSSL has no stable API contract — consumers must pin to a commit. Acceptable: it lives in the depot, and the depot is pinned anyway.
+**Why BoringSSL (not OpenSSL) for the crypto backend?** The `msf/` module needs X.509 parsing, SHA-256, RSA/ECDSA signature verification, and certificate chain validation. OpenSSL and BoringSSL both expose the same API surface for these primitives. BoringSSL was chosen because (1) it has a stricter, better-maintained ASN.1 parser (it rejects malformed X.509 v1 certs that carry v3 extensions — a real defense-in-depth win), (2) it builds cleanly and fast with CMake on all three platforms, (3) it is a single static library with no license-text or runtime DLL distribution concerns, and (4) Google actively maintains it for Chrome / Android / Cronet, which is where most of the JWS ecosystem's battle-testing happens. The trade-off is that BoringSSL has no stable API contract — consumers must pin to a commit. Acceptable: it lives in the depot, and the depot is pinned anyway.
 
-**Why jwt-cpp?** Header-only C++ JWS/JWT library. It does exactly one thing well: takes a payload + private key + algorithm and produces a compact serialization; takes a compact serialization + public key and verifies the signature. It works with both OpenSSL and BoringSSL (since they share API). No link-time dependency, no DLL to ship. We bypass its CMake `find_package(OpenSSL)` glue (it chokes on BoringSSL's non-standard headers) and just copy the headers into the depot with a custom `INSTALL_COMMAND`. Link `src/jws/` directly against BoringSSL; jwt-cpp just provides header templates.
+**Why jwt-cpp?** Header-only C++ JWS/JWT library. It does exactly one thing well: takes a payload + private key + algorithm and produces a compact serialization; takes a compact serialization + public key and verifies the signature. It works with both OpenSSL and BoringSSL (since they share API). No link-time dependency, no DLL to ship. We bypass its CMake `find_package(OpenSSL)` glue (it chokes on BoringSSL's non-standard headers) and just copy the headers into the depot with a custom `INSTALL_COMMAND`. Link `src/msf/` directly against BoringSSL; jwt-cpp just provides header templates.
 
 **Why SHA-256 of SPKI as the organizational identifier?** The identity of an organization that signs MSF/MSS files must survive (a) certificate renewals (same key, new expiry date), (b) signing-tool changes, and (c) independent computation by any consumer (engine or HTML viewer). Hashing the `SubjectPublicKeyInfo` (the raw DER public-key blob inside the X.509 cert) satisfies all three: the key is stable across renewals with the same key pair, the hash is deterministic, and both BoringSSL (`i2d_PUBKEY`) and the Web Crypto API (`crypto.subtle.importKey("spki", ...)` with access to raw SPKI bytes via the ASN.1 parser) produce byte-identical SPKI representations. Verified end-to-end: `482cda4c2b6c2a81f46a39ec4232f140b24b439dba4b6040b4b7610506c490b7` is the fingerprint of the test provider cert as computed by the engine, the signing tool, and the HTML viewer.
 
@@ -470,14 +473,11 @@ The `FILAMENT_MATC` override sidesteps all three: it keeps filament's builds "no
 
 **Vox in the depot.** Added as `deps/vox.cmake` with its own `ExternalProject_Add`, included by `deps/CMakeLists.txt` and ordered via `add_dependencies(vox spirv-cross)`. Configured with `-DSpirvCross_ROOT=${LIBS_DIR}/SPIRV-Cross/install` and `-DBUILD_TESTING=OFF`. Source cloned to `deps/repos/Vox/`. Per-config install at `deps/builds/<plat>/<cfg>/libs/Vox/install/`. The old `E:\Dev\Vox` working copy has been deleted — work directly in the depot copy going forward.
 
-### JWS (MSF/MSS Signing and Verification)
+### MSF (Signing and Verification)
 
-The `jws/` module implements [RFC 7515 JSON Web Signature](https://datatracker.ietf.org/doc/html/rfc7515) in compact serialization form, used to sign and verify the two browser-facing service-metadata file formats:
+The `msf/` module implements [RFC 7515 JSON Web Signature](https://datatracker.ietf.org/doc/html/rfc7515) in compact serialization form, used to sign and verify `.msf` (Metaversal Spatial Fabric) files — signed JSON that describes a spatial fabric and the services it aggregates. The previous distinction between `.msf` and `.mss` files has been eliminated; there is now a single `.msf` format.
 
-- **`.msf`** (Metaversal Spatial Fabric) — describes a spatial fabric and the services it aggregates
-- **`.mss`** (Metaversal Spatial Service) — describes a single service within a fabric
-
-Both files are signed JSON wrapped as JWS compact serialization (`<header>.<payload>.<signature>`), with the full X.509 certificate chain embedded in the `x5c` header claim. The browser verifies signature + chain before trusting any content.
+MSF files are signed JSON wrapped as JWS compact serialization (`<header>.<payload>.<signature>`), with the full X.509 certificate chain embedded in the `x5c` header claim. The browser verifies signature + chain before trusting any content.
 
 **JWS stack:**
 
@@ -486,14 +486,15 @@ Both files are signed JSON wrapped as JWS compact serialization (`<header>.<payl
 | X.509 parse, PEM decode, hashing, RSA/ECDSA | BoringSSL | Crypto primitives |
 | Chain validation (trust store, expiry) | BoringSSL (`X509_STORE`) | Platform root trust |
 | JWS compact serialization + signing | jwt-cpp (header-only) | JWS/JWT builder |
-| Payload shape (MSS / MSF) | nlohmann/json | JSON model |
+| Payload shape | nlohmann/json | JSON model |
 
 **Key architectural decisions:**
 
 - **Identity = SHA-256 of leaf public key (SPKI).** Not the cert's fingerprint (which changes on renewal) — the public key's. The same org can re-issue certs without changing its identity, as long as the key pair is preserved. Engine and viewer compute this identically.
 - **Algorithms supported.** RS256 / RS384 / RS512 (RSA-PKCS1-v1_5) and ES256 / ES384 / ES512 (ECDSA). The HTML viewer also supports PS256/384/512 (RSA-PSS) via Web Crypto. The Sign CLI defaults to RS256.
-- **Class hierarchy.** `JWS_BASE` owns the sign/verify + chain validation + fingerprint extraction. `JWS_SERVICE` and `JWS_FABRIC` derive from it to add typed accessors on top of the verified JSON payload — they don't re-implement any crypto.
-- **Integrated into the Sneeze static library.** `src/jws/*.cpp` is part of the `Sneeze` CMake target; BoringSSL's `libcrypto` is linked `PUBLIC` and jwt-cpp headers are on the public include interface. Consumers just `target_link_libraries(... Sneeze)` — see `tests/JwsTest` and `tools/SignMsf`. The depot is driven by `deps/boringssl.cmake` + `deps/jwt-cpp.cmake` in Jonathan's superbuild, with matching `src/cmake/FindBoringSSL.cmake` and `src/cmake/FindJwtCpp.cmake` modules.
+- **Single unified class.** `MSF_FILE` handles the full lifecycle: parsing, signing, verification (signature and chain as separate explicit steps), certificate management, and typed payload access. The former `JWS_BASE` / `JWS_SERVICE` / `JWS_FABRIC` hierarchy has been replaced. `CERT_CHAIN` handles X.509 chain validation and exposes public static utilities for certificate operations so `MSF_FILE` has no direct BoringSSL dependency.
+- **Parse separated from verify.** `MSF_FILE::Parse()` populates all data (payload, cert info, fingerprint) without performing any cryptographic validation. `VerifySignature()` and `VerifyChain()` are explicit follow-up calls. This allows consumers to inspect MSF content before deciding whether to verify.
+- **Integrated into the Sneeze static library.** `src/msf/*.cpp` is part of the `Sneeze` CMake target; BoringSSL's `libcrypto` is linked `PUBLIC` and jwt-cpp headers are on the public include interface. Consumers just `target_link_libraries(... Sneeze)` — see `tests/JwsTest` and `tools/SignMsf`. The depot is driven by `deps/boringssl.cmake` + `deps/jwt-cpp.cmake` in Jonathan's superbuild, with matching `src/cmake/FindBoringSSL.cmake` and `src/cmake/FindJwtCpp.cmake` modules.
 
 **Tools produced by the JWS work:**
 
@@ -530,8 +531,8 @@ Both files are signed JSON wrapped as JWS compact serialization (`<header>.<payl
 - **BoringSSL is picky about PEM line endings.** CRLF-terminated PEM files from Windows sometimes fail to parse. Convert to LF before handing to `PEM_read_bio_X509` if you see mysterious decode errors.
 - **Go and NASM are hard requirements for BoringSSL on Windows.** Without both on PATH, the depot build fails during BoringSSL's CMake configure step. Go is Google's build-and-test tool for the library; NASM compiles the assembly-optimized crypto primitives. `winget install GoLang.Go` handles Go; NASM via winget installs to `C:\Program Files\NASM\` but does not add itself to PATH — add it manually via `[Environment]::SetEnvironmentVariable('Path', "$env:Path;C:\Program Files\NASM", 'User')` (then restart the shell).
 - **Visual Studio Developer PowerShell clobbers user PATH.** `Launch-VsDevShell.ps1` replaces the process PATH with MSVC-specific entries, dropping user-persisted tool paths (Go, NASM, anything else). Symptom: `go version` / `nasm -v` work in a fresh PowerShell but fail in a VS Dev Shell. Fix: in the user's PowerShell profile (`$PROFILE` → `...\Documents\PowerShell\Microsoft.PowerShell_profile.ps1`), after the dev-shell init, re-merge persistent User + Machine PATH entries back into `$env:Path`. This makes Go + NASM (and the rest) available in every shell type. Dean's profile was updated 2026-04-17 to do this; the profile itself is per-user and not in the Sneeze repo.
-- **jwt-cpp's `find_package(OpenSSL)` does not work with BoringSSL.** BoringSSL's headers live in `openssl/` but are versioned differently from OpenSSL and do not include `opensslv.h` in the shape CMake expects. The depot bypasses jwt-cpp's CMake entirely with a custom `INSTALL_COMMAND` that just copies the headers. jwt-cpp is header-only, so no linking happens; `src/jws/` links BoringSSL directly.
-- **`JWS_BASE::Sign()` output format is nested.** The payload JSON is wrapped as `{"data": "<original-json-string>"}` before signing, because jwt-cpp's `set_payload_claim()` expects claim-shaped data. The HTML viewer and `JWS_BASE::Verify()` unwrap this nesting on parse. If you change the payload shape in one place, change it in all three (signing tool, engine verifier, HTML viewer).
+- **jwt-cpp's `find_package(OpenSSL)` does not work with BoringSSL.** BoringSSL's headers live in `openssl/` but are versioned differently from OpenSSL and do not include `opensslv.h` in the shape CMake expects. The depot bypasses jwt-cpp's CMake entirely with a custom `INSTALL_COMMAND` that just copies the headers. jwt-cpp is header-only, so no linking happens; `src/msf/` links BoringSSL directly.
+- **`MSF_FILE::Sign()` output format is nested.** The payload JSON is wrapped as `{"data": "<original-json-string>"}` before signing, because jwt-cpp's `set_payload_claim()` expects claim-shaped data. The HTML viewer and `MSF_FILE::Parse()` unwrap this nesting on parse. If you change the payload shape in one place, change it in all three (signing tool, engine verifier, HTML viewer).
 - **`CERT_CHAIN` loads the OS trust store on Windows.** It calls `CertOpenSystemStoreA("ROOT")` and walks every cert into the BoringSSL `X509_STORE`. This means chain validation respects Windows Update's root store updates automatically, but also means tests must use a fully self-signed chain — you can't rely on the cert being "trusted" unless you inject the test CA into the store (tests don't, which is why the untrusted-chain test works as written).
 
 ### Build System
@@ -696,10 +697,10 @@ SMAP abstracts the network layer so the browser can connect to any spatial fabri
 
 | # | Task | Notes |
 |---|------|-------|
-| 0 | ~~JWS verification for MSF/MSS files~~ | **DONE.** `src/jws/` module implements RFC 7515 JWS sign + verify with BoringSSL + jwt-cpp. `JWS_BASE`, `CERT_CHAIN`, `JWS_SERVICE`, `JWS_FABRIC`. Linked into the Sneeze static library. `SignMsf.exe` CLI tool (`tools/SignMsf/`) gated by `SNEEZE_BUILD_TOOLS` (ON by default on desktop). HTML viewer at `tools/MsfViewer/`. JwsTest wired into CTest (32/32 passing). Organizational identity is SHA-256 of leaf public key (SPKI). |
+| 0 | ~~JWS verification for MSF files~~ | **DONE.** `src/msf/` module implements RFC 7515 JWS sign + verify with BoringSSL + jwt-cpp. `MSF_FILE` (unified class), `CERT_CHAIN`, `CERT_INFO`, `MSF_SERVICE`, `MSF_MODULE`. Linked into the Sneeze static library. `SignMsf.exe` CLI tool (`tools/SignMsf/`) gated by `SNEEZE_BUILD_TOOLS` (ON by default on desktop). HTML viewer at `tools/MsfViewer/`. JwsTest wired into CTest (42/42 passing). Organizational identity is SHA-256 of leaf public key (SPKI). |
 | 1 | Design SMAP driver interface | Abstract connection, discovery, and data streaming per architecture doc (Section 10.6) |
 | 2 | Implement `smap/` module with `sneeze::smap` namespace | Driver registration, connection lifecycle, message routing |
-| 3 | Implement first SMAP driver (WebSocket) | Connect to MSF_Map_Svc as the first real fabric. Browser fetches `.msf` over HTTPS, verifies via `JWS_FABRIC`, then connects to each service endpoint and verifies its `.mss` via `JWS_SERVICE` before accepting any data. |
+| 3 | Implement first SMAP driver (WebSocket) | Connect to MSF_Map_Svc as the first real fabric. Browser fetches `.msf` over HTTPS, verifies via `MSF_FILE`, then connects to each service endpoint. |
 | 4 | Proximity-based discovery prototype | Local proximity triggers fabric connection per architecture doc (Section 5) |
 | 5 | Multi-fabric simultaneous connection | Browser maintains connections to multiple fabrics, each owning SOM branches |
 
@@ -734,7 +735,7 @@ Supporting components that can be developed in parallel with or after the core p
 
 | # | Task | Notes |
 |---|------|-------|
-| 1 | Browser-managed identity (`identity/` module) | Cryptographic credentials, zero-knowledge proofs, no per-service sign-on (Section 13). The organization-identity primitive (SHA-256 of leaf SPKI) is already defined and implemented in `src/jws/CERT_CHAIN::GetLeafFingerprint()`; the `identity/` module will build on that for user identity, not duplicate it. |
+| 1 | Browser-managed identity (`identity/` module) | Cryptographic credentials, zero-knowledge proofs, no per-service sign-on (Section 13). The organization-identity primitive (SHA-256 of leaf SPKI) is already defined and implemented in `src/msf/CERT_CHAIN::GetLeafFingerprint()` (and exposed as `CERT_CHAIN::ComputeFingerprint()`); the `identity/` module will build on that for user identity, not duplicate it. |
 | 2 | Spatial audio (`audio/` module) | Server-side voice mixing, purpose-built codec, 3D spatialization (Section 15) |
 | 3 | SPIR-V compute pipeline (`compute/` module) | GLSL kernels → glslang → SPIR-V → **Vox** GPU compute dispatch for physics, proximity, IK, audio DSP. Vox is integrated into `COMPUTE_DISPATCH` (DX12 / Metal / Vulkan backends). Remaining work is authoring kernels for the specific runtime workloads, not wiring plumbing. |
 | 4 | Content provider SDK | Tools and documentation for fabric/service developers (Section 16) |

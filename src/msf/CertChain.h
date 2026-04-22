@@ -18,9 +18,11 @@
 #include <string>
 #include <vector>
 
+#include "CertInfo.h"
+
 namespace sneeze
 {
-namespace jws
+namespace msf
 {
 
 class CERT_CHAIN
@@ -38,16 +40,27 @@ public:
 
    std::string GetLeafFingerprint () const;
 
+   const std::vector<CERT_INFO>& GetCertInfos () const;
+
    void AddTrustedCert (const std::string& sPem);
+
+   // --- Static cert utilities (no instance needed) -----------------------
+
+   static CERT_INFO   DecodeInfoDerBase64 (const std::string& sB64, bool bIsCA);
+   static CERT_INFO   DecodeInfoPem       (const std::string& sPem, bool bIsCA);
+   static std::string ComputeFingerprint  (const std::string& sB64Der);
+   static std::string ExtractPublicKeyPem (const std::string& sB64Der);
+   static std::string PemToDerBase64      (const std::string& sPem);
 
 private:
    void LoadTrustStore ();
 
    struct IMPL;
-   IMPL* m_pImpl;
+   IMPL*                   m_pImpl;
+   std::vector<CERT_INFO>  m_aCertInfos;
 };
 
-} // namespace jws
+} // namespace msf
 } // namespace sneeze
 
 #endif // SNEEZE_JWS_CERTCHAIN_H

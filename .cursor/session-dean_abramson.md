@@ -331,3 +331,18 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 - `.cursor/session-dean_abramson.md` (this entry)
 
 **Dean commits the repo himself** (per standing rule).
+
+---
+
+## 2026-04-19 — MSF_FILE Refactor + Folder Rename
+
+**Dean Abramson (Dean)**
+
+### Work performed
+
+- **Implemented `MSF_FILE` class** — single unified class replacing the `JWS_BASE` / `JWS_SERVICE` / `JWS_FABRIC` hierarchy. Full MSF file lifecycle: parse, sign, verify signature, verify chain, certificate management, typed payload accessors. `MsfFile.h`, `MsfFile.cpp`, `CertInfo.h` created; old `JwsBase.*`, `JwsService.*`, `JwsFabric.*` deleted.
+- **Consolidated certificate helpers into `CERT_CHAIN`** — added 5 public static utility methods (`DecodeInfoDerBase64`, `DecodeInfoPem`, `ComputeFingerprint`, `ExtractPublicKeyPem`, `PemToDerBase64`) so `MSF_FILE` has no direct BoringSSL dependency. Removed duplicated helpers and `#undef` guards from `MsfFile.cpp`.
+- **Updated `SignMsf` tool and `JwsTest`** to use the new `MSF_FILE` API. Enforced single-return rule in `main()`. Added 2 new test groups (parse-without-verify, composition round-trip) — 42/42 tests passing.
+- **Created `MsfFile.md` documentation** — covers `MSF_FILE` API, parse/compose paths, data structs, and `CERT_CHAIN` static utilities.
+- **Renamed `src/jws/` to `src/msf/`** — local file system rename (not git mv). Updated all includes, `CMakeLists.txt` variables (`MSF_SOURCES`/`MSF_HEADERS`), namespace (`sneeze::jws` → `sneeze::msf`), documentation references, and `FindBoringSSL.cmake` comment. Clean build, 42/42 tests passing.
+- **Updated `project.mdc`** — class inventory, test table, roadmap entries, dependency references, architectural narrative, and known gotchas all updated to reflect the new folder, namespace, and class structure.

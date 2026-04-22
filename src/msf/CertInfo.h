@@ -12,33 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef SNEEZE_JWS_JWSFABRIC_H
-#define SNEEZE_JWS_JWSFABRIC_H
-
-#include "JwsBase.h"
+#ifndef SNEEZE_JWS_CERTINFO_H
+#define SNEEZE_JWS_CERTINFO_H
 
 #include <string>
-#include <vector>
 
 namespace sneeze
 {
-namespace jws
+namespace msf
 {
 
-// MSF payload schema is not yet fully defined (open question in the
-// architecture doc).  This class is stubbed with basic accessors that
-// will be fleshed out once the MSF format stabilises.
-
-class JWS_FABRIC : public JWS_BASE
+struct CERT_INFO
 {
-public:
-   JWS_FABRIC ();
-   ~JWS_FABRIC () override;
-
-   std::vector<std::string> GetServiceRefs () const;
+   std::string sSubject;
+   std::string sIssuer;
+   std::string sSerial;
+   std::string sNotBefore;
+   std::string sNotAfter;
+   std::string sKeyType;      // "RSA", "EC", or "unknown"
+   int         nKeyBits;
+   bool        bIsCA;
 };
 
-} // namespace jws
+} // namespace msf
 } // namespace sneeze
 
-#endif // SNEEZE_JWS_JWSFABRIC_H
+#endif // SNEEZE_JWS_CERTINFO_H

@@ -531,16 +531,13 @@ set (UI_HEADERS      ui/UiContext.h)
 set (COMPUTE_SOURCES compute/EmbeddedKernels.cpp compute/ComputeDispatch.cpp)
 set (COMPUTE_HEADERS compute/EmbeddedKernels.h compute/ComputeDispatch.h)
 
-set (JWS_SOURCES
-   jws/JwsBase.cpp
-   jws/JwsFabric.cpp
-   jws/JwsService.cpp
-   jws/CertChain.cpp)
-set (JWS_HEADERS
-   jws/JwsBase.h
-   jws/JwsFabric.h
-   jws/JwsService.h
-   jws/CertChain.h)
+set (MSF_SOURCES
+   msf/MsfFile.cpp
+   msf/CertChain.cpp)
+set (MSF_HEADERS
+   msf/MsfFile.h
+   msf/CertInfo.h
+   msf/CertChain.h)
 
 # ---------------------------------------------------------------------------
 # Static library
@@ -556,7 +553,7 @@ add_library (Sneeze STATIC
    ${NET_SOURCES}       ${NET_HEADERS}
    ${UI_SOURCES}        ${UI_HEADERS}
    ${COMPUTE_SOURCES}   ${COMPUTE_HEADERS}
-   ${JWS_SOURCES}       ${JWS_HEADERS}
+   ${MSF_SOURCES}       ${MSF_HEADERS}
    ${KERNEL_EMBED_FILES}
 )
 add_dependencies (Sneeze CompileKernels)
@@ -642,7 +639,7 @@ source_group ("xr"       FILES ${XR_SOURCES} ${XR_HEADERS})
 source_group ("net"      FILES ${NET_SOURCES} ${NET_HEADERS})
 source_group ("ui"       FILES ${UI_SOURCES} ${UI_HEADERS})
 source_group ("compute"  FILES ${COMPUTE_SOURCES} ${COMPUTE_HEADERS})
-source_group ("jws"      FILES ${JWS_SOURCES} ${JWS_HEADERS})
+source_group ("msf"      FILES ${MSF_SOURCES} ${MSF_HEADERS})
 
 # ---------------------------------------------------------------------------
 # Tools (desktop-only CLI utilities built on top of the Sneeze library)

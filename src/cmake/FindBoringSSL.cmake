@@ -4,7 +4,7 @@
 # <openssl/...> header layout and libcrypto/libssl binaries, so source
 # code that targets the OpenSSL API compiles unchanged against it.
 #
-# Sneeze uses only the crypto half (src/jws/). The ssl half is built
+# Sneeze uses only the crypto half (src/msf/). The ssl half is built
 # anyway and consumed by curl on Android (see deps/curl.cmake).
 #
 # Sets:

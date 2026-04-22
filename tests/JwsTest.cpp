@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "../src/jws/JwsBase.h"
-#include "../src/jws/JwsService.h"
-#include "../src/jws/JwsFabric.h"
+#include "../src/msf/MsfFile.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -48,8 +46,8 @@ static void BeginGroup (const char* sName)
 
 static std::string ReadFile (const std::string& sPath)
 {
-   std::ifstream ifs (sPath, std::ios::binary);
    std::string sResult;
+   std::ifstream ifs (sPath, std::ios::binary);
    if (ifs.is_open ())
    {
       std::ostringstream oss;
@@ -57,6 +55,22 @@ static std::string ReadFile (const std::string& sPath)
       sResult = oss.str ();
    }
    return sResult;
+}
+
+// ---------------------------------------------------------------------------
+// Helper: sign a raw JSON string using MSF_FILE composition path
+// ---------------------------------------------------------------------------
+
+static std::string SignPayload (const std::string& sPayload,
+                                const std::string& sPrivateKey,
+                                const std::vector<std::string>& aCertChain,
+                                const std::string& sAlgorithm = "RS256")
+{
+   sneeze::msf::MSF_FILE msf;
+   msf.SetPayload (nlohmann::json::parse (sPayload));
+   for (const auto& sCert : aCertChain)
+      msf.AddCert (sCert);
+   return msf.Sign (sPrivateKey, sAlgorithm);
 }
 
 // ---------------------------------------------------------------------------
@@ -104,25 +118,27 @@ int main (int nArgc, char** aArgv)
    aCertChain.push_back (sCaCert);
 
    printf ("Signing...\n"); fflush (stdout);
-   std::string sJws = sneeze::jws::JWS_BASE::Sign (sPayload, sProviderKey, aCertChain, "RS256");
+   std::string sJws = SignPayload (sPayload, sProviderKey, aCertChain, "RS256");
    printf ("Sign returned (%zu bytes)\n", sJws.size ()); fflush (stdout);
    ASSERT (!sJws.empty (), "JWS signed successfully");
    ASSERT (sJws.find ('.') != std::string::npos, "JWS contains dot separators");
 
-   sneeze::jws::JWS_BASE verifier;
-   verifier.GetCertChain ().AddTrustedCert (sCaCert);
-   sneeze::jws::JWS_RESULT result = verifier.Verify (sJws);
-   ASSERT (result.sError.empty (), "Verification succeeded (no error)");
-   ASSERT (result.sAlgorithm == "RS256", "Algorithm is RS256");
-   ASSERT (!result.sFingerprint.empty (), "Signer fingerprint computed");
+   sneeze::msf::MSF_FILE verifier;
+   verifier.AddTrustedCert (sCaCert);
+   verifier.Parse (sJws);
+   verifier.VerifySignature ();
+   verifier.VerifyChain ();
+   ASSERT (verifier.IsSignatureValid ()  &&  verifier.IsChainTrusted (), "Verification succeeded (no error)");
+   ASSERT (verifier.GetAlgorithm () == "RS256", "Algorithm is RS256");
+   ASSERT (!verifier.GetFingerprint ().empty (), "Signer fingerprint computed");
 
-   printf ("  Fingerprint: %s\n", result.sFingerprint.c_str ());
+   printf ("  Fingerprint: %s\n", verifier.GetFingerprint ().c_str ());
 
    // -----------------------------------------------------------------------
-   // Test 2: JWS_SERVICE parses MSS payload
+   // Test 2: MSF_FILE parses MSS payload
    // -----------------------------------------------------------------------
 
-   BeginGroup ("JWS_SERVICE Payload Parsing");
+   BeginGroup ("MSF_FILE Payload Parsing");
 
    std::string sMssPayload = R"({
       "namespace": "com.pokerstars.poker",
@@ -144,18 +160,19 @@ int main (int nArgc, char** aArgv)
       "successor": "deadbeef0123456789abcdef"
    })";
 
-   std::string sMssJws = sneeze::jws::JWS_BASE::Sign (sMssPayload, sProviderKey, aCertChain, "RS256");
+   std::string sMssJws = SignPayload (sMssPayload, sProviderKey, aCertChain, "RS256");
    ASSERT (!sMssJws.empty (), "MSS JWS signed successfully");
 
-   sneeze::jws::JWS_SERVICE svc;
-   svc.GetCertChain ().AddTrustedCert (sCaCert);
-   sneeze::jws::JWS_RESULT svcResult = svc.Verify (sMssJws);
-   ASSERT (svcResult.sError.empty (), "MSS verification succeeded");
+   sneeze::msf::MSF_FILE svc;
+   svc.AddTrustedCert (sCaCert);
+   svc.Parse (sMssJws);
+   svc.VerifySignature ();
+   svc.VerifyChain ();
+   ASSERT (svc.IsSignatureValid ()  &&  svc.IsChainTrusted (), "MSS verification succeeded");
 
    ASSERT (svc.GetNamespace () == "com.pokerstars.poker", "Namespace parsed correctly");
    ASSERT (svc.GetOrganization () == "PokerStars", "Organization parsed correctly");
    ASSERT (svc.GetSuccessor () == "deadbeef0123456789abcdef", "Successor parsed correctly");
-   ASSERT (svcResult.sSuccessorFingerprint == "deadbeef0123456789abcdef", "Successor fingerprint in result");
 
    auto aServices = svc.GetServices ();
    ASSERT (aServices.size () == 1, "One service declared");
@@ -184,11 +201,12 @@ int main (int nArgc, char** aArgv)
       sTampered[nMid] = (sTampered[nMid] == 'A') ? 'B' : 'A';
    }
 
-   sneeze::jws::JWS_BASE tamperedVerifier;
-   tamperedVerifier.GetCertChain ().AddTrustedCert (sCaCert);
-   sneeze::jws::JWS_RESULT tamperedResult = tamperedVerifier.Verify (sTampered);
-   ASSERT (!tamperedResult.sError.empty (), "Tampered payload rejected");
-   printf ("  Error: %s\n", tamperedResult.sError.c_str ());
+   sneeze::msf::MSF_FILE tamperedVerifier;
+   tamperedVerifier.AddTrustedCert (sCaCert);
+   tamperedVerifier.Parse (sTampered);
+   tamperedVerifier.VerifySignature ();
+   ASSERT (!tamperedVerifier.IsSignatureValid (), "Tampered payload rejected");
+   printf ("  Error: %s\n", tamperedVerifier.GetSignatureError ().c_str ());
 
    // -----------------------------------------------------------------------
    // Test 4: Expired certificate rejected
@@ -200,14 +218,15 @@ int main (int nArgc, char** aArgv)
    aExpiredChain.push_back (sExpiredCert);
    aExpiredChain.push_back (sCaCert);
 
-   std::string sExpiredJws = sneeze::jws::JWS_BASE::Sign (sPayload, sExpiredKey, aExpiredChain, "RS256");
+   std::string sExpiredJws = SignPayload (sPayload, sExpiredKey, aExpiredChain, "RS256");
    ASSERT (!sExpiredJws.empty (), "Expired JWS signed successfully");
 
-   sneeze::jws::JWS_BASE expiredVerifier;
-   expiredVerifier.GetCertChain ().AddTrustedCert (sCaCert);
-   sneeze::jws::JWS_RESULT expiredResult = expiredVerifier.Verify (sExpiredJws);
-   ASSERT (!expiredResult.sError.empty (), "Expired certificate rejected");
-   printf ("  Error: %s\n", expiredResult.sError.c_str ());
+   sneeze::msf::MSF_FILE expiredVerifier;
+   expiredVerifier.AddTrustedCert (sCaCert);
+   expiredVerifier.Parse (sExpiredJws);
+   expiredVerifier.VerifyChain ();
+   ASSERT (!expiredVerifier.IsChainTrusted (), "Expired certificate rejected");
+   printf ("  Error: %s\n", expiredVerifier.GetChainError ().c_str ());
 
    // -----------------------------------------------------------------------
    // Test 5: Untrusted chain rejected
@@ -215,10 +234,11 @@ int main (int nArgc, char** aArgv)
 
    BeginGroup ("Untrusted Chain Rejected");
 
-   sneeze::jws::JWS_BASE untrustedVerifier;
-   sneeze::jws::JWS_RESULT untrustedResult = untrustedVerifier.Verify (sJws);
-   ASSERT (!untrustedResult.sError.empty (), "Untrusted chain rejected");
-   printf ("  Error: %s\n", untrustedResult.sError.c_str ());
+   sneeze::msf::MSF_FILE untrustedVerifier;
+   untrustedVerifier.Parse (sJws);
+   untrustedVerifier.VerifyChain ();
+   ASSERT (!untrustedVerifier.IsChainTrusted (), "Untrusted chain rejected");
+   printf ("  Error: %s\n", untrustedVerifier.GetChainError ().c_str ());
 
    // -----------------------------------------------------------------------
    // Test 6: Fingerprint stability
@@ -226,11 +246,13 @@ int main (int nArgc, char** aArgv)
 
    BeginGroup ("Fingerprint Stability");
 
-   sneeze::jws::JWS_BASE verifier2;
-   verifier2.GetCertChain ().AddTrustedCert (sCaCert);
-   sneeze::jws::JWS_RESULT result2 = verifier2.Verify (sJws);
-   ASSERT (result2.sError.empty (), "Second verification succeeded");
-   ASSERT (result.sFingerprint == result2.sFingerprint, "Fingerprint is stable across verifications");
+   sneeze::msf::MSF_FILE verifier2;
+   verifier2.AddTrustedCert (sCaCert);
+   verifier2.Parse (sJws);
+   verifier2.VerifySignature ();
+   verifier2.VerifyChain ();
+   ASSERT (verifier2.IsSignatureValid ()  &&  verifier2.IsChainTrusted (), "Second verification succeeded");
+   ASSERT (verifier.GetFingerprint () == verifier2.GetFingerprint (), "Fingerprint is stable across verifications");
 
    // -----------------------------------------------------------------------
    // Test 7: Malformed JWS rejected
@@ -238,16 +260,58 @@ int main (int nArgc, char** aArgv)
 
    BeginGroup ("Malformed JWS Rejected");
 
-   sneeze::jws::JWS_BASE malformedVerifier;
+   sneeze::msf::MSF_FILE malformedVerifier;
 
-   sneeze::jws::JWS_RESULT emptyResult = malformedVerifier.Verify ("");
-   ASSERT (!emptyResult.sError.empty (), "Empty string rejected");
+   bool bEmpty = malformedVerifier.Parse ("");
+   ASSERT (!bEmpty, "Empty string rejected");
 
-   sneeze::jws::JWS_RESULT garbageResult = malformedVerifier.Verify ("not.a.jws");
-   ASSERT (!garbageResult.sError.empty (), "Garbage string rejected");
+   bool bGarbage = malformedVerifier.Parse ("not.a.jws");
+   ASSERT (!bGarbage, "Garbage string rejected");
 
-   sneeze::jws::JWS_RESULT partialResult = malformedVerifier.Verify ("eyJhbGciOiJSUzI1NiJ9");
-   ASSERT (!partialResult.sError.empty (), "Partial JWS (one segment) rejected");
+   bool bPartial = malformedVerifier.Parse ("eyJhbGciOiJSUzI1NiJ9");
+   ASSERT (!bPartial, "Partial JWS (one segment) rejected");
+
+   // -----------------------------------------------------------------------
+   // Test 8: Parse always populates data (even without verification)
+   // -----------------------------------------------------------------------
+
+   BeginGroup ("Parse Populates Data Without Verification");
+
+   sneeze::msf::MSF_FILE parseOnly;
+   bool bParsed = parseOnly.Parse (sMssJws);
+   ASSERT (bParsed, "Parse succeeded without verification");
+   ASSERT (parseOnly.GetNamespace () == "com.pokerstars.poker", "Namespace available without verify");
+   ASSERT (!parseOnly.GetFingerprint ().empty (), "Fingerprint available without verify");
+   ASSERT (parseOnly.GetCertCount () == 2, "Cert count available without verify");
+
+   // -----------------------------------------------------------------------
+   // Test 9: Composition round-trip
+   // -----------------------------------------------------------------------
+
+   BeginGroup ("Composition Round-Trip");
+
+   sneeze::msf::MSF_FILE composer;
+   composer.SetNamespace ("com.test.composed");
+   composer.SetOrganization ("Test Org");
+   composer.AddService ({"my-svc", "grpc", "grpc://example.com:443", {"mod.wasm"}});
+   composer.AddModule ("mod.wasm", "https://example.com/mod.wasm", "abcdef123456");
+   composer.AddCert (sProviderCert);
+   composer.AddCert (sCaCert);
+
+   std::string sComposedJws = composer.Sign (sProviderKey, "RS256");
+   ASSERT (!sComposedJws.empty (), "Composed MSF signed successfully");
+
+   sneeze::msf::MSF_FILE reader;
+   reader.AddTrustedCert (sCaCert);
+   reader.Parse (sComposedJws);
+   reader.VerifySignature ();
+   reader.VerifyChain ();
+   ASSERT (reader.IsSignatureValid ()  &&  reader.IsChainTrusted (), "Composed MSF verifies");
+   ASSERT (reader.GetNamespace () == "com.test.composed", "Composed namespace round-trips");
+   ASSERT (reader.GetOrganization () == "Test Org", "Composed organization round-trips");
+   ASSERT (reader.GetServices ().size () == 1, "Composed service round-trips");
+   ASSERT (reader.GetModules ().count ("mod.wasm") == 1, "Composed module round-trips");
+   ASSERT (reader.GetModules ()["mod.wasm"].sSha256 == "abcdef123456", "Composed module sha256 round-trips");
 
    // -----------------------------------------------------------------------
    // Summary
