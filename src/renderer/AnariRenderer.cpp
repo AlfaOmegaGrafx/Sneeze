@@ -190,7 +190,12 @@ bool ANARI_RENDERER::Initialize (int nWidth, int nHeight)
             ANARIObject ns = anariNewObject (m_pDevice, "nativeSurface", "default");
             if (ns)
             {
-               anariSetParameter (m_pDevice, ns, "nativeWindow", ANARI_VOID_POINTER, &m_pNativeWindow);
+               // ANARI_VOID_POINTER takes the pointer value directly as the
+               // 5th arg to anariSetParameter — NOT a pointer to it. The
+               // C++ wrapper at anari_cpp_impl.hpp:530 dereferences one level
+               // for this type; passing &m_pNativeWindow stores the wrong
+               // value and crashes inside vkCreateAndroidSurfaceKHR on Vulkan.
+               anariSetParameter (m_pDevice, ns, "nativeWindow", ANARI_VOID_POINTER, m_pNativeWindow);
                anariCommitParameters (m_pDevice, ns);
                m_pNativeSurface = reinterpret_cast<anari::api::Object*> (ns);
                m_bNativeSurface = true;
