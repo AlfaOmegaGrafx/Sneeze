@@ -54,7 +54,8 @@
 # deps/builds/windows-x64/{debug,release}/ but share a single Sneeze build
 # tree at builds/windows-x64/build/ and distinct install trees at
 # builds/windows-x64/install/{debug,release}/. Source clones in deps/repos/
-# are shared across configs.
+# are shared across configs. Both -All and -Fresh use `cmake --fresh` to
+# prevent stale find_library cache entries when switching between configs.
 #
 # Usage:
 #   .\scripts\build-windows.ps1                        # Sneeze (Release)
@@ -338,10 +339,11 @@ if ($Fresh -or $SneezeMode) {
          "-DSNEEZE_BUILD_ROOT=$SneezeOutDir"
       )
 
-      # -Fresh maps to `cmake --fresh` (CMake 3.24+): wipes CMakeCache.txt +
-      # CMakeFiles/ before reconfiguring. -All's reconfigure stays normal
-      # (idempotent cache update) -- -Fresh is the explicit "start over" path.
-      if ($Fresh) { $sneezeConfigureArgs += '--fresh' }
+      # --fresh (CMake 3.24+): wipes CMakeCache.txt + CMakeFiles/ before
+      # reconfiguring.  Applied for both -Fresh and -All because find_library
+      # caches absolute paths — switching configs without --fresh leaves stale
+      # Release paths in the cache even though LIBS_DIR was updated.
+      if ($Fresh -or $All) { $sneezeConfigureArgs += '--fresh' }
 
       & cmake @sneezeConfigureArgs
       if ($LASTEXITCODE -ne 0) {
