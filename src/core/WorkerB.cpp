@@ -16,6 +16,11 @@
 
 namespace sneeze { namespace core {
 
+WORKER_B::WORKER_B (SNEEZE* pSneeze)
+   : WORKER (pSneeze)
+{
+}
+
 void WORKER_B::Tick ()
 {
 }

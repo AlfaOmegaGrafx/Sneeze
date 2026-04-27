@@ -358,3 +358,24 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 - **Created 8 derived worker classes** (`WORKER_A` through `WORKER_H`) — each in its own `.h`/`.cpp` file pair. Empty `Tick()` placeholders for now.
 - **Updated `src/CMakeLists.txt`** — added all 18 new source files to `CORE_SOURCES`/`CORE_HEADERS`.
 - **Updated `project.mdc`** — module table and key classes table updated with ENGINE, WORKER, and WORKER_A–H entries.
+
+---
+
+## 2026-04-27 — Dean Abramson — 12:16 PM – 3:54 PM PDT
+
+### Work performed
+
+- **Moved `astro/` module from Artemis to Sneeze** — 8 files (BodyData, Celestial, Orbit, RMCObject, each .h/.cpp). Namespace changed from `artemis::astro` to `sneeze::astro`, copyright updated to Apache 2.0, include guards renamed. Original files deleted from Artemis. Artemis CMakeLists.txt updated to remove astro references.
+- **Renamed `ENGINE` to `SNEEZE`** — class, files (`Sneeze.h`/`Sneeze.cpp`), all references. `SNEEZE` is now the single entry point for all engine functionality.
+- **Renamed `WORKER_A` to `WORKER_COMPOSITOR`** — files (`WorkerCompositor.h`/`WorkerCompositor.cpp`). Self-paced rendering worker, owns ANARI_RENDERER and CAMERA_ORBIT. Old `WorkerA` files deleted.
+- **Implemented engine-driven rendering pipeline** — `SNEEZE::Initialize()` now initializes all engine modules (wasm, spirv, xr, net, ui), creates solar system, creates workers, starts engine thread. Nested `if` initialization with reverse-order shutdown preserved (Dave's methodology).
+- **Implemented `WORKER_COMPOSITOR` self-paced rendering** — overrides `ThreadLoop()`, renders each frame, writes to shared framebuffer, notifies Artemis via `SNEEZE_LISTENER::OnFrameReady()`, syncs to display via `DwmFlush()`.
+- **Added `SNEEZE_LISTENER` callback interface** — Artemis implements as `ARTEMIS_LISTENER`, passed to `SNEEZE` constructor.
+- **Added input/framebuffer APIs** — `SetMouseInput()`, `SetKeyInput()`, `ConsumeInput()`, `LockFrameBuffer()`/`UnlockFrameBuffer()`, `WriteFrameBuffer()`, `Resize()`. Thread-safe via mutexes.
+- **Updated `WORKER` base class** — constructor takes `SNEEZE* pSneeze`, stored as `m_pSneeze`. `ThreadLoop()` made virtual. Added `SignalReady()`, `IsShutdown()` helpers. All 7 placeholder workers (B–H) updated.
+- **Added `WORKER_CONFIG::nInterval`** — 0 = self-paced (skip on metronome tick), non-zero = metronome-driven. Engine thread only signals workers with interval > 0.
+- **Simplified Artemis `main.cpp`** — removed all engine module includes and solar system logic. Main loop: poll events, feed input to SNEEZE, present framebuffer from SNEEZE.
+- **Added console window** — `AllocConsole()` + `freopen_s()` in `WinMain()` for debug output in Win32 GUI app.
+- **Added FPS logging** — `WORKER_COMPOSITOR` logs frames-per-second to stdout once per second. ~17 FPS on CPU-only machine.
+- **Updated Sneeze `CMakeLists.txt`** — added astro module, replaced Engine/WorkerA with Sneeze/WorkerCompositor, linked `dwmapi` on Windows.
+- **Updated `project.mdc`** — exhaustive update of module table, key classes, PoC section, directory structure, known gotchas, and new "Engine-Driven Rendering Pipeline" section.

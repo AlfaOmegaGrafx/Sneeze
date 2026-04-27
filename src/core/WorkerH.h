@@ -21,6 +21,9 @@ namespace sneeze { namespace core {
 
 class WORKER_H : public WORKER
 {
+public:
+   explicit WORKER_H (SNEEZE* pSneeze);
+
 protected:
    void Tick () override;
 };

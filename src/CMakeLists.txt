@@ -502,9 +502,9 @@ endif ()
 
 set (CORE_SOURCES
    core/Epoch.cpp
-   core/Engine.cpp
+   core/Sneeze.cpp
    core/Worker.cpp
-   core/WorkerA.cpp
+   core/WorkerCompositor.cpp
    core/WorkerB.cpp
    core/WorkerC.cpp
    core/WorkerD.cpp
@@ -515,9 +515,9 @@ set (CORE_SOURCES
 set (CORE_HEADERS
    core/Epoch.h
    core/Types.h
-   core/Engine.h
+   core/Sneeze.h
    core/Worker.h
-   core/WorkerA.h
+   core/WorkerCompositor.h
    core/WorkerB.h
    core/WorkerC.h
    core/WorkerD.h
@@ -525,6 +525,17 @@ set (CORE_HEADERS
    core/WorkerF.h
    core/WorkerG.h
    core/WorkerH.h)
+
+set (ASTRO_SOURCES
+   astro/BodyData.cpp
+   astro/Celestial.cpp
+   astro/Orbit.cpp
+   astro/RMCObject.cpp)
+set (ASTRO_HEADERS
+   astro/BodyData.h
+   astro/Celestial.h
+   astro/Orbit.h
+   astro/RMCObject.h)
 
 set (RENDERER_SOURCES  renderer/AnariRenderer.cpp)
 set (RENDERER_HEADERS  renderer/Renderer.h  renderer/AnariRenderer.h)
@@ -568,6 +579,7 @@ set (MSF_HEADERS
 
 add_library (Sneeze STATIC
    ${CORE_SOURCES}      ${CORE_HEADERS}
+   ${ASTRO_SOURCES}     ${ASTRO_HEADERS}
    ${RENDERER_SOURCES}  ${RENDERER_HEADERS}
    ${VIEW_SOURCES}      ${VIEW_HEADERS}
    ${WASM_SOURCES}      ${WASM_HEADERS}
@@ -635,6 +647,8 @@ if (WIN32)
    target_link_libraries (Sneeze PUBLIC ws2_32 advapi32 userenv ntdll shell32 ole32 bcrypt)
    # curl Windows deps
    target_link_libraries (Sneeze PUBLIC wldap32 crypt32 normaliz)
+   # DWM (compositor vsync)
+   target_link_libraries (Sneeze PUBLIC dwmapi)
 elseif (APPLE)
    find_library (SECURITY_FW Security)
    find_library (COREFOUNDATION_FW CoreFoundation)
@@ -654,6 +668,7 @@ endif ()
 # ---------------------------------------------------------------------------
 
 source_group ("core"     FILES ${CORE_SOURCES} ${CORE_HEADERS})
+source_group ("astro"    FILES ${ASTRO_SOURCES} ${ASTRO_HEADERS})
 source_group ("renderer" FILES ${RENDERER_SOURCES} ${RENDERER_HEADERS})
 source_group ("view"     FILES ${VIEW_SOURCES} ${VIEW_HEADERS})
 source_group ("wasm"     FILES ${WASM_SOURCES} ${WASM_HEADERS})

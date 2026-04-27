@@ -22,10 +22,12 @@
 
 namespace sneeze { namespace core {
 
+class SNEEZE;
+
 class WORKER
 {
 public:
-   WORKER ();
+   explicit WORKER (SNEEZE* pSneeze);
    virtual ~WORKER ();
 
    bool Initialize ();
@@ -37,9 +39,14 @@ public:
 
 protected:
    virtual void Tick () = 0;
+   virtual void ThreadLoop ();
+
+   void SignalReady ();
+   bool IsShutdown () const;
+
+   SNEEZE* m_pSneeze;
 
 private:
-   void ThreadLoop ();
    bool Control ();
    void CtlBreak_Thread ();
 

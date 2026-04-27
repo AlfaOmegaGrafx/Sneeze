@@ -16,8 +16,9 @@
 
 namespace sneeze { namespace core {
 
-WORKER::WORKER ()
-   : m_pThread (nullptr)
+WORKER::WORKER (SNEEZE* pSneeze)
+   : m_pSneeze (pSneeze)
+   , m_pThread (nullptr)
    , m_bShutdown (false)
    , m_bReady (false)
 {
@@ -61,14 +62,24 @@ void WORKER::Signal ()
 
 void WORKER::ThreadLoop ()
 {
+   SignalReady ();
+
+   std::unique_lock<std::mutex> mlock (m_mutex);
+   m_condVar.wait (mlock, std::bind (&WORKER::Control, this));
+}
+
+void WORKER::SignalReady ()
+{
    {
       std::lock_guard<std::mutex> guard (m_mutex);
       m_bReady = true;
    }
    m_condVar.notify_all ();
+}
 
-   std::unique_lock<std::mutex> mlock (m_mutex);
-   m_condVar.wait (mlock, std::bind (&WORKER::Control, this));
+bool WORKER::IsShutdown () const
+{
+   return m_bShutdown;
 }
 
 bool WORKER::Control ()

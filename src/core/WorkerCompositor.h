@@ -12,19 +12,40 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef SNEEZE_CORE_WORKER_A_H
-#define SNEEZE_CORE_WORKER_A_H
+#ifndef SNEEZE_CORE_WORKERCOMPOSITOR_H
+#define SNEEZE_CORE_WORKERCOMPOSITOR_H
 
 #include "Worker.h"
+#include "renderer/AnariRenderer.h"
+#include "view/CameraOrbit.h"
+#include <chrono>
 
 namespace sneeze { namespace core {
 
-class WORKER_A : public WORKER
+class WORKER_COMPOSITOR : public WORKER
 {
+public:
+   explicit WORKER_COMPOSITOR (SNEEZE* pSneeze);
+
 protected:
    void Tick () override;
+   void ThreadLoop () override;
+
+private:
+   sneeze::renderer::ANARI_RENDERER  m_pRenderer;
+   sneeze::view::CAMERA_ORBIT        m_pCameraOrbit;
+
+   int64_t m_tmNow;
+   double  m_dTimeScale;
+   bool    m_bPaused;
+   bool    m_bSpaceWasDown;
+
+   std::chrono::steady_clock::time_point m_tpLastFrame;
+
+   int    m_nFrameCount;
+   double m_dFpsAccum;
 };
 
 }} // namespace sneeze::core
 
-#endif // SNEEZE_CORE_WORKER_A_H
+#endif // SNEEZE_CORE_WORKERCOMPOSITOR_H

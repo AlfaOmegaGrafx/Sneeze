@@ -12,12 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "WorkerA.h"
+#ifndef SNEEZE_ASTRO_BODYDATA_H
+#define SNEEZE_ASTRO_BODYDATA_H
 
-namespace sneeze { namespace core {
+#include <vector>
 
-void WORKER_A::Tick ()
-{
-}
+namespace sneeze { namespace astro {
 
-}} // namespace sneeze::core
+class RMCOBJECT;
+
+void CreateSolarSystem ();
+
+}} // namespace sneeze::astro
+
+#endif // SNEEZE_ASTRO_BODYDATA_H
