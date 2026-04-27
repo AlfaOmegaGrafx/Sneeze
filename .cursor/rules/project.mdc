@@ -126,7 +126,7 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 
 | Module | Namespace | Purpose | Phase |
 |--------|-----------|---------|-------|
-| `core/` | `sneeze::core` | Foundational types (Epoch, Vec3, Quat) used by all modules | PoC |
+| `core/` | `sneeze::core` | Foundational types (Epoch, Vec3, Quat), engine lifecycle (ENGINE), and worker thread infrastructure (WORKER base + 8 derived workers A–H) | PoC |
 | `renderer/` | `sneeze::renderer` | Abstract rendering interface + ANARI implementation (device chosen by caller — Halogen in production) | PoC |
 | `view/` | `sneeze::view` | Camera orbit controller (decoupled from windowing — takes raw input deltas) | PoC |
 | `som/` | `sneeze::som` | Scene Object Model (future) | 4 |
@@ -145,6 +145,9 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 
 | Class | Module | Purpose |
 |-------|--------|---------|
+| `ENGINE` | `core` | Sneeze engine lifecycle — the single entry point Artemis instantiates. `Initialize()` creates 8 worker threads from a `WORKER_CONFIG` factory table (`std::vector` of `std::function` lambdas), waits for each to signal ready, then spawns the engine thread which runs a 64Hz tick loop (derived from `TICKS_PER_S`). Each tick signals all workers via `WORKER::Signal()`. `Shutdown()` stops the engine thread, then shuts down and deletes workers in reverse order. Uses the Artemis Logger threading pattern: `m_mutex`/`m_condVar`, `Shutdown()` method, destructor calls `Shutdown()`. Constructor does no work — all lifecycle through `Initialize()`/`Shutdown()`. Non-copyable, non-movable. |
+| `WORKER` | `core` | Abstract base class for engine worker threads. Each worker owns one `std::thread`. `Initialize()` starts the thread and blocks until it signals `m_bReady`. Thread loop uses the Logger pattern: `m_condVar.wait(mlock, std::bind(&WORKER::Control, this))` where `Control()` calls pure virtual `Tick()` when not shutting down and returns `m_bShutdown`. `Signal()` calls `CtlBreak_Thread()`. `Shutdown()` sets `m_bShutdown` + notifies, then joins. |
+| `WORKER_A`–`WORKER_H` | `core` | Eight concrete workers derived from `WORKER`, each in its own file pair (`WorkerA.h`/`.cpp` through `WorkerH.h`/`.cpp`). Override `Tick()` — currently empty placeholders. Will be assigned specific engine responsibilities as the engine develops. |
 | `EPOCH` | `core` | Julian date calculations, time propagation |
 | `RENDERER` | `renderer` | Abstract rendering interface (pure virtual) |
 | `ANARI_RENDERER` | `renderer` | Concrete ANARI implementation of RENDERER. Constructor takes a library name string (e.g. `"halogen"`) and calls `anariLoadLibrary(name)` at runtime — the class is device-agnostic. No default; caller must specify. |
@@ -650,17 +653,18 @@ Integrate the four remaining core runtime APIs into the build system. The goal i
 | 6 | Add VisRTX (NVIDIA ray-traced ANARI device) | **DEFERRED** | Alternative GPU ANARI device (ray tracing on NVIDIA via OptiX) alongside the Halogen/Filament rasterizer. No Sneeze code changes — just another value to pass to `ANARI_RENDERER("visrtx")`. Deferred — Halogen covers production rendering; VisRTX requires CUDA + OptiX SDK. |
 | 7 | ~~RmlUi (UI toolkit)~~ | **DONE** | RmlUi 6.2 built from source (static lib, no FreeType). `ui/UI_CONTEXT` class with stub system/render/font interfaces. UiTest.exe passes 20/20 integration tests (init, context lifecycle, document loading, update/render cycle, multi-context). |
 
-### Phase 2 — Implement RmlUI Elements
+### Phase 2 — Scene Object Model (SOM)
 
-Build out the RmlUI integration from stub interfaces to functional UI components. RmlUI's HTML/CSS retained-mode model will power all browser chrome, developer tools, and service-provided UI surfaces.
+The SOM is the browser's central data structure — analogous to the DOM in a web browser. It's where all runtime interfaces converge. Without it, there's no way to manage content from multiple sources.
 
 | # | Task | Notes |
 |---|------|-------|
-| 1 | Implement font engine | Replace `STUB_FONT_ENGINE` with a real font engine (FreeType or custom). Required for readable text. |
-| 2 | Implement render interface | Connect RmlUi's render calls to ANARI (or a 2D overlay compositor). Currently stubbed. |
-| 3 | Basic chrome elements | Address bar, tab bar, navigation controls — the minimal browser UI shell. |
-| 4 | Developer tools panel | Inspectable SOM tree, network activity, console output. |
-| 5 | Service-provided UI | Allow WASM services to define UI via RmlUI documents injected into the browser. |
+| 1 | Design SOM node hierarchy | Branch ownership, read-access permissions, single-copy architecture per the architecture doc (Section 9) |
+| 2 | Implement `som/` module with `sneeze::som` namespace | Core node types: spatial node, geometry node, light node, group node |
+| 3 | Refactor renderer to consume SOM rather than raw sphere/curve lists | Renderer walks the SOM tree instead of receiving flat data from main.cpp |
+| 4 | Refactor astro module to populate SOM nodes | Bodies write into the SOM; main.cpp no longer manually bridges astro to renderer |
+| 5 | Multi-source branch architecture | SOM branches owned by different sources (local astro vs. future fabric services) |
+| 6 | SOM change detection / dirty flagging | Only re-submit changed geometry to ANARI, not the entire scene every frame |
 
 ### Phase 3 — Solar System Polish + Build Hardening
 
@@ -678,22 +682,21 @@ Complete the solar system demo to visual parity with the JavaScript original, an
 | 9 | Add Sun emissive material | Sun should glow, not just be a matte sphere lit by its own point light |
 | 10 | Moon orbital accuracy | Verify moon positions against JS reference; moons may need parent-relative positioning fixes |
 
-### Phase 4 — Scene Object Model (SOM)
+### Phase 4 — Implement RmlUI Elements
 
-The SOM is the browser's central data structure — analogous to the DOM in a web browser. It's where all runtime interfaces converge. Without it, there's no way to manage content from multiple sources.
+Build out the RmlUI integration from stub interfaces to functional UI components. RmlUI's HTML/CSS retained-mode model will power all browser chrome, developer tools, and service-provided UI surfaces.
 
 | # | Task | Notes |
 |---|------|-------|
-| 1 | Design SOM node hierarchy | Branch ownership, read-access permissions, single-copy architecture per the architecture doc (Section 9) |
-| 2 | Implement `som/` module with `sneeze::som` namespace | Core node types: spatial node, geometry node, light node, group node |
-| 3 | Refactor renderer to consume SOM rather than raw sphere/curve lists | Renderer walks the SOM tree instead of receiving flat data from main.cpp |
-| 4 | Refactor astro module to populate SOM nodes | Bodies write into the SOM; main.cpp no longer manually bridges astro to renderer |
-| 5 | Multi-source branch architecture | SOM branches owned by different sources (local astro vs. future fabric services) |
-| 6 | SOM change detection / dirty flagging | Only re-submit changed geometry to ANARI, not the entire scene every frame |
+| 1 | Implement font engine | Replace `STUB_FONT_ENGINE` with a real font engine (FreeType or custom). Required for readable text. |
+| 2 | Implement render interface | Connect RmlUi's render calls to ANARI (or a 2D overlay compositor). Currently stubbed. |
+| 3 | Basic chrome elements | Address bar, tab bar, navigation controls — the minimal browser UI shell. |
+| 4 | Developer tools panel | Inspectable SOM tree, network activity, console output. |
+| 5 | Service-provided UI | Allow WASM services to define UI via RmlUI documents injected into the browser. |
 
-### Phase 5 — SMAP (Networking Abstraction)
+### Phase 5 — SMAP (C++)
 
-SMAP abstracts the network layer so the browser can connect to any spatial fabric service without knowledge of its underlying protocol.
+SMAP abstracts the network layer so the browser can connect to any spatial fabric service without knowledge of its underlying protocol. This phase implements the core C++ SMAP infrastructure in the engine.
 
 | # | Task | Notes |
 |---|------|-------|
@@ -717,7 +720,17 @@ WASM provides sandboxed execution for third-party service logic with per-service
 | 5 | Load and execute a trivial WASM service | Proof of concept: WASM module creates a SOM node |
 | 6 | Per-service isolation verification | Confirm memory isolation, resource limits (fuel + memory caps), concurrent instances |
 
-### Phase 7 — OpenXR Integration
+### Phase 7 — SMAP (WASM)
+
+SMAP service drivers implemented as WASM modules — third-party fabric connectivity running in the sandboxed execution environment established in Phase 6.
+
+| # | Task | Notes |
+|---|------|-------|
+| 1 | Define WIT interface for SMAP drivers | Resource types and method signatures for WASM-based service drivers to interact with the C++ SMAP infrastructure |
+| 2 | WASM SMAP driver PoC | A WASM module that implements a service driver, loaded and executed by the engine |
+| 3 | Cross-language driver validation | Verify drivers written in Rust and C++ (via wasi-sdk) both work through the same WIT interface |
+
+### Phase 8 — OpenXR Integration
 
 OpenXR provides a unified API for VR/AR devices, enabling Sneeze to run on headsets.
 
@@ -729,7 +742,7 @@ OpenXR provides a unified API for VR/AR devices, enabling Sneeze to run on heads
 | 4 | Controller input mapping | Map OpenXR input actions to browser navigation and interaction |
 | 5 | AR passthrough / anchoring | Physical-world anchoring per architecture doc (Section 12) |
 
-### Phase 8 — Identity + Audio + Content Ecosystem
+### Phase 9 — Identity + Audio + Content Ecosystem
 
 Supporting components that can be developed in parallel with or after the core phases.
 

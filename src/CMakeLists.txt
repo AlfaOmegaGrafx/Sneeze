@@ -500,8 +500,31 @@ endif ()
 # Source files by module
 # ---------------------------------------------------------------------------
 
-set (CORE_SOURCES    core/Epoch.cpp)
-set (CORE_HEADERS    core/Epoch.h  core/Types.h)
+set (CORE_SOURCES
+   core/Epoch.cpp
+   core/Engine.cpp
+   core/Worker.cpp
+   core/WorkerA.cpp
+   core/WorkerB.cpp
+   core/WorkerC.cpp
+   core/WorkerD.cpp
+   core/WorkerE.cpp
+   core/WorkerF.cpp
+   core/WorkerG.cpp
+   core/WorkerH.cpp)
+set (CORE_HEADERS
+   core/Epoch.h
+   core/Types.h
+   core/Engine.h
+   core/Worker.h
+   core/WorkerA.h
+   core/WorkerB.h
+   core/WorkerC.h
+   core/WorkerD.h
+   core/WorkerE.h
+   core/WorkerF.h
+   core/WorkerG.h
+   core/WorkerH.h)
 
 set (RENDERER_SOURCES  renderer/AnariRenderer.cpp)
 set (RENDERER_HEADERS  renderer/Renderer.h  renderer/AnariRenderer.h)

@@ -346,3 +346,15 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 - **Created `MsfFile.md` documentation** — covers `MSF_FILE` API, parse/compose paths, data structs, and `CERT_CHAIN` static utilities.
 - **Renamed `src/jws/` to `src/msf/`** — local file system rename (not git mv). Updated all includes, `CMakeLists.txt` variables (`MSF_SOURCES`/`MSF_HEADERS`), namespace (`sneeze::jws` → `sneeze::msf`), documentation references, and `FindBoringSSL.cmake` comment. Clean build, 42/42 tests passing.
 - **Updated `project.mdc`** — class inventory, test table, roadmap entries, dependency references, architectural narrative, and known gotchas all updated to reflect the new folder, namespace, and class structure.
+
+---
+
+## 2026-04-27 — Dean Abramson — 11:13 AM – 12:16 PM PDT
+
+### Work performed
+
+- **Implemented `ENGINE` class** (`core/Engine.h`, `core/Engine.cpp`) — Sneeze engine lifecycle entry point. Artemis instantiates it, calls `Initialize()`/`Shutdown()`. Creates worker threads from a `WORKER_CONFIG` factory table (`std::vector` with `std::function` lambdas), spawns an engine thread running a 64Hz tick loop (using `TICKS_PER_S` from `Types.h`). Each tick signals all workers. Shutdown stops the engine thread, then workers in reverse order. Ready handshake ensures all threads are confirmed running before `Initialize()` returns.
+- **Implemented `WORKER` base class** (`core/Worker.h`, `core/Worker.cpp`) — abstract base for worker threads. Uses the Artemis Logger threading pattern: `ThreadLoop` with `Control` as a bound predicate, `CtlBreak_Thread()` for wake, `Shutdown()` for teardown, two-phase `Initialize()`/`Shutdown()` lifecycle. Pure virtual `Tick()` for derived classes.
+- **Created 8 derived worker classes** (`WORKER_A` through `WORKER_H`) — each in its own `.h`/`.cpp` file pair. Empty `Tick()` placeholders for now.
+- **Updated `src/CMakeLists.txt`** — added all 18 new source files to `CORE_SOURCES`/`CORE_HEADERS`.
+- **Updated `project.mdc`** — module table and key classes table updated with ENGINE, WORKER, and WORKER_A–H entries.
