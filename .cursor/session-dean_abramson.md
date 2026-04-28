@@ -379,3 +379,17 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 - **Added FPS logging** — `WORKER_COMPOSITOR` logs frames-per-second to stdout once per second. ~17 FPS on CPU-only machine.
 - **Updated Sneeze `CMakeLists.txt`** — added astro module, replaced Engine/WorkerA with Sneeze/WorkerCompositor, linked `dwmapi` on Windows.
 - **Updated `project.mdc`** — exhaustive update of module table, key classes, PoC section, directory structure, known gotchas, and new "Engine-Driven Rendering Pipeline" section.
+
+---
+
+## 2026-04-28 — Dean Abramson — 7:34 AM – 8:29 AM PDT
+
+### Work performed
+
+- **Compositor timing diagnostics** — added five timed sections per frame (input/camera, scene build, ANARI render, framebuffer publish, DwmFlush) with per-frame averages logged once per second. Initial findings: scene 0.2ms, ANARI ~19ms, DwmFlush ~17ms, ~24ms unaccounted for (extra input/publish timers added to locate the gap).
+- **Metronome redesign** — renamed `nInterval` to `nHertz` (cycles per second). Rewrote `EngineThreadLoop` with drift-free fixed-origin scheduling: `sleep_for(1ms)`, `floor(elapsed * nHertz) > lastTick` check per worker. Metronome logs measured signal counts per worker per second. Removed old 64Hz `wait_until` approach.
+- **Added `timeBeginPeriod(1)` / `timeEndPeriod(1)`** in engine metronome thread (Windows). Links `winmm.lib`.
+- **Worker wake-rate measurement** — added infrastructure in `WORKER` base class (`m_nWakeCount`, `SetWorkerIndex()`), then commented out after initial test confirmed all Hz targets achieved.
+- **Test Hz values** in factory table: 0 (compositor), 1, 30, 60, 64, 90, 120, 144 — all targets achieved perfectly.
+- **C++14 targeting discussion** — Dean intends C++14 instead of C++17. Audit deferred. Key concern: `std::optional` in astro module.
+- **Updated `project.mdc`** — metronome redesign details, compositor diagnostics findings, C++14 note, `winmm.lib` gotcha, updated key classes.

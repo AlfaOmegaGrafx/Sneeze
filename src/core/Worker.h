@@ -19,6 +19,8 @@
 #include <mutex>
 #include <condition_variable>
 #include <functional>
+#include <chrono>
+#include <cstdint>
 
 namespace sneeze { namespace core {
 
@@ -55,6 +57,15 @@ private:
    std::condition_variable m_condVar;
    bool                    m_bShutdown;
    bool                    m_bReady;
+
+   // Wake-rate measurement
+   std::chrono::steady_clock::time_point m_tpOrigin;
+   int                     m_nWakeCount;
+   int64_t                 m_nLastReportSec;
+   int                     m_nWorkerIndex;
+
+public:
+   void SetWorkerIndex (int nIndex);
 };
 
 }} // namespace sneeze::core

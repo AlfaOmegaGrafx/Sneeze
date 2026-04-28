@@ -34,12 +34,16 @@
 #include "ui/UiContext.h"
 #include <chrono>
 #include <cstdio>
+#include <thread>
 #include <cstring>
 #include <functional>
 
-namespace sneeze { namespace core {
+#ifdef _WIN32
+#include <windows.h>
+#pragma comment (lib, "winmm.lib")
+#endif
 
-static constexpr int64_t TICK_INTERVAL_US = 1000000 / TICKS_PER_S;
+namespace sneeze { namespace core {
 
 // ---------------------------------------------------------------------------
 // Worker configuration table
@@ -47,20 +51,20 @@ static constexpr int64_t TICK_INTERVAL_US = 1000000 / TICKS_PER_S;
 
 struct WORKER_CONFIG
 {
-   int                                    nInterval;
+   int                                    nHertz;
    std::function<WORKER* (SNEEZE*)>       Create;
 };
 
 static const std::vector<WORKER_CONFIG> aWorkerConfig =
 {
-   { 0, [] (SNEEZE* p) -> WORKER* { return new WORKER_COMPOSITOR (p); } },
-   { 1, [] (SNEEZE* p) -> WORKER* { return new WORKER_B (p); } },
-   { 1, [] (SNEEZE* p) -> WORKER* { return new WORKER_C (p); } },
-   { 1, [] (SNEEZE* p) -> WORKER* { return new WORKER_D (p); } },
-   { 1, [] (SNEEZE* p) -> WORKER* { return new WORKER_E (p); } },
-   { 1, [] (SNEEZE* p) -> WORKER* { return new WORKER_F (p); } },
-   { 1, [] (SNEEZE* p) -> WORKER* { return new WORKER_G (p); } },
-   { 1, [] (SNEEZE* p) -> WORKER* { return new WORKER_H (p); } },
+   {   0, [] (SNEEZE* p) -> WORKER* { return new WORKER_COMPOSITOR (p); } },
+   {   1, [] (SNEEZE* p) -> WORKER* { return new WORKER_B          (p); } },
+   {  30, [] (SNEEZE* p) -> WORKER* { return new WORKER_C          (p); } },
+   {  60, [] (SNEEZE* p) -> WORKER* { return new WORKER_D          (p); } },
+   {  64, [] (SNEEZE* p) -> WORKER* { return new WORKER_E          (p); } },
+   {  90, [] (SNEEZE* p) -> WORKER* { return new WORKER_F          (p); } },
+   { 120, [] (SNEEZE* p) -> WORKER* { return new WORKER_G          (p); } },
+   { 144, [] (SNEEZE* p) -> WORKER* { return new WORKER_H          (p); } },
 };
 
 // ---------------------------------------------------------------------------
@@ -140,10 +144,14 @@ bool SNEEZE::Initialize (int nWidth, int nHeight, const std::string& sRenderer)
 
                      WORKER* pWorker = config.Create (this);
 
+                     pWorker->SetWorkerIndex (static_cast<int> (m_apWorkers.size ()));
+
                      if (pWorker->Initialize ())
                      {
                         m_apWorkers.push_back (pWorker);
-                        m_anWorkerInterval.push_back (config.nInterval);
+                        m_anWorkerHertz.push_back (config.nHertz);
+                        m_anWorkerLastTick.push_back (0);
+                        m_anWorkerSignalCount.push_back (0);
                      }
                      else
                      {
@@ -162,8 +170,8 @@ bool SNEEZE::Initialize (int nWidth, int nHeight, const std::string& sRenderer)
                      std::unique_lock<std::mutex> lock (m_mutex);
                      m_condVar.wait (lock, [this] { return m_bReady; });
 
-                     std::fprintf (stdout, "SNEEZE: Initialized (1 engine thread + %d workers, %lld Hz)\n",
-                        static_cast<int> (m_apWorkers.size ()), static_cast<long long> (TICKS_PER_S));
+                     std::fprintf (stdout, "SNEEZE: Initialized (1 engine thread + %d workers)\n",
+                        static_cast<int> (m_apWorkers.size ()));
                   }
 
                   if (!bResult)
@@ -174,7 +182,9 @@ bool SNEEZE::Initialize (int nWidth, int nHeight, const std::string& sRenderer)
                         delete m_apWorkers[nIz];
                      }
                      m_apWorkers.clear ();
-                     m_anWorkerInterval.clear ();
+                     m_anWorkerHertz.clear ();
+                     m_anWorkerLastTick.clear ();
+                     m_anWorkerSignalCount.clear ();
                   }
 
                   if (!bResult)
@@ -228,7 +238,9 @@ void SNEEZE::Shutdown ()
       delete m_apWorkers[nIz];
    }
    m_apWorkers.clear ();
-   m_anWorkerInterval.clear ();
+   m_anWorkerHertz.clear ();
+   m_anWorkerLastTick.clear ();
+   m_anWorkerSignalCount.clear ();
 
    s_pUiContext.Shutdown ();
    s_pHttpClient.Shutdown ();
@@ -345,32 +357,67 @@ std::vector<void*>& SNEEZE::GetBodies ()
 
 void SNEEZE::EngineThreadLoop ()
 {
+#ifdef _WIN32
+   timeBeginPeriod (1);
+#endif
+
    {
       std::lock_guard<std::mutex> guard (m_mutex);
       m_bReady = true;
    }
    m_condVar.notify_all ();
 
-   auto tpNext = std::chrono::steady_clock::now ();
+   auto tpOrigin       = std::chrono::steady_clock::now ();
+   int64_t nLastReport = 0;
 
-   std::unique_lock<std::mutex> mlock (m_mutex);
-
-   while (!m_bShutdown)
+   while (true)
    {
-      tpNext += std::chrono::microseconds (TICK_INTERVAL_US);
-      m_condVar.wait_until (mlock, tpNext, [this] { return m_bShutdown; });
+      std::this_thread::sleep_for (std::chrono::milliseconds (1));
 
-      if (!m_bShutdown)
       {
-         mlock.unlock ();
+         std::lock_guard<std::mutex> guard (m_mutex);
+         if (m_bShutdown)
+            break;
+      }
+
+      auto tpNow = std::chrono::steady_clock::now ();
+      double dElapsed = std::chrono::duration<double> (tpNow - tpOrigin).count ();
+
+      for (int nIz = 0; nIz < static_cast<int> (m_apWorkers.size ()); nIz++)
+      {
+         int nHz = m_anWorkerHertz[nIz];
+         if (nHz <= 0)
+            continue;
+
+         int64_t nCurrentTick = static_cast<int64_t> (dElapsed * nHz);
+         if (nCurrentTick > m_anWorkerLastTick[nIz])
+         {
+            m_anWorkerLastTick[nIz] = nCurrentTick;
+            m_anWorkerSignalCount[nIz]++;
+            m_apWorkers[nIz]->Signal ();
+         }
+      }
+
+      int64_t nCurrentSecond = static_cast<int64_t> (dElapsed);
+      if (nCurrentSecond > nLastReport)
+      {
+         std::fprintf (stdout, "METRONOME:");
          for (int nIz = 0; nIz < static_cast<int> (m_apWorkers.size ()); nIz++)
          {
-            if (m_anWorkerInterval[nIz] != 0)
-               m_apWorkers[nIz]->Signal ();
+            int nHz = m_anWorkerHertz[nIz];
+            if (nHz <= 0)
+               continue;
+            std::fprintf (stdout, "  [%d] %d/%d Hz", nIz, m_anWorkerSignalCount[nIz], nHz);
+            m_anWorkerSignalCount[nIz] = 0;
          }
-         mlock.lock ();
+         std::fprintf (stdout, "\n");
+         nLastReport = nCurrentSecond;
       }
    }
+
+#ifdef _WIN32
+   timeEndPeriod (1);
+#endif
 }
 
 }} // namespace sneeze::core

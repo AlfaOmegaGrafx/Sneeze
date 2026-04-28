@@ -106,7 +106,9 @@ private:
 
    // Workers
    std::vector<WORKER*>     m_apWorkers;
-   std::vector<int>         m_anWorkerInterval;
+   std::vector<int>         m_anWorkerHertz;
+   std::vector<int64_t>     m_anWorkerLastTick;
+   std::vector<int>         m_anWorkerSignalCount;
 
    // Input
    std::mutex               m_inputMutex;

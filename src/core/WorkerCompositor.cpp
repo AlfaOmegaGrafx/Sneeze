@@ -54,6 +54,11 @@ WORKER_COMPOSITOR::WORKER_COMPOSITOR (SNEEZE* pSneeze)
    , m_bSpaceWasDown (false)
    , m_nFrameCount (0)
    , m_dFpsAccum (0.0)
+   , m_dAccumInput (0.0)
+   , m_dAccumScene (0.0)
+   , m_dAccumAnari (0.0)
+   , m_dAccumPublish (0.0)
+   , m_dAccumFlush (0.0)
 {
    m_pCameraOrbit.dTheta    = 0.3f;
    m_pCameraOrbit.dPhi      = 0.4f;
@@ -81,6 +86,8 @@ void WORKER_COMPOSITOR::ThreadLoop ()
 
    while (!IsShutdown ())
    {
+      auto tpLoopStart = std::chrono::steady_clock::now ();
+
       // --- Consume input ---
 
       SNEEZE_INPUT pInput = m_pSneeze->ConsumeInput ();
@@ -100,9 +107,22 @@ void WORKER_COMPOSITOR::ThreadLoop ()
       m_dFpsAccum += dDeltaS;
       if (m_dFpsAccum >= 1.0)
       {
-         std::fprintf (stdout, "FPS: %d\n", m_nFrameCount);
-         m_nFrameCount = 0;
-         m_dFpsAccum  -= 1.0;
+         double dAvgInput   = (m_nFrameCount > 0) ? m_dAccumInput   / m_nFrameCount * 1000.0 : 0.0;
+         double dAvgScene   = (m_nFrameCount > 0) ? m_dAccumScene   / m_nFrameCount * 1000.0 : 0.0;
+         double dAvgAnari   = (m_nFrameCount > 0) ? m_dAccumAnari   / m_nFrameCount * 1000.0 : 0.0;
+         double dAvgPublish = (m_nFrameCount > 0) ? m_dAccumPublish / m_nFrameCount * 1000.0 : 0.0;
+         double dAvgFlush   = (m_nFrameCount > 0) ? m_dAccumFlush   / m_nFrameCount * 1000.0 : 0.0;
+         double dAvgFrame   = (m_nFrameCount > 0) ? m_dFpsAccum     / m_nFrameCount * 1000.0 : 0.0;
+         std::fprintf (stdout,
+            "FPS: %d  (frame %.1f ms | input %.1f ms | scene %.1f ms | anari %.1f ms | publish %.1f ms | flush %.1f ms)\n",
+            m_nFrameCount, dAvgFrame, dAvgInput, dAvgScene, dAvgAnari, dAvgPublish, dAvgFlush);
+         m_nFrameCount    = 0;
+         m_dFpsAccum     -= 1.0;
+         m_dAccumInput    = 0.0;
+         m_dAccumScene    = 0.0;
+         m_dAccumAnari    = 0.0;
+         m_dAccumPublish  = 0.0;
+         m_dAccumFlush    = 0.0;
       }
 
       if (!m_bPaused)
@@ -142,6 +162,9 @@ void WORKER_COMPOSITOR::ThreadLoop ()
       m_pRenderer.SetCamera (pCamera);
 
       // --- Build scene ---
+
+      auto tpSceneStart = std::chrono::steady_clock::now ();
+      m_dAccumInput += std::chrono::duration<double> (tpSceneStart - tpLoopStart).count ();
 
       std::vector<sneeze::renderer::SPHERE_DATA> aSpheres;
       std::vector<sneeze::renderer::CURVE_DATA>  aCurves;
@@ -238,12 +261,20 @@ void WORKER_COMPOSITOR::ThreadLoop ()
 
       // --- Render ---
 
+      auto tpAnariStart = std::chrono::steady_clock::now ();
+      m_dAccumScene += std::chrono::duration<double> (tpAnariStart - tpSceneStart).count ();
+
       m_pRenderer.BeginFrame ();
       m_pRenderer.SubmitSpheres (aSpheres);
       m_pRenderer.SubmitCurves (aCurves);
       m_pRenderer.EndFrame ();
 
+      auto tpAnariEnd = std::chrono::steady_clock::now ();
+      m_dAccumAnari += std::chrono::duration<double> (tpAnariEnd - tpAnariStart).count ();
+
       // --- Publish framebuffer ---
+
+      auto tpPublishStart = std::chrono::steady_clock::now ();
 
       const uint32_t* pPixels = m_pRenderer.GetFrameBuffer ();
       if (pPixels)
@@ -258,11 +289,17 @@ void WORKER_COMPOSITOR::ThreadLoop ()
 
       // --- Pace to display refresh ---
 
+      auto tpFlushStart = std::chrono::steady_clock::now ();
+      m_dAccumPublish += std::chrono::duration<double> (tpFlushStart - tpPublishStart).count ();
+
 #ifdef _WIN32
       DwmFlush ();
 #else
       std::this_thread::sleep_for (std::chrono::milliseconds (16));
 #endif
+
+      auto tpFlushEnd = std::chrono::steady_clock::now ();
+      m_dAccumFlush += std::chrono::duration<double> (tpFlushEnd - tpFlushStart).count ();
    }
 
    m_pRenderer.Shutdown ();

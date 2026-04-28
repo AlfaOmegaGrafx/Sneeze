@@ -44,6 +44,11 @@ private:
 
    int    m_nFrameCount;
    double m_dFpsAccum;
+   double m_dAccumInput;
+   double m_dAccumScene;
+   double m_dAccumAnari;
+   double m_dAccumPublish;
+   double m_dAccumFlush;
 };
 
 }} // namespace sneeze::core

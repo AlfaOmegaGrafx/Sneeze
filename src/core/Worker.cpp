@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "Worker.h"
+#include <cstdio>
 
 namespace sneeze { namespace core {
 
@@ -21,7 +22,15 @@ WORKER::WORKER (SNEEZE* pSneeze)
    , m_pThread (nullptr)
    , m_bShutdown (false)
    , m_bReady (false)
+   , m_nWakeCount (0)
+   , m_nLastReportSec (0)
+   , m_nWorkerIndex (-1)
 {
+}
+
+void WORKER::SetWorkerIndex (int nIndex)
+{
+   m_nWorkerIndex = nIndex;
 }
 
 WORKER::~WORKER ()
@@ -62,6 +71,8 @@ void WORKER::Signal ()
 
 void WORKER::ThreadLoop ()
 {
+   m_tpOrigin = std::chrono::steady_clock::now ();
+
    SignalReady ();
 
    std::unique_lock<std::mutex> mlock (m_mutex);
@@ -86,6 +97,19 @@ bool WORKER::Control ()
 {
    if (m_bShutdown == false)
    {
+      // m_nWakeCount++;
+      //
+      // double dElapsed = std::chrono::duration<double> (
+      //    std::chrono::steady_clock::now () - m_tpOrigin).count ();
+      // int64_t nCurrentSec = static_cast<int64_t> (dElapsed);
+      // if (nCurrentSec > m_nLastReportSec)
+      // {
+      //    std::fprintf (stdout, "WORKER[%d]: %d wakes/sec\n",
+      //       m_nWorkerIndex, m_nWakeCount);
+      //    m_nWakeCount    = 0;
+      //    m_nLastReportSec = nCurrentSec;
+      // }
+
       Tick ();
    }
 
