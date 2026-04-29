@@ -93,6 +93,7 @@ SNEEZE::SNEEZE (SNEEZE_LISTENER* pListener)
    , m_bResizePending (false)
    , m_nResizeWidth (0)
    , m_nResizeHeight (0)
+   , m_pNativeWindow (nullptr)
 {
 }
 

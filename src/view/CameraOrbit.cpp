@@ -29,8 +29,8 @@ void UpdateCameraOrbit (CAMERA_ORBIT& pOrbit, int nDX, int nDY, float dScrollY,
 {
    if (bMouseLeft)
    {
-      pOrbit.dTheta -= nDX * MOUSE_SENSITIVITY;
-      pOrbit.dPhi   -= nDY * MOUSE_SENSITIVITY;
+      pOrbit.dTheta += nDX * MOUSE_SENSITIVITY;
+      pOrbit.dPhi   += nDY * MOUSE_SENSITIVITY;
       pOrbit.dPhi = std::max (-PI_F * 0.49f, std::min (PI_F * 0.49f, pOrbit.dPhi));
    }
 

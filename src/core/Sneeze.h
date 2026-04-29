@@ -63,6 +63,9 @@ public:
    explicit SNEEZE (SNEEZE_LISTENER* pListener);
    ~SNEEZE ();
 
+   void SetNativeWindow (void* pHandle) { m_pNativeWindow = pHandle; }
+   void* GetNativeWindow () const      { return m_pNativeWindow; }
+
    bool Initialize (int nWidth, int nHeight, const std::string& sRenderer);
    void Shutdown ();
 
@@ -128,6 +131,7 @@ private:
    std::string              m_sRenderer;
    int                      m_nWidth;
    int                      m_nHeight;
+   void*                    m_pNativeWindow;
 
    // Resize request
    std::mutex               m_resizeMutex;

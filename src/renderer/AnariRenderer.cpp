@@ -22,6 +22,7 @@
 
 #include <cstring>
 #include <cstdio>
+#include <chrono>
 
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
@@ -83,8 +84,11 @@ ANARI_RENDERER::ANARI_RENDERER (const std::string& sLibrary)
    , m_pNativeSurface (nullptr)
    , m_pNativeWindow (nullptr)
    , m_bNativeSurface (false)
+   , m_nResizeGeneration (0)
    , m_nWidth (0)
    , m_nHeight (0)
+   , m_dLastSubmitSeconds (0.0)
+   , m_dLastRenderSeconds (0.0)
 {
 }
 
@@ -245,6 +249,14 @@ void ANARI_RENDERER::Resize (int nWidth, int nHeight)
    m_nHeight = nHeight;
    m_aPixels.resize (nWidth * nHeight, 0);
 
+   if (m_pNativeSurface)
+   {
+      ANARIObject ns = reinterpret_cast<ANARIObject> (m_pNativeSurface);
+      ++m_nResizeGeneration;
+      anariSetParameter (m_pDevice, ns, "generation", ANARI_UINT64, &m_nResizeGeneration);
+      anariCommitParameters (m_pDevice, ns);
+   }
+
    anariRelease (m_pDevice, m_pFrame);
 
    m_pFrame = anariNewFrame (m_pDevice);
@@ -337,13 +349,21 @@ void ANARI_RENDERER::SubmitCurves (const std::vector<CURVE_DATA>& aCurves)
 
 void ANARI_RENDERER::EndFrame ()
 {
+   auto tpSubmitStart = std::chrono::steady_clock::now ();
+
    RebuildWorld (m_aSpheres, m_aCurves);
 
    anariCommitParameters (m_pDevice, m_pWorld);
    anariCommitParameters (m_pDevice, m_pFrame);
 
+   auto tpRenderStart = std::chrono::steady_clock::now ();
+   m_dLastSubmitSeconds = std::chrono::duration<double> (tpRenderStart - tpSubmitStart).count ();
+
    anariRenderFrame (m_pDevice, m_pFrame);
    anariFrameReady (m_pDevice, m_pFrame, ANARI_WAIT);
+
+   auto tpRenderEnd = std::chrono::steady_clock::now ();
+   m_dLastRenderSeconds = std::chrono::duration<double> (tpRenderEnd - tpRenderStart).count ();
 
    // Native-surface mode: Halogen presented directly to the window; no readback.
    if (m_bNativeSurface) return;

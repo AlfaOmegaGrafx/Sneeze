@@ -46,7 +46,8 @@ private:
    double m_dFpsAccum;
    double m_dAccumInput;
    double m_dAccumScene;
-   double m_dAccumAnari;
+   double m_dAccumSubmit;
+   double m_dAccumRender;
    double m_dAccumPublish;
    double m_dAccumFlush;
 };

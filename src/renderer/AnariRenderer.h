@@ -57,6 +57,9 @@ public:
    int GetWidth () const override;
    int GetHeight () const override;
 
+   double GetLastSubmitSeconds () const override { return m_dLastSubmitSeconds; }
+   double GetLastRenderSeconds () const override { return m_dLastRenderSeconds; }
+
 private:
    std::string   m_sLibrary;
    anari::api::Library*  m_pLibrary;
@@ -69,6 +72,7 @@ private:
 
    void* m_pNativeWindow;
    bool  m_bNativeSurface;
+   uint64_t m_nResizeGeneration;
 
    int m_nWidth;
    int m_nHeight;
@@ -80,6 +84,9 @@ private:
 
    std::vector<SPHERE_DATA> m_aSpheres;
    std::vector<CURVE_DATA>  m_aCurves;
+
+   double m_dLastSubmitSeconds;
+   double m_dLastRenderSeconds;
 };
 
 }} // namespace sneeze::renderer

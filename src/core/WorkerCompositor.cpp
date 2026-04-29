@@ -56,7 +56,8 @@ WORKER_COMPOSITOR::WORKER_COMPOSITOR (SNEEZE* pSneeze)
    , m_dFpsAccum (0.0)
    , m_dAccumInput (0.0)
    , m_dAccumScene (0.0)
-   , m_dAccumAnari (0.0)
+   , m_dAccumSubmit (0.0)
+   , m_dAccumRender (0.0)
    , m_dAccumPublish (0.0)
    , m_dAccumFlush (0.0)
 {
@@ -79,7 +80,17 @@ void WORKER_COMPOSITOR::Tick ()
 
 void WORKER_COMPOSITOR::ThreadLoop ()
 {
+   void* pNativeWindow = m_pSneeze->GetNativeWindow ();
+   if (pNativeWindow)
+      m_pRenderer.SetNativeWindow (pNativeWindow);
+
    m_pRenderer.Initialize (m_pSneeze->GetWidth (), m_pSneeze->GetHeight ());
+
+   bool bNativeSurface = m_pRenderer.IsRenderingToNativeSurface ();
+   if (bNativeSurface)
+      std::fprintf (stdout, "COMPOSITOR: Rendering to native surface (direct-to-window)\n");
+   else
+      std::fprintf (stdout, "COMPOSITOR: Rendering to CPU framebuffer (readback path)\n");
    m_tpLastFrame = std::chrono::steady_clock::now ();
 
    SignalReady ();
@@ -115,18 +126,20 @@ void WORKER_COMPOSITOR::ThreadLoop ()
       {
          double dAvgInput   = (m_nFrameCount > 0) ? m_dAccumInput   / m_nFrameCount * 1000.0 : 0.0;
          double dAvgScene   = (m_nFrameCount > 0) ? m_dAccumScene   / m_nFrameCount * 1000.0 : 0.0;
-         double dAvgAnari   = (m_nFrameCount > 0) ? m_dAccumAnari   / m_nFrameCount * 1000.0 : 0.0;
+         double dAvgSubmit  = (m_nFrameCount > 0) ? m_dAccumSubmit  / m_nFrameCount * 1000.0 : 0.0;
+         double dAvgRender  = (m_nFrameCount > 0) ? m_dAccumRender  / m_nFrameCount * 1000.0 : 0.0;
          double dAvgPublish = (m_nFrameCount > 0) ? m_dAccumPublish / m_nFrameCount * 1000.0 : 0.0;
          double dAvgFlush   = (m_nFrameCount > 0) ? m_dAccumFlush   / m_nFrameCount * 1000.0 : 0.0;
          double dAvgFrame   = (m_nFrameCount > 0) ? m_dFpsAccum     / m_nFrameCount * 1000.0 : 0.0;
          std::fprintf (stdout,
-            "FPS: %d  (frame %.1f ms | input %.1f ms | scene %.1f ms | anari %.1f ms | publish %.1f ms | flush %.1f ms)\n",
-            m_nFrameCount, dAvgFrame, dAvgInput, dAvgScene, dAvgAnari, dAvgPublish, dAvgFlush);
+            "FPS: %d  (frame %.1f ms | input %.1f ms | scene %.1f ms | submit %.1f ms | render %.1f ms | publish %.1f ms | flush %.1f ms)\n",
+            m_nFrameCount, dAvgFrame, dAvgInput, dAvgScene, dAvgSubmit, dAvgRender, dAvgPublish, dAvgFlush);
          m_nFrameCount    = 0;
          m_dFpsAccum     -= 1.0;
          m_dAccumInput    = 0.0;
          m_dAccumScene    = 0.0;
-         m_dAccumAnari    = 0.0;
+         m_dAccumSubmit   = 0.0;
+         m_dAccumRender   = 0.0;
          m_dAccumPublish  = 0.0;
          m_dAccumFlush    = 0.0;
       }
@@ -267,37 +280,39 @@ void WORKER_COMPOSITOR::ThreadLoop ()
 
       // --- Render ---
 
-      auto tpAnariStart = std::chrono::steady_clock::now ();
-      m_dAccumScene += std::chrono::duration<double> (tpAnariStart - tpSceneStart).count ();
+      m_dAccumScene += std::chrono::duration<double> (std::chrono::steady_clock::now () - tpSceneStart).count ();
 
       m_pRenderer.BeginFrame ();
       m_pRenderer.SubmitSpheres (aSpheres);
       m_pRenderer.SubmitCurves (aCurves);
       m_pRenderer.EndFrame ();
 
-      auto tpAnariEnd = std::chrono::steady_clock::now ();
-      m_dAccumAnari += std::chrono::duration<double> (tpAnariEnd - tpAnariStart).count ();
+      m_dAccumSubmit += m_pRenderer.GetLastSubmitSeconds ();
+      m_dAccumRender += m_pRenderer.GetLastRenderSeconds ();
 
       // --- Publish framebuffer ---
 
       auto tpPublishStart = std::chrono::steady_clock::now ();
 
-      const uint32_t* pPixels = m_pRenderer.GetFrameBuffer ();
-      if (pPixels)
+      if (!bNativeSurface)
       {
-         m_pSneeze->WriteFrameBuffer (pPixels,
-            m_pRenderer.GetWidth (), m_pRenderer.GetHeight ());
-
-         SNEEZE_LISTENER* pListener = m_pSneeze->GetListener ();
-         if (pListener)
+         const uint32_t* pPixels = m_pRenderer.GetFrameBuffer ();
+         if (pPixels)
          {
-            int nFbW, nFbH;
-            const uint32_t* pFB = m_pSneeze->LockFrameBuffer (nFbW, nFbH);
+            m_pSneeze->WriteFrameBuffer (pPixels,
+               m_pRenderer.GetWidth (), m_pRenderer.GetHeight ());
 
-            if (pFB != nullptr)
-               pListener->OnFrameReady (pFB, nFbW, nFbH);
+            SNEEZE_LISTENER* pListener = m_pSneeze->GetListener ();
+            if (pListener)
+            {
+               int nFbW, nFbH;
+               const uint32_t* pFB = m_pSneeze->LockFrameBuffer (nFbW, nFbH);
 
-            m_pSneeze->UnlockFrameBuffer ();
+               if (pFB != nullptr)
+                  pListener->OnFrameReady (pFB, nFbW, nFbH);
+
+               m_pSneeze->UnlockFrameBuffer ();
+            }
          }
       }
 
@@ -306,11 +321,14 @@ void WORKER_COMPOSITOR::ThreadLoop ()
       auto tpFlushStart = std::chrono::steady_clock::now ();
       m_dAccumPublish += std::chrono::duration<double> (tpFlushStart - tpPublishStart).count ();
 
+      if (!bNativeSurface)
+      {
 #ifdef _WIN32
-      DwmFlush ();
+         DwmFlush ();
 #else
-      std::this_thread::sleep_for (std::chrono::milliseconds (16));
+         std::this_thread::sleep_for (std::chrono::milliseconds (16));
 #endif
+      }
 
       auto tpFlushEnd = std::chrono::steady_clock::now ();
       m_dAccumFlush += std::chrono::duration<double> (tpFlushEnd - tpFlushStart).count ();
