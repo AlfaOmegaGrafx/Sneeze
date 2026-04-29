@@ -79,7 +79,7 @@ void WORKER_COMPOSITOR::Tick ()
 
 void WORKER_COMPOSITOR::ThreadLoop ()
 {
-   m_pRenderer.Initialize (1280, 720);
+   m_pRenderer.Initialize (m_pSneeze->GetWidth (), m_pSneeze->GetHeight ());
    m_tpLastFrame = std::chrono::steady_clock::now ();
 
    SignalReady ();
@@ -87,6 +87,12 @@ void WORKER_COMPOSITOR::ThreadLoop ()
    while (!IsShutdown ())
    {
       auto tpLoopStart = std::chrono::steady_clock::now ();
+
+      // --- Consume pending resize ---
+
+      int nNewW, nNewH;
+      if (m_pSneeze->ConsumePendingResize (nNewW, nNewH))
+         m_pRenderer.Resize (nNewW, nNewH);
 
       // --- Consume input ---
 

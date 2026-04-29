@@ -77,9 +77,12 @@ public:
    const uint32_t* LockFrameBuffer (int& nWidth, int& nHeight);
    void            UnlockFrameBuffer ();
 
-   // --- Resize ---
+   // --- Dimensions ---
 
+   int  GetWidth () const  { return m_nWidth; }
+   int  GetHeight () const { return m_nHeight; }
    void Resize (int nWidth, int nHeight);
+   bool ConsumePendingResize (int& nWidth, int& nHeight);
 
    SNEEZE (const SNEEZE&) = delete;
    SNEEZE& operator= (const SNEEZE&) = delete;

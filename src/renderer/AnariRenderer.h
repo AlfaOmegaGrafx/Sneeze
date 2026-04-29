@@ -44,6 +44,7 @@ public:
    bool IsRenderingToNativeSurface () const override;
 
    bool Initialize (int nWidth, int nHeight) override;
+   void Resize (int nWidth, int nHeight) override;
    void Shutdown () override;
 
    void SetCamera (const CAMERA_DATA& pCamera) override;

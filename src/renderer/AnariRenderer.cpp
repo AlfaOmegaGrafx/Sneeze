@@ -236,6 +236,33 @@ bool ANARI_RENDERER::Initialize (int nWidth, int nHeight)
    return bOk;
 }
 
+void ANARI_RENDERER::Resize (int nWidth, int nHeight)
+{
+   if (!m_pDevice || !m_pFrame)
+      return;
+
+   m_nWidth  = nWidth;
+   m_nHeight = nHeight;
+   m_aPixels.resize (nWidth * nHeight, 0);
+
+   anariRelease (m_pDevice, m_pFrame);
+
+   m_pFrame = anariNewFrame (m_pDevice);
+   uint32_t aSize[2] = { static_cast<uint32_t> (nWidth), static_cast<uint32_t> (nHeight) };
+   anariSetParameter (m_pDevice, m_pFrame, "size", ANARI_UINT32_VEC2, aSize);
+   ANARIDataType nColorType = ANARI_UFIXED8_RGBA_SRGB;
+   anariSetParameter (m_pDevice, m_pFrame, "channel.color", ANARI_DATA_TYPE, &nColorType);
+   anariSetParameter (m_pDevice, m_pFrame, "renderer", _ANARI_RENDERER, &m_pRenderer);
+   anariSetParameter (m_pDevice, m_pFrame, "camera", ANARI_CAMERA, &m_pCamera);
+   anariSetParameter (m_pDevice, m_pFrame, "world", ANARI_WORLD, &m_pWorld);
+   if (m_pNativeSurface)
+   {
+      ANARIObject ns = reinterpret_cast<ANARIObject> (m_pNativeSurface);
+      anariSetParameter (m_pDevice, m_pFrame, "nativeSurface", ANARI_OBJECT, &ns);
+   }
+   anariCommitParameters (m_pDevice, m_pFrame);
+}
+
 void ANARI_RENDERER::Shutdown ()
 {
    if (m_pDevice)

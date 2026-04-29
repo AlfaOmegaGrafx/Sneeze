@@ -326,6 +326,20 @@ void SNEEZE::Resize (int nWidth, int nHeight)
    m_nResizeHeight  = nHeight;
 }
 
+bool SNEEZE::ConsumePendingResize (int& nWidth, int& nHeight)
+{
+   std::lock_guard<std::mutex> guard (m_resizeMutex);
+   if (!m_bResizePending)
+      return false;
+
+   nWidth  = m_nResizeWidth;
+   nHeight = m_nResizeHeight;
+   m_nWidth  = nWidth;
+   m_nHeight = nHeight;
+   m_bResizePending = false;
+   return true;
+}
+
 // ---------------------------------------------------------------------------
 // Listener
 // ---------------------------------------------------------------------------
