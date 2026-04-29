@@ -30,11 +30,12 @@ class WORKER;
 // Callback interface for notifying the owning application
 // ---------------------------------------------------------------------------
 
+class SNEEZE;
 class SNEEZE_LISTENER
 {
 public:
    virtual ~SNEEZE_LISTENER () = default;
-   virtual void OnFrameReady () = 0;
+   virtual void OnFrameReady (const uint32_t* pFB, int nFbW, int nFbH) = 0;
 };
 
 // ---------------------------------------------------------------------------

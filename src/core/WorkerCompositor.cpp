@@ -284,7 +284,15 @@ void WORKER_COMPOSITOR::ThreadLoop ()
 
          SNEEZE_LISTENER* pListener = m_pSneeze->GetListener ();
          if (pListener)
-            pListener->OnFrameReady ();
+         {
+            int nFbW, nFbH;
+            const uint32_t* pFB = m_pSneeze->LockFrameBuffer (nFbW, nFbH);
+
+            if (pFB != nullptr)
+               pListener->OnFrameReady (pFB, nFbW, nFbH);
+
+            m_pSneeze->UnlockFrameBuffer ();
+         }
       }
 
       // --- Pace to display refresh ---
