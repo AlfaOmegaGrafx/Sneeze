@@ -40,8 +40,19 @@ class SNEEZE;
 class SNEEZE_LISTENER
 {
 public:
+   enum eLOGLEVEL
+   {
+      kLOGLEVEL_Trace,
+      kLOGLEVEL_Info,
+      kLOGLEVEL_Warning,
+      kLOGLEVEL_Error
+   };
+
+public:
    virtual ~SNEEZE_LISTENER () = default;
+
    virtual void OnFrameReady (const uint32_t* pFB, int nFbW, int nFbH) = 0;
+   virtual void Log (eLOGLEVEL Level, std::string& sModule, std::string& sMessage) = 0;
 };
 
 // ---------------------------------------------------------------------------
@@ -101,6 +112,7 @@ public:
    // --- Shared state accessed by workers ---
 
    SNEEZE_LISTENER*         GetListener () const;
+   void                     Log (SNEEZE_LISTENER::eLOGLEVEL Level, std::string& sModule, std::string& sMessage);
    SNEEZE_INPUT             ConsumeInput ();
    void                     WriteFrameBuffer (const uint32_t* pPixels, int nWidth, int nHeight);
    std::vector<void*>&      GetBodies ();

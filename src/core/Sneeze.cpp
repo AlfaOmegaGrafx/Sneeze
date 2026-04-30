@@ -448,6 +448,11 @@ SNEEZE_LISTENER* SNEEZE::GetListener () const
    return m_pListener;
 }
 
+void SNEEZE::Log (SNEEZE_LISTENER::eLOGLEVEL Level, std::string& sModule, std::string& sMessage)
+{
+   m_pListener->Log (Level, sModule, sMessage);
+}
+
 // ---------------------------------------------------------------------------
 // Bodies (accessed by compositor)
 // ---------------------------------------------------------------------------
