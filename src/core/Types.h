@@ -18,7 +18,7 @@
 #include <cmath>
 #include <cstdint>
 
-namespace sneeze { namespace core {
+namespace SNEEZE { namespace CORE {
 
 struct VEC3
 {
@@ -49,6 +49,6 @@ constexpr int64_t TICKS_PER_CY = 36525LL * 86400LL * TICKS_PER_S;
 
 constexpr double OBLIQUITY_J2000 = 23.4392911;
 
-}} // namespace sneeze::core
+}} // namespace SNEEZE::CORE
 
 #endif // SNEEZE_CORE_TYPES_H

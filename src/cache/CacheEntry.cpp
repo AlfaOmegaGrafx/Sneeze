@@ -14,7 +14,7 @@
 
 #include "CacheEntry.h"
 
-namespace sneeze { namespace cache {
+namespace SNEEZE { namespace cache {
 
 CACHE_ENTRY::CACHE_ENTRY (const std::string& sUrl, const std::string& sSha256)
    : m_sUrl (sUrl)
@@ -70,4 +70,4 @@ void CACHE_ENTRY::NotifyAll ()
    m_apCallbacks.clear ();
 }
 
-}} // namespace sneeze::cache
+}} // namespace SNEEZE::cache

@@ -32,7 +32,7 @@
 #include <thread>
 #endif
 
-namespace sneeze { namespace core {
+namespace SNEEZE { namespace CORE {
 
 static constexpr float METERS_TO_AU     = 1.0f / 149597870700.0f;
 static constexpr float MIN_SPHERE_RADIUS = 0.005f;
@@ -51,7 +51,7 @@ static void ColorFromU32 (uint32_t nColor, float& r, float& g, float& b)
 
 WORKER_COMPOSITOR::WORKER_COMPOSITOR (SNEEZE* pSneeze)
    : WORKER (pSneeze)
-   , m_pRenderer ("halogen")
+   , m_pRenderer (pSneeze, "halogen")
    , m_tmNow (0)
    , m_dTimeScale (1.0)
    , m_bPaused (false)
@@ -92,9 +92,9 @@ void WORKER_COMPOSITOR::ThreadLoop ()
 
    bool bNativeSurface = m_pRenderer.IsRenderingToNativeSurface ();
    if (bNativeSurface)
-      std::fprintf (stdout, "COMPOSITOR: Rendering to native surface (direct-to-window)\n");
+      m_pSneeze->Log (SNEEZE_LISTENER::kLOGLEVEL_Info, "COMPOSITOR", "Rendering to native surface (direct-to-window)");
    else
-      std::fprintf (stdout, "COMPOSITOR: Rendering to CPU framebuffer (readback path)\n");
+      m_pSneeze->Log (SNEEZE_LISTENER::kLOGLEVEL_Info, "COMPOSITOR", "Rendering to CPU framebuffer (readback path)");
    m_tpLastFrame = std::chrono::steady_clock::now ();
 
    SignalReady ();
@@ -135,9 +135,11 @@ void WORKER_COMPOSITOR::ThreadLoop ()
          double dAvgPublish = (m_nFrameCount > 0) ? m_dAccumPublish / m_nFrameCount * 1000.0 : 0.0;
          double dAvgFlush   = (m_nFrameCount > 0) ? m_dAccumFlush   / m_nFrameCount * 1000.0 : 0.0;
          double dAvgFrame   = (m_nFrameCount > 0) ? m_dFpsAccum     / m_nFrameCount * 1000.0 : 0.0;
-         std::fprintf (stdout,
-            "FPS: %d  (frame %.1f ms | input %.1f ms | scene %.1f ms | submit %.1f ms | render %.1f ms | publish %.1f ms | flush %.1f ms)\n",
+         char szFps[256];
+         std::snprintf (szFps, sizeof (szFps),
+            "%d  (frame %.1f ms | input %.1f ms | scene %.1f ms | submit %.1f ms | render %.1f ms | publish %.1f ms | flush %.1f ms)",
             m_nFrameCount, dAvgFrame, dAvgInput, dAvgScene, dAvgSubmit, dAvgRender, dAvgPublish, dAvgFlush);
+         m_pSneeze->Log (SNEEZE_LISTENER::kLOGLEVEL_Trace, "FPS", std::string (szFps));
          m_nFrameCount    = 0;
          m_dFpsAccum     -= 1.0;
          m_dAccumInput    = 0.0;
@@ -155,7 +157,7 @@ void WORKER_COMPOSITOR::ThreadLoop ()
       }
 
       // Camera
-      sneeze::view::UpdateCameraOrbit (m_pCameraOrbit,
+      view::UpdateCameraOrbit (m_pCameraOrbit,
          pInput.nMouseDX, pInput.nMouseDY, pInput.dScrollY,
          pInput.bMouseLeft, pInput.bMouseRight);
 
@@ -163,7 +165,7 @@ void WORKER_COMPOSITOR::ThreadLoop ()
       float dCamY = m_pCameraOrbit.dTargetY + m_pCameraOrbit.dDistance * std::sin (m_pCameraOrbit.dPhi);
       float dCamZ = m_pCameraOrbit.dTargetZ + m_pCameraOrbit.dDistance * std::cos (m_pCameraOrbit.dPhi) * std::sin (m_pCameraOrbit.dTheta);
 
-      sneeze::renderer::CAMERA_DATA pCamera;
+      renderer::CAMERA_DATA pCamera;
       pCamera.dPosX = dCamX;
       pCamera.dPosY = dCamY;
       pCamera.dPosZ = dCamZ;
@@ -189,28 +191,28 @@ void WORKER_COMPOSITOR::ThreadLoop ()
       auto tpSceneStart = std::chrono::steady_clock::now ();
       m_dAccumInput += std::chrono::duration<double> (tpSceneStart - tpLoopStart).count ();
 
-      std::vector<sneeze::renderer::SPHERE_DATA> aSpheres;
-      std::vector<sneeze::renderer::CURVE_DATA>  aCurves;
+      std::vector<renderer::SPHERE_DATA> aSpheres;
+      std::vector<renderer::CURVE_DATA>  aCurves;
 
-      sneeze::som::FABRIC* pPrimaryFabric = m_pSneeze->GetPrimaryFabric ();
-      sneeze::som::NODE* pSomRoot = pPrimaryFabric ? pPrimaryFabric->GetRootNode () : nullptr;
+      som::FABRIC* pPrimaryFabric = m_pSneeze->GetPrimaryFabric ();
+      som::NODE* pSomRoot = pPrimaryFabric ? pPrimaryFabric->GetRootNode () : nullptr;
 
       if (pSomRoot)
       {
-         sneeze::astro::ORBIT_POSITION pos;
+         astro::ORBIT_POSITION pos;
 
-         for (sneeze::som::NODE* pNode : pSomRoot->Children ())
+         for (som::NODE* pNode : pSomRoot->Children ())
          {
-            sneeze::som::MAP_OBJECT* pObj = pNode->GetMapObject ();
-            if (!pObj  ||  pObj->GetType () != sneeze::som::MAP_OBJECT_TYPE_CELESTIAL)
+            som::MAP_OBJECT* pObj = pNode->GetMapObject ();
+            if (!pObj  ||  pObj->GetType () != som::MAP_OBJECT_TYPE_CELESTIAL)
                continue;
 
-            auto* pCelestial = static_cast<sneeze::astro::CELESTIAL_MAP_OBJECT*> (pObj);
+            auto* pCelestial = static_cast<astro::CELESTIAL_MAP_OBJECT*> (pObj);
 
             float dBodyX, dBodyY, dBodyZ;
             if (pCelestial->m_pOrbit)
             {
-               sneeze::astro::ORBIT_POSITION* pPos = pCelestial->m_pOrbit->PositionAtTick (m_tmNow, pos);
+               astro::ORBIT_POSITION* pPos = pCelestial->m_pOrbit->PositionAtTick (m_tmNow, pos);
                if (!pPos) continue;
                dBodyX = static_cast<float> (pPos->x * METERS_TO_AU);
                dBodyY = static_cast<float> (pPos->y * METERS_TO_AU);
@@ -227,7 +229,7 @@ void WORKER_COMPOSITOR::ThreadLoop ()
             if (dRadius < MIN_SPHERE_RADIUS) dRadius = MIN_SPHERE_RADIUS;
             if (!pCelestial->m_pOrbit) dRadius *= SUN_RADIUS_SCALE;
 
-            sneeze::renderer::SPHERE_DATA sphere;
+            renderer::SPHERE_DATA sphere;
             sphere.x       = dBodyX;
             sphere.y       = dBodyY;
             sphere.z       = dBodyZ;
@@ -239,7 +241,7 @@ void WORKER_COMPOSITOR::ThreadLoop ()
 
             if (pCelestial->m_pOrbit)
             {
-               sneeze::renderer::CURVE_DATA curve;
+               renderer::CURVE_DATA curve;
                ColorFromU32 (pCelestial->m_nColor, curve.r, curve.g, curve.b);
                curve.r *= 0.4f;
                curve.g *= 0.4f;
@@ -247,14 +249,14 @@ void WORKER_COMPOSITOR::ThreadLoop ()
 
                int nTrailPoints = static_cast<int> (TRAIL_SEGMENTS * TRAIL_FRACTION);
 
-               sneeze::renderer::CURVE_POINT cpHead;
+               renderer::CURVE_POINT cpHead;
                cpHead.x       = dBodyX;
                cpHead.y       = dBodyY;
                cpHead.z       = dBodyZ;
                cpHead.dRadius = 0.002f;
                curve.aPoints.push_back (cpHead);
 
-               sneeze::astro::ORBIT_POSITION* pPos = pCelestial->m_pOrbit->PositionAtTick (m_tmNow, pos);
+               astro::ORBIT_POSITION* pPos = pCelestial->m_pOrbit->PositionAtTick (m_tmNow, pos);
                if (pPos)
                {
                   double dE_planet = pPos->dE;
@@ -263,7 +265,7 @@ void WORKER_COMPOSITOR::ThreadLoop ()
                      double dE = dE_planet - (static_cast<double> (i) / TRAIL_SEGMENTS) * TWO_PI;
                      VEC3 vPt = pCelestial->m_pOrbit->PointOnOrbit (dE, m_tmNow);
 
-                     sneeze::renderer::CURVE_POINT cp;
+                     renderer::CURVE_POINT cp;
                      cp.x       = static_cast<float> (vPt.x * METERS_TO_AU);
                      cp.y       = static_cast<float> (vPt.y * METERS_TO_AU);
                      cp.z       = static_cast<float> (vPt.z * METERS_TO_AU);
@@ -336,4 +338,4 @@ void WORKER_COMPOSITOR::ThreadLoop ()
    m_pRenderer.Shutdown ();
 }
 
-}} // namespace sneeze::core
+}} // namespace SNEEZE::CORE

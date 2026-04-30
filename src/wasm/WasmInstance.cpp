@@ -14,12 +14,14 @@
 
 #include "WasmInstance.h"
 #include "WasmStore.h"
+#include "core/Sneeze.h"
 #include <cstdio>
 
-namespace sneeze { namespace wasm {
+namespace SNEEZE { namespace wasm {
 
-WASM_INSTANCE::WASM_INSTANCE (WASM_STORE* pStore, const std::string& sUrl, const std::string& sSha256)
-   : m_pStore (pStore)
+WASM_INSTANCE::WASM_INSTANCE (CORE::SNEEZE* pSneeze, WASM_STORE* pStore, const std::string& sUrl, const std::string& sSha256)
+   : m_pSneeze (pSneeze)
+   , m_pStore (pStore)
    , m_sUrl (sUrl)
    , m_sSha256 (sSha256)
    , m_bState (INSTANCE_STATE_DORMANT)
@@ -52,15 +54,17 @@ bool WASM_INSTANCE::Compile (wasm_engine_t* pEngine, const uint8_t* pBytes, size
    {
       wasm_message_t msg;
       wasmtime_error_message (pError, &msg);
-      std::fprintf (stderr, "WASM_INSTANCE: Compile failed [%s]: %.*s\n",
-         m_sUrl.c_str (), static_cast<int> (msg.size), msg.data);
+      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Error, "WASM_INSTANCE",
+         "Compile failed [" + m_sUrl + "]: " + std::string (msg.data, msg.size));
       wasm_byte_vec_delete (&msg);
       wasmtime_error_delete (pError);
       return false;
    }
 
-   std::fprintf (stdout, "WASM_INSTANCE: Compiled module [%s] (%.1f KB)\n",
-      m_sUrl.c_str (), static_cast<double> (nSize) / 1024.0);
+   char sSizeBuf[32];
+   std::snprintf (sSizeBuf, sizeof (sSizeBuf), "%.1f", static_cast<double> (nSize) / 1024.0);
+   m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "WASM_INSTANCE",
+      "Compiled module [" + m_sUrl + "] (" + sSizeBuf + " KB)");
    return true;
 }
 
@@ -99,28 +103,32 @@ int WASM_INSTANCE::ReleaseRef ()
 bool WASM_INSTANCE::CallInit ()
 {
    m_bState = INSTANCE_STATE_ACTIVE;
-   std::fprintf (stdout, "WASM_INSTANCE: Init [%s]\n", m_sUrl.c_str ());
+   m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Trace, "WASM_INSTANCE",
+      "Init [" + m_sUrl + "]");
    return true;
 }
 
 bool WASM_INSTANCE::CallOpen (uint32_t twFabricId, const uint8_t* pParams, size_t nParamsSize)
 {
-   std::fprintf (stdout, "WASM_INSTANCE: Open [%s] fabric=%u params=%zu bytes\n",
-      m_sUrl.c_str (), twFabricId, nParamsSize);
+   m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Trace, "WASM_INSTANCE",
+      "Open [" + m_sUrl + "] fabric=" + std::to_string (twFabricId) +
+      " params=" + std::to_string (nParamsSize) + " bytes");
    return true;
 }
 
 bool WASM_INSTANCE::CallClose (uint32_t twFabricId)
 {
-   std::fprintf (stdout, "WASM_INSTANCE: Close [%s] fabric=%u\n", m_sUrl.c_str (), twFabricId);
+   m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Trace, "WASM_INSTANCE",
+      "Close [" + m_sUrl + "] fabric=" + std::to_string (twFabricId));
    return true;
 }
 
 bool WASM_INSTANCE::CallShutdown ()
 {
    m_bState = INSTANCE_STATE_DORMANT;
-   std::fprintf (stdout, "WASM_INSTANCE: Shutdown [%s]\n", m_sUrl.c_str ());
+   m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Trace, "WASM_INSTANCE",
+      "Shutdown [" + m_sUrl + "]");
    return true;
 }
 
-}} // namespace sneeze::wasm
+}} // namespace SNEEZE::wasm

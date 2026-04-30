@@ -11,7 +11,7 @@ compositor to navigate the solar system view.
 ```cpp
 #include "view/CameraOrbit.h"
 
-sneeze::view::CAMERA_ORBIT camera;
+SNEEZE::view::CAMERA_ORBIT camera;
 camera.dTheta    = 0.0f;      // azimuthal angle (radians)
 camera.dPhi      = 0.3f;      // polar angle (radians)
 camera.dDistance  = 10.0f;     // distance from target
@@ -20,7 +20,7 @@ camera.dTargetY  = 0.0f;
 camera.dTargetZ  = 0.0f;
 
 // Each frame, feed mouse input
-sneeze::view::UpdateCameraOrbit (camera, nDX, nDY, dScrollY, bMouseLeft, bMouseRight);
+SNEEZE::view::UpdateCameraOrbit (camera, nDX, nDY, dScrollY, bMouseLeft, bMouseRight);
 ```
 
 ### Controls

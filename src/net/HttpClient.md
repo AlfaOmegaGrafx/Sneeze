@@ -9,7 +9,7 @@ A thin wrapper around libcurl for GET requests and file downloads.
 ```cpp
 #include "net/HttpClient.h"
 
-sneeze::net::HTTP_CLIENT http;
+SNEEZE::net::HTTP_CLIENT http;
 http.Initialize ();
 
 // GET a URL into a string

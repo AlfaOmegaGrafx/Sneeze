@@ -22,7 +22,7 @@
 #include <chrono>
 #include <cstdint>
 
-namespace sneeze { namespace core {
+namespace SNEEZE { namespace CORE {
 
 class SNEEZE;
 
@@ -68,6 +68,6 @@ public:
    void SetWorkerIndex (int nIndex);
 };
 
-}} // namespace sneeze::core
+}} // namespace SNEEZE::CORE
 
 #endif // SNEEZE_CORE_WORKER_H

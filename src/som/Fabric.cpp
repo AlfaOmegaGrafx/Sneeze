@@ -16,7 +16,7 @@
 #include "Node.h"
 #include <algorithm>
 
-namespace sneeze { namespace som {
+namespace SNEEZE { namespace som {
 
 FABRIC::FABRIC ()
    : m_pParent (nullptr)
@@ -50,4 +50,4 @@ void FABRIC::RemoveChildFabric (FABRIC* pChild)
    }
 }
 
-}} // namespace sneeze::som
+}} // namespace SNEEZE::som

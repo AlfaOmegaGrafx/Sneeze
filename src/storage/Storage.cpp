@@ -13,17 +13,17 @@
 // limitations under the License.
 
 #include "Storage.h"
+#include "core/Sneeze.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <filesystem>
-#include <cstdio>
 
 #ifdef _WIN32
 #include <windows.h>
 #include <shlobj.h>
 #endif
 
-namespace sneeze { namespace storage {
+namespace SNEEZE { namespace storage {
 
 // ===========================================================================
 // CONTAINER
@@ -220,7 +220,8 @@ FINGERPRINT* PERSONA_STORE::GetFingerprint (const std::string& sFingerprint)
 // STORAGE_SYSTEM
 // ===========================================================================
 
-STORAGE_SYSTEM::STORAGE_SYSTEM ()
+STORAGE_SYSTEM::STORAGE_SYSTEM (CORE::SNEEZE* pSneeze)
+   : m_pSneeze (pSneeze)
 {
 }
 
@@ -234,12 +235,14 @@ bool STORAGE_SYSTEM::Initialize ()
    m_sRootPath = GetStorageRootPath ();
    if (m_sRootPath.empty ())
    {
-      std::fprintf (stderr, "STORAGE: Failed to determine storage root path\n");
+      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Error, "STORAGE",
+         "Failed to determine storage root path");
       return false;
    }
 
    std::filesystem::create_directories (m_sRootPath);
-   std::fprintf (stdout, "STORAGE: Initialized (root: %s)\n", m_sRootPath.c_str ());
+   m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "STORAGE",
+      "Initialized (root: " + m_sRootPath + ")");
    return true;
 }
 
@@ -287,4 +290,4 @@ std::string STORAGE_SYSTEM::GetStorageRootPath () const
 #endif
 }
 
-}} // namespace sneeze::storage
+}} // namespace SNEEZE::storage

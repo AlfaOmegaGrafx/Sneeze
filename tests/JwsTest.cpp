@@ -66,7 +66,7 @@ static std::string SignPayload (const std::string& sPayload,
                                 const std::vector<std::string>& aCertChain,
                                 const std::string& sAlgorithm = "RS256")
 {
-   sneeze::msf::MSF_FILE msf;
+   SNEEZE::msf::MSF_FILE msf;
    msf.SetPayload (nlohmann::json::parse (sPayload));
    for (const auto& sCert : aCertChain)
       msf.AddCert (sCert);
@@ -123,7 +123,7 @@ int main (int nArgc, char** aArgv)
    ASSERT (!sJws.empty (), "JWS signed successfully");
    ASSERT (sJws.find ('.') != std::string::npos, "JWS contains dot separators");
 
-   sneeze::msf::MSF_FILE verifier;
+   SNEEZE::msf::MSF_FILE verifier;
    verifier.AddTrustedCert (sCaCert);
    verifier.Parse (sJws);
    verifier.VerifySignature ();
@@ -163,7 +163,7 @@ int main (int nArgc, char** aArgv)
    std::string sMssJws = SignPayload (sMssPayload, sProviderKey, aCertChain, "RS256");
    ASSERT (!sMssJws.empty (), "MSS JWS signed successfully");
 
-   sneeze::msf::MSF_FILE svc;
+   SNEEZE::msf::MSF_FILE svc;
    svc.AddTrustedCert (sCaCert);
    svc.Parse (sMssJws);
    svc.VerifySignature ();
@@ -201,7 +201,7 @@ int main (int nArgc, char** aArgv)
       sTampered[nMid] = (sTampered[nMid] == 'A') ? 'B' : 'A';
    }
 
-   sneeze::msf::MSF_FILE tamperedVerifier;
+   SNEEZE::msf::MSF_FILE tamperedVerifier;
    tamperedVerifier.AddTrustedCert (sCaCert);
    tamperedVerifier.Parse (sTampered);
    tamperedVerifier.VerifySignature ();
@@ -221,7 +221,7 @@ int main (int nArgc, char** aArgv)
    std::string sExpiredJws = SignPayload (sPayload, sExpiredKey, aExpiredChain, "RS256");
    ASSERT (!sExpiredJws.empty (), "Expired JWS signed successfully");
 
-   sneeze::msf::MSF_FILE expiredVerifier;
+   SNEEZE::msf::MSF_FILE expiredVerifier;
    expiredVerifier.AddTrustedCert (sCaCert);
    expiredVerifier.Parse (sExpiredJws);
    expiredVerifier.VerifyChain ();
@@ -234,7 +234,7 @@ int main (int nArgc, char** aArgv)
 
    BeginGroup ("Untrusted Chain Rejected");
 
-   sneeze::msf::MSF_FILE untrustedVerifier;
+   SNEEZE::msf::MSF_FILE untrustedVerifier;
    untrustedVerifier.Parse (sJws);
    untrustedVerifier.VerifyChain ();
    ASSERT (!untrustedVerifier.IsChainTrusted (), "Untrusted chain rejected");
@@ -246,7 +246,7 @@ int main (int nArgc, char** aArgv)
 
    BeginGroup ("Fingerprint Stability");
 
-   sneeze::msf::MSF_FILE verifier2;
+   SNEEZE::msf::MSF_FILE verifier2;
    verifier2.AddTrustedCert (sCaCert);
    verifier2.Parse (sJws);
    verifier2.VerifySignature ();
@@ -260,7 +260,7 @@ int main (int nArgc, char** aArgv)
 
    BeginGroup ("Malformed JWS Rejected");
 
-   sneeze::msf::MSF_FILE malformedVerifier;
+   SNEEZE::msf::MSF_FILE malformedVerifier;
 
    bool bEmpty = malformedVerifier.Parse ("");
    ASSERT (!bEmpty, "Empty string rejected");
@@ -277,7 +277,7 @@ int main (int nArgc, char** aArgv)
 
    BeginGroup ("Parse Populates Data Without Verification");
 
-   sneeze::msf::MSF_FILE parseOnly;
+   SNEEZE::msf::MSF_FILE parseOnly;
    bool bParsed = parseOnly.Parse (sMssJws);
    ASSERT (bParsed, "Parse succeeded without verification");
    ASSERT (parseOnly.GetNamespace () == "com.pokerstars.poker", "Namespace available without verify");
@@ -290,7 +290,7 @@ int main (int nArgc, char** aArgv)
 
    BeginGroup ("Composition Round-Trip");
 
-   sneeze::msf::MSF_FILE composer;
+   SNEEZE::msf::MSF_FILE composer;
    composer.SetNamespace ("com.test.composed");
    composer.SetOrganization ("Test Org");
    composer.AddService ({"my-svc", "grpc", "grpc://example.com:443", {"mod.wasm"}});
@@ -301,7 +301,7 @@ int main (int nArgc, char** aArgv)
    std::string sComposedJws = composer.Sign (sProviderKey, "RS256");
    ASSERT (!sComposedJws.empty (), "Composed MSF signed successfully");
 
-   sneeze::msf::MSF_FILE reader;
+   SNEEZE::msf::MSF_FILE reader;
    reader.AddTrustedCert (sCaCert);
    reader.Parse (sComposedJws);
    reader.VerifySignature ();

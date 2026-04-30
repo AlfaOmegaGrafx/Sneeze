@@ -31,7 +31,7 @@ STORAGE_SYSTEM
 ```cpp
 #include "storage/Storage.h"
 
-sneeze::storage::STORAGE_SYSTEM storage;
+SNEEZE::storage::STORAGE_SYSTEM storage;
 storage.Initialize ();
 
 // Navigate to a specific scope

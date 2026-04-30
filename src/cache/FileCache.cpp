@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "FileCache.h"
-#include <cstdio>
+#include "core/Sneeze.h"
 #include <fstream>
 #include <filesystem>
 
@@ -22,9 +22,10 @@
 #include <shlobj.h>
 #endif
 
-namespace sneeze { namespace cache {
+namespace SNEEZE { namespace cache {
 
-FILE_CACHE::FILE_CACHE ()
+FILE_CACHE::FILE_CACHE (CORE::SNEEZE* pSneeze)
+   : m_pSneeze (pSneeze)
 {
 }
 
@@ -38,12 +39,14 @@ bool FILE_CACHE::Initialize ()
    m_sCachePath = GetPersistentCachePath ();
    if (m_sCachePath.empty ())
    {
-      std::fprintf (stderr, "FILE_CACHE: Failed to determine persistent cache path\n");
+      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Error, "FILE_CACHE",
+         "Failed to determine persistent cache path");
       return false;
    }
 
    std::filesystem::create_directories (m_sCachePath);
-   std::fprintf (stdout, "FILE_CACHE: Initialized (persistent path: %s)\n", m_sCachePath.c_str ());
+   m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "FILE_CACHE",
+      "Initialized (persistent path: " + m_sCachePath + ")");
    return true;
 }
 
@@ -292,4 +295,4 @@ void FILE_CACHE::SaveModuleToDisk (const std::string& sUrl, const std::string& s
       file.write (reinterpret_cast<const char*> (aData.data ()), aData.size ());
 }
 
-}} // namespace sneeze::cache
+}} // namespace SNEEZE::cache

@@ -18,7 +18,7 @@
 #include <vector>
 #include <string>
 
-namespace sneeze { namespace som {
+namespace SNEEZE { namespace som {
 
 class NODE;
 
@@ -83,6 +83,6 @@ private:
    std::string           m_sUrl;
 };
 
-}} // namespace sneeze::som
+}} // namespace SNEEZE::som
 
 #endif // SNEEZE_SOM_FABRIC_H

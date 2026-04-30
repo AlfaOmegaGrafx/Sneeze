@@ -21,7 +21,7 @@
 #include <cstring>
 #include <vector>
 
-namespace sneeze
+namespace SNEEZE
 {
 namespace compute
 {
@@ -224,4 +224,4 @@ bool COMPUTE_DISPATCH::DispatchVox (
 }
 
 } // namespace compute
-} // namespace sneeze
+} // namespace SNEEZE

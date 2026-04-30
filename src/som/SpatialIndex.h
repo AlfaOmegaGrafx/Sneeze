@@ -18,7 +18,7 @@
 #include <vector>
 #include <cstdint>
 
-namespace sneeze { namespace som {
+namespace SNEEZE { namespace som {
 
 class NODE;
 
@@ -106,6 +106,6 @@ private:
    int                    m_nRootIndex;
 };
 
-}} // namespace sneeze::som
+}} // namespace SNEEZE::som
 
 #endif // SNEEZE_SOM_SPATIALINDEX_H

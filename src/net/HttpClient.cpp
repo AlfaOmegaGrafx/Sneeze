@@ -13,12 +13,11 @@
 // limitations under the License.
 
 #include "net/HttpClient.h"
+#include "core/Sneeze.h"
 
 #include <curl/curl.h>
 
-#include <cstdio>
-
-namespace sneeze
+namespace SNEEZE
 {
 namespace net
 {
@@ -31,7 +30,8 @@ static size_t WriteCallback (char* pData, size_t nSize, size_t nMembers, void* p
 }
 
 HTTP_CLIENT::HTTP_CLIENT ()
-   : bInitialized (false)
+   : m_pSneeze (nullptr)
+   , bInitialized (false)
 {
 }
 
@@ -40,20 +40,24 @@ HTTP_CLIENT::~HTTP_CLIENT ()
    Shutdown ();
 }
 
-bool HTTP_CLIENT::Initialize ()
+bool HTTP_CLIENT::Initialize (CORE::SNEEZE* pSneeze)
 {
+   m_pSneeze = pSneeze;
+
    CURLcode nCode = curl_global_init (CURL_GLOBAL_DEFAULT);
    if (nCode != CURLE_OK)
    {
-      std::fprintf (stderr, "HTTP_CLIENT: curl_global_init failed (code %d)\n", nCode);
+      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Error, "HTTP_CLIENT",
+         "curl_global_init failed (code " + std::to_string (static_cast<int> (nCode)) + ")");
    }
    else
    {
       bInitialized = true;
 
       curl_version_info_data* pInfo = curl_version_info (CURLVERSION_NOW);
-      std::printf ("HTTP_CLIENT: libcurl %s initialized (SSL: %s)\n",
-         pInfo->version, pInfo->ssl_version ? pInfo->ssl_version : "none");
+      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "HTTP_CLIENT",
+         "libcurl " + std::string (pInfo->version) + " initialized (SSL: " +
+         std::string (pInfo->ssl_version ? pInfo->ssl_version : "none") + ")");
    }
 
    return bInitialized;
@@ -112,7 +116,8 @@ bool HTTP_CLIENT::DownloadToFile (const std::string& sUrl, const std::string& sF
 
    if (!pFile)
    {
-      std::fprintf (stderr, "HTTP_CLIENT: failed to open %s for writing\n", sFilePath.c_str ());
+      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Error, "HTTP_CLIENT",
+         "failed to open " + sFilePath + " for writing");
       return false;
    }
 
@@ -139,4 +144,4 @@ bool HTTP_CLIENT::DownloadToFile (const std::string& sUrl, const std::string& sF
 }
 
 } // namespace net
-} // namespace sneeze
+} // namespace SNEEZE

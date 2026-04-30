@@ -22,7 +22,9 @@
 #include <mutex>
 #include <string>
 
-namespace sneeze { namespace wasm {
+namespace SNEEZE { namespace CORE { class SNEEZE; }}
+
+namespace SNEEZE { namespace wasm {
 
 // ---------------------------------------------------------------------------
 // WASM_RUNTIME — top-level manager of the Wasmtime engine and all stores.
@@ -37,7 +39,7 @@ public:
    WASM_RUNTIME ();
    ~WASM_RUNTIME ();
 
-   bool Initialize ();
+   bool Initialize (CORE::SNEEZE* pSneeze);
    void Shutdown ();
 
    wasm_engine_t* GetEngine () const { return m_pEngine; }
@@ -50,11 +52,12 @@ public:
    void        DestroyAllStores ();
 
 private:
+   CORE::SNEEZE*  m_pSneeze;
    wasm_engine_t* m_pEngine;
    std::unordered_map<std::string, std::unique_ptr<WASM_STORE>> m_mapStores;
    mutable std::mutex m_storesMutex;
 };
 
-}} // namespace sneeze::wasm
+}} // namespace SNEEZE::wasm
 
 #endif // SNEEZE_WASM_RUNTIME_H

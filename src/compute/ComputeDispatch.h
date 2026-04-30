@@ -25,7 +25,7 @@
 // consumers that don't need Vox directly don't pull in the backend.
 namespace vox { class DEVICE; }
 
-namespace sneeze
+namespace SNEEZE
 {
 namespace compute
 {
@@ -95,6 +95,6 @@ private:
 };
 
 } // namespace compute
-} // namespace sneeze
+} // namespace SNEEZE
 
 #endif // SNEEZE_COMPUTE_COMPUTE_DISPATCH_H

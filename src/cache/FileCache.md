@@ -21,14 +21,14 @@ survives application restarts.
 ```cpp
 #include "cache/FileCache.h"
 
-sneeze::cache::FILE_CACHE cache;
+SNEEZE::cache::FILE_CACHE cache;
 cache.Initialize ();
 
 // Request an MSF file — callback fires when ready or failed
 cache.Request_Msf ("https://example.com/world.msf",
-   [] (sneeze::cache::ENTRY_STATE bState, const std::vector<uint8_t>& aData)
+   [] (SNEEZE::cache::ENTRY_STATE bState, const std::vector<uint8_t>& aData)
    {
-      if (bState == sneeze::cache::ENTRY_STATE_READY)
+      if (bState == SNEEZE::cache::ENTRY_STATE_READY)
          ; // use aData
    });
 
@@ -36,9 +36,9 @@ cache.Request_Msf ("https://example.com/world.msf",
 cache.Request_Module (
    "https://cdn.example.com/game.wasm",
    "a1b2c3d4...",
-   [] (sneeze::cache::ENTRY_STATE bState, const std::vector<uint8_t>& aData)
+   [] (SNEEZE::cache::ENTRY_STATE bState, const std::vector<uint8_t>& aData)
    {
-      if (bState == sneeze::cache::ENTRY_STATE_READY)
+      if (bState == SNEEZE::cache::ENTRY_STATE_READY)
          ; // compile the WASM bytes
    });
 

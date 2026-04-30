@@ -18,7 +18,7 @@
 #include <string>
 #include <cstdint>
 
-namespace sneeze { namespace core {
+namespace SNEEZE { namespace CORE {
 
 class EPOCH
 {
@@ -41,6 +41,6 @@ private:
 
 extern const EPOCH EPOCH_J2000;
 
-}} // namespace sneeze::core
+}} // namespace SNEEZE::CORE
 
 #endif // SNEEZE_CORE_EPOCH_H

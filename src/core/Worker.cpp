@@ -15,7 +15,7 @@
 #include "Worker.h"
 #include <cstdio>
 
-namespace sneeze { namespace core {
+namespace SNEEZE { namespace CORE {
 
 WORKER::WORKER (SNEEZE* pSneeze)
    : m_pSneeze (pSneeze)
@@ -122,4 +122,4 @@ void WORKER::CtlBreak_Thread ()
    m_condVar.notify_all ();
 }
 
-}} // namespace sneeze::core
+}} // namespace SNEEZE::CORE

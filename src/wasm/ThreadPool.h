@@ -23,7 +23,9 @@
 #include <functional>
 #include <atomic>
 
-namespace sneeze { namespace wasm {
+namespace SNEEZE { namespace CORE { class SNEEZE; }}
+
+namespace SNEEZE { namespace wasm {
 
 // ---------------------------------------------------------------------------
 // THREAD_POOL — fixed-size pool for dispatching WASM store work items.
@@ -37,7 +39,7 @@ namespace sneeze { namespace wasm {
 class THREAD_POOL
 {
 public:
-   THREAD_POOL ();
+   explicit THREAD_POOL (CORE::SNEEZE* pSneeze);
    ~THREAD_POOL ();
 
    bool Initialize (int nThreads = 0);
@@ -50,6 +52,7 @@ public:
 private:
    void WorkerLoop ();
 
+   CORE::SNEEZE*                       m_pSneeze;
    std::vector<std::thread>            m_aThreads;
    std::queue<std::function<void ()>>  m_aQueue;
    mutable std::mutex                  m_mutex;
@@ -57,6 +60,6 @@ private:
    std::atomic<bool>                   m_bShutdown;
 };
 
-}} // namespace sneeze::wasm
+}} // namespace SNEEZE::wasm
 
 #endif // SNEEZE_WASM_THREADPOOL_H

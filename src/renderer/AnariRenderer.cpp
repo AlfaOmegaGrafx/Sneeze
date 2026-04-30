@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "AnariRenderer.h"
+#include "core/Sneeze.h"
 #include <anari/anari.h>
 
 /* ANARI_RENDERER enum conflicts with our class name,
@@ -21,7 +22,6 @@
 #undef ANARI_RENDERER
 
 #include <cstring>
-#include <cstdio>
 #include <chrono>
 
 #if defined(__APPLE__)
@@ -37,12 +37,9 @@
 #include <android/log.h>
 #define ANARI_LOGE(fmt, ...) __android_log_print (ANDROID_LOG_ERROR, "Sneeze.Anari", fmt, ##__VA_ARGS__)
 #define ANARI_LOGI(fmt, ...) __android_log_print (ANDROID_LOG_INFO,  "Sneeze.Anari", fmt, ##__VA_ARGS__)
-#else
-#define ANARI_LOGE(fmt, ...) std::fprintf (stderr, "ANARI: " fmt "\n", ##__VA_ARGS__)
-#define ANARI_LOGI(fmt, ...) std::fprintf (stdout, "ANARI: " fmt "\n", ##__VA_ARGS__)
 #endif
 
-namespace sneeze { namespace renderer {
+namespace SNEEZE { namespace renderer {
 
 #if defined(SNEEZE_ANARI_OVERRIDE_LIBDIR)
 // ANARI's anchor-based lib-path detection uses dlsym(RTLD_DEFAULT, "_anari_anchor")
@@ -73,8 +70,9 @@ static std::string GetLocalLibDir ()
 
 // ---------------------------------------------------------------------------
 
-ANARI_RENDERER::ANARI_RENDERER (const std::string& sLibrary)
-   : m_sLibrary (sLibrary)
+ANARI_RENDERER::ANARI_RENDERER (CORE::SNEEZE* pSneeze, const std::string& sLibrary)
+   : m_pSneeze (pSneeze)
+   , m_sLibrary (sLibrary)
    , m_pLibrary (nullptr)
    , m_pDevice (nullptr)
    , m_pWorld (nullptr)
@@ -153,27 +151,57 @@ bool ANARI_RENDERER::Initialize (int nWidth, int nHeight)
    if (!sLibDir.empty ())
    {
       sLibraryArg = m_sLibrary + "," + sLibDir;
+#if defined(__ANDROID__)
       ANARI_LOGI ("lib dir: '%s'", sLibDir.c_str ());
+#else
+      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Trace, "ANARI",
+         "lib dir: '" + sLibDir + "'");
+#endif
    }
    else
    {
+#if defined(__ANDROID__)
       ANARI_LOGE ("could not resolve local lib dir via dladdr");
+#else
+      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Warning, "ANARI",
+         "could not resolve local lib dir via dladdr");
+#endif
    }
 #endif
 
+#if defined(__ANDROID__)
    ANARI_LOGI ("loading library '%s'", sLibraryArg.c_str ());
+#else
+   m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "ANARI",
+      "loading library '" + sLibraryArg + "'");
+#endif
    m_pLibrary = anariLoadLibrary (sLibraryArg.c_str (), nullptr, nullptr);
    if (!m_pLibrary)
    {
+#if defined(__ANDROID__)
       ANARI_LOGE ("failed to load library '%s'", sLibraryArg.c_str ());
+#else
+      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Error, "ANARI",
+         "failed to load library '" + sLibraryArg + "'");
+#endif
    }
    else
    {
+#if defined(__ANDROID__)
       ANARI_LOGI ("creating device 'default'");
+#else
+      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "ANARI",
+         "creating device 'default'");
+#endif
       m_pDevice = anariNewDevice (m_pLibrary, "default");
       if (!m_pDevice)
       {
+#if defined(__ANDROID__)
          ANARI_LOGE ("failed to create device from library '%s'", m_sLibrary.c_str ());
+#else
+         m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Error, "ANARI",
+            "failed to create device from library '" + m_sLibrary + "'");
+#endif
          anariUnloadLibrary (m_pLibrary);
          m_pLibrary = nullptr;
       }
@@ -528,4 +556,4 @@ void ANARI_RENDERER::RebuildWorld (const std::vector<SPHERE_DATA>& aSpheres,
    }
 }
 
-}} // namespace sneeze::renderer
+}} // namespace SNEEZE::renderer

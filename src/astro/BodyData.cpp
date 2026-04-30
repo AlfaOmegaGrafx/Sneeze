@@ -15,7 +15,7 @@
 #include "BodyData.h"
 #include "RMCObject.h"
 
-namespace sneeze { namespace astro {
+namespace SNEEZE { namespace astro {
 
 static RMCOBJECT_COLOR MakeColor (uint8_t r, uint8_t g, uint8_t b)
 {
@@ -377,4 +377,4 @@ void CreateSolarSystem ()
    }
 }
 
-}} // namespace sneeze::astro
+}} // namespace SNEEZE::astro

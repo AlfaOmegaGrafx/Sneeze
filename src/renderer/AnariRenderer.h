@@ -19,6 +19,8 @@
 #include <vector>
 #include <string>
 
+namespace SNEEZE { namespace CORE { class SNEEZE; }}
+
 // Forward declarations for ANARI types used in ANARI_RENDERER class body
 // to avoid transitively including in every unit that uses AnariRenderer.h
 namespace anari { namespace api {
@@ -32,12 +34,12 @@ struct Renderer;
 struct World;
 }} // namespace api::anari
 
-namespace sneeze { namespace renderer {
+namespace SNEEZE { namespace renderer {
 
 class ANARI_RENDERER : public RENDERER
 {
 public:
-   explicit ANARI_RENDERER (const std::string& sLibrary);
+   explicit ANARI_RENDERER (CORE::SNEEZE* pSneeze, const std::string& sLibrary);
    ~ANARI_RENDERER () override;
 
    void SetNativeWindow (void* pHandle) override;
@@ -61,6 +63,7 @@ public:
    double GetLastRenderSeconds () const override { return m_dLastRenderSeconds; }
 
 private:
+   CORE::SNEEZE* m_pSneeze;
    std::string   m_sLibrary;
    anari::api::Library*  m_pLibrary;
    anari::api::Device*   m_pDevice;
@@ -89,6 +92,6 @@ private:
    double m_dLastRenderSeconds;
 };
 
-}} // namespace sneeze::renderer
+}} // namespace SNEEZE::renderer
 
 #endif // SNEEZE_RENDERER_ANARIRENDERER_H

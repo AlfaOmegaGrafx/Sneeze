@@ -16,7 +16,7 @@
 #include "Fabric.h"
 #include <algorithm>
 
-namespace sneeze { namespace som {
+namespace SNEEZE { namespace som {
 
 NODE::NODE ()
    : m_twObjectIx (0)
@@ -111,4 +111,4 @@ void NODE::RemoveChild (NODE* pChild)
    }
 }
 
-}} // namespace sneeze::som
+}} // namespace SNEEZE::som

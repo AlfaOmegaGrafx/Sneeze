@@ -13,12 +13,14 @@
 // limitations under the License.
 
 #include "WasmRuntime.h"
+#include "core/Sneeze.h"
 #include <cstdio>
 
-namespace sneeze { namespace wasm {
+namespace SNEEZE { namespace wasm {
 
 WASM_RUNTIME::WASM_RUNTIME ()
-   : m_pEngine (nullptr)
+   : m_pSneeze (nullptr)
+   , m_pEngine (nullptr)
 {
 }
 
@@ -27,16 +29,20 @@ WASM_RUNTIME::~WASM_RUNTIME ()
    Shutdown ();
 }
 
-bool WASM_RUNTIME::Initialize ()
+bool WASM_RUNTIME::Initialize (CORE::SNEEZE* pSneeze)
 {
+   m_pSneeze = pSneeze;
+
    m_pEngine = wasm_engine_new ();
    if (!m_pEngine)
    {
-      std::fprintf (stderr, "WASM_RUNTIME: Failed to create Wasmtime engine\n");
+      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Error, "WASM_RUNTIME",
+         "Failed to create Wasmtime engine");
       return false;
    }
 
-   std::fprintf (stdout, "WASM_RUNTIME: Wasmtime %s initialized\n", WASMTIME_VERSION);
+   m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "WASM_RUNTIME",
+      "Wasmtime " + std::string (WASMTIME_VERSION) + " initialized");
    return true;
 }
 
@@ -65,12 +71,12 @@ WASM_STORE* WASM_RUNTIME::FindOrCreateStore (const STORE_IDENTITY& pIdentity)
    if (it != m_mapStores.end ())
       return it->second.get ();
 
-   auto pStore = std::make_unique<WASM_STORE> (m_pEngine, pIdentity);
+   auto pStore = std::make_unique<WASM_STORE> (m_pSneeze, m_pEngine, pIdentity);
    WASM_STORE* pRaw = pStore.get ();
    m_mapStores[sKey] = std::move (pStore);
 
-   std::fprintf (stdout, "WASM_RUNTIME: Created store [%s|%s]\n",
-      pIdentity.sFingerprint.c_str (), pIdentity.sContainer.c_str ());
+   m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "WASM_RUNTIME",
+      "Created store [" + pIdentity.sFingerprint + "|" + pIdentity.sContainer + "]");
 
    return pRaw;
 }
@@ -101,4 +107,4 @@ void WASM_RUNTIME::DestroyAllStores ()
    m_mapStores.clear ();
 }
 
-}} // namespace sneeze::wasm
+}} // namespace SNEEZE::wasm

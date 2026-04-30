@@ -20,7 +20,7 @@
 #include "view/CameraOrbit.h"
 #include <chrono>
 
-namespace sneeze { namespace core {
+namespace SNEEZE { namespace CORE {
 
 class WORKER_COMPOSITOR : public WORKER
 {
@@ -32,8 +32,8 @@ protected:
    void ThreadLoop () override;
 
 private:
-   sneeze::renderer::ANARI_RENDERER  m_pRenderer;
-   sneeze::view::CAMERA_ORBIT        m_pCameraOrbit;
+   renderer::ANARI_RENDERER  m_pRenderer;
+   view::CAMERA_ORBIT        m_pCameraOrbit;
 
    int64_t m_tmNow;
    double  m_dTimeScale;
@@ -52,6 +52,6 @@ private:
    double m_dAccumFlush;
 };
 
-}} // namespace sneeze::core
+}} // namespace SNEEZE::CORE
 
 #endif // SNEEZE_CORE_WORKERCOMPOSITOR_H

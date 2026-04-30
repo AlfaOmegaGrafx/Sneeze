@@ -13,14 +13,15 @@
 // limitations under the License.
 
 #include "Persona.h"
+#include "core/Sneeze.h"
 #include <openssl/sha.h>
-#include <cstdio>
 #include <cstring>
 
-namespace sneeze { namespace persona {
+namespace SNEEZE { namespace persona {
 
-PERSONA::PERSONA ()
-   : m_bLoggedIn (false)
+PERSONA::PERSONA (CORE::SNEEZE* pSneeze)
+   : m_pSneeze (pSneeze)
+   , m_bLoggedIn (false)
 {
 }
 
@@ -34,13 +35,14 @@ void PERSONA::Login (const std::string& sFirst, const std::string& sSecond)
    m_sHash = ComputeHash (m_sName);
    m_bLoggedIn = true;
 
-   std::fprintf (stdout, "PERSONA: Logged in as \"%s\" (hash: %s)\n",
-      m_sName.c_str (), m_sHash.c_str ());
+   m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "PERSONA",
+      "Logged in as \"" + m_sName + "\" (hash: " + m_sHash + ")");
 }
 
 void PERSONA::Logout ()
 {
-   std::fprintf (stdout, "PERSONA: Logged out \"%s\"\n", m_sName.c_str ());
+   m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "PERSONA",
+      "Logged out \"" + m_sName + "\"");
    m_bLoggedIn = false;
    m_sName.clear ();
    m_sHash.clear ();
@@ -60,4 +62,4 @@ std::string PERSONA::ComputeHash (const std::string& sInput)
    return std::string (szHex);
 }
 
-}} // namespace sneeze::persona
+}} // namespace SNEEZE::persona

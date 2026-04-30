@@ -13,14 +13,15 @@
 // limitations under the License.
 
 #include "AstroService.h"
+#include "core/Sneeze.h"
 #include "RMCObject.h"
 #include "Orbit.h"
-#include <cstdio>
 
-namespace sneeze { namespace astro {
+namespace SNEEZE { namespace astro {
 
-ASTRO_SERVICE::ASTRO_SERVICE ()
-   : m_pFabric (nullptr)
+ASTRO_SERVICE::ASTRO_SERVICE (CORE::SNEEZE* pSneeze)
+   : m_pSneeze (pSneeze)
+   , m_pFabric (nullptr)
 {
 }
 
@@ -37,13 +38,13 @@ ASTRO_SERVICE::~ASTRO_SERVICE ()
 // The sun gets a standalone node with no orbit.
 // ---------------------------------------------------------------------------
 
-bool ASTRO_SERVICE::Initialize (sneeze::som::FABRIC* pPrimaryFabric)
+bool ASTRO_SERVICE::Initialize (SNEEZE::som::FABRIC* pPrimaryFabric)
 {
    m_pFabric = pPrimaryFabric;
    if (!m_pFabric  ||  !m_pFabric->GetRootNode ())
       return false;
 
-   sneeze::som::NODE* pRoot = m_pFabric->GetRootNode ();
+   SNEEZE::som::NODE* pRoot = m_pFabric->GetRootNode ();
 
    // --- Sun node (no orbit, sits at origin) ---
    {
@@ -56,7 +57,7 @@ bool ASTRO_SERVICE::Initialize (sneeze::som::FABRIC* pPrimaryFabric)
       pMapObj->m_pBody   = nullptr;
       pMapObj->m_pOrbit  = nullptr;
 
-      auto* pNode = new sneeze::som::NODE ();
+      auto* pNode = new SNEEZE::som::NODE ();
       pNode->SetFabric (m_pFabric);
       pNode->SetMapObject (pMapObj);
       pRoot->AddChild (pNode);
@@ -98,7 +99,7 @@ bool ASTRO_SERVICE::Initialize (sneeze::som::FABRIC* pPrimaryFabric)
       pMapObj->m_pBody   = pBody;
       pMapObj->m_pOrbit  = pBody->pOrbit.get ();
 
-      auto* pNode = new sneeze::som::NODE ();
+      auto* pNode = new SNEEZE::som::NODE ();
       pNode->SetFabric (m_pFabric);
       pNode->SetMapObject (pMapObj);
       pRoot->AddChild (pNode);
@@ -107,8 +108,8 @@ bool ASTRO_SERVICE::Initialize (sneeze::som::FABRIC* pPrimaryFabric)
       m_apMapObjects.push_back (pMapObj);
    }
 
-   std::fprintf (stdout, "ASTRO_SERVICE: Populated %d SOM nodes\n",
-      static_cast<int> (m_apNodes.size ()));
+   m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "ASTRO_SERVICE",
+      "Populated " + std::to_string (static_cast<int> (m_apNodes.size ())) + " SOM nodes");
 
    return true;
 }
@@ -126,4 +127,4 @@ void ASTRO_SERVICE::Shutdown ()
    m_pFabric = nullptr;
 }
 
-}} // namespace sneeze::astro
+}} // namespace SNEEZE::astro

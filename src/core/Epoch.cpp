@@ -17,7 +17,7 @@
 #include <chrono>
 #include <regex>
 
-namespace sneeze { namespace core {
+namespace SNEEZE { namespace CORE {
 
 // Leap-second offset: TAI - UTC.  As of 2017-01-01, DeltaAT = 37 s.
 // TT = UTC + DeltaAT + 32.184 s
@@ -110,4 +110,4 @@ double EPOCH::CalendarToJD (int dwY, int dwM, int dwD)
 
 const EPOCH EPOCH_J2000;
 
-}} // namespace sneeze::core
+}} // namespace SNEEZE::CORE

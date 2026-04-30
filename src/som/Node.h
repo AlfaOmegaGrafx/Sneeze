@@ -22,7 +22,7 @@
 #include <unordered_map>
 #include <cstdint>
 
-namespace sneeze { namespace som {
+namespace SNEEZE { namespace som {
 
 class FABRIC;
 class MAP_OBJECT;
@@ -108,6 +108,6 @@ private:
    SEQLOCK              m_pSeqlock;
 };
 
-}} // namespace sneeze::som
+}} // namespace SNEEZE::som
 
 #endif // SNEEZE_SOM_NODE_H

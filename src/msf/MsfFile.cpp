@@ -13,12 +13,13 @@
 // limitations under the License.
 
 #include "MsfFile.h"
+#include "core/Sneeze.h"
 
 #include <jwt-cpp/traits/nlohmann-json/defaults.h>
 
 #include <cstdio>
 
-namespace sneeze
+namespace SNEEZE
 {
 namespace msf
 {
@@ -27,10 +28,11 @@ namespace msf
 // Construction / Destruction
 // ---------------------------------------------------------------------------
 
-MSF_FILE::MSF_FILE ()
+MSF_FILE::MSF_FILE (CORE::SNEEZE* pSneeze)
    : m_bSignatureValid (false)
    , m_bChainTrusted (false)
    , m_bParsed (false)
+   , m_pSneeze (pSneeze)
 {
 }
 
@@ -101,7 +103,10 @@ bool MSF_FILE::Parse (const std::string& sJws)
       }
       catch (const std::exception& ex)
       {
-         std::fprintf (stderr, "MSF_FILE::Parse: %s\n", ex.what ());
+         if (m_pSneeze)
+            m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Error, "MSF_FILE", std::string ("Parse: ") + ex.what ());
+         else
+            std::fprintf (stderr, "MSF_FILE::Parse: %s\n", ex.what ());
       }
    }
 
@@ -153,13 +158,20 @@ std::string MSF_FILE::Sign (const std::string& sPrivateKeyPem,
          else if (sAlgorithm == "ES512")
             sResult = pBuilder.sign (jwt::algorithm::es512 ("", sPrivateKeyPem));
          else
-            std::fprintf (stderr, "MSF_FILE::Sign: unknown algorithm \"%s\"\n",
-               sAlgorithm.c_str ());
+         {
+            if (m_pSneeze)
+               m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Error, "MSF_FILE", "Sign: unknown algorithm \"" + sAlgorithm + "\"");
+            else
+               std::fprintf (stderr, "MSF_FILE::Sign: unknown algorithm \"%s\"\n", sAlgorithm.c_str ());
+         }
       }
    }
    catch (const std::exception& ex)
    {
-      std::fprintf (stderr, "MSF_FILE::Sign: exception: %s\n", ex.what ());
+      if (m_pSneeze)
+         m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Error, "MSF_FILE", std::string ("Sign: exception: ") + ex.what ());
+      else
+         std::fprintf (stderr, "MSF_FILE::Sign: exception: %s\n", ex.what ());
       sResult.clear ();
    }
 
@@ -497,4 +509,4 @@ std::string MSF_FILE::GetSignatureError () const  { return m_sSignatureError; }
 std::string MSF_FILE::GetChainError () const      { return m_sChainError; }
 
 } // namespace msf
-} // namespace sneeze
+} // namespace SNEEZE

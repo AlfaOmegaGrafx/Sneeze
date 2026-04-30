@@ -23,7 +23,9 @@
 #include "CertChain.h"
 #include "CertInfo.h"
 
-namespace sneeze
+namespace SNEEZE { namespace CORE { class SNEEZE; }}
+
+namespace SNEEZE
 {
 namespace msf
 {
@@ -45,7 +47,7 @@ struct MSF_MODULE
 class MSF_FILE
 {
 public:
-   MSF_FILE ();
+   explicit MSF_FILE (CORE::SNEEZE* pSneeze = nullptr);
    ~MSF_FILE ();
 
    MSF_FILE (const MSF_FILE&) = delete;
@@ -128,9 +130,10 @@ private:
    std::vector<std::string>   m_aCertsPem;      // PEM certs (for composition)
 
    CERT_CHAIN                 m_certChain;
+   CORE::SNEEZE*              m_pSneeze;
 };
 
 } // namespace msf
-} // namespace sneeze
+} // namespace SNEEZE
 
 #endif // SNEEZE_JWS_MSFFILE_H

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "ui/UiContext.h"
+#include "core/Sneeze.h"
 
 #include <RmlUi/Core.h>
 #include <RmlUi/Core/FontEngineInterface.h>
@@ -20,7 +21,6 @@
 #include <RmlUi/Core/SystemInterface.h>
 
 #include <chrono>
-#include <cstdio>
 
 namespace
 {
@@ -30,9 +30,12 @@ class STUB_SYSTEM : public Rml::SystemInterface
 {
 public:
    STUB_SYSTEM ()
+      : m_pSneeze (nullptr)
    {
       tpStart = std::chrono::steady_clock::now ();
    }
+
+   void SetSneeze (SNEEZE::CORE::SNEEZE* pSneeze) { m_pSneeze = pSneeze; }
 
    double GetElapsedTime () override
    {
@@ -42,16 +45,20 @@ public:
 
    bool LogMessage (Rml::Log::Type nType, const Rml::String& sMessage) override
    {
-      const char* szLevel = "INFO";
-      if (nType == Rml::Log::LT_ERROR)   szLevel = "ERROR";
-      if (nType == Rml::Log::LT_WARNING) szLevel = "WARN";
-      if (nType == Rml::Log::LT_DEBUG)   szLevel = "DEBUG";
+      if (!m_pSneeze)
+         return true;
 
-      std::printf ("UI_CONTEXT [%s]: %s\n", szLevel, sMessage.c_str ());
+      SNEEZE::CORE::SNEEZE_LISTENER::eLOGLEVEL eLevel = SNEEZE::CORE::SNEEZE_LISTENER::kLOGLEVEL_Info;
+      if (nType == Rml::Log::LT_ERROR)   eLevel = SNEEZE::CORE::SNEEZE_LISTENER::kLOGLEVEL_Error;
+      if (nType == Rml::Log::LT_WARNING) eLevel = SNEEZE::CORE::SNEEZE_LISTENER::kLOGLEVEL_Warning;
+      if (nType == Rml::Log::LT_DEBUG)   eLevel = SNEEZE::CORE::SNEEZE_LISTENER::kLOGLEVEL_Trace;
+
+      m_pSneeze->Log (eLevel, "UI_CONTEXT", sMessage);
       return true;
    }
 
 private:
+   SNEEZE::CORE::SNEEZE* m_pSneeze;
    std::chrono::steady_clock::time_point tpStart;
 };
 
@@ -116,13 +123,14 @@ static STUB_FONT_ENGINE pStubFontEngine;
 
 } // anonymous namespace
 
-namespace sneeze
+namespace SNEEZE
 {
 namespace ui
 {
 
 UI_CONTEXT::UI_CONTEXT ()
-   : bInitialized (false)
+   : m_pSneeze (nullptr)
+   , bInitialized (false)
 {
 }
 
@@ -131,8 +139,11 @@ UI_CONTEXT::~UI_CONTEXT ()
    Shutdown ();
 }
 
-bool UI_CONTEXT::Initialize ()
+bool UI_CONTEXT::Initialize (CORE::SNEEZE* pSneeze)
 {
+   m_pSneeze = pSneeze;
+   pStubSystem.SetSneeze (pSneeze);
+
    Rml::SetSystemInterface (&pStubSystem);
    Rml::SetRenderInterface (&pStubRender);
    Rml::SetFontEngineInterface (&pStubFontEngine);
@@ -140,14 +151,16 @@ bool UI_CONTEXT::Initialize ()
    bool bOk = Rml::Initialise ();
    if (!bOk)
    {
-      std::fprintf (stderr, "UI_CONTEXT: Rml::Initialise failed\n");
+      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Error, "UI_CONTEXT",
+         "Rml::Initialise failed");
       bInitialized = false;
    }
    else
    {
       bInitialized = true;
       Rml::String sVersion = Rml::GetVersion ();
-      std::printf ("UI_CONTEXT: RmlUi %s initialized (stub renderer)\n", sVersion.c_str ());
+      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "UI_CONTEXT",
+         "RmlUi " + std::string (sVersion.c_str ()) + " initialized (stub renderer)");
    }
 
    return bInitialized;
@@ -163,4 +176,4 @@ void UI_CONTEXT::Shutdown ()
 }
 
 } // namespace ui
-} // namespace sneeze
+} // namespace SNEEZE

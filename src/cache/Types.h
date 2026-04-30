@@ -17,7 +17,7 @@
 
 #include <cstdint>
 
-namespace sneeze { namespace cache {
+namespace SNEEZE { namespace cache {
 
 // ---------------------------------------------------------------------------
 // Cache tiers
@@ -43,6 +43,6 @@ enum ENTRY_STATE
    ENTRY_STATE_FAILED     = 4,
 };
 
-}} // namespace sneeze::cache
+}} // namespace SNEEZE::cache
 
 #endif // SNEEZE_CACHE_TYPES_H

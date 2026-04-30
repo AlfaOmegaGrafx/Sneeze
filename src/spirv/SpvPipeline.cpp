@@ -13,18 +13,18 @@
 // limitations under the License.
 
 #include "spirv/SpvPipeline.h"
+#include "core/Sneeze.h"
 
 #include <spirv-tools/libspirv.hpp>
 
-#include <cstdio>
-
-namespace sneeze
+namespace SNEEZE
 {
 namespace spirv
 {
 
 SPV_PIPELINE::SPV_PIPELINE ()
-   : bInitialized (false)
+   : m_pSneeze (nullptr)
+   , bInitialized (false)
 {
 }
 
@@ -33,10 +33,12 @@ SPV_PIPELINE::~SPV_PIPELINE ()
    Shutdown ();
 }
 
-bool SPV_PIPELINE::Initialize ()
+bool SPV_PIPELINE::Initialize (CORE::SNEEZE* pSneeze)
 {
+   m_pSneeze = pSneeze;
    bInitialized = true;
-   std::printf ("SPV_PIPELINE: SPIR-V validation pipeline initialized (SPIRV-Tools)\n");
+   m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "SPV_PIPELINE",
+      "SPIR-V validation pipeline initialized (SPIRV-Tools)");
    return true;
 }
 
@@ -65,4 +67,4 @@ bool SPV_PIPELINE::Validate (const std::vector<uint32_t>& aBinary, std::string& 
 }
 
 } // namespace spirv
-} // namespace sneeze
+} // namespace SNEEZE

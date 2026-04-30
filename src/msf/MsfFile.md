@@ -18,7 +18,7 @@ An `.msf` file is a JWS (JSON Web Signature) compact string with:
 #include "msf/MsfFile.h"
 
 // 1. Create the object and optionally load trusted CA certs
-sneeze::msf::MSF_FILE msf;
+SNEEZE::msf::MSF_FILE msf;
 msf.AddTrustedCert (sCaPem);     // feeds the trust store for chain validation
 
 // 2. Parse the JWS string — always populates all fields
@@ -65,7 +65,7 @@ Verification is separate. A viewer that just wants to display contents can call
 #include "msf/MsfFile.h"
 
 // 1. Create the object
-sneeze::msf::MSF_FILE msf;
+SNEEZE::msf::MSF_FILE msf;
 
 // 2. Set payload fields
 msf.SetNamespace ("com.pokerstars.poker");
@@ -158,8 +158,8 @@ parsing a full `.msf` file.
 ```cpp
 #include "msf/CertChain.h"
 
-using sneeze::msf::CERT_CHAIN;
-using sneeze::msf::CERT_INFO;
+using SNEEZE::msf::CERT_CHAIN;
+using SNEEZE::msf::CERT_INFO;
 
 // Decode a CERT_INFO from a base64 DER string (as found in x5c headers)
 CERT_INFO info = CERT_CHAIN::DecodeInfoDerBase64 (sB64Der, false);

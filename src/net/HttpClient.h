@@ -17,7 +17,9 @@
 
 #include <string>
 
-namespace sneeze
+namespace SNEEZE { namespace CORE { class SNEEZE; }}
+
+namespace SNEEZE
 {
 namespace net
 {
@@ -28,17 +30,18 @@ public:
    HTTP_CLIENT ();
    ~HTTP_CLIENT ();
 
-   bool Initialize ();
+   bool Initialize (CORE::SNEEZE* pSneeze);
    void Shutdown ();
 
    bool Get (const std::string& sUrl, std::string& sResponse, long& nHttpCode);
    bool DownloadToFile (const std::string& sUrl, const std::string& sFilePath, long& nHttpCode);
 
 private:
+   CORE::SNEEZE* m_pSneeze;
    bool bInitialized;
 };
 
 } // namespace net
-} // namespace sneeze
+} // namespace SNEEZE
 
 #endif // SNEEZE_NET_HTTP_CLIENT_H

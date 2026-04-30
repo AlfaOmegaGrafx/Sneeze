@@ -22,13 +22,13 @@
 #include <string>
 #include <cstdint>
 
-namespace sneeze { namespace som { class FABRIC; class NODE; }}
-namespace sneeze { namespace astro { class ASTRO_SERVICE; }}
-namespace sneeze { namespace cache { class FILE_CACHE; }}
-namespace sneeze { namespace storage { class STORAGE_SYSTEM; }}
-namespace sneeze { namespace persona { class PERSONA; }}
+namespace SNEEZE { namespace som { class FABRIC; class NODE; }}
+namespace SNEEZE { namespace astro { class ASTRO_SERVICE; }}
+namespace SNEEZE { namespace cache { class FILE_CACHE; }}
+namespace SNEEZE { namespace storage { class STORAGE_SYSTEM; }}
+namespace SNEEZE { namespace persona { class PERSONA; }}
 
-namespace sneeze { namespace core {
+namespace SNEEZE { namespace CORE {
 
 class WORKER;
 
@@ -52,7 +52,7 @@ public:
    virtual ~SNEEZE_LISTENER () = default;
 
    virtual void OnFrameReady (const uint32_t* pFB, int nFbW, int nFbH) = 0;
-   virtual void Log (eLOGLEVEL Level, std::string& sModule, std::string& sMessage) = 0;
+   virtual void Log (eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage) = 0;
 };
 
 // ---------------------------------------------------------------------------
@@ -112,15 +112,15 @@ public:
    // --- Shared state accessed by workers ---
 
    SNEEZE_LISTENER*         GetListener () const;
-   void                     Log (SNEEZE_LISTENER::eLOGLEVEL Level, std::string& sModule, std::string& sMessage);
+   void                     Log (SNEEZE_LISTENER::eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage);
    SNEEZE_INPUT             ConsumeInput ();
    void                     WriteFrameBuffer (const uint32_t* pPixels, int nWidth, int nHeight);
    std::vector<void*>&      GetBodies ();
 
    // --- SOM ---
 
-   sneeze::som::FABRIC*     GetRootFabric () const    { return m_pRootFabric; }
-   sneeze::som::FABRIC*     GetPrimaryFabric () const { return m_pPrimaryFabric; }
+   som::FABRIC*     GetRootFabric () const    { return m_pRootFabric; }
+   som::FABRIC*     GetPrimaryFabric () const { return m_pPrimaryFabric; }
 
    // --- Persona ---
 
@@ -131,9 +131,9 @@ public:
 
    // --- Subsystems ---
 
-   sneeze::cache::FILE_CACHE*       GetCache () const { return m_pFileCache; }
-   sneeze::storage::STORAGE_SYSTEM* GetStorage () const { return m_pStorage; }
-   sneeze::persona::PERSONA*        GetPersona () const { return m_pPersona; }
+   cache::FILE_CACHE*       GetCache () const { return m_pFileCache; }
+   storage::STORAGE_SYSTEM* GetStorage () const { return m_pStorage; }
+   persona::PERSONA*        GetPersona () const { return m_pPersona; }
 
 private:
    void EngineThreadLoop ();
@@ -176,19 +176,19 @@ private:
    int                      m_nResizeHeight;
 
    // SOM
-   sneeze::som::FABRIC*           m_pRootFabric;
-   sneeze::som::NODE*             m_pRootFabricRootNode;
-   sneeze::som::NODE*             m_pPrimaryAttachNode;
-   sneeze::som::FABRIC*           m_pPrimaryFabric;
-   sneeze::som::NODE*             m_pPrimaryFabricRootNode;
-   sneeze::astro::ASTRO_SERVICE*  m_pAstroService;
+   som::FABRIC*           m_pRootFabric;
+   som::NODE*             m_pRootFabricRootNode;
+   som::NODE*             m_pPrimaryAttachNode;
+   som::FABRIC*           m_pPrimaryFabric;
+   som::NODE*             m_pPrimaryFabricRootNode;
+   astro::ASTRO_SERVICE*  m_pAstroService;
 
    // Subsystems
-   sneeze::cache::FILE_CACHE*       m_pFileCache;
-   sneeze::storage::STORAGE_SYSTEM* m_pStorage;
-   sneeze::persona::PERSONA*        m_pPersona;
+   cache::FILE_CACHE*       m_pFileCache;
+   storage::STORAGE_SYSTEM* m_pStorage;
+   persona::PERSONA*        m_pPersona;
 };
 
-}} // namespace sneeze::core
+}} // namespace SNEEZE::CORE
 
 #endif // SNEEZE_CORE_SNEEZE_H

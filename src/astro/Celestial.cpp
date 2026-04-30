@@ -16,11 +16,11 @@
 #include <cmath>
 #include <algorithm>
 
-namespace sneeze { namespace astro {
+namespace SNEEZE { namespace astro {
 
-using core::DEG_TO_RAD;
-using core::OBLIQUITY_J2000;
-using core::TICKS_PER_CY;
+using CORE::DEG_TO_RAD;
+using CORE::OBLIQUITY_J2000;
+using CORE::TICKS_PER_CY;
 
 // ---------------------------------------------------------------------------
 
@@ -243,4 +243,4 @@ void CELESTIAL::ConvertFrameYUp ()
    dPrecZ /= static_cast<double> (TICKS_PER_CY);
 }
 
-}} // namespace sneeze::astro
+}} // namespace SNEEZE::astro

@@ -14,18 +14,21 @@
 
 #include "WasmStore.h"
 #include "WasmInstance.h"
+#include "core/Sneeze.h"
 #include <cstdio>
 
-namespace sneeze { namespace wasm {
+namespace SNEEZE { namespace wasm {
 
-WASM_STORE::WASM_STORE (wasm_engine_t* pEngine, const STORE_IDENTITY& pIdentity)
-   : m_pIdentity (pIdentity)
+WASM_STORE::WASM_STORE (CORE::SNEEZE* pSneeze, wasm_engine_t* pEngine, const STORE_IDENTITY& pIdentity)
+   : m_pSneeze (pSneeze)
+   , m_pIdentity (pIdentity)
    , m_pStore (nullptr)
    , m_nFabricRefCount (0)
 {
    m_pStore = wasmtime_store_new (pEngine, nullptr, nullptr);
    if (!m_pStore)
-      std::fprintf (stderr, "WASM_STORE: Failed to create native store for [%s]\n", pIdentity.sContainer.c_str ());
+      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Error, "WASM_STORE",
+         "Failed to create native store for [" + pIdentity.sContainer + "]");
 }
 
 WASM_STORE::~WASM_STORE ()
@@ -80,4 +83,4 @@ void WASM_STORE::AddInstance (WASM_INSTANCE* pInstance)
    m_apInstances.push_back (pInstance);
 }
 
-}} // namespace sneeze::wasm
+}} // namespace SNEEZE::wasm

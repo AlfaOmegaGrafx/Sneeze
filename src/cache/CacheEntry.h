@@ -22,7 +22,7 @@
 #include <functional>
 #include <cstdint>
 
-namespace sneeze { namespace cache {
+namespace SNEEZE { namespace cache {
 
 // ---------------------------------------------------------------------------
 // CACHE_ENTRY — manages the fetch/validate lifecycle of a single cached file.
@@ -75,6 +75,6 @@ private:
    std::mutex               m_mutex;
 };
 
-}} // namespace sneeze::cache
+}} // namespace SNEEZE::cache
 
 #endif // SNEEZE_CACHE_CACHEENTRY_H

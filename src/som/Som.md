@@ -28,7 +28,7 @@ A spatial fabric representing a branch of the SOM owned by a single
 container/store.
 
 ```cpp
-sneeze::som::FABRIC fabric;
+SNEEZE::som::FABRIC fabric;
 fabric.SetUrl ("https://example.com/world.msf");
 fabric.SetOwner (pMyStore);
 fabric.SetRootNode (pRootNode);
@@ -56,7 +56,7 @@ containers for different access patterns:
 Both are protected by a single `std::mutex`.
 
 ```cpp
-sneeze::som::NODE node;
+SNEEZE::som::NODE node;
 node.SetObjectIx (42);
 node.SetFabric (&fabric);
 node.SetMapObject (&myMapObject);
@@ -111,11 +111,11 @@ owner and bypass all checks.
 #include "som/AccessControl.h"
 
 // WASM host function checks before reading
-if (!sneeze::som::CanRead (pNode, pRequestingStoreOwner))
+if (!SNEEZE::som::CanRead (pNode, pRequestingStoreOwner))
    return ERROR_ACCESS_DENIED;
 
 // WASM host function checks before writing
-if (!sneeze::som::CanWrite (pNode, pRequestingStoreOwner))
+if (!SNEEZE::som::CanWrite (pNode, pRequestingStoreOwner))
    return ERROR_ACCESS_DENIED;
 ```
 
@@ -131,7 +131,7 @@ it.
 changes.
 
 ```cpp
-sneeze::som::EVENT_SYSTEM events;
+SNEEZE::som::EVENT_SYSTEM events;
 
 // Watch a single node for additions and removals
 uint32_t twId = events.Watch_Node (pNode, EVENT_TYPE_NODE_ADDED | EVENT_TYPE_NODE_REMOVED,
@@ -156,22 +156,22 @@ to dispatch events to matching watchers.
 for efficient spatial queries.
 
 ```cpp
-sneeze::som::SPATIAL_INDEX bvh;
+SNEEZE::som::SPATIAL_INDEX bvh;
 
 // Collect all nodes with map objects
-std::vector<sneeze::som::NODE*> apNodes;
+std::vector<SNEEZE::som::NODE*> apNodes;
 // ... populate from SOM traversal ...
 
 bvh.Build (apNodes);
 
 // Frustum culling — returns visible nodes
-sneeze::som::FRUSTUM frustum;
+SNEEZE::som::FRUSTUM frustum;
 // ... populate 6 planes from camera projection ...
-std::vector<sneeze::som::NODE*> aVisible;
+std::vector<SNEEZE::som::NODE*> aVisible;
 bvh.QueryFrustum (frustum, aVisible);
 
 // Proximity query — all nodes within a sphere
-std::vector<sneeze::som::NODE*> aNearby;
+std::vector<SNEEZE::som::NODE*> aNearby;
 bvh.QuerySphere (x, y, z, dRadius, aNearby);
 ```
 

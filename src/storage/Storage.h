@@ -21,7 +21,9 @@
 #include <mutex>
 #include <memory>
 
-namespace sneeze { namespace storage {
+namespace SNEEZE { namespace CORE { class SNEEZE; }}
+
+namespace SNEEZE { namespace storage {
 
 // ---------------------------------------------------------------------------
 // CONTAINER — per-container key-value store.
@@ -119,7 +121,7 @@ private:
 class STORAGE_SYSTEM
 {
 public:
-   STORAGE_SYSTEM ();
+   explicit STORAGE_SYSTEM (CORE::SNEEZE* pSneeze);
    ~STORAGE_SYSTEM ();
 
    bool Initialize ();
@@ -130,11 +132,12 @@ public:
 private:
    std::string GetStorageRootPath () const;
 
+   CORE::SNEEZE*                                                m_pSneeze;
    std::string                                                  m_sRootPath;
    std::unordered_map<std::string, std::unique_ptr<PERSONA_STORE>> m_mapPersonas;
    std::mutex                                                   m_mutex;
 };
 
-}} // namespace sneeze::storage
+}} // namespace SNEEZE::storage
 
 #endif // SNEEZE_STORAGE_STORAGE_H

@@ -21,7 +21,9 @@
 #include <mutex>
 #include <cstdint>
 
-namespace sneeze { namespace wasm {
+namespace SNEEZE { namespace CORE { class SNEEZE; }}
+
+namespace SNEEZE { namespace wasm {
 
 class WASM_INSTANCE;
 
@@ -57,7 +59,7 @@ struct STORE_IDENTITY
 class WASM_STORE
 {
 public:
-   WASM_STORE (wasm_engine_t* pEngine, const STORE_IDENTITY& pIdentity);
+   WASM_STORE (CORE::SNEEZE* pSneeze, wasm_engine_t* pEngine, const STORE_IDENTITY& pIdentity);
    ~WASM_STORE ();
 
    const STORE_IDENTITY& GetIdentity () const { return m_pIdentity; }
@@ -77,6 +79,7 @@ public:
    const std::vector<WASM_INSTANCE*>& GetInstances () const { return m_apInstances; }
 
 private:
+   CORE::SNEEZE*                m_pSneeze;
    STORE_IDENTITY               m_pIdentity;
    wasmtime_store_t*            m_pStore;
    int                          m_nFabricRefCount;
@@ -84,6 +87,6 @@ private:
    mutable std::mutex           m_mutex;
 };
 
-}} // namespace sneeze::wasm
+}} // namespace SNEEZE::wasm
 
 #endif // SNEEZE_WASM_WASMSTORE_H

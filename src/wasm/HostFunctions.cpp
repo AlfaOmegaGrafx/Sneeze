@@ -15,7 +15,7 @@
 #include "HostFunctions.h"
 #include <cstdio>
 
-namespace sneeze { namespace wasm {
+namespace SNEEZE { namespace wasm {
 
 // ---------------------------------------------------------------------------
 // SOM host function stubs
@@ -133,4 +133,4 @@ wasm_trap_t* Storage_Has (void* pEnv, wasmtime_caller_t* pCaller,
    return nullptr;
 }
 
-}} // namespace sneeze::wasm
+}} // namespace SNEEZE::wasm

@@ -9,7 +9,7 @@ is implemented — this is a local testing proxy.
 ```cpp
 #include "persona/Persona.h"
 
-sneeze::persona::PERSONA persona;
+SNEEZE::persona::PERSONA persona;
 
 persona.Login ("Dean", "Abramson");
 // persona.GetName()  -> "Dean.Abramson"

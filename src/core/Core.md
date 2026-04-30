@@ -14,7 +14,7 @@ management, and subsystem accessors.
 ```cpp
 #include "core/Sneeze.h"
 
-sneeze::core::SNEEZE engine (&myListener);
+SNEEZE::CORE::SNEEZE engine (&myListener);
 engine.SetNativeWindow (hWnd);
 engine.Initialize (1280, 720, "anari");
 

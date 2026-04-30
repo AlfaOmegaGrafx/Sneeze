@@ -17,12 +17,12 @@
 
 #include <vector>
 
-namespace sneeze { namespace astro {
+namespace SNEEZE { namespace astro {
 
 class RMCOBJECT;
 
 void CreateSolarSystem ();
 
-}} // namespace sneeze::astro
+}} // namespace SNEEZE::astro
 
 #endif // SNEEZE_ASTRO_BODYDATA_H

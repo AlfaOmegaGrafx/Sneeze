@@ -24,10 +24,10 @@ Top-level manager. Owns the shared Wasmtime engine and all active stores.
 ```cpp
 #include "wasm/WasmRuntime.h"
 
-sneeze::wasm::WASM_RUNTIME runtime;
+SNEEZE::wasm::WASM_RUNTIME runtime;
 runtime.Initialize ();
 
-sneeze::wasm::STORE_IDENTITY id;
+SNEEZE::wasm::STORE_IDENTITY id;
 id.sPersonaHash = "a3f1...";
 id.sFingerprint = "b2c4...";
 id.sContainer   = "poker";
@@ -85,7 +85,7 @@ stop receiving calls.
 ### Compilation
 
 ```cpp
-auto* pInstance = new sneeze::wasm::WASM_INSTANCE (pStore, sUrl, sSha256);
+auto* pInstance = new SNEEZE::wasm::WASM_INSTANCE (pStore, sUrl, sSha256);
 pInstance->Compile (runtime.GetEngine (), pBytes, nBytes);
 pStore->AddInstance (pInstance);
 ```
@@ -128,7 +128,7 @@ WASM work items.
 ```cpp
 #include "wasm/ThreadPool.h"
 
-sneeze::wasm::THREAD_POOL pool;
+SNEEZE::wasm::THREAD_POOL pool;
 pool.Initialize ();        // defaults to hardware_concurrency - 2
 
 pool.Submit ([] {

@@ -65,7 +65,7 @@ creates a device, and manages the frame/world/camera lifecycle.
 ```cpp
 #include "renderer/AnariRenderer.h"
 
-sneeze::renderer::ANARI_RENDERER renderer ("anari");
+SNEEZE::renderer::ANARI_RENDERER renderer ("anari");
 renderer.SetNativeWindow (hWnd);
 renderer.Initialize (1280, 720);
 

@@ -22,7 +22,9 @@
 #include <mutex>
 #include <memory>
 
-namespace sneeze { namespace cache {
+namespace SNEEZE { namespace CORE { class SNEEZE; }}
+
+namespace SNEEZE { namespace cache {
 
 // ---------------------------------------------------------------------------
 // FILE_CACHE — three-tier caching system.
@@ -39,7 +41,7 @@ namespace sneeze { namespace cache {
 class FILE_CACHE
 {
 public:
-   FILE_CACHE ();
+   explicit FILE_CACHE (CORE::SNEEZE* pSneeze);
    ~FILE_CACHE ();
 
    bool Initialize ();
@@ -73,6 +75,8 @@ private:
    bool        LoadModuleFromDisk (const std::string& sUrl, const std::string& sSha256, std::vector<uint8_t>& aOut) const;
    void        SaveModuleToDisk (const std::string& sUrl, const std::string& sSha256, const std::vector<uint8_t>& aData) const;
 
+   CORE::SNEEZE*     m_pSneeze;
+
    using ENTRY_MAP = std::unordered_map<std::string, std::unique_ptr<CACHE_ENTRY>>;
 
    ENTRY_MAP         m_mapMsf;
@@ -86,6 +90,6 @@ private:
    std::string       m_sCachePath;
 };
 
-}} // namespace sneeze::cache
+}} // namespace SNEEZE::cache
 
 #endif // SNEEZE_CACHE_FILECACHE_H

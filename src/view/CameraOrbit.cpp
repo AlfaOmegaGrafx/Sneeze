@@ -16,7 +16,7 @@
 #include <cmath>
 #include <algorithm>
 
-namespace sneeze { namespace view {
+namespace SNEEZE { namespace view {
 
 static constexpr float MOUSE_SENSITIVITY = 0.005f;
 static constexpr float SCROLL_FACTOR     = 1.1f;
@@ -42,4 +42,4 @@ void UpdateCameraOrbit (CAMERA_ORBIT& pOrbit, int nDX, int nDY, float dScrollY,
    }
 }
 
-}} // namespace sneeze::view
+}} // namespace SNEEZE::view

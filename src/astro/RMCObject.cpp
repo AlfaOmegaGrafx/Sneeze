@@ -14,9 +14,9 @@
 
 #include "RMCObject.h"
 
-namespace sneeze { namespace astro {
+namespace SNEEZE { namespace astro {
 
-using core::G_M3_KG_S2;
+using CORE::G_M3_KG_S2;
 
 // Static members
 std::map<std::string, RMCOBJECT*>  RMCOBJECT::s_pRegistry;
@@ -140,4 +140,4 @@ uint32_t RMCOBJECT::GetColor () const
    return pColor.nNormal;
 }
 
-}} // namespace sneeze::astro
+}} // namespace SNEEZE::astro

@@ -13,17 +13,18 @@
 // limitations under the License.
 
 #include "xr/XrRuntime.h"
-#include <cstdio>
+#include "core/Sneeze.h"
 #include <cstdlib>
 #include <cstring>
 
-namespace sneeze
+namespace SNEEZE
 {
 namespace xr
 {
 
 XR_RUNTIME::XR_RUNTIME ()
-   : hInstance   (XR_NULL_HANDLE)
+   : m_pSneeze    (nullptr)
+   , hInstance   (XR_NULL_HANDLE)
    , bHasRuntime (false)
 {
 }
@@ -33,8 +34,9 @@ XR_RUNTIME::~XR_RUNTIME ()
    Shutdown ();
 }
 
-bool XR_RUNTIME::Initialize ()
+bool XR_RUNTIME::Initialize (CORE::SNEEZE* pSneeze)
 {
+   m_pSneeze = pSneeze;
    // Suppress the loader's own stderr diagnostics - we handle all error cases
    // ourselves with clearer messages. Without this, the loader prints alarming
    // "Error [GENERAL | xrCreateInstance | OpenXR-Loader]" lines on machines
@@ -61,8 +63,10 @@ bool XR_RUNTIME::Initialize ()
    if (XR_FAILED (nResult))
    {
       bHasRuntime = false;
-      std::printf ("XR_RUNTIME: OpenXR loader initialized - no XR runtime detected (code %d)\n", nResult);
-      std::printf ("XR_RUNTIME: This is normal on machines without a VR/AR headset or runtime installed.\n");
+      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Warning, "XR_RUNTIME",
+         "OpenXR loader initialized - no XR runtime detected (code " + std::to_string (nResult) + ")");
+      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Warning, "XR_RUNTIME",
+         "This is normal on machines without a VR/AR headset or runtime installed.");
       return true;
    }
 
@@ -72,14 +76,14 @@ bool XR_RUNTIME::Initialize ()
    if (XR_SUCCEEDED (xrGetInstanceProperties (hInstance, &pProps)))
    {
       sRuntimeName = pProps.runtimeName;
-      std::printf ("XR_RUNTIME: OpenXR %d.%d.%d initialized - runtime: %s (v%d.%d.%d)\n",
-         XR_VERSION_MAJOR (XR_CURRENT_API_VERSION),
-         XR_VERSION_MINOR (XR_CURRENT_API_VERSION),
-         XR_VERSION_PATCH (XR_CURRENT_API_VERSION),
-         pProps.runtimeName,
-         XR_VERSION_MAJOR (pProps.runtimeVersion),
-         XR_VERSION_MINOR (pProps.runtimeVersion),
-         XR_VERSION_PATCH (pProps.runtimeVersion));
+      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "XR_RUNTIME",
+         "OpenXR " + std::to_string (XR_VERSION_MAJOR (XR_CURRENT_API_VERSION)) + "."
+         + std::to_string (XR_VERSION_MINOR (XR_CURRENT_API_VERSION)) + "."
+         + std::to_string (XR_VERSION_PATCH (XR_CURRENT_API_VERSION))
+         + " initialized - runtime: " + pProps.runtimeName
+         + " (v" + std::to_string (XR_VERSION_MAJOR (pProps.runtimeVersion)) + "."
+         + std::to_string (XR_VERSION_MINOR (pProps.runtimeVersion)) + "."
+         + std::to_string (XR_VERSION_PATCH (pProps.runtimeVersion)) + ")");
    }
 
    return true;
@@ -107,4 +111,4 @@ std::string XR_RUNTIME::GetRuntimeName () const
 }
 
 } // namespace xr
-} // namespace sneeze
+} // namespace SNEEZE
