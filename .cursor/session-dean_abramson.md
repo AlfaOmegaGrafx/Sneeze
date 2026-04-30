@@ -393,3 +393,20 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 - **Test Hz values** in factory table: 0 (compositor), 1, 30, 60, 64, 90, 120, 144 — all targets achieved perfectly.
 - **C++14 targeting discussion** — Dean intends C++14 instead of C++17. Audit deferred. Key concern: `std::optional` in astro module.
 - **Updated `project.mdc`** — metronome redesign details, compositor diagnostics findings, C++14 note, `winmm.lib` gotcha, updated key classes.
+
+---
+
+## 2026-04-29 — Dean Abramson — ~11:11 PM – ~11:40 PM PDT
+
+### Work performed (continuation of MBE runtime pipeline implementation)
+
+- **SOM Access Control** (`som/AccessControl.h/cpp`) — `CanRead`/`CanWrite` for nodes and fabrics. Browser internals (null owner) bypass; WASM stores must match fabric owner. Private flags on nodes/fabrics restrict cross-container visibility.
+- **SOM Event System** (`som/Events.h/cpp`) — `EVENT_SYSTEM` with `Watch_Node`, `Watch_Tree`, `Unwatch`, `UnwatchAll`. `Fire_NodeAdded`/`Fire_NodeRemoved`/`Fire_NodeModified` dispatch to matching watchers. Recursive tree watches walk ancestors.
+- **SOM Spatial Index** (`som/SpatialIndex.h/cpp`) — BVH with AABB bounds from MAP_OBJECT positions. Median-split along longest axis. `QueryFrustum` (6-plane) and `QuerySphere` (proximity) return matching leaf nodes.
+- **WASM Thread Pool** (`wasm/ThreadPool.h/cpp`) — Fixed-size pool (defaults to `hardware_concurrency - 2`). Submit/shutdown with clean queue drain and worker join.
+- **Graceful Teardown** (updated `Sneeze.h/cpp`) — `Logout()` now runs 4-phase teardown: Signal, Communicate, Shutdown (DestroyAllStores), Destroy (ClearSession caches, persona logout). Added `ChangePrimaryFabric(sUrl)` with same teardown + AstroService cleanup.
+- **Updated `CMakeLists.txt`** — added 6 new source files (3 SOM, 1 WASM) to build.
+- **Clean build verified** — all 6 new files compiled, all tests linked, Artemis confirmed running.
+- **Total new code this session:** ~1,030 lines (987 in 8 new files + ~45 in modifications).
+- **Per-module documentation** — created `.md` files in 14 of 16 `src/` subdirectories (skipping `astro`, `msf` already had one). Each follows the `MsfFile.md` pattern: usage examples, working theory, data structures, dependencies, and unimplemented/future work.
+- **Updated `project.mdc`** — module table (som, cache, storage, persona now Active; wasm expanded), directory structure, 17 new Key Classes entries, updated SNEEZE class description with SOM/subsystem/teardown details.

@@ -530,12 +530,44 @@ set (ASTRO_SOURCES
    astro/BodyData.cpp
    astro/Celestial.cpp
    astro/Orbit.cpp
-   astro/RMCObject.cpp)
+   astro/RMCObject.cpp
+   astro/AstroService.cpp)
 set (ASTRO_HEADERS
    astro/BodyData.h
    astro/Celestial.h
    astro/Orbit.h
-   astro/RMCObject.h)
+   astro/RMCObject.h
+   astro/AstroService.h)
+
+set (SOM_SOURCES
+   som/Node.cpp
+   som/Fabric.cpp
+   som/MapObject.cpp
+   som/AccessControl.cpp
+   som/Events.cpp
+   som/SpatialIndex.cpp)
+set (SOM_HEADERS
+   som/Types.h
+   som/Node.h
+   som/Fabric.h
+   som/MapObject.h
+   som/AccessControl.h
+   som/Events.h
+   som/SpatialIndex.h)
+
+set (CACHE_SOURCES
+   cache/CacheEntry.cpp
+   cache/FileCache.cpp)
+set (CACHE_HEADERS
+   cache/Types.h
+   cache/CacheEntry.h
+   cache/FileCache.h)
+
+set (STORAGE_SOURCES  storage/Storage.cpp)
+set (STORAGE_HEADERS  storage/Storage.h)
+
+set (PERSONA_SOURCES  persona/Persona.cpp)
+set (PERSONA_HEADERS  persona/Persona.h)
 
 set (RENDERER_SOURCES  renderer/AnariRenderer.cpp)
 set (RENDERER_HEADERS  renderer/Renderer.h  renderer/AnariRenderer.h)
@@ -544,8 +576,18 @@ set (VIEW_SOURCES    view/CameraOrbit.cpp)
 set (VIEW_HEADERS    view/CameraOrbit.h)
 
 if (SNEEZE_ENABLE_WASM)
-   set (WASM_SOURCES    wasm/WasmRuntime.cpp)
-   set (WASM_HEADERS    wasm/WasmRuntime.h)
+   set (WASM_SOURCES
+      wasm/WasmRuntime.cpp
+      wasm/WasmStore.cpp
+      wasm/WasmInstance.cpp
+      wasm/HostFunctions.cpp
+      wasm/ThreadPool.cpp)
+   set (WASM_HEADERS
+      wasm/WasmRuntime.h
+      wasm/WasmStore.h
+      wasm/WasmInstance.h
+      wasm/HostFunctions.h
+      wasm/ThreadPool.h)
 endif ()
 
 set (SPIRV_SOURCES   spirv/SpvPipeline.cpp)
@@ -580,6 +622,10 @@ set (MSF_HEADERS
 add_library (Sneeze STATIC
    ${CORE_SOURCES}      ${CORE_HEADERS}
    ${ASTRO_SOURCES}     ${ASTRO_HEADERS}
+   ${SOM_SOURCES}       ${SOM_HEADERS}
+   ${CACHE_SOURCES}     ${CACHE_HEADERS}
+   ${STORAGE_SOURCES}   ${STORAGE_HEADERS}
+   ${PERSONA_SOURCES}   ${PERSONA_HEADERS}
    ${RENDERER_SOURCES}  ${RENDERER_HEADERS}
    ${VIEW_SOURCES}      ${VIEW_HEADERS}
    ${WASM_SOURCES}      ${WASM_HEADERS}
@@ -669,6 +715,10 @@ endif ()
 
 source_group ("core"     FILES ${CORE_SOURCES} ${CORE_HEADERS})
 source_group ("astro"    FILES ${ASTRO_SOURCES} ${ASTRO_HEADERS})
+source_group ("som"      FILES ${SOM_SOURCES} ${SOM_HEADERS})
+source_group ("cache"    FILES ${CACHE_SOURCES} ${CACHE_HEADERS})
+source_group ("storage"  FILES ${STORAGE_SOURCES} ${STORAGE_HEADERS})
+source_group ("persona"  FILES ${PERSONA_SOURCES} ${PERSONA_HEADERS})
 source_group ("renderer" FILES ${RENDERER_SOURCES} ${RENDERER_HEADERS})
 source_group ("view"     FILES ${VIEW_SOURCES} ${VIEW_HEADERS})
 source_group ("wasm"     FILES ${WASM_SOURCES} ${WASM_HEADERS})

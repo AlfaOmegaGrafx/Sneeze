@@ -12,17 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "wasm/WasmRuntime.h"
+#include "WasmRuntime.h"
 #include <cstdio>
 
-namespace sneeze
-{
-namespace wasm
-{
+namespace sneeze { namespace wasm {
 
 WASM_RUNTIME::WASM_RUNTIME ()
-   : pEngine (nullptr)
-   , pStore  (nullptr)
+   : m_pEngine (nullptr)
 {
 }
 
@@ -33,42 +29,76 @@ WASM_RUNTIME::~WASM_RUNTIME ()
 
 bool WASM_RUNTIME::Initialize ()
 {
-   pEngine = wasm_engine_new ();
-   if (!pEngine)
+   m_pEngine = wasm_engine_new ();
+   if (!m_pEngine)
    {
       std::fprintf (stderr, "WASM_RUNTIME: Failed to create Wasmtime engine\n");
       return false;
    }
 
-   pStore = wasmtime_store_new (pEngine, nullptr, nullptr);
-   if (!pStore)
-   {
-      std::fprintf (stderr, "WASM_RUNTIME: Failed to create Wasmtime store\n");
-      wasm_engine_delete (pEngine);
-      pEngine = nullptr;
-      return false;
-   }
-
-   std::printf ("WASM_RUNTIME: Wasmtime %s initialized (engine + store)\n",
-      WASMTIME_VERSION);
-
+   std::fprintf (stdout, "WASM_RUNTIME: Wasmtime %s initialized\n", WASMTIME_VERSION);
    return true;
 }
 
 void WASM_RUNTIME::Shutdown ()
 {
-   if (pStore)
-   {
-      wasmtime_store_delete (pStore);
-      pStore = nullptr;
-   }
+   DestroyAllStores ();
 
-   if (pEngine)
+   if (m_pEngine)
    {
-      wasm_engine_delete (pEngine);
-      pEngine = nullptr;
+      wasm_engine_delete (m_pEngine);
+      m_pEngine = nullptr;
    }
 }
 
-} // namespace wasm
-} // namespace sneeze
+// ---------------------------------------------------------------------------
+// Store management
+// ---------------------------------------------------------------------------
+
+WASM_STORE* WASM_RUNTIME::FindOrCreateStore (const STORE_IDENTITY& pIdentity)
+{
+   std::string sKey = pIdentity.Key ();
+
+   std::lock_guard<std::mutex> guard (m_storesMutex);
+
+   auto it = m_mapStores.find (sKey);
+   if (it != m_mapStores.end ())
+      return it->second.get ();
+
+   auto pStore = std::make_unique<WASM_STORE> (m_pEngine, pIdentity);
+   WASM_STORE* pRaw = pStore.get ();
+   m_mapStores[sKey] = std::move (pStore);
+
+   std::fprintf (stdout, "WASM_RUNTIME: Created store [%s|%s]\n",
+      pIdentity.sFingerprint.c_str (), pIdentity.sContainer.c_str ());
+
+   return pRaw;
+}
+
+WASM_STORE* WASM_RUNTIME::FindStore (const STORE_IDENTITY& pIdentity) const
+{
+   std::string sKey = pIdentity.Key ();
+
+   std::lock_guard<std::mutex> guard (m_storesMutex);
+
+   auto it = m_mapStores.find (sKey);
+   if (it != m_mapStores.end ())
+      return it->second.get ();
+   return nullptr;
+}
+
+void WASM_RUNTIME::DestroyStore (const STORE_IDENTITY& pIdentity)
+{
+   std::string sKey = pIdentity.Key ();
+
+   std::lock_guard<std::mutex> guard (m_storesMutex);
+   m_mapStores.erase (sKey);
+}
+
+void WASM_RUNTIME::DestroyAllStores ()
+{
+   std::lock_guard<std::mutex> guard (m_storesMutex);
+   m_mapStores.clear ();
+}
+
+}} // namespace sneeze::wasm

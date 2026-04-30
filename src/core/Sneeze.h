@@ -22,6 +22,12 @@
 #include <string>
 #include <cstdint>
 
+namespace sneeze { namespace som { class FABRIC; class NODE; }}
+namespace sneeze { namespace astro { class ASTRO_SERVICE; }}
+namespace sneeze { namespace cache { class FILE_CACHE; }}
+namespace sneeze { namespace storage { class STORAGE_SYSTEM; }}
+namespace sneeze { namespace persona { class PERSONA; }}
+
 namespace sneeze { namespace core {
 
 class WORKER;
@@ -99,6 +105,24 @@ public:
    void                     WriteFrameBuffer (const uint32_t* pPixels, int nWidth, int nHeight);
    std::vector<void*>&      GetBodies ();
 
+   // --- SOM ---
+
+   sneeze::som::FABRIC*     GetRootFabric () const    { return m_pRootFabric; }
+   sneeze::som::FABRIC*     GetPrimaryFabric () const { return m_pPrimaryFabric; }
+
+   // --- Persona ---
+
+   void Login (const std::string& sFirst, const std::string& sSecond);
+   void Logout ();
+   void ChangePersona (const std::string& sFirst, const std::string& sSecond);
+   void ChangePrimaryFabric (const std::string& sUrl);
+
+   // --- Subsystems ---
+
+   sneeze::cache::FILE_CACHE*       GetCache () const { return m_pFileCache; }
+   sneeze::storage::STORAGE_SYSTEM* GetStorage () const { return m_pStorage; }
+   sneeze::persona::PERSONA*        GetPersona () const { return m_pPersona; }
+
 private:
    void EngineThreadLoop ();
 
@@ -138,6 +162,19 @@ private:
    bool                     m_bResizePending;
    int                      m_nResizeWidth;
    int                      m_nResizeHeight;
+
+   // SOM
+   sneeze::som::FABRIC*           m_pRootFabric;
+   sneeze::som::NODE*             m_pRootFabricRootNode;
+   sneeze::som::NODE*             m_pPrimaryAttachNode;
+   sneeze::som::FABRIC*           m_pPrimaryFabric;
+   sneeze::som::NODE*             m_pPrimaryFabricRootNode;
+   sneeze::astro::ASTRO_SERVICE*  m_pAstroService;
+
+   // Subsystems
+   sneeze::cache::FILE_CACHE*       m_pFileCache;
+   sneeze::storage::STORAGE_SYSTEM* m_pStorage;
+   sneeze::persona::PERSONA*        m_pPersona;
 };
 
 }} // namespace sneeze::core

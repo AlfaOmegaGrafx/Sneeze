@@ -13,7 +13,7 @@ alwaysApply: true
 
 The project produces two components:
 
-- **Sneeze** — the Metaverse Browser Engine (MBE). A standalone, reusable engine library (static `.lib`). Analogous to Blink in the web browser world. Owns all third-party dependencies (Wasmtime, SPIRV-Tools, OpenXR, curl, RmlUi, ANARI, nlohmann/json, Filament, Halogen, BoringSSL, jwt-cpp) and the engine modules that wrap them (`wasm/`, `spirv/`, `xr/`, `net/`, `ui/`, `core/`, `compute/`, `msf/`, and future `som/`, `smap/`, `identity/`, `audio/`). All test executables (WasmTest, SpvTest, XrTest, NetTest, UiTest, ComputeTest, JwsTest) belong to Sneeze. Another team could build a different metaverse browser on top of Sneeze without touching Artemis.
+- **Sneeze** — the Metaverse Browser Engine (MBE). A standalone, reusable engine library (static `.lib`). Analogous to Blink in the web browser world. Owns all third-party dependencies (Wasmtime, SPIRV-Tools, OpenXR, curl, RmlUi, ANARI, nlohmann/json, Filament, Halogen, BoringSSL, jwt-cpp) and the engine modules that wrap them (`wasm/`, `spirv/`, `xr/`, `net/`, `ui/`, `core/`, `compute/`, `msf/`, `som/`, `cache/`, `storage/`, `persona/`, and future `smap/`, `identity/`, `audio/`). All test executables (WasmTest, SpvTest, XrTest, NetTest, UiTest, ComputeTest, JwsTest) belong to Sneeze. Another team could build a different metaverse browser on top of Sneeze without touching Artemis.
 
 - **Artemis** — the metaverse browser application. The single `.exe`. Analogous to Chrome/Chromium. A thin application layer that consumes Sneeze: window management (`canvas/`), user chrome, and `main()`. Owns SDL3 (windowing/input is application-level, not engine-level). Artemis is **not open source** — proprietary copyright headers.
 
@@ -46,7 +46,11 @@ Sneeze/
 │   ├── net/               HTTP client (libcurl)
 │   ├── ui/                RmlUi HTML/CSS UI toolkit
 │   ├── compute/           SPIR-V kernel embedding + dispatch (Vox GPU, CPU fallback)
-│   └── msf/               MSF file signing/verification (JWS compact serialization)
+│   ├── msf/               MSF file signing/verification (JWS compact serialization)
+│   ├── som/               Scene Object Model (FABRIC, NODE, MapObject, AccessControl, Events, SpatialIndex)
+│   ├── cache/             Three-tier file cache (MSF, Asset, Module)
+│   ├── storage/           Persistent per-persona/per-org/per-container key-value storage
+│   └── persona/           Local identity proxy (name → SHA-256 hash)
 ├── tests/                 Test source (pulled in by src/CMakeLists.txt)
 │   ├── CMakeLists.txt
 │   ├── certs/             Self-signed X.509 v3 test certificates (CA, provider, expired)
@@ -131,9 +135,12 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 | `astro/` | `sneeze::astro` | Solar system simulation — orbital mechanics (ORBIT, CELESTIAL), body data (BODY_DATA), and the RMC object hierarchy (RMCOBJECT). Disposable PoC code that exercises the rendering pipeline. Moved from Artemis to Sneeze (2026-04-27) because scene management is an engine responsibility. | PoC |
 | `renderer/` | `sneeze::renderer` | Abstract rendering interface + ANARI implementation (device chosen by caller — Halogen in production) | PoC |
 | `view/` | `sneeze::view` | Camera orbit controller (decoupled from windowing — takes raw input deltas). Owned by WORKER_COMPOSITOR. | PoC |
-| `som/` | `sneeze::som` | Scene Object Model (future) | 4 |
+| `som/` | `sneeze::som` | Scene Object Model — the browser's internal scene graph. FABRIC (hierarchical ownership, private/public, URL identity, store pointer) and NODE (structural graph element, children in vector + unordered_map, seqlock-protected MAP_OBJECT references). Includes AccessControl (read/write enforcement for WASM host functions), Events (watch registration + callback dispatch on add/remove/modify), and SpatialIndex (BVH with frustum culling and proximity queries). MAP_OBJECT base class + derived types (Root, Celestial, Terrestrial, Physical) carry all 3D properties. | Active |
+| `cache/` | `sneeze::cache` | Three-tier file caching: MSF (session, URL-keyed), Asset (session, URL-keyed), Module (persistent at `%APPDATA%/Sneeze/Cache/`, URL+SHA256-keyed). CACHE_ENTRY manages fetch state and deduplicates in-flight requests via callbacks. | Active |
+| `storage/` | `sneeze::storage` | Persistent per-persona/per-org/per-container key-value storage. Hierarchy: STORAGE_SYSTEM -> PERSONA_STORE -> FINGERPRINT -> CONTAINER. JSON on disk at `%APPDATA%/Sneeze/Storage/`. Mutex per scope, write-on-set. | Active |
+| `persona/` | `sneeze::persona` | Temporary local identity proxy. Login with "First.Second" name, SHA-256 hashed to scope stores and storage. No real identity/auth — testing stub. | Active |
 | `smap/` | `sneeze::smap` | SMAP driver layer (future) | 5 |
-| `wasm/` | `sneeze::wasm` | WASM sandbox runtime (Wasmtime v43.0.0) | 1 |
+| `wasm/` | `sneeze::wasm` | WASM sandbox runtime (Wasmtime v43.0.0). WASM_RUNTIME manages engine + multiple WASM_STOREs (identified by persona+fingerprint+container triple). WASM_STORE holds fabric refcount and WASM_INSTANCEs (URL+SHA256 identity, Init/Open/Close/Shutdown lifecycle, refcount). Host functions (SOM_* and Storage_*) are C-linkage stubs. THREAD_POOL provides fixed-size worker pool for parallel WASM execution. | Active |
 | `spirv/` | `sneeze::spirv` | SPIR-V validation (SPIRV-Tools, vulkan-sdk-1.4.341.0) | 1 |
 | `xr/` | `sneeze::xr` | OpenXR device abstraction (OpenXR SDK 1.1.58) | 1 |
 | `net/` | `sneeze::net` | HTTP client (libcurl 8.9.1, static, Schannel SSL) | 1 |
@@ -147,7 +154,7 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 
 | Class | Module | Purpose |
 |-------|--------|---------|
-| `SNEEZE` | `core` | The engine class — the single entry point Artemis instantiates. Constructor takes a `SNEEZE_LISTENER*` (callback interface). `Initialize(nWidth, nHeight, sRenderer)` performs nested initialization of all engine modules in order: WASM_RUNTIME → SPV_PIPELINE → XR_RUNTIME (if enabled) → HTTP_CLIENT → UI_CONTEXT, then creates the solar system (`sneeze::astro::CreateSolarSystem()`), creates all workers from a `WORKER_CONFIG` factory table (`std::vector` of `{nHertz, std::function<WORKER*(SNEEZE*)>}`), and spawns the engine metronome thread. The metronome uses drift-free fixed-origin scheduling: `sleep_for(1ms)` in a loop, computing elapsed seconds from a fixed `tpOrigin` via `steady_clock`, and for each worker checking whether `floor(elapsed * nHertz) > lastTick` — if so, signal the worker. This avoids drift accumulation from delta-based timing. `timeBeginPeriod(1)` is called at metronome start (Windows) to guarantee 1ms sleep resolution; `timeEndPeriod(1)` on exit. The nested `if` initialization pattern ensures reverse-order shutdown on any failure — each successful init nests deeper, with corresponding shutdown in the `else`/failure path. `Shutdown()` tears down everything in reverse order. Public API: `SetMouseInput()` / `SetKeyInput()` (thread-safe input accumulation), `LockFrameBuffer()` / `UnlockFrameBuffer()` (mutex-protected shared RGBA framebuffer for Artemis to present), `Resize()`, `ConsumeInput()` (called by workers), `WriteFrameBuffer()` (called by compositor), `GetBodies()` (returns `void*` pointers to RMCOBJECT instances), `GetListener()`. Links `winmm.lib` (Windows) for timer period control. Non-copyable, non-movable. Files: `Sneeze.h` / `Sneeze.cpp`. |
+| `SNEEZE` | `core` | The engine class — the single entry point Artemis instantiates. Constructor takes a `SNEEZE_LISTENER*` (callback interface). `Initialize(nWidth, nHeight, sRenderer)` performs nested initialization of all engine modules in order: WASM_RUNTIME → SPV_PIPELINE → XR_RUNTIME (if enabled) → HTTP_CLIENT → UI_CONTEXT, then creates the solar system (`sneeze::astro::CreateSolarSystem()`), creates all workers from a `WORKER_CONFIG` factory table (`std::vector` of `{nHertz, std::function<WORKER*(SNEEZE*)>}`), and spawns the engine metronome thread. The metronome uses drift-free fixed-origin scheduling: `sleep_for(1ms)` in a loop, computing elapsed seconds from a fixed `tpOrigin` via `steady_clock`, and for each worker checking whether `floor(elapsed * nHertz) > lastTick` — if so, signal the worker. This avoids drift accumulation from delta-based timing. `timeBeginPeriod(1)` is called at metronome start (Windows) to guarantee 1ms sleep resolution; `timeEndPeriod(1)` on exit. The nested `if` initialization pattern ensures reverse-order shutdown on any failure — each successful init nests deeper, with corresponding shutdown in the `else`/failure path. `Shutdown()` tears down everything in reverse order. Public API: `SetMouseInput()` / `SetKeyInput()` (thread-safe input accumulation), `LockFrameBuffer()` / `UnlockFrameBuffer()` (mutex-protected shared RGBA framebuffer for Artemis to present), `Resize()`, `ConsumeInput()` (called by workers), `WriteFrameBuffer()` (called by compositor), `GetBodies()` (returns `void*` pointers to RMCOBJECT instances), `GetListener()`, `GetRootFabric()` / `GetPrimaryFabric()` (SOM accessors), `GetCache()` / `GetStorage()` / `GetPersona()` (subsystem accessors), `Login()` / `Logout()` / `ChangePersona()` / `ChangePrimaryFabric()` (persona and teardown). Initialize now creates: root fabric -> root node -> primary attach node -> primary fabric -> primary fabric root node, then FILE_CACHE, STORAGE_SYSTEM, PERSONA, and ASTRO_SERVICE (which populates the primary fabric with celestial nodes). The compositor reads from the SOM instead of RMCOBJECT::All(). Logout/ChangePersona/ChangePrimaryFabric run a four-phase graceful teardown: Signal, Communicate, Shutdown (destroy all WASM stores), Destroy (clear session caches). Links `winmm.lib` (Windows) for timer period control. Non-copyable, non-movable. Files: `Sneeze.h` / `Sneeze.cpp`. |
 | `SNEEZE_LISTENER` | `core` | Abstract callback interface passed to the SNEEZE constructor. Single method: `OnFrameReady()`. Artemis implements this as `ARTEMIS_LISTENER` to handle presentation when the compositor finishes a frame. Decouples the engine from any assumption about how the application presents pixels. |
 | `SNEEZE_INPUT` | `core` | POD struct accumulating raw input state: `nMouseDX`, `nMouseDY`, `dScrollY`, `bMouseLeft`, `bMouseRight`, `bKeySpace`, `bKeyPlus`, `bKeyMinus`. Written by Artemis via `SetMouseInput()` / `SetKeyInput()`, consumed by `WORKER_COMPOSITOR` via `ConsumeInput()` (which resets the accumulated state). Protected by `m_mutexInput`. |
 | `WORKER` | `core` | Abstract base class for engine worker threads. Constructor takes `SNEEZE* pSneeze` (stored as `m_pSneeze`). Each worker owns one `std::thread`. `Initialize()` starts the thread and blocks until it signals `m_bReady`. `ThreadLoop()` is `virtual protected` — the default implementation uses `m_condVar.wait(mlock, std::bind(&WORKER::Control, this))` where `Control()` calls pure virtual `Tick()` when not shutting down. Derived classes can override `ThreadLoop()` for self-paced operation (see `WORKER_COMPOSITOR`). Helper methods: `SignalReady()`, `IsShutdown()`. `Signal()` calls `CtlBreak_Thread()`. `Shutdown()` sets `m_bShutdown` + notifies, then joins. |
@@ -159,7 +166,23 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 | `ANARI_RENDERER` | `renderer` | Concrete ANARI implementation of RENDERER. Constructor takes a library name string (e.g. `"halogen"`) and calls `anariLoadLibrary(name)` at runtime — the class is device-agnostic. No default; caller must specify. Supports native surface rendering via the `HALOGEN_NATIVE_SURFACE` extension — when `SetNativeWindow(hwnd)` is called before `Initialize`, creates a Filament Vulkan swapchain on the platform window (zero CPU copies, 60 FPS). `EndFrame()` internally measures submit time (`RebuildWorld` + `anariCommitParameters`) and render time (`anariRenderFrame` + `anariFrameReady`), exposed via `GetLastSubmitSeconds()` / `GetLastRenderSeconds()`. `Resize()` recreates the native surface object at the new dimensions (Filament's swapchain recreates automatically). |
 | `CAMERA_ORBIT` | `view` | Orbit camera parameters (theta, phi, distance, target) |
 | `UpdateCameraOrbit` | `view` | Applies raw input deltas (nDX, nDY, dScrollY, mouse buttons) to CAMERA_ORBIT |
-| `WASM_RUNTIME` | `wasm` | Wasmtime engine + store lifecycle (init/shutdown) |
+| `WASM_RUNTIME` | `wasm` | Wasmtime engine + multi-store manager. Owns `wasm_engine_t` and a map of `WASM_STORE` objects keyed by identity triple. `FindOrCreateStore()`, `FindStore()`, `DestroyStore()`, `DestroyAllStores()`. |
+| `WASM_STORE` | `wasm` | Isolated execution context identified by (persona hash, fingerprint, container name). Wraps `wasmtime_store_t`. Fabric refcount tracks how many fabrics reference this store. Owns a vector of `WASM_INSTANCE` objects. |
+| `WASM_INSTANCE` | `wasm` | A compiled WASM module instance within a store. Identity = URL + SHA256. Lifecycle: Compile -> AddRef (0->1 triggers CallInit) -> CallOpen per fabric -> CallClose per fabric -> ReleaseRef (1->0 triggers CallShutdown). Cannot be unloaded from a live store. |
+| `THREAD_POOL` | `wasm` | Fixed-size worker pool for dispatching WASM work items. Defaults to `hardware_concurrency - 2`. Submit/shutdown with clean queue drain. |
+| `FABRIC` | `som` | Spatial fabric — a branch of the SOM owned by a single store. Parent/child fabric hierarchy, root node, attaching node, owner pointer, private flag, URL. |
+| `NODE` | `som` | Structural graph element. Children stored in `std::vector<NODE*>` (iteration) + `std::unordered_map<uint32_t, NODE*>` (O(1) lookup by `twObjectIx`), mutex-protected. Each node has a SEQLOCK for map object property access, pointers to fabric, map object, and optionally an attached child fabric. Cross-fabric upward traversal via `Parent()`. |
+| `MAP_OBJECT` | `som` | Base class for 3D domain objects. Position, scale, bound, color. Derived types: `MAP_OBJECT_ROOT`, `MAP_OBJECT_CELESTIAL` (+radius), `MAP_OBJECT_TERRESTRIAL`, `MAP_OBJECT_PHYSICAL`. |
+| `SEQLOCK` | `som` | CAS multi-writer seqlock protecting MAP_OBJECT properties. Readers spin-retry on version mismatch; writers atomically increment version. |
+| `EVENT_SYSTEM` | `som` | Watch registration and dispatch for SOM changes. `Watch_Node` (single node), `Watch_Tree` (recursive), `Unwatch`, `UnwatchAll` (by owner). Fire_NodeAdded/Removed/Modified dispatch to matching watchers. |
+| `SPATIAL_INDEX` | `som` | BVH built from SOM nodes with MAP_OBJECTs. Median-split along longest axis. `QueryFrustum` (6-plane frustum culling) and `QuerySphere` (proximity) return matching nodes. Rebuilt on demand, not incremental. |
+| `AccessControl` | `som` | Free functions `CanRead`/`CanWrite` for nodes and fabrics. Browser internals (null owner) bypass; WASM stores must match fabric owner. Private flags on nodes and fabrics restrict cross-container visibility. |
+| `ASTRO_SERVICE` | `astro` | Populates the primary SOM fabric with celestial body nodes. Creates one NODE + CELESTIAL_MAP_OBJECT per renderable orbit body from RMCOBJECT data. Owns and cleans up all created nodes/map objects on shutdown. |
+| `CELESTIAL_MAP_OBJECT` | `astro` | Extends MAP_OBJECT_CELESTIAL with pointers to the source RMCOBJECT and ORBIT. Bridge between the astro PoC and the SOM. |
+| `FILE_CACHE` | `cache` | Three-tier cache manager. MSF and Asset tiers are session-only (cleared on logout/fabric change). Module tier persists to `%APPDATA%/Sneeze/Cache/` (URL+SHA256-keyed). Request methods deduplicate in-flight fetches via shared CACHE_ENTRY objects with callback lists. |
+| `CACHE_ENTRY` | `cache` | Manages fetch/validate lifecycle of a single cached file. States: Idle -> Fetching -> Validating -> Ready/Failed. Multiple callers share one entry and are notified via callbacks. |
+| `STORAGE_SYSTEM` | `storage` | Top-level storage manager. Root at `%APPDATA%/Sneeze/Storage/`. Lazy-creates PERSONA_STORE -> FINGERPRINT -> CONTAINER hierarchy. Each scope has its own mutex. Write-on-set persistence. |
+| `PERSONA` | `persona` | Local identity proxy. `Login("First", "Second")` combines to "First.Second", hashed via SHA-256 (BoringSSL). Hash used as key for WASM stores and storage scoping. |
 | `SPV_PIPELINE` | `spirv` | SPIR-V validation (SPIRV-Tools) |
 | `XR_RUNTIME` | `xr` | OpenXR loader lifecycle, instance creation, runtime discovery. Gracefully handles no-runtime case. |
 | `HTTP_CLIENT` | `net` | libcurl lifecycle (global init/cleanup), synchronous HTTP GET, file download (`DownloadToFile`). Static lib with Schannel SSL. |
@@ -943,4 +966,48 @@ Replaces the earlier `-CleanStamps` flag, which only cleared the script-level st
 - **After pulling a new dep version:** `.\scripts\build-windows.ps1 -Only <name> -Rebuild` forces that one dep to rebuild from scratch while every other dep stays cached.
 
 **Recommended daily workflow on Windows — use Visual Studio, not the scripts.** Once `-All` has produced a configured Sneeze tree, the CMake machinery has already generated a full `.sln` at `builds\windows-x64\build\Sneeze.sln` (single file, multi-config). For day-to-day "I edited a `.cpp`, rebuild" work, open the solution in Visual Studio and use F7 — incremental builds are faster than re-invoking the scripts, and you get the debugger, breakpoints, IntelliSense, Error List, and the rest of the IDE for free. The Debug ↔ Release dropdown in the toolbar flips configs without reopening; outputs land in `install\debug\{bin,lib}` or `install\release\{bin,lib}` accordingly. The scripts exist for the cases Visual Studio can't solve: CI, Linux/macOS builds, fresh-checkout smoke tests, and reconfigure after editing `CMakeLists.txt` (which is what `-Fresh` is for). The rule of thumb: **fresh-checkout / config-changes / cross-platform → scripts; daily editing → `.sln` in VS.** Same deal on macOS with the Xcode project CMake produces, and on Linux with Ninja Multi-Config + your editor of choice. CMake's command-line UX is legitimately rough; nobody should have to live in it day-to-day.
+
+## MBE Runtime Pipeline — Remaining Work (2026-04-30)
+
+The following items were discussed during the MBE architecture sessions but are not yet implemented or not yet wired up. The building blocks (classes, methods, data structures) exist for most of these — what's missing is the integration code that connects them.
+
+### Wiring and Orchestration
+
+1. **Fabric instantiation orchestration** — The full sequence when a spatial fabric is loaded: create/find store by persona+fingerprint+container, AddFabricRef, add WASM instances for each module in the MSF payload, AddRef on each instance (triggering CallInit on 0->1), CallOpen with the attachment point params (fabric ID + params from the MSF). All building blocks exist; the orchestration code that calls them in sequence does not.
+
+2. **FABRIC -> WASM_STORE typed connection** — `Fabric.h` has `void* m_pOwner` but no code sets it during fabric instantiation. When fabrics are loaded from MSF payloads, this needs to be wired to the actual `WASM_STORE*`.
+
+3. **EVENT_SYSTEM not connected** — The event system (Watch_Node, Watch_Tree, Fire_*) exists as a standalone class but: (a) there is no `EVENT_SYSTEM` instance in the engine, (b) `NODE::AddChild`/`RemoveChild` don't call `Fire_NodeAdded`/`Fire_NodeRemoved`, (c) no code calls `Fire_NodeModified` on property writes. Needs an engine-owned instance and wiring into the SOM mutators.
+
+4. **SPATIAL_INDEX not connected** — `SPATIAL_INDEX` exists but nothing collects SOM nodes into a flat list and calls `Build()`, and nothing calls `QueryFrustum`/`QuerySphere`. Needs integration into the compositor (frustum culling) and potentially a host function for proximity queries.
+
+5. **THREAD_POOL not connected** — `THREAD_POOL` exists but is not instantiated by `WASM_RUNTIME` or `SNEEZE`. No work is submitted to it. Needs initialization during engine startup and work dispatch from WASM store execution paths.
+
+6. **Host function linker registration** — The 12 host functions (SOM_* and Storage_*) are declared and stubbed in `HostFunctions.h/cpp` but are never registered with a `wasmtime_linker_t`. Store creation needs to set up a linker, register all host functions, and use it for module instantiation.
+
+7. **Host function implementations** — All 12 host functions are empty stubs. They need to: decode WASM parameters, identify the calling store (from `pEnv`), perform access control checks (via `AccessControl.h`), call into the SOM or Storage, and return results. Each one is a small project.
+
+### Features Not Yet Started
+
+8. **Cache -> HTTP integration** — `Request_Msf`/`Request_Asset`/`Request_Module` create cache entries but never trigger HTTP fetches. Needs integration with `net::HTTP_CLIENT`, ideally on a background thread.
+
+9. **Module hash validation** — The cache discussion covered fetch-hash-compare-save-or-reject logic. The `CACHE_ENTRY` state machine exists but SHA-256 validation of downloaded modules is not implemented.
+
+10. **WorkerAnimator (WorkerB)** — Discussed as a dedicated 64Hz animator thread that traverses the SOM and interpolates animation state on map objects. `WORKER_B` is still a placeholder with an empty `Tick()`. Needs: rename, SOM traversal, animation data model on MAP_OBJECT, interpolation logic.
+
+11. **WASM CPU budgeting (fuel metering)** — Wasmtime fuel metering is proven in WasmTest but not wired into store creation. Each store should have a configurable fuel budget.
+
+12. **WASM memory caps** — Per-store linear memory limits. Not implemented.
+
+13. **Overlay fabrics** — The root fabric structure supports overlay siblings alongside the primary fabric, but no overlay nodes are created or managed.
+
+### Teardown Gaps
+
+14. **Teardown phase 2 (Communicate)** — Currently a log line. Needs to actually await async acknowledgements from active WASM instances before proceeding to phase 3.
+
+15. **Teardown instance lifecycle** — `DestroyAllStores` deletes stores (destructor deletes instances), but it doesn't call `CallClose`/`CallShutdown` on active instances before destruction. The proper sequence is: CallClose on all open fabrics per instance, then CallShutdown on each active instance, then destroy the store.
+
+### Future Milestone: Loading a Spatial Fabric
+
+The ultimate integration test is loading one or more real `.msf` files containing WASM modules, instantiating them into stores, and having them manipulate the SOM through host functions. This requires most of the above items to be complete (especially #1, #6, #7, #8, #9) plus MSF payload parsing for the WASM module manifest.
 

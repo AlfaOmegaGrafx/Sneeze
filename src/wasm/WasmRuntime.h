@@ -15,12 +15,21 @@
 #ifndef SNEEZE_WASM_RUNTIME_H
 #define SNEEZE_WASM_RUNTIME_H
 
+#include "WasmStore.h"
 #include <wasmtime.h>
+#include <unordered_map>
+#include <memory>
+#include <mutex>
+#include <string>
 
-namespace sneeze
-{
-namespace wasm
-{
+namespace sneeze { namespace wasm {
+
+// ---------------------------------------------------------------------------
+// WASM_RUNTIME — top-level manager of the Wasmtime engine and all stores.
+//
+// Owns the shared wasm_engine_t. Provides store creation and lookup by
+// identity tuple (persona + fingerprint + container).
+// ---------------------------------------------------------------------------
 
 class WASM_RUNTIME
 {
@@ -31,12 +40,21 @@ public:
    bool Initialize ();
    void Shutdown ();
 
+   wasm_engine_t* GetEngine () const { return m_pEngine; }
+
+   // --- Store management ---
+
+   WASM_STORE* FindOrCreateStore (const STORE_IDENTITY& pIdentity);
+   WASM_STORE* FindStore (const STORE_IDENTITY& pIdentity) const;
+   void        DestroyStore (const STORE_IDENTITY& pIdentity);
+   void        DestroyAllStores ();
+
 private:
-   wasm_engine_t*     pEngine;
-   wasmtime_store_t*  pStore;
+   wasm_engine_t* m_pEngine;
+   std::unordered_map<std::string, std::unique_ptr<WASM_STORE>> m_mapStores;
+   mutable std::mutex m_storesMutex;
 };
 
-} // namespace wasm
-} // namespace sneeze
+}} // namespace sneeze::wasm
 
 #endif // SNEEZE_WASM_RUNTIME_H

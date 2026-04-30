@@ -25,6 +25,13 @@
 #include "WorkerH.h"
 #include "astro/BodyData.h"
 #include "astro/RMCObject.h"
+#include "astro/AstroService.h"
+#include "som/Fabric.h"
+#include "som/Node.h"
+#include "som/MapObject.h"
+#include "cache/FileCache.h"
+#include "storage/Storage.h"
+#include "persona/Persona.h"
 #include "wasm/WasmRuntime.h"
 #include "spirv/SpvPipeline.h"
 #ifdef SNEEZE_HAS_XR
@@ -94,6 +101,15 @@ SNEEZE::SNEEZE (SNEEZE_LISTENER* pListener)
    , m_nResizeWidth (0)
    , m_nResizeHeight (0)
    , m_pNativeWindow (nullptr)
+   , m_pRootFabric (nullptr)
+   , m_pRootFabricRootNode (nullptr)
+   , m_pPrimaryAttachNode (nullptr)
+   , m_pPrimaryFabric (nullptr)
+   , m_pPrimaryFabricRootNode (nullptr)
+   , m_pAstroService (nullptr)
+   , m_pFileCache (nullptr)
+   , m_pStorage (nullptr)
+   , m_pPersona (nullptr)
 {
 }
 
@@ -122,7 +138,43 @@ bool SNEEZE::Initialize (int nWidth, int nHeight, const std::string& sRenderer)
             {
                if (s_pUiContext.Initialize ())
                {
-                  // --- Create solar system ---
+                  // --- Create SOM fabric structure ---
+                  //
+                  // root fabric -> root fabric root node -> primary attach node
+                  //    -> primary fabric -> primary fabric root node (solar system)
+
+                  m_pRootFabric         = new sneeze::som::FABRIC ();
+                  m_pRootFabricRootNode = new sneeze::som::NODE ();
+                  m_pRootFabricRootNode->SetFabric (m_pRootFabric);
+                  m_pRootFabric->SetRootNode (m_pRootFabricRootNode);
+
+                  m_pPrimaryAttachNode = new sneeze::som::NODE ();
+                  m_pPrimaryAttachNode->SetFabric (m_pRootFabric);
+                  m_pPrimaryAttachNode->SetPrimary (true);
+                  m_pRootFabricRootNode->AddChild (m_pPrimaryAttachNode);
+
+                  m_pPrimaryFabric         = new sneeze::som::FABRIC ();
+                  m_pPrimaryFabricRootNode = new sneeze::som::NODE ();
+                  m_pPrimaryFabricRootNode->SetFabric (m_pPrimaryFabric);
+                  m_pPrimaryFabric->SetRootNode (m_pPrimaryFabricRootNode);
+                  m_pPrimaryFabric->SetParent (m_pRootFabric);
+                  m_pPrimaryFabric->SetAttachingNode (m_pPrimaryAttachNode);
+                  m_pPrimaryAttachNode->SetAttachedFabric (m_pPrimaryFabric);
+                  m_pRootFabric->AddChildFabric (m_pPrimaryFabric);
+
+                  std::fprintf (stdout, "SNEEZE: SOM initialized (root fabric + primary fabric)\n");
+
+                  // --- Initialize subsystems (cache, storage, persona) ---
+
+                  m_pFileCache = new sneeze::cache::FILE_CACHE ();
+                  m_pFileCache->Initialize ();
+
+                  m_pStorage = new sneeze::storage::STORAGE_SYSTEM ();
+                  m_pStorage->Initialize ();
+
+                  m_pPersona = new sneeze::persona::PERSONA ();
+
+                  // --- Create solar system and populate SOM ---
 
                   sneeze::astro::CreateSolarSystem ();
                   auto& aBodies = sneeze::astro::RMCOBJECT::All ();
@@ -134,6 +186,9 @@ bool SNEEZE::Initialize (int nWidth, int nHeight, const std::string& sRenderer)
 
                   std::fprintf (stdout, "SNEEZE: Created %d bodies\n",
                      static_cast<int> (aBodies.size ()));
+
+                  m_pAstroService = new sneeze::astro::ASTRO_SERVICE ();
+                  m_pAstroService->Initialize (m_pPrimaryFabric);
 
                   // --- Create and initialize workers ---
 
@@ -242,6 +297,49 @@ void SNEEZE::Shutdown ()
    m_anWorkerHertz.clear ();
    m_anWorkerLastTick.clear ();
    m_anWorkerSignalCount.clear ();
+
+   // --- Destroy subsystems ---
+
+   delete m_pPersona;
+   m_pPersona = nullptr;
+
+   if (m_pStorage)
+   {
+      m_pStorage->Shutdown ();
+      delete m_pStorage;
+      m_pStorage = nullptr;
+   }
+
+   if (m_pFileCache)
+   {
+      m_pFileCache->Shutdown ();
+      delete m_pFileCache;
+      m_pFileCache = nullptr;
+   }
+
+   // --- Destroy SOM ---
+
+   if (m_pAstroService)
+   {
+      m_pAstroService->Shutdown ();
+      delete m_pAstroService;
+      m_pAstroService = nullptr;
+   }
+
+   delete m_pPrimaryFabricRootNode;
+   m_pPrimaryFabricRootNode = nullptr;
+
+   delete m_pPrimaryFabric;
+   m_pPrimaryFabric = nullptr;
+
+   delete m_pPrimaryAttachNode;
+   m_pPrimaryAttachNode = nullptr;
+
+   delete m_pRootFabricRootNode;
+   m_pRootFabricRootNode = nullptr;
+
+   delete m_pRootFabric;
+   m_pRootFabric = nullptr;
 
    s_pUiContext.Shutdown ();
    s_pHttpClient.Shutdown ();
@@ -364,6 +462,83 @@ std::vector<void*>& SNEEZE::GetBodies ()
    for (auto* pBody : aAll)
       aBodies.push_back (static_cast<void*> (pBody));
    return aBodies;
+}
+
+// ---------------------------------------------------------------------------
+// Persona
+// ---------------------------------------------------------------------------
+
+void SNEEZE::Login (const std::string& sFirst, const std::string& sSecond)
+{
+   if (m_pPersona)
+      m_pPersona->Login (sFirst, sSecond);
+}
+
+void SNEEZE::Logout ()
+{
+   // --- Phase 1: Signal ---
+   // Notify all active stores that a teardown is imminent.
+   std::fprintf (stdout, "SNEEZE: Teardown phase 1 (signal)\n");
+
+   // --- Phase 2: Communicate ---
+   // Give instances time to communicate with their services.
+   // (In the future, this would await async acknowledgements.)
+   std::fprintf (stdout, "SNEEZE: Teardown phase 2 (communicate)\n");
+
+   // --- Phase 3: Shutdown ---
+   // Call Shutdown on all active instances, destroy all stores.
+   std::fprintf (stdout, "SNEEZE: Teardown phase 3 (shutdown)\n");
+   s_pWasmRuntime.DestroyAllStores ();
+
+   // --- Phase 4: Destroy ---
+   // Clear session caches.
+   if (m_pFileCache)
+      m_pFileCache->ClearSession ();
+
+   std::fprintf (stdout, "SNEEZE: Teardown phase 4 (destroy)\n");
+
+   if (m_pPersona)
+      m_pPersona->Logout ();
+}
+
+void SNEEZE::ChangePersona (const std::string& sFirst, const std::string& sSecond)
+{
+   Logout ();
+   Login (sFirst, sSecond);
+}
+
+void SNEEZE::ChangePrimaryFabric (const std::string& sUrl)
+{
+   // Same phased teardown as Logout, but we stay logged in and switch fabric.
+   std::fprintf (stdout, "SNEEZE: ChangePrimaryFabric -> %s\n", sUrl.c_str ());
+
+   // --- Phase 1: Signal ---
+   std::fprintf (stdout, "SNEEZE: Teardown phase 1 (signal)\n");
+
+   // --- Phase 2: Communicate ---
+   std::fprintf (stdout, "SNEEZE: Teardown phase 2 (communicate)\n");
+
+   // --- Phase 3: Shutdown ---
+   std::fprintf (stdout, "SNEEZE: Teardown phase 3 (shutdown)\n");
+   s_pWasmRuntime.DestroyAllStores ();
+
+   // --- Phase 4: Destroy and rebuild ---
+   if (m_pFileCache)
+      m_pFileCache->ClearSession ();
+
+   // Tear down existing primary fabric content
+   if (m_pAstroService)
+   {
+      m_pAstroService->Shutdown ();
+      delete m_pAstroService;
+      m_pAstroService = nullptr;
+   }
+
+   // The primary fabric root node's children are now gone (AstroService owned them).
+   // In the future, this is where we'd fetch the new MSF at sUrl,
+   // create the new primary fabric content, and repopulate the SOM.
+
+   std::fprintf (stdout, "SNEEZE: Primary fabric cleared, ready for new content from [%s]\n", sUrl.c_str ());
 }
 
 // ---------------------------------------------------------------------------

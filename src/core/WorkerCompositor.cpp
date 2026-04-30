@@ -16,8 +16,12 @@
 #include "Sneeze.h"
 #include "Types.h"
 #include "Epoch.h"
+#include "astro/AstroService.h"
 #include "astro/RMCObject.h"
 #include "astro/Orbit.h"
+#include "som/Node.h"
+#include "som/Fabric.h"
+#include "som/MapObject.h"
 #include <cmath>
 #include <cstdio>
 
@@ -180,7 +184,7 @@ void WORKER_COMPOSITOR::ThreadLoop ()
 
       m_pRenderer.SetCamera (pCamera);
 
-      // --- Build scene ---
+      // --- Build scene from SOM ---
 
       auto tpSceneStart = std::chrono::steady_clock::now ();
       m_dAccumInput += std::chrono::duration<double> (tpSceneStart - tpLoopStart).count ();
@@ -188,94 +192,89 @@ void WORKER_COMPOSITOR::ThreadLoop ()
       std::vector<sneeze::renderer::SPHERE_DATA> aSpheres;
       std::vector<sneeze::renderer::CURVE_DATA>  aCurves;
 
-      auto& aBodies = sneeze::astro::RMCOBJECT::All ();
-      sneeze::astro::ORBIT_POSITION pos;
+      sneeze::som::FABRIC* pPrimaryFabric = m_pSneeze->GetPrimaryFabric ();
+      sneeze::som::NODE* pSomRoot = pPrimaryFabric ? pPrimaryFabric->GetRootNode () : nullptr;
 
-      for (auto* pBody : aBodies)
+      if (pSomRoot)
       {
-         if (!pBody->pOrbit) continue;
+         sneeze::astro::ORBIT_POSITION pos;
 
-         sneeze::astro::ORBIT_POSITION* pPos = pBody->pOrbit->PositionAtTick (m_tmNow, pos);
-         if (!pPos) continue;
-
-         float dBodyX = static_cast<float> (pPos->x * METERS_TO_AU);
-         float dBodyY = static_cast<float> (pPos->y * METERS_TO_AU);
-         float dBodyZ = static_cast<float> (pPos->z * METERS_TO_AU);
-
-         sneeze::astro::RMCOBJECT* pChildBody = nullptr;
-         for (auto* pChild : pBody->aChildren)
+         for (sneeze::som::NODE* pNode : pSomRoot->Children ())
          {
-            if (pChild->bType == sneeze::astro::RMCOBJECT_TYPE_PLANET  ||
-               pChild->bType == sneeze::astro::RMCOBJECT_TYPE_STAR)
+            sneeze::som::MAP_OBJECT* pObj = pNode->GetMapObject ();
+            if (!pObj  ||  pObj->GetType () != sneeze::som::MAP_OBJECT_TYPE_CELESTIAL)
+               continue;
+
+            auto* pCelestial = static_cast<sneeze::astro::CELESTIAL_MAP_OBJECT*> (pObj);
+
+            float dBodyX, dBodyY, dBodyZ;
+            if (pCelestial->m_pOrbit)
             {
-               pChildBody = pChild;
-               break;
+               sneeze::astro::ORBIT_POSITION* pPos = pCelestial->m_pOrbit->PositionAtTick (m_tmNow, pos);
+               if (!pPos) continue;
+               dBodyX = static_cast<float> (pPos->x * METERS_TO_AU);
+               dBodyY = static_cast<float> (pPos->y * METERS_TO_AU);
+               dBodyZ = static_cast<float> (pPos->z * METERS_TO_AU);
+            }
+            else
+            {
+               dBodyX = static_cast<float> (pCelestial->m_dPosX * METERS_TO_AU);
+               dBodyY = static_cast<float> (pCelestial->m_dPosY * METERS_TO_AU);
+               dBodyZ = static_cast<float> (pCelestial->m_dPosZ * METERS_TO_AU);
+            }
+
+            float dRadius = static_cast<float> (pCelestial->m_dRadius * METERS_TO_AU);
+            if (dRadius < MIN_SPHERE_RADIUS) dRadius = MIN_SPHERE_RADIUS;
+            if (!pCelestial->m_pOrbit) dRadius *= SUN_RADIUS_SCALE;
+
+            sneeze::renderer::SPHERE_DATA sphere;
+            sphere.x       = dBodyX;
+            sphere.y       = dBodyY;
+            sphere.z       = dBodyZ;
+            sphere.dRadius = dRadius;
+            ColorFromU32 (pCelestial->m_nColor, sphere.r, sphere.g, sphere.b);
+            aSpheres.push_back (sphere);
+
+            // --- Orbit trail ---
+
+            if (pCelestial->m_pOrbit)
+            {
+               sneeze::renderer::CURVE_DATA curve;
+               ColorFromU32 (pCelestial->m_nColor, curve.r, curve.g, curve.b);
+               curve.r *= 0.4f;
+               curve.g *= 0.4f;
+               curve.b *= 0.4f;
+
+               int nTrailPoints = static_cast<int> (TRAIL_SEGMENTS * TRAIL_FRACTION);
+
+               sneeze::renderer::CURVE_POINT cpHead;
+               cpHead.x       = dBodyX;
+               cpHead.y       = dBodyY;
+               cpHead.z       = dBodyZ;
+               cpHead.dRadius = 0.002f;
+               curve.aPoints.push_back (cpHead);
+
+               sneeze::astro::ORBIT_POSITION* pPos = pCelestial->m_pOrbit->PositionAtTick (m_tmNow, pos);
+               if (pPos)
+               {
+                  double dE_planet = pPos->dE;
+                  for (int i = 1; i <= nTrailPoints; i++)
+                  {
+                     double dE = dE_planet - (static_cast<double> (i) / TRAIL_SEGMENTS) * TWO_PI;
+                     VEC3 vPt = pCelestial->m_pOrbit->PointOnOrbit (dE, m_tmNow);
+
+                     sneeze::renderer::CURVE_POINT cp;
+                     cp.x       = static_cast<float> (vPt.x * METERS_TO_AU);
+                     cp.y       = static_cast<float> (vPt.y * METERS_TO_AU);
+                     cp.z       = static_cast<float> (vPt.z * METERS_TO_AU);
+                     cp.dRadius = 0.002f;
+                     curve.aPoints.push_back (cp);
+                  }
+               }
+
+               aCurves.push_back (std::move (curve));
             }
          }
-
-         float dRadius = MIN_SPHERE_RADIUS;
-         uint32_t nColor = pBody->GetColor ();
-
-         if (pChildBody)
-         {
-            float dRadKm = static_cast<float> (pChildBody->dRadius.value_or (100.0));
-            dRadius = dRadKm * 1000.0f * METERS_TO_AU;
-            if (dRadius < MIN_SPHERE_RADIUS) dRadius = MIN_SPHERE_RADIUS;
-            nColor = pChildBody->GetColor ();
-         }
-
-         sneeze::renderer::SPHERE_DATA sphere;
-         sphere.x       = dBodyX;
-         sphere.y       = dBodyY;
-         sphere.z       = dBodyZ;
-         sphere.dRadius = dRadius;
-         ColorFromU32 (nColor, sphere.r, sphere.g, sphere.b);
-         aSpheres.push_back (sphere);
-
-         // --- Orbit trail ---
-
-         sneeze::renderer::CURVE_DATA curve;
-         ColorFromU32 (nColor, curve.r, curve.g, curve.b);
-         curve.r *= 0.4f;
-         curve.g *= 0.4f;
-         curve.b *= 0.4f;
-
-         int nTrailPoints = static_cast<int> (TRAIL_SEGMENTS * TRAIL_FRACTION);
-
-         sneeze::renderer::CURVE_POINT cpHead;
-         cpHead.x       = dBodyX;
-         cpHead.y       = dBodyY;
-         cpHead.z       = dBodyZ;
-         cpHead.dRadius = 0.002f;
-         curve.aPoints.push_back (cpHead);
-
-         double dE_planet = pPos->dE;
-         for (int i = 1; i <= nTrailPoints; i++)
-         {
-            double dE = dE_planet - (static_cast<double> (i) / TRAIL_SEGMENTS) * TWO_PI;
-            VEC3 vPt = pBody->pOrbit->PointOnOrbit (dE, m_tmNow);
-
-            sneeze::renderer::CURVE_POINT cp;
-            cp.x       = static_cast<float> (vPt.x * METERS_TO_AU);
-            cp.y       = static_cast<float> (vPt.y * METERS_TO_AU);
-            cp.z       = static_cast<float> (vPt.z * METERS_TO_AU);
-            cp.dRadius = 0.002f;
-            curve.aPoints.push_back (cp);
-         }
-         aCurves.push_back (std::move (curve));
-      }
-
-      // --- Sun ---
-      {
-         sneeze::renderer::SPHERE_DATA sun;
-         sun.x       = 0.0f;
-         sun.y       = 0.0f;
-         sun.z       = 0.0f;
-         sun.dRadius = 695700.0f * 1000.0f * METERS_TO_AU * SUN_RADIUS_SCALE;
-         sun.r       = 1.0f;
-         sun.g       = 0.9f;
-         sun.b       = 0.4f;
-         aSpheres.push_back (sun);
       }
 
       // --- Render ---
