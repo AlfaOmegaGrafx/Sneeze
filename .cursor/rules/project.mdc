@@ -13,7 +13,7 @@ alwaysApply: true
 
 The project produces two components:
 
-- **Sneeze** — the Metaverse Browser Engine (MBE). A standalone, reusable engine library (static `.lib`). Analogous to Blink in the web browser world. Owns all third-party dependencies (Wasmtime, SPIRV-Tools, OpenXR, curl, RmlUi, ANARI, nlohmann/json, Filament, Halogen, BoringSSL, jwt-cpp) and the engine modules that wrap them (`wasm/`, `spirv/`, `xr/`, `net/`, `ui/`, `core/`, `compute/`, `msf/`, `som/`, `cache/`, `storage/`, `persona/`, and future `smap/`, `identity/`, `audio/`). All test suites are compiled into a single `SneezeTest` executable (run all with no args, or select suites with `--wasm`, `--spv`, `--xr`, `--net`, `--ui`, `--compute`, `--vox`, `--jws`). Another team could build a different metaverse browser on top of Sneeze without touching Artemis.
+- **Sneeze** — the Metaverse Browser Engine (MBE). A standalone, reusable engine library (static `.lib`). Analogous to Blink in the web browser world. Owns all third-party dependencies (Wasmtime, SPIRV-Tools, OpenXR, curl, RmlUi, ANARI, nlohmann/json, Filament, Halogen, BoringSSL, jwt-cpp) and the engine modules that wrap them (`wasm/`, `spirv/`, `xr/`, `net/`, `ui/`, `core/`, `compute/`, `msf/`, `som/`, `cache/`, `storage/`, `persona/`, and future `smap/`, `identity/`, `audio/`). All test suites are compiled into a single `SneezeTest` executable (run all with no args, or select suites with `--wasm`, `--spv`, `--xr`, `--net`, `--ui`, `--compute`, `--vox`, `--jws`, `--cache`). Another team could build a different metaverse browser on top of Sneeze without touching Artemis.
 
 - **Artemis** — the metaverse browser application. The single `.exe`. Analogous to Chrome/Chromium. A thin application layer that consumes Sneeze: window management (`canvas/`), user chrome, and `main()`. Owns SDL3 (windowing/input is application-level, not engine-level). Artemis is **not open source** — proprietary copyright headers.
 
@@ -48,7 +48,7 @@ Sneeze/
 │   ├── compute/           SPIR-V kernel embedding + dispatch (Vox GPU, CPU fallback)
 │   ├── msf/               MSF file signing/verification (JWS compact serialization)
 │   ├── som/               Scene Object Model (FABRIC, NODE, MapObject, AccessControl, Events, SpatialIndex)
-│   ├── cache/             Three-tier file cache (MSF, Asset, Module)
+│   ├── cache/             Type-agnostic file cache (SNEEZE::CACHE — session + persistent)
 │   ├── storage/           Persistent per-persona/per-org/per-container key-value storage
 │   └── persona/           Local identity proxy (name → SHA-256 hash)
 ├── tests/                 Test source (pulled in by src/CMakeLists.txt)
@@ -136,7 +136,7 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 | `renderer/` | `sneeze::renderer` | Abstract rendering interface + ANARI implementation (device chosen by caller — Halogen in production) | PoC |
 | `view/` | `sneeze::view` | Camera orbit controller (decoupled from windowing — takes raw input deltas). Owned by WORKER_COMPOSITOR. | PoC |
 | `som/` | `sneeze::som` | Scene Object Model — the browser's internal scene graph. FABRIC (hierarchical ownership, private/public, URL identity, store pointer) and NODE (structural graph element, children in vector + unordered_map, seqlock-protected MAP_OBJECT references). Includes AccessControl (read/write enforcement for WASM host functions), Events (watch registration + callback dispatch on add/remove/modify), and SpatialIndex (BVH with frustum culling and proximity queries). MAP_OBJECT base class + derived types (Root, Celestial, Terrestrial, Physical) carry all 3D properties. | Active |
-| `cache/` | `sneeze::cache` | Three-tier file caching: MSF (session, URL-keyed), Asset (session, URL-keyed), Module (persistent at `%APPDATA%/Sneeze/Cache/`, URL+SHA256-keyed). CACHE_ENTRY manages fetch state and deduplicates in-flight requests via callbacks. | Active |
+| `cache/` | `SNEEZE::CACHE` | Type-agnostic file caching. MANAGER (singleton) owns ENTRY objects (one per URL). Callers receive FILE handles via Request() and return them via Release(). Session-only (no hash) or persistent (SRI hash verified, manifest.json). All files stored on disk with 2-char fan-out. Background fetch threads capped at 16 (overflow queued), atomic writes, HTTP header capture. Network inspector data layer: high-res timing, HTTP status, sequence numbers, history list, served-from-cache detection, OnCacheFileCreated/Changed notifications to SNEEZE_LISTENER. Request flags (REQUEST_CREATE, REQUEST_FETCH) control whether entries are created and/or fetched. FILE::Reset() invalidates cached data without removing the ENTRY. See `Cache.md` for full documentation. | Active |
 | `storage/` | `sneeze::storage` | Persistent per-persona/per-org/per-container key-value storage. Hierarchy: STORAGE_SYSTEM -> PERSONA_STORE -> FINGERPRINT -> CONTAINER. JSON on disk at `%APPDATA%/Sneeze/Storage/`. Mutex per scope, write-on-set. | Active |
 | `persona/` | `sneeze::persona` | Temporary local identity proxy. Login with "First.Second" name, SHA-256 hashed to scope stores and storage. No real identity/auth — testing stub. | Active |
 | `smap/` | `sneeze::smap` | SMAP driver layer (future) | 5 |
@@ -179,8 +179,10 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 | `AccessControl` | `som` | Free functions `CanRead`/`CanWrite` for nodes and fabrics. Browser internals (null owner) bypass; WASM stores must match fabric owner. Private flags on nodes and fabrics restrict cross-container visibility. |
 | `ASTRO_SERVICE` | `astro` | Populates the primary SOM fabric with celestial body nodes. Creates one NODE + CELESTIAL_MAP_OBJECT per renderable orbit body from RMCOBJECT data. Owns and cleans up all created nodes/map objects on shutdown. |
 | `CELESTIAL_MAP_OBJECT` | `astro` | Extends MAP_OBJECT_CELESTIAL with pointers to the source RMCOBJECT and ORBIT. Bridge between the astro PoC and the SOM. |
-| `FILE_CACHE` | `cache` | Three-tier cache manager. MSF and Asset tiers are session-only (cleared on logout/fabric change). Module tier persists to `%APPDATA%/Sneeze/Cache/` (URL+SHA256-keyed). Request methods deduplicate in-flight fetches via shared CACHE_ENTRY objects with callback lists. |
-| `CACHE_ENTRY` | `cache` | Manages fetch/validate lifecycle of a single cached file. States: Idle -> Fetching -> Validating -> Ready/Failed. Multiple callers share one entry and are notified via callbacks. |
+| `MANAGER` | `CACHE` | Singleton cache manager. Owns ENTRY map (one per URL), capped fetch thread pool (16 max, overflow queued), history list (all FILE* ever created), session epoch (steady_clock), manifest I/O. API: Request(url, listener), Request(url, hash, listener, bFlags), Release(FILE*), Reset(FILE*), Clear(url), ClearSession(), ClearAll(), GetHistory(), GetEpochAge(). Request flags: REQUEST_CREATE (create entry if missing, else return nullptr), REQUEST_FETCH (trigger network fetch for IDLE entries). Both flags default on. Notifications dispatched outside m_mutex to prevent deadlock. |
+| `ENTRY` | `CACHE` | Internal shared state for a single cached URL. Stores MANAGER* parent. Tracks atomic STATE lifecycle, disk path, HTTP headers, access metadata, HTTP status code, high-res fetch start/end times (seconds since session epoch), served-from-cache flag. CollectFiles() returns attached handles for notification dispatch. Reset() clears cached data without removing from map. Not exposed to callers. |
+| `FILE` | `CACHE` | Per-caller handle wrapping an ENTRY. Stores MANAGER* parent. Monotonic sequence number assigned at creation. Provides read-only access to data (ReadData), metadata (headers, size, disk path, times), network inspector fields (GetSequence, GetHttpStatus, GetFetchStartTime/EndTime/Duration, IsServedFromCache), and state. Reset() invalidates the ENTRY's cached data. Created by Request(), detached by Release() but retained in history. |
+| `IFILE` | `CACHE` | Observer interface. OnFileReady(FILE*) and OnFileFailed(FILE*). Callers implement to receive async notifications. Callbacks always fire outside MANAGER's mutex. |
 | `STORAGE_SYSTEM` | `storage` | Top-level storage manager. Root at `%APPDATA%/Sneeze/Storage/`. Lazy-creates PERSONA_STORE -> FINGERPRINT -> CONTAINER hierarchy. Each scope has its own mutex. Write-on-set persistence. |
 | `PERSONA` | `persona` | Local identity proxy. `Login("First", "Second")` combines to "First.Second", hashed via SHA-256 (BoringSSL). Hash used as key for WASM stores and storage scoping. |
 | `SPV_PIPELINE` | `spirv` | SPIR-V validation (SPIRV-Tools) |
@@ -986,9 +988,9 @@ The following items were discussed during the MBE architecture sessions but are 
 
 ### Features Not Yet Started
 
-8. **Cache -> HTTP integration** — `Request_Msf`/`Request_Asset`/`Request_Module` create cache entries but never trigger HTTP fetches. Needs integration with `net::HTTP_CLIENT`, ideally on a background thread.
+8. ~~**Cache -> HTTP integration**~~ — **Done.** MANAGER::FetchEntry() uses libcurl directly to stream downloads to disk on background threads. HTTP status checked (2xx only), redirects followed, 300s timeout.
 
-9. **Module hash validation** — The cache discussion covered fetch-hash-compare-save-or-reject logic. The `CACHE_ENTRY` state machine exists but SHA-256 validation of downloaded modules is not implemented.
+9. ~~**Module hash validation**~~ — **Done.** SRI-format hashes (sha256/sha384/sha512) parsed and verified via BoringSSL EVP_Digest. Hash mismatch -> FAILED, file deleted. Persistent entries verified on fetch; unhashed entries can be upgraded.
 
 10. **WorkerAnimator (WorkerB)** — Discussed as a dedicated 64Hz animator thread that traverses the SOM and interpolates animation state on map objects. `WORKER_B` is still a placeholder with an empty `Tick()`. Needs: rename, SOM traversal, animation data model on MAP_OBJECT, interpolation logic.
 

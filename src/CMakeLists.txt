@@ -556,12 +556,14 @@ set (SOM_HEADERS
    som/SpatialIndex.h)
 
 set (CACHE_SOURCES
-   cache/CacheEntry.cpp
-   cache/FileCache.cpp)
+   cache/Entry.cpp
+   cache/File.cpp
+   cache/Manager.cpp)
 set (CACHE_HEADERS
    cache/Types.h
-   cache/CacheEntry.h
-   cache/FileCache.h)
+   cache/Entry.h
+   cache/File.h
+   cache/Manager.h)
 
 set (STORAGE_SOURCES  storage/Storage.cpp)
 set (STORAGE_HEADERS  storage/Storage.h)

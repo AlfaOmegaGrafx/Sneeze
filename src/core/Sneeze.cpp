@@ -29,7 +29,7 @@
 #include "som/Fabric.h"
 #include "som/Node.h"
 #include "som/MapObject.h"
-#include "cache/FileCache.h"
+#include "cache/Manager.h"
 #include "storage/Storage.h"
 #include "persona/Persona.h"
 #include "wasm/WasmRuntime.h"
@@ -107,7 +107,7 @@ SNEEZE::SNEEZE (SNEEZE_LISTENER* pListener)
    , m_pPrimaryFabric (nullptr)
    , m_pPrimaryFabricRootNode (nullptr)
    , m_pAstroService (nullptr)
-   , m_pFileCache (nullptr)
+   , m_pCache (nullptr)
    , m_pStorage (nullptr)
    , m_pPersona (nullptr)
 {
@@ -166,8 +166,8 @@ bool SNEEZE::Initialize (int nWidth, int nHeight, const std::string& sRenderer)
 
                   // --- Initialize subsystems (cache, storage, persona) ---
 
-                  m_pFileCache = new cache::FILE_CACHE (this);
-                  m_pFileCache->Initialize ();
+                  m_pCache = new CACHE::MANAGER (this);
+                  m_pCache->Initialize ();
 
                   m_pStorage = new storage::STORAGE_SYSTEM (this);
                   m_pStorage->Initialize ();
@@ -310,11 +310,11 @@ void SNEEZE::Shutdown ()
       m_pStorage = nullptr;
    }
 
-   if (m_pFileCache)
+   if (m_pCache)
    {
-      m_pFileCache->Shutdown ();
-      delete m_pFileCache;
-      m_pFileCache = nullptr;
+      m_pCache->Shutdown ();
+      delete m_pCache;
+      m_pCache = nullptr;
    }
 
    // --- Destroy SOM ---
@@ -475,6 +475,18 @@ net::HTTP_CLIENT* SNEEZE::GetHttpClient () const
    return &s_pHttpClient;
 }
 
+void SNEEZE::NotifyCacheFileCreated (CACHE::FILE* pFile)
+{
+   if (m_pListener)
+      m_pListener->OnCacheFileCreated (pFile);
+}
+
+void SNEEZE::NotifyCacheFileChanged (CACHE::FILE* pFile)
+{
+   if (m_pListener)
+      m_pListener->OnCacheFileChanged (pFile);
+}
+
 // ---------------------------------------------------------------------------
 // Persona
 // ---------------------------------------------------------------------------
@@ -503,8 +515,8 @@ void SNEEZE::Logout ()
 
    // --- Phase 4: Destroy ---
    // Clear session caches.
-   if (m_pFileCache)
-      m_pFileCache->ClearSession ();
+   if (m_pCache)
+      m_pCache->ClearSession ();
 
    Log (SNEEZE_LISTENER::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 4 (destroy)");
 
@@ -534,8 +546,8 @@ void SNEEZE::ChangePrimaryFabric (const std::string& sUrl)
    s_pWasmRuntime.DestroyAllStores ();
 
    // --- Phase 4: Destroy and rebuild ---
-   if (m_pFileCache)
-      m_pFileCache->ClearSession ();
+   if (m_pCache)
+      m_pCache->ClearSession ();
 
    // Tear down existing primary fabric content
    if (m_pAstroService)

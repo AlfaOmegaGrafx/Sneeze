@@ -17,32 +17,35 @@
 
 #include <cstdint>
 
-namespace SNEEZE { namespace cache {
+namespace SNEEZE { namespace CACHE {
 
-// ---------------------------------------------------------------------------
-// Cache tiers
-// ---------------------------------------------------------------------------
+class FILE;
 
-enum CACHE_TIER
+enum STATE
 {
-   CACHE_TIER_MSF      = 0,   // Session-only, URL-keyed (.msf files)
-   CACHE_TIER_ASSET    = 1,   // Session-only, URL-keyed (.glb, .gltf, etc.)
-   CACHE_TIER_MODULE   = 2,   // Persistent, URL+SHA256-keyed (.wasm, .spv)
+   STATE_IDLE       = 0,
+   STATE_FETCHING   = 1,
+   STATE_VALIDATING = 2,
+   STATE_READY      = 3,
+   STATE_FAILED     = 4,
 };
 
-// ---------------------------------------------------------------------------
-// Cache entry lifecycle states
-// ---------------------------------------------------------------------------
-
-enum ENTRY_STATE
+enum REQUEST
 {
-   ENTRY_STATE_IDLE       = 0,
-   ENTRY_STATE_FETCHING   = 1,
-   ENTRY_STATE_VALIDATING = 2,
-   ENTRY_STATE_READY      = 3,
-   ENTRY_STATE_FAILED     = 4,
+   REQUEST_CREATE = 0x01,
+   REQUEST_FETCH  = 0x02,
 };
 
-}} // namespace SNEEZE::cache
+static const uint32_t kREQUEST_DEFAULT = REQUEST_CREATE | REQUEST_FETCH;
+
+class IFILE
+{
+public:
+   virtual ~IFILE () {}
+   virtual void OnFileReady  (FILE* pFile) = 0;
+   virtual void OnFileFailed (FILE* pFile) = 0;
+};
+
+}} // namespace SNEEZE::CACHE
 
 #endif // SNEEZE_CACHE_TYPES_H

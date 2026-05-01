@@ -15,7 +15,7 @@
 # ---------------------------------------------------------------------------
 # SneezeTest — unified test executable. Run with no args to execute all
 # suites, or pass --wasm, --spv, --xr, --net, --ui, --compute, --vox,
-# --jws to select individual suites.
+# --jws, --cache to select individual suites.
 # ---------------------------------------------------------------------------
 
 set (TEST_SOURCES
@@ -26,6 +26,7 @@ set (TEST_SOURCES
    ComputeTest.cpp
    VoxTest.cpp
    JwsTest.cpp
+   CacheTest.cpp
 )
 
 if (SNEEZE_ENABLE_WASM)

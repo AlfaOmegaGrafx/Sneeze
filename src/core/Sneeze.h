@@ -24,7 +24,7 @@
 
 namespace SNEEZE { namespace som { class FABRIC; class NODE; }}
 namespace SNEEZE { namespace astro { class ASTRO_SERVICE; }}
-namespace SNEEZE { namespace cache { class FILE_CACHE; }}
+namespace SNEEZE { namespace CACHE { class MANAGER; class FILE; }}
 namespace SNEEZE { namespace storage { class STORAGE_SYSTEM; }}
 namespace SNEEZE { namespace persona { class PERSONA; }}
 namespace SNEEZE { namespace net { class HTTP_CLIENT; }}
@@ -55,6 +55,9 @@ public:
 
    virtual void OnFrameReady (const uint32_t* pFB, int nFbW, int nFbH) = 0;
    virtual void Log (eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage) = 0;
+
+   virtual void OnCacheFileCreated (CACHE::FILE* pFile) { (void)pFile; }
+   virtual void OnCacheFileChanged (CACHE::FILE* pFile) { (void)pFile; }
 };
 
 // ---------------------------------------------------------------------------
@@ -133,10 +136,13 @@ public:
 
    // --- Subsystems ---
 
-   cache::FILE_CACHE*       GetCache () const { return m_pFileCache; }
+   CACHE::MANAGER*          GetCache () const { return m_pCache; }
    storage::STORAGE_SYSTEM* GetStorage () const { return m_pStorage; }
    persona::PERSONA*        GetPersona () const { return m_pPersona; }
    net::HTTP_CLIENT*        GetHttpClient () const;
+
+   void NotifyCacheFileCreated (CACHE::FILE* pFile);
+   void NotifyCacheFileChanged (CACHE::FILE* pFile);
 
 private:
    void EngineThreadLoop ();
@@ -187,7 +193,7 @@ private:
    astro::ASTRO_SERVICE*  m_pAstroService;
 
    // Subsystems
-   cache::FILE_CACHE*       m_pFileCache;
+   CACHE::MANAGER*          m_pCache;
    storage::STORAGE_SYSTEM* m_pStorage;
    persona::PERSONA*        m_pPersona;
 };
