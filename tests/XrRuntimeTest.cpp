@@ -236,7 +236,7 @@ static void TestStructInit ()
 
 // ---------------------------------------------------------------------------
 
-int main (int /*argc*/, char* /*argv*/[])
+int RunXrTests (int /*nArgc*/, char** /*aArgv*/)
 {
    std::printf ("=== OpenXR Integration Test Suite ===\n");
 

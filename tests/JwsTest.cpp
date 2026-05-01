@@ -77,7 +77,7 @@ static std::string SignPayload (const std::string& sPayload,
 // Main
 // ---------------------------------------------------------------------------
 
-int main (int nArgc, char** aArgv)
+int RunJwsTests (int nArgc, char** aArgv)
 {
    setvbuf (stdout, nullptr, _IONBF, 0);
    setvbuf (stderr, nullptr, _IONBF, 0);

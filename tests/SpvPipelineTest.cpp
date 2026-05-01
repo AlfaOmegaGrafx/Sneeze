@@ -141,7 +141,7 @@ static void TestDisassemble ()
 
 // ---------------------------------------------------------------------------
 
-int main (int /*argc*/, char* /*argv*/[])
+int RunSpvTests (int /*nArgc*/, char** /*aArgv*/)
 {
    std::printf ("=== SPIR-V Integration Test Suite ===\n");
 

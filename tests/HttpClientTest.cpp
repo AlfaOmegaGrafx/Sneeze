@@ -240,7 +240,7 @@ static void TestFetchMsfConfig ()
 
 // ---------------------------------------------------------------------------
 
-int main (int /*argc*/, char* /*argv*/[])
+int RunNetTests (int /*nArgc*/, char** /*aArgv*/)
 {
    std::printf ("=== curl Integration Test Suite ===\n");
 

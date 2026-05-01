@@ -13,7 +13,7 @@ alwaysApply: true
 
 The project produces two components:
 
-- **Sneeze** — the Metaverse Browser Engine (MBE). A standalone, reusable engine library (static `.lib`). Analogous to Blink in the web browser world. Owns all third-party dependencies (Wasmtime, SPIRV-Tools, OpenXR, curl, RmlUi, ANARI, nlohmann/json, Filament, Halogen, BoringSSL, jwt-cpp) and the engine modules that wrap them (`wasm/`, `spirv/`, `xr/`, `net/`, `ui/`, `core/`, `compute/`, `msf/`, `som/`, `cache/`, `storage/`, `persona/`, and future `smap/`, `identity/`, `audio/`). All test executables (WasmTest, SpvTest, XrTest, NetTest, UiTest, ComputeTest, JwsTest) belong to Sneeze. Another team could build a different metaverse browser on top of Sneeze without touching Artemis.
+- **Sneeze** — the Metaverse Browser Engine (MBE). A standalone, reusable engine library (static `.lib`). Analogous to Blink in the web browser world. Owns all third-party dependencies (Wasmtime, SPIRV-Tools, OpenXR, curl, RmlUi, ANARI, nlohmann/json, Filament, Halogen, BoringSSL, jwt-cpp) and the engine modules that wrap them (`wasm/`, `spirv/`, `xr/`, `net/`, `ui/`, `core/`, `compute/`, `msf/`, `som/`, `cache/`, `storage/`, `persona/`, and future `smap/`, `identity/`, `audio/`). All test suites are compiled into a single `SneezeTest` executable (run all with no args, or select suites with `--wasm`, `--spv`, `--xr`, `--net`, `--ui`, `--compute`, `--vox`, `--jws`). Another team could build a different metaverse browser on top of Sneeze without touching Artemis.
 
 - **Artemis** — the metaverse browser application. The single `.exe`. Analogous to Chrome/Chromium. A thin application layer that consumes Sneeze: window management (`canvas/`), user chrome, and `main()`. Owns SDL3 (windowing/input is application-level, not engine-level). Artemis is **not open source** — proprietary copyright headers.
 
@@ -197,9 +197,11 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 
 **Naming note:** The concrete renderer class is `sneeze::renderer::ANARI_RENDERER`. The ANARI SDK's `ANARI_*` enum constants (e.g. `ANARI_RENDERER`, `ANARI_CAMERA`) live in the global namespace, so scoping ours inside `sneeze::renderer` avoids collision without needing a backend-specific class name. (An earlier iteration called the class `HELIDE_RENDERER` to dodge the collision; the namespace fix replaced that and lets the class carry a neutral name that reflects its device-agnostic nature.)
 
-### Test Executables
+### Test Suites (unified `SneezeTest` executable)
 
-**WasmTest.exe** — Standalone Wasmtime integration test suite (`tests/WasmRuntimeTest.cpp`). 21 assertions across 5 test groups, all passing:
+All test suites are compiled into a single `SneezeTest` executable (`tests/TestRunner.cpp` + individual suite files). Each suite's `main()` was renamed to `RunXxxTests(int nArgc, char** aArgv)` and is dispatched by the unified runner. Suite selection flags (`--wasm`, `--spv`, `--xr`, `--net`, `--ui`, `--compute`, `--vox`, `--jws`) are stripped from argv before forwarding to suite functions, so suites that inspect argv (e.g. JwsTest reading a certs directory) see only passthrough args. With no flags, all suites run. `--help` lists available suites. Wasm and XR suites are conditionally compiled behind `SNEEZE_HAS_WASM` / `SNEEZE_HAS_XR` (propagated from Sneeze's PUBLIC compile definitions). The executable links only against `Sneeze` — all dependency includes, definitions, and link libraries propagate transitively via Sneeze's PUBLIC declarations. `GenCerts` remains a standalone executable (it's a tool, not a test).
+
+**Wasm suite** (`--wasm`) — Wasmtime integration tests (`tests/WasmRuntimeTest.cpp`). 21 assertions across 5 test groups, all passing:
 
 | Test | What it proves |
 |------|---------------|
@@ -209,7 +211,7 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 | Error handling | Invalid WAT is rejected with a diagnostic message, no crash |
 | Host functions | WASM-to-C++ callback: module imports `host.multiply`, Sneeze provides the implementation, `square(7)` returns 49. This is how the browser will expose its host API surface to sandboxed service code. |
 
-**SpvTest.exe** — Standalone SPIR-V integration test suite (`tests/SpvPipelineTest.cpp`). Assertions across 4 test groups, all passing:
+**Spv suite** (`--spv`) — SPIR-V integration tests (`tests/SpvPipelineTest.cpp`). Assertions across 4 test groups, all passing:
 
 | Test | What it proves |
 |------|---------------|
@@ -218,7 +220,7 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 | Validate (bad) | Garbage bytecode with valid magic number is correctly rejected — no crash, clean error path. |
 | Disassemble | Round-trips binary back to text. Confirms OpEntryPoint and OpReturn survive the assembler/disassembler cycle. |
 
-**XrTest.exe** — Standalone OpenXR integration test suite (`tests/XrRuntimeTest.cpp`). 10 assertions across 5 test groups, all passing:
+**Xr suite** (`--xr`) — OpenXR integration tests (`tests/XrRuntimeTest.cpp`). 10 assertions across 5 test groups, all passing:
 
 | Test | What it proves |
 |------|---------------|
@@ -228,7 +230,7 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 | Create instance | Full instance lifecycle: create, query properties (runtime name + version), query HMD system, query handheld display system, destroy. Each step gracefully handles the no-runtime case with a clean error code instead of a crash. On machines with SteamVR/Oculus/WMR installed, reports the runtime name, HMD capabilities, and tracking properties. |
 | Struct initialization | Verifies OpenXR typed-struct pattern (`type` tag, `next` pointer, `flags`) works correctly with MSVC. |
 
-**NetTest.exe** — Standalone libcurl integration test suite (`tests/HttpClientTest.cpp`). 20 assertions across 6 test groups, all passing. Single `curl_global_init` / `curl_global_cleanup` pair in `main` (per libcurl requirements):
+**Net suite** (`--net`) — libcurl integration tests (`tests/HttpClientTest.cpp`). 20 assertions across 6 test groups, all passing. Single `curl_global_init` / `curl_global_cleanup` pair in suite entry (per libcurl requirements):
 
 | Test | What it proves |
 |------|---------------|
@@ -239,7 +241,7 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 | Error handling | Invalid hostname correctly returns `CURLE_COULDNT_RESOLVE_HOST` — no crash, clean error code. |
 | Fetch MSF config | HTTPS GET of `cdn2-david.rp1.dev/config/dave2.msf` — real service manifest, HTTP 200, body printed to console. Proves end-to-end CDN fetch over TLS. |
 
-**UiTest.exe** — Standalone RmlUi integration test suite (`tests/UiContextTest.cpp`). 20 assertions across 5 test groups, all passing:
+**Ui suite** (`--ui`) — RmlUi integration tests (`tests/UiContextTest.cpp`). 20 assertions across 5 test groups, all passing:
 
 | Test | What it proves |
 |------|---------------|
@@ -249,7 +251,7 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 | Update cycle | `Context.Update()` + `Context.Render()` complete without crash. Proves the layout engine and render dispatch pipeline are functional (stub renderer receives calls). |
 | Multiple contexts | Two simultaneous contexts with distinct names, both create and destroy cleanly. Proves multi-context architecture works. |
 
-**JwsTest.exe** — MSF file signing + verification integration test suite (`tests/JwsTest.cpp`). 42 assertions across 9 test groups, all passing. Wired into `tests/CMakeLists.txt` (linked against the Sneeze library) and registered with CTest (`WORKING_DIRECTORY` set to the repo root so the `tests/certs/` fixtures resolve):
+**Jws suite** (`--jws`) — MSF file signing + verification integration tests (`tests/JwsTest.cpp`). 42 assertions across 9 test groups. Registered with CTest (`WORKING_DIRECTORY` set to the repo root so the `tests/certs/` fixtures resolve). **Known issue (2026-04-30):** crashes during "Tampered Payload Rejected" test (access violation in `MSF_FILE::VerifySignature` when parsing a tampered JWS) — pre-existing, needs investigation:
 
 | Test | What it proves |
 |------|---------------|
@@ -265,7 +267,7 @@ All C++ code lives in namespace `sneeze` with sub-namespaces per module. Source 
 
 **Note:** The HTML/JS viewer at `tools/MsfViewer/index.html` computes the same fingerprint (SHA-256 of SPKI) using the browser's Web Crypto API. Engine and viewer produce byte-identical fingerprints for the same leaf certificate — confirmed end-to-end against `sample.mss`.
 
-**ComputeTest.exe** — Standalone SPIR-V compute integration test suite (`tests/ComputeTest.cpp`). 20 assertions across 8 test groups, all passing:
+**Compute suite** (`--compute`) — SPIR-V compute integration tests (`tests/ComputeTest.cpp`). 20 assertions across 8 test groups. **Known issue (2026-04-30):** Embedded kernel retrieval tests fail (4 of 20) — the SPIR-V binary is not found at runtime, likely a resource embedding issue that needs investigation:
 
 | Test | What it proves |
 |------|---------------|
@@ -577,7 +579,7 @@ The project has **two fully independent CMake trees**, parameterized by `SNEEZE_
 - **deps/CMakeLists.txt** — standalone deps project. `cmake -S deps` builds all deps; `cmake -S deps -DDEP=<name>` builds one (CI path). Never references `src/`. Derives `SNEEZE_CONFIG`, `SNEEZE_PLATFORM`, `SNEEZE_DEP_REPO`, `LIBS_DIR` if not passed explicitly. Applies cross-dep ordering via `add_dependencies(...)`.
 - **deps/*.cmake** — one `ExternalProject_Add` per dep. Single source of truth; included by `deps/CMakeLists.txt`.
 - **src/CMakeLists.txt** — standalone Sneeze project. `cmake -S src`. Finds deps under `${LIBS_DIR}/<Name>/install/`. Forces `CMAKE_{ARCHIVE,LIBRARY,RUNTIME}_OUTPUT_DIRECTORY` (and the per-config `_DEBUG` / `_RELEASE` variants) to `${SNEEZE_BUILD_ROOT}/install/$<LOWER_CASE:$<CONFIG>>/{lib,bin}` so one build tree produces both configs into separate sibling `install/` trees (symmetric with each dep's `install/{bin,lib}`). `CMAKE_CONFIGURATION_TYPES` is pinned to `Debug;Release` **before** `project()` to keep VS/Xcode/Ninja-Multi-Config from probing `MinSizeRel`/`RelWithDebInfo` paths that don't exist in `deps/builds/<plat>/`. Never references `deps/`.
-- **tests/CMakeLists.txt** — defines individual test executables; pulled in by `src/CMakeLists.txt`, inherits its multi-config output dirs.
+- **tests/CMakeLists.txt** — defines the unified `SneezeTest` executable (all suite TUs + `TestRunner.cpp`) and the `GenCerts` tool; pulled in by `src/CMakeLists.txt`, inherits its multi-config output dirs. `SneezeTest` links only against `Sneeze` (all deps propagate transitively). Wasm and XR suites conditionally compiled via `SNEEZE_ENABLE_WASM` / `SNEEZE_ENABLE_XR`.
 - **scripts/build-{windows.ps1,linux.sh,macos.sh}** — the only glue between deps and Sneeze. Default (no flag): plain `cmake --build builds/<plat>/build --config <cfg>` (no dep checks, no configure). `-Deps` / `--deps`: `cmake -S deps` + stamped per-dep build loop against the per-config dep tree. `-All` / `--all`: deps flow, then `cmake -S src -B builds/<plat>/build` configure (Visual Studio generator on Windows, Ninja Multi-Config on Linux/macOS), then `cmake --build … --config <cfg>` to emit that config. `-Fresh` / `--fresh`: passes `cmake --fresh` (CMake 3.24+) to wipe `CMakeCache.txt` + `CMakeFiles/` before reconfiguring, then builds Sneeze. Deps phase is skipped entirely. Renamed from the earlier `-Configure` to avoid collision with the `-Config Debug|Release` flag that sits next to it on every command line, and to match the real semantics (`cmake --fresh` is the underlying primitive). Use `-Fresh` when you want to be certain stale cache values (anari_DIR, compiler paths, toolchain tweaks) are gone; `-All`'s reconfigure stays non-destructive (idempotent cache update). `-Rebuild` / `--rebuild` is a **modifier, not a mode**: it composes with whatever target set the real mode flags pick out, and it **never crosses the src ↔ deps wall on its own**. Alone → wipe + rebuild the Sneeze tree (`builds/<plat>/`, which includes both configs' install siblings and the shared `build/`). With `-Only <dep>` → scrub + rebuild that one dep. With `-Deps` → scrub + rebuild the entire per-config dep root. With `-All` → scrub + rebuild deps, then scrub + rebuild Sneeze. Source clones in `deps/repos/` are always preserved. `-Only` and `-List` imply deps mode; `-Rebuild` does NOT. `-Deps`, `-All`, and `-Fresh` are mutually exclusive; `-Rebuild` composes with any of them.
 - **scripts/build-deps.sh** — shared bash helper that drives `cmake -S deps` and the per-dep stamped loop on Linux/macOS; invoked by `build-linux.sh` and `build-macos.sh` when in deps mode.
 - **Wasmtime** is built via `cargo build --release -p wasmtime-c-api` regardless of `SNEEZE_CONFIG` (Cargo release mode is always used; the product just gets copied into the config-specific install tree).
@@ -607,14 +609,10 @@ The project has **two fully independent CMake trees**, parameterized by `SNEEZE_
 .\scripts\build-windows.ps1 -Rebuild                    # full-scrub SNEEZE ONLY (no deps touched)
 
 # Run tests (Release; swap 'release' -> 'debug' for Debug builds)
-builds\windows-x64\install\release\bin\WasmTest.exe
-builds\windows-x64\install\release\bin\SpvTest.exe
-builds\windows-x64\install\release\bin\XrTest.exe
-builds\windows-x64\install\release\bin\NetTest.exe
-builds\windows-x64\install\release\bin\UiTest.exe
-builds\windows-x64\install\release\bin\ComputeTest.exe
-builds\windows-x64\install\release\bin\VoxTest.exe
-builds\windows-x64\install\release\bin\JwsTest.exe
+builds\windows-x64\install\release\bin\SneezeTest.exe              # all suites
+builds\windows-x64\install\release\bin\SneezeTest.exe --jws        # single suite
+builds\windows-x64\install\release\bin\SneezeTest.exe --spv --vox  # multiple suites
+builds\windows-x64\install\release\bin\SneezeTest.exe --help       # list suites
 ```
 
 ```bash
@@ -639,9 +637,8 @@ builds\windows-x64\install\release\bin\JwsTest.exe
 ./scripts/build-linux.sh --rebuild                      # full-scrub SNEEZE ONLY (no deps touched)
 
 # Run tests
-./builds/linux-x64/install/release/bin/WasmTest
-./builds/linux-x64/install/release/bin/ComputeTest
-# (etc.)
+./builds/linux-x64/install/release/bin/SneezeTest              # all suites
+./builds/linux-x64/install/release/bin/SneezeTest --jws        # single suite
 ```
 
 ## Proof of Concept — Solar System (COMPLETE)

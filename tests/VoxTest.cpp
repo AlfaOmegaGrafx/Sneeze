@@ -115,7 +115,7 @@ static void TestNullDevice ()
    TEST_ASSERT (pDevice == nullptr);
 }
 
-int main ()
+int RunVoxTests (int /*nArgc*/, char** /*aArgv*/)
 {
    std::printf ("=== VoxTest ===\n\n");
 

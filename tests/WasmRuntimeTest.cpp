@@ -384,7 +384,7 @@ static void TestHostFunction ()
 
 // ---------------------------------------------------------------------------
 
-int main (int /*argc*/, char* /*argv*/[])
+int RunWasmTests (int /*nArgc*/, char** /*aArgv*/)
 {
    std::printf ("=== Wasmtime Integration Test Suite ===\n");
    std::printf ("Wasmtime version: %s\n", WASMTIME_VERSION);

@@ -276,7 +276,7 @@ static void TestMultipleContexts ()
 
 // ---------------------------------------------------------------------------
 
-int main (int /*argc*/, char* /*argv*/[])
+int RunUiTests (int /*nArgc*/, char** /*aArgv*/)
 {
    std::printf ("=== RmlUi Integration Test Suite ===\n");
 

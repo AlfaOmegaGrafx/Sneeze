@@ -201,7 +201,7 @@ static void TestUnknownKernelDispatch ()
    Check (!bResult, "Dispatch of unknown kernel returns false");
 }
 
-int main ()
+int RunComputeTests (int /*nArgc*/, char** /*aArgv*/)
 {
    std::printf ("ComputeTest - SPIR-V Compute Integration Tests\n");
    std::printf ("=======================================================\n");
