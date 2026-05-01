@@ -49,6 +49,7 @@ public:
    };
 
 public:
+
    virtual ~SNEEZE_LISTENER () = default;
 
    virtual void OnFrameReady (const uint32_t* pFB, int nFbW, int nFbH) = 0;
