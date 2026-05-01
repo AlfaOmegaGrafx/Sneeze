@@ -37,6 +37,7 @@ RMCOBJECT::RMCOBJECT (const RMCOBJECT_PROPS& props)
    , dSystemRadiusKm (props.dSystemRadiusKm)
    , dBound       (0.0)
    , pColor       (props.pColor)
+   , sTexture     (props.sTexture)
 {
    // Parent wiring
    if (!props.sId_Parent.empty ())

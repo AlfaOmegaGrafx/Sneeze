@@ -183,6 +183,8 @@ void WORKER_COMPOSITOR::ThreadLoop ()
       pCamera.dAspect = (nW > 0  &&  nH > 0)
          ? static_cast<float> (nW) / static_cast<float> (nH)
          : 1.0f;
+      pCamera.dNear   = 0.0001f;
+      pCamera.dFar    = 1000.0f;
 
       m_pRenderer.SetCamera (pCamera);
 
@@ -230,11 +232,22 @@ void WORKER_COMPOSITOR::ThreadLoop ()
             if (!pCelestial->m_pOrbit) dRadius *= SUN_RADIUS_SCALE;
 
             renderer::SPHERE_DATA sphere;
-            sphere.x       = dBodyX;
-            sphere.y       = dBodyY;
-            sphere.z       = dBodyZ;
-            sphere.dRadius = dRadius;
+            sphere.x         = dBodyX;
+            sphere.y         = dBodyY;
+            sphere.z         = dBodyZ;
+            sphere.dRadius   = dRadius;
+            sphere.bEmissive = !pCelestial->m_pOrbit;
             ColorFromU32 (pCelestial->m_nColor, sphere.r, sphere.g, sphere.b);
+
+            if (pCelestial->m_bTextureReady.load ())
+            {
+               pCelestial->LockTexture ();
+               sphere.pTexturePixels  = pCelestial->m_aTexturePixels.data ();
+               sphere.nTextureWidth   = pCelestial->m_nTextureWidth;
+               sphere.nTextureHeight  = pCelestial->m_nTextureHeight;
+               pCelestial->UnlockTexture ();
+            }
+
             aSpheres.push_back (sphere);
 
             // --- Orbit trail ---

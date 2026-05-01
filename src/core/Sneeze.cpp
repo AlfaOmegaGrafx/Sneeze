@@ -470,6 +470,11 @@ std::vector<void*>& SNEEZE::GetBodies ()
    return aBodies;
 }
 
+net::HTTP_CLIENT* SNEEZE::GetHttpClient () const
+{
+   return &s_pHttpClient;
+}
+
 // ---------------------------------------------------------------------------
 // Persona
 // ---------------------------------------------------------------------------
@@ -603,11 +608,10 @@ void SNEEZE::EngineThreadLoop ()
             int nHz = m_anWorkerHertz[nIz];
             if (nHz <= 0)
                continue;
-            sMetronome += "  [" + std::to_string (nIz) + "] "
-               + std::to_string (m_anWorkerSignalCount[nIz]) + "/" + std::to_string (nHz) + " Hz";
+            sMetronome += "  [" + std::to_string (nIz) + "] " + std::to_string (m_anWorkerSignalCount[nIz]) + "/" + std::to_string (nHz) + " Hz";
             m_anWorkerSignalCount[nIz] = 0;
          }
-         Log (SNEEZE_LISTENER::kLOGLEVEL_Trace, "METRONOME", sMetronome);
+      // Log (SNEEZE_LISTENER::kLOGLEVEL_Trace, "METRONOME", sMetronome);
          nLastReport = nCurrentSecond;
       }
    }

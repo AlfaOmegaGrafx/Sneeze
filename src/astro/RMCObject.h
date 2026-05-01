@@ -65,6 +65,7 @@ struct RMCOBJECT_PROPS
    std::optional<double> dObliquity;
 
    RMCOBJECT_COLOR       pColor          = { 0xcccccc, 0x666666, 0xffffff };
+   std::string           sTexture;
 
    ORBIT_PROPS           orbit;
    bool                  bHasOrbit       = false;
@@ -94,6 +95,7 @@ public:
 
    // Visual
    RMCOBJECT_COLOR         pColor;
+   std::string             sTexture;
 
    // Composition
    std::unique_ptr<ORBIT>  pOrbit;

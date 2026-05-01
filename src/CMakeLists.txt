@@ -569,8 +569,8 @@ set (STORAGE_HEADERS  storage/Storage.h)
 set (PERSONA_SOURCES  persona/Persona.cpp)
 set (PERSONA_HEADERS  persona/Persona.h)
 
-set (RENDERER_SOURCES  renderer/AnariRenderer.cpp)
-set (RENDERER_HEADERS  renderer/Renderer.h  renderer/AnariRenderer.h)
+set (RENDERER_SOURCES  renderer/AnariRenderer.cpp  renderer/UVSphere.cpp)
+set (RENDERER_HEADERS  renderer/Renderer.h  renderer/AnariRenderer.h  renderer/UVSphere.h)
 
 set (VIEW_SOURCES    view/CameraOrbit.cpp)
 set (VIEW_HEADERS    view/CameraOrbit.h)
@@ -615,6 +615,9 @@ set (MSF_HEADERS
    msf/CertInfo.h
    msf/CertChain.h)
 
+set (STB_SOURCES  stb/stb_image_impl.cpp)
+set (STB_HEADERS  stb/stb_image.h)
+
 # ---------------------------------------------------------------------------
 # Static library
 # ---------------------------------------------------------------------------
@@ -635,6 +638,7 @@ add_library (Sneeze STATIC
    ${UI_SOURCES}        ${UI_HEADERS}
    ${COMPUTE_SOURCES}   ${COMPUTE_HEADERS}
    ${MSF_SOURCES}       ${MSF_HEADERS}
+   ${STB_SOURCES}       ${STB_HEADERS}
    ${KERNEL_EMBED_FILES}
 )
 add_dependencies (Sneeze CompileKernels)
@@ -728,6 +732,7 @@ source_group ("net"      FILES ${NET_SOURCES} ${NET_HEADERS})
 source_group ("ui"       FILES ${UI_SOURCES} ${UI_HEADERS})
 source_group ("compute"  FILES ${COMPUTE_SOURCES} ${COMPUTE_HEADERS})
 source_group ("msf"      FILES ${MSF_SOURCES} ${MSF_HEADERS})
+source_group ("stb"      FILES ${STB_SOURCES} ${STB_HEADERS})
 
 # ---------------------------------------------------------------------------
 # Tools (desktop-only CLI utilities built on top of the Sneeze library)

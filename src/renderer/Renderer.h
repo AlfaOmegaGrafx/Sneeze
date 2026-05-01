@@ -26,6 +26,11 @@ struct SPHERE_DATA
    float x, y, z;
    float dRadius;
    float r, g, b;
+
+   const uint8_t* pTexturePixels  = nullptr;
+   int            nTextureWidth   = 0;
+   int            nTextureHeight  = 0;
+   bool           bEmissive       = false;
 };
 
 struct CURVE_POINT
@@ -47,6 +52,8 @@ struct CAMERA_DATA
    float dUpX,  dUpY,  dUpZ;
    float dFovY;
    float dAspect;
+   float dNear;
+   float dFar;
 };
 
 class RENDERER

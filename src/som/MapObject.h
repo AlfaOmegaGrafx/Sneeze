@@ -17,6 +17,10 @@
 
 #include "Types.h"
 #include <cstdint>
+#include <string>
+#include <vector>
+#include <mutex>
+#include <atomic>
 
 namespace SNEEZE { namespace som {
 
@@ -47,6 +51,18 @@ public:
 
    // Visual color (0xRRGGBB)
    uint32_t m_nColor = 0xcccccc;
+
+   // Texture
+   std::string              m_sTextureUrl;
+   std::vector<uint8_t>     m_aTexturePixels;
+   int                      m_nTextureWidth  = 0;
+   int                      m_nTextureHeight = 0;
+   int                      m_nTextureChannels = 0;
+   std::atomic<bool>        m_bTextureReady {false};
+   mutable std::mutex       m_textureMutex;
+
+   void LockTexture () const   { m_textureMutex.lock (); }
+   void UnlockTexture () const { m_textureMutex.unlock (); }
 
 private:
    MAP_OBJECT_TYPE m_bType;

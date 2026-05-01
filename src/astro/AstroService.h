@@ -19,6 +19,7 @@
 #include "som/Node.h"
 #include "som/MapObject.h"
 #include <vector>
+#include <thread>
 
 namespace SNEEZE { namespace CORE { class SNEEZE; }}
 
@@ -60,10 +61,13 @@ public:
    void Shutdown ();
 
 private:
+   void FetchTexture (CELESTIAL_MAP_OBJECT* pMapObj);
+
    CORE::SNEEZE*                           m_pSneeze;
    SNEEZE::som::FABRIC*                    m_pFabric;
    std::vector<SNEEZE::som::NODE*>         m_apNodes;
    std::vector<CELESTIAL_MAP_OBJECT*>      m_apMapObjects;
+   std::vector<std::thread>                m_aFetchThreads;
 };
 
 }} // namespace SNEEZE::astro

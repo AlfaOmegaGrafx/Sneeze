@@ -16,8 +16,10 @@
 #define SNEEZE_RENDERER_ANARIRENDERER_H
 
 #include "Renderer.h"
+#include "UVSphere.h"
 #include <vector>
 #include <string>
+#include <unordered_map>
 
 namespace SNEEZE { namespace CORE { class SNEEZE; }}
 
@@ -87,6 +89,10 @@ private:
 
    std::vector<SPHERE_DATA> m_aSpheres;
    std::vector<CURVE_DATA>  m_aCurves;
+
+   UV_SPHERE m_pUnitSphere;
+   bool      m_bUnitSphereReady;
+   std::unordered_map<const uint8_t*, std::vector<float>> m_pColorCache;
 
    double m_dLastSubmitSeconds;
    double m_dLastRenderSeconds;

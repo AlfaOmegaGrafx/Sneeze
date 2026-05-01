@@ -32,6 +32,31 @@ static RMCOBJECT_COLOR MakeColor (uint8_t r, uint8_t g, uint8_t b)
 
 void CreateSolarSystem ()
 {
+/*
+https://cdn.rp1.com/res/texture/celestial/sun.jpg
+https://cdn.rp1.com/res/texture/celestial/sun_yellow.jpg
+https://cdn.rp1.com/res/texture/celestial/sun_orange.jpg
+
+https://cdn.rp1.com/res/texture/celestial/mercury.jpg
+https://cdn.rp1.com/res/texture/celestial/venus.jpg
+https://cdn.rp1.com/res/texture/celestial/earth.jpg
+https://cdn.rp1.com/res/texture/celestial/mars.jpg
+https://cdn.rp1.com/res/texture/celestial/jupiter.jpg
+https://cdn.rp1.com/res/texture/celestial/saturn.jpg
+https://cdn.rp1.com/res/texture/celestial/uranus.jpg
+https://cdn.rp1.com/res/texture/celestial/neptune.jpg
+https://cdn.rp1.com/res/texture/celestial/pluto.jpg
+
+https://cdn.rp1.com/res/texture/celestial/saturn_ring.png
+
+https://cdn.rp1.com/res/texture/celestial/moon.jpg
+
+https://cdn.rp1.com/res/texture/celestial/generic_moon-0.png
+https://cdn.rp1.com/res/texture/celestial/generic_moon-1.png
+https://cdn.rp1.com/res/texture/celestial/generic_moon-2.png
+https://cdn.rp1.com/res/texture/celestial/generic_moon-3.png
+https://cdn.rp1.com/res/texture/celestial/generic_moon-4.png
+*/   
    {
       RMCOBJECT_PROPS props;
       props.sName       = "Solar System";
@@ -50,6 +75,7 @@ void CreateSolarSystem ()
       props.dRadius     = 695700;
       props.dMass       = 1.98841e30;
       props.pColor      = MakeColor (0xff, 0xdd, 0x66);
+      props.sTexture    = "https://cdn.rp1.com/res/texture/celestial/sun.jpg";
       props.bHasOrbit   = false;
       new RMCOBJECT (props);
    }
@@ -85,6 +111,7 @@ void CreateSolarSystem ()
       props.dRadius     = 2439.4;
       props.dMass       = 3.302e23;
       props.pColor      = MakeColor (0xaa, 0xaa, 0xaa);
+      props.sTexture    = "https://cdn.rp1.com/res/texture/celestial/mercury.jpg";
       props.bHasOrbit   = false;
       new RMCOBJECT (props);
    }
@@ -120,6 +147,7 @@ void CreateSolarSystem ()
       props.dRadius     = 6051.84;
       props.dMass       = 4.8685e24;
       props.pColor      = MakeColor (0xee, 0xcc, 0x88);
+      props.sTexture    = "https://cdn.rp1.com/res/texture/celestial/venus.jpg";
       props.bHasOrbit   = false;
       new RMCOBJECT (props);
    }
@@ -156,6 +184,7 @@ void CreateSolarSystem ()
       props.dRadius     = 6371.01;
       props.dMass       = 5.97219e24;
       props.pColor      = MakeColor (0x44, 0x88, 0xff);
+      props.sTexture    = "https://cdn.rp1.com/res/texture/celestial/earth.jpg";
       props.bHasOrbit   = false;
       new RMCOBJECT (props);
    }
@@ -192,6 +221,7 @@ void CreateSolarSystem ()
       props.dRadius     = 3389.92;
       props.dMass       = 6.4171e23;
       props.pColor      = MakeColor (0xff, 0x66, 0x44);
+      props.sTexture    = "https://cdn.rp1.com/res/texture/celestial/mars.jpg";
       props.bHasOrbit   = false;
       new RMCOBJECT (props);
    }
@@ -228,6 +258,7 @@ void CreateSolarSystem ()
       props.dRadius     = 69911;
       props.dMass       = 1.89819e27;
       props.pColor      = MakeColor (0xdd, 0xaa, 0x66);
+      props.sTexture    = "https://cdn.rp1.com/res/texture/celestial/jupiter.jpg";
       props.bHasOrbit   = false;
       new RMCOBJECT (props);
    }
@@ -264,6 +295,7 @@ void CreateSolarSystem ()
       props.dRadius     = 58232;
       props.dMass       = 5.6834e26;
       props.pColor      = MakeColor (0xcc, 0xbb, 0x77);
+      props.sTexture    = "https://cdn.rp1.com/res/texture/celestial/saturn.jpg";
       props.bHasOrbit   = false;
       new RMCOBJECT (props);
    }
@@ -300,6 +332,7 @@ void CreateSolarSystem ()
       props.dRadius     = 25362;
       props.dMass       = 8.6813e25;
       props.pColor      = MakeColor (0x66, 0xcc, 0xdd);
+      props.sTexture    = "https://cdn.rp1.com/res/texture/celestial/uranus.jpg";
       props.bHasOrbit   = false;
       new RMCOBJECT (props);
    }
@@ -336,6 +369,7 @@ void CreateSolarSystem ()
       props.dRadius     = 24624;
       props.dMass       = 1.02409e26;
       props.pColor      = MakeColor (0x44, 0x66, 0xff);
+      props.sTexture    = "https://cdn.rp1.com/res/texture/celestial/neptune.jpg";
       props.bHasOrbit   = false;
       new RMCOBJECT (props);
    }
@@ -372,6 +406,7 @@ void CreateSolarSystem ()
       props.dRadius     = 1188.3;
       props.dMass       = 1.307e22;
       props.pColor      = MakeColor (0xcc, 0xaa, 0x88);
+      props.sTexture    = "https://cdn.rp1.com/res/texture/celestial/pluto.jpg";
       props.bHasOrbit   = false;
       new RMCOBJECT (props);
    }

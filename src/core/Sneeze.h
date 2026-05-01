@@ -27,6 +27,7 @@ namespace SNEEZE { namespace astro { class ASTRO_SERVICE; }}
 namespace SNEEZE { namespace cache { class FILE_CACHE; }}
 namespace SNEEZE { namespace storage { class STORAGE_SYSTEM; }}
 namespace SNEEZE { namespace persona { class PERSONA; }}
+namespace SNEEZE { namespace net { class HTTP_CLIENT; }}
 
 namespace SNEEZE { namespace CORE {
 
@@ -135,6 +136,7 @@ public:
    cache::FILE_CACHE*       GetCache () const { return m_pFileCache; }
    storage::STORAGE_SYSTEM* GetStorage () const { return m_pStorage; }
    persona::PERSONA*        GetPersona () const { return m_pPersona; }
+   net::HTTP_CLIENT*        GetHttpClient () const;
 
 private:
    void EngineThreadLoop ();

@@ -14,8 +14,10 @@
 
 #include "AstroService.h"
 #include "core/Sneeze.h"
+#include "net/HttpClient.h"
 #include "RMCObject.h"
 #include "Orbit.h"
+#include "stb/stb_image.h"
 
 namespace SNEEZE { namespace astro {
 
@@ -48,14 +50,17 @@ bool ASTRO_SERVICE::Initialize (SNEEZE::som::FABRIC* pPrimaryFabric)
 
    // --- Sun node (no orbit, sits at origin) ---
    {
+      RMCOBJECT* pSun = RMCOBJECT::Find ("sun");
+
       auto* pMapObj = new CELESTIAL_MAP_OBJECT ();
-      pMapObj->m_dPosX   = 0.0;
-      pMapObj->m_dPosY   = 0.0;
-      pMapObj->m_dPosZ   = 0.0;
-      pMapObj->m_dRadius = 695700.0 * 1000.0;
-      pMapObj->m_nColor  = 0xFFE666;
-      pMapObj->m_pBody   = nullptr;
-      pMapObj->m_pOrbit  = nullptr;
+      pMapObj->m_dPosX       = 0.0;
+      pMapObj->m_dPosY       = 0.0;
+      pMapObj->m_dPosZ       = 0.0;
+      pMapObj->m_dRadius     = 695700.0 * 1000.0;
+      pMapObj->m_nColor      = 0xFFE666;
+      pMapObj->m_pBody       = nullptr;
+      pMapObj->m_pOrbit      = nullptr;
+      pMapObj->m_sTextureUrl = pSun ? pSun->sTexture : "";
 
       auto* pNode = new SNEEZE::som::NODE ();
       pNode->SetFabric (m_pFabric);
@@ -93,11 +98,16 @@ bool ASTRO_SERVICE::Initialize (SNEEZE::som::FABRIC* pPrimaryFabric)
          nColor = pChildBody->GetColor ();
       }
 
+      std::string sTexture;
+      if (pChildBody  &&  !pChildBody->sTexture.empty ())
+         sTexture = pChildBody->sTexture;
+
       auto* pMapObj = new CELESTIAL_MAP_OBJECT ();
-      pMapObj->m_dRadius = dRadius;
-      pMapObj->m_nColor  = nColor;
-      pMapObj->m_pBody   = pBody;
-      pMapObj->m_pOrbit  = pBody->pOrbit.get ();
+      pMapObj->m_dRadius     = dRadius;
+      pMapObj->m_nColor      = nColor;
+      pMapObj->m_pBody       = pBody;
+      pMapObj->m_pOrbit      = pBody->pOrbit.get ();
+      pMapObj->m_sTextureUrl = sTexture;
 
       auto* pNode = new SNEEZE::som::NODE ();
       pNode->SetFabric (m_pFabric);
@@ -111,11 +121,69 @@ bool ASTRO_SERVICE::Initialize (SNEEZE::som::FABRIC* pPrimaryFabric)
    m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "ASTRO_SERVICE",
       "Populated " + std::to_string (static_cast<int> (m_apNodes.size ())) + " SOM nodes");
 
+   for (auto* pObj : m_apMapObjects)
+   {
+      if (!pObj->m_sTextureUrl.empty ())
+         m_aFetchThreads.emplace_back (&ASTRO_SERVICE::FetchTexture, this, pObj);
+   }
+
    return true;
+}
+
+void ASTRO_SERVICE::FetchTexture (CELESTIAL_MAP_OBJECT* pMapObj)
+{
+   net::HTTP_CLIENT* pHttp = m_pSneeze->GetHttpClient ();
+   if (!pHttp)
+      return;
+
+   std::string sData;
+   long nHttpCode = 0;
+   bool bOk = pHttp->Get (pMapObj->m_sTextureUrl, sData, nHttpCode);
+   if (!bOk  ||  nHttpCode != 200)
+   {
+      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Warning, "ASTRO_SERVICE",
+         "Failed to fetch texture: " + pMapObj->m_sTextureUrl +
+         " (http " + std::to_string (nHttpCode) + ")");
+      return;
+   }
+
+   int nW = 0, nH = 0, nChannels = 0;
+   unsigned char* pPixels = stbi_load_from_memory (
+      reinterpret_cast<const unsigned char*> (sData.data ()),
+      static_cast<int> (sData.size ()),
+      &nW, &nH, &nChannels, 4);
+
+   if (!pPixels)
+   {
+      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Warning, "ASTRO_SERVICE",
+         "Failed to decode texture: " + pMapObj->m_sTextureUrl);
+      return;
+   }
+
+   {
+      std::lock_guard<std::mutex> lock (pMapObj->m_textureMutex);
+      pMapObj->m_aTexturePixels.assign (pPixels, pPixels + nW * nH * 4);
+      pMapObj->m_nTextureWidth    = nW;
+      pMapObj->m_nTextureHeight   = nH;
+      pMapObj->m_nTextureChannels = 4;
+   }
+   pMapObj->m_bTextureReady.store (true);
+   stbi_image_free (pPixels);
+
+   m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "ASTRO_SERVICE",
+      "Loaded texture " + pMapObj->m_sTextureUrl +
+      " (" + std::to_string (nW) + "x" + std::to_string (nH) + ")");
 }
 
 void ASTRO_SERVICE::Shutdown ()
 {
+   for (auto& thread : m_aFetchThreads)
+   {
+      if (thread.joinable ())
+         thread.join ();
+   }
+   m_aFetchThreads.clear ();
+
    for (auto* pNode : m_apNodes)
       delete pNode;
    m_apNodes.clear ();
