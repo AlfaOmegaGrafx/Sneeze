@@ -25,6 +25,7 @@ namespace SNEEZE { namespace CACHE {
 
 class ENTRY;
 class MANAGER;
+class STORE;
 
 // ---------------------------------------------------------------------------
 // FILE — per-caller handle to a cached resource.
@@ -39,7 +40,7 @@ class MANAGER;
 class FILE
 {
 public:
-   FILE (MANAGER* pManager, ENTRY* pEntry, IFILE* pListener);
+   FILE (MANAGER* pManager, ENTRY* pEntry, STORE* pStore, IFILE* pListener, uint32_t nSequence);
    ~FILE ();
 
    // --- State ---
@@ -85,6 +86,11 @@ public:
    void        Clear (bool b = true);
    void        Reset (bool b = true);
 
+   // --- Store ---
+
+   STORE*      GetStore () const          { return m_pStore; }
+   std::string GetStoreName () const;
+
    // --- Listener ---
 
    IFILE*      GetListener () const { return m_pListener; }
@@ -95,13 +101,13 @@ public:
    bool        IsPendingClear () const    { return m_bPendingClear; }
    bool        IsReleased () const        { return m_bReleased; }
 
-   void        SetSequence (uint32_t nSeq) { m_nSequence = nSeq; }
-   void        SetReleased ()              { m_bReleased = true; }
-   void        NullEntry ()               { m_pEntry = nullptr; }
+   void        SetReleased ()               { m_bReleased = true; }
+   bool        SetPendingClear (bool b)     { bool bChanged = (b != m_bPendingClear); m_bPendingClear = b; return bChanged; }
 
 private:
    MANAGER*    m_pManager;
    ENTRY*      m_pEntry;
+   STORE*      m_pStore;
    IFILE*      m_pListener;
    uint32_t    m_nSequence;
    bool        m_bPendingClear;

@@ -442,3 +442,36 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 - **Demoted verbose log messages** — Changed "Cached ..." (CACHE) and "Loaded texture ..." (ASTRO_SERVICE) from INFO to TRACE level.
 - **Both projects compile cleanly** — Sneeze and Artemis build successfully. Artemis link error was only due to running executable being locked.
 - **Updated `project.mdc`** — rewrote SNEEZE, ISNEEZE, ASTRO_SERVICE, CELESTIAL_MAP_OBJECT, STORAGE_SYSTEM, cache module entries. Updated all stale `SNEEZE_LISTENER`/`ARTEMIS_LISTENER`/`GetListener()` references throughout.
+
+### 2026-05-01 (Thu) ~7:15 PM – 2026-05-02 (Fri) ~6:30 AM PDT
+**Dean Abramson**
+
+- **Eliminated session/persistent distinction** — All cached files now persist on disk across restarts. Removed the separate `Cache/tmp/` session directory. The `GetSessionCachePath()` method and `m_sSessionPath` member were removed; replaced by a single `GetCachePath()` / `m_sCachePath`. `DiskKeyToPath()` no longer takes a `bPersistent` parameter.
+- **Collapsed bulk operations** — `ClearSession()`/`ClearAll()`/`ResetSession()`/`ResetAll()` replaced by single `Clear()` and `Reset()` methods. `Sneeze.cpp` teardown paths updated (`ClearSession()` → `Clear()`).
+- **Reworked Clear to immediate action** — `Clear(bool)` is now an immediate visibility toggle for the inspector. `Clear(true)` fires `OnCacheFileDeleted` and removes the FILE from the history list at once; `Clear(false)` adds it back and fires `OnCacheFileCreated`. `SetPendingClear(bool)` on FILE returns `bool` (whether the flag changed) to prevent duplicate notifications. Clear also acts as a deferred destruction flag — cleared FILEs are deleted on Release.
+- **Reworked Reset to deferred flag** — `Reset(bool)` only sets a flag on the ENTRY. Actual destruction (disk file deletion + ENTRY removal from map) happens when the last FILE handle is released and the attach count reaches zero. `ResetEntry()` replaces the old `DestroyEntry()` + `NullifyHistoryEntries()` methods.
+- **Added STORE identity** — New `Store.h` class. Every `Request()` now takes a store name string identifying the originating WASM container. MANAGER creates STORE objects per unique name via `FindOrCreateStore()`, attached to each FILE at creation. `GetStore()` and `GetStoreName()` accessors on FILE. Added to `CMakeLists.txt`.
+- **Reordered Request() signatures** — Listener and store moved to front: `Request(pListener, sStore, sUrl)` and `Request(pListener, sStore, sUrl, sHash, bFlags)`. All callers updated (tests, ASTRO_SERVICE).
+- **Removed REQUEST_FETCH flag** — `kREQUEST_DEFAULT` is now just `REQUEST_CREATE`. The fetch-vs-don't-fetch decision is driven by entry state, not a flag.
+- **Added cache bypass toggle** — `SetCacheEnabled(bool)` / `IsCacheEnabled()`. When disabled, `Request()` always triggers a fresh fetch even when cached data exists on disk. Existing entries are not destroyed.
+- **Added display toggle** — `SetDisplayEnabled(bool)` / `IsDisplayEnabled()`. When disabled, new FILEs are auto-cleared so they never appear in inspector history and no `OnCacheFileCreated` notifications fire.
+- **Simplified FILE** — Removed null-guard `if (m_pEntry)` checks from all accessors — FILE always has a valid ENTRY. Removed `NullEntry()`. `Clear()` and `Reset()` now route through MANAGER. Sequence number assigned at construction (moved from MANAGER setter to constructor parameter).
+- **ENTRY gained `ResetState()`** — Clears all state (disk path, hash, headers, size, times, flags) back to IDLE. `ReadData()` refactored to single-return pattern.
+- **Changed mutex to `recursive_mutex`** — Needed for re-entrant locking in notification → Clear → Release chains.
+- **Moved texture fetches to AddChild time** — `ASTRO_SERVICE` now triggers cache requests immediately after each node is added to the SOM via `AddChild()`, not in a batch loop afterward. Store name: `"Solar System"`.
+- **7-hour debugging session (crash in Test 19)** — Heap corruption manifesting as crash during `thread.join()` in Shutdown. Root cause was a race condition in the Clear/Release/notification interaction where a FILE could be deleted while a fetch thread still referenced it. Tracked down via extensive `fprintf(stderr)` diagnostic tracing through all code paths. All debug artifacts removed after fix.
+- **Bug fixes** — IDLE path in `Request()` now sets hash on the ENTRY when one is provided (fixed Tests 4 and 9). Test 16 updated to verify `IsPendingClear()` flag instead of checking history size.
+- **Removed Test 20 (ResetAll)** — Consolidated into simplified Test 19 (Clear). Suite: 69 tests, 0 failures.
+- **SaveManifest moved to shutdown-only** — Removed per-fetch `SaveManifest()` call from `FetchEntry()`. Manifest now saved only in `Shutdown()`. Decision: at scale (100K entries), iterating all entries and serializing JSON 10 times/second under mutex is unacceptable. If the app crashes, the cache reverts to the prior session's manifest — acceptable trade-off.
+- **Updated `Cache.md`** — Full rewrite to match new API: removed session/persistent distinction, documented STORE, cache bypass, display toggle, immediate Clear semantics, simplified bulk operations, updated all code examples and tables.
+- **Updated `project.mdc`** — Updated cache module, MANAGER, ENTRY, FILE, STORE, ASTRO_SERVICE entries.
+- **Power outage** — Session interrupted by power failure during the SaveManifest change. SaveManifest removal was the only incomplete change; completed in the follow-up session.
+
+### 2026-05-02 (Sat) — ~6:38 AM – 7:00 AM PDT
+**Dean Abramson**
+
+- **Recovered from power outage** — Read prior session transcript to determine state. All debug artifacts (fprintf traces) had been cleaned up. Only the SaveManifest-only-on-shutdown change was incomplete.
+- **Completed SaveManifest change** — Removed the per-fetch `SaveManifest()` call from `FetchEntry()` (line 860). `Shutdown()` already had the save call. Rebuilt and ran full cache suite: 69 passed, 0 failed.
+- **Cleaned up test artifacts** — Deleted `test_stderr.txt`, identified `test_out.txt`, `test_output.txt`, `test_stdout.txt` as leftover debug output files.
+- **Updated `project.mdc`** — Fixed stale references to `REQUEST_FETCH`, `GetHistory()` (now `GetFiles()`). Added manifest-only-on-shutdown and `recursive_mutex` notes to MANAGER entry. Updated ENTRY (ResetState, pending-reset flag) and FILE (no null guards, SetPendingClear returns bool, sequence at construction) entries.
+- **Logged session.**

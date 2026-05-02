@@ -15,6 +15,7 @@
 #include "Manager.h"
 #include "Entry.h"
 #include "File.h"
+#include "Store.h"
 #include "core/Sneeze.h"
 #include "net/HttpClient.h"
 
@@ -83,6 +84,8 @@ static size_t FetchHeaderCallback (char* pData, size_t nSize, size_t nMembers, v
 MANAGER::MANAGER (CORE::SNEEZE* pSneeze) :
    m_pSneeze       (pSneeze),
    m_bShuttingDown (false),
+   m_bCacheEnabled   (true),
+   m_bDisplayEnabled (true),
    m_nNextSequence (1),
    m_tpEpoch       (std::chrono::steady_clock::now ())
 {
@@ -97,26 +100,22 @@ bool MANAGER::Initialize ()
 {
    bool bResult = false;
 
-   m_tpEpoch      = std::chrono::steady_clock::now ();
-   m_sCachePath   = GetPersistentCachePath ();
-   m_sSessionPath = GetSessionCachePath ();
+   m_tpEpoch    = std::chrono::steady_clock::now ();
+   m_sCachePath = GetCachePath ();
 
    if (!m_sCachePath.empty ())
    {
       std::filesystem::create_directories (m_sCachePath);
-      std::filesystem::create_directories (m_sSessionPath);
 
       LoadManifest ();
 
-      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "CACHE",
-         "Initialized (path: " + m_sCachePath + ", entries: " +
-         std::to_string (m_mapEntries.size ()) + ")");
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "CACHE", "Initialized (path: " + m_sCachePath + ", entries: " + std::to_string (m_mapEntries.size ()) + ")");
+
       bResult = true;
    }
    else
    {
-      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Error, "CACHE",
-         "Failed to determine cache path");
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Error, "CACHE", "Failed to determine cache path");
    }
 
    return bResult;
@@ -124,34 +123,33 @@ bool MANAGER::Initialize ()
 
 void MANAGER::Shutdown ()
 {
-   if (m_sCachePath.empty ())
-      return;
-
-   m_bShuttingDown.store (true);
-
-   // Join all fetch threads
-   for (auto* pSlot : m_apFetchSlots)
+   if (!m_sCachePath.empty ())
    {
-      if (pSlot->thread.joinable ())
-         pSlot->thread.join ();
-      delete pSlot;
+      m_bShuttingDown.store (true);
+
+      for (auto* pSlot : m_apFetchSlots)
+      {
+         if (pSlot->thread.joinable ())
+            pSlot->thread.join ();
+         delete pSlot;
+      }
+      m_apFetchSlots.clear ();
+
+      while (!m_aFetchQueue.empty ())
+         m_aFetchQueue.pop ();
+
+      SaveManifest ();
+
+      {
+         std::lock_guard<std::recursive_mutex> guard (m_mutex);
+         
+         m_mapEntries.clear ();
+      }
+
+      DeleteFiles ();
+
+      m_sCachePath.clear ();
    }
-   m_apFetchSlots.clear ();
-
-   // Drain the fetch queue
-   while (!m_aFetchQueue.empty ())
-      m_aFetchQueue.pop ();
-
-   SaveManifest ();
-
-   {
-      std::lock_guard<std::mutex> guard (m_mutex);
-      m_mapEntries.clear ();
-   }
-
-   DeleteHistory ();
-
-   m_sCachePath.clear ();
 }
 
 // ---------------------------------------------------------------------------
@@ -161,6 +159,7 @@ void MANAGER::Shutdown ()
 double MANAGER::SecondsSinceEpoch () const
 {
    auto tpNow = std::chrono::steady_clock::now ();
+ 
    return std::chrono::duration<double> (tpNow - m_tpEpoch).count ();
 }
 
@@ -170,37 +169,25 @@ double MANAGER::GetEpochAge () const
 }
 
 // ---------------------------------------------------------------------------
-// History management
+// File ownership
 // ---------------------------------------------------------------------------
 
-void MANAGER::DeleteHistory ()
+void MANAGER::DeleteFiles ()
 {
-   for (auto* pFile : m_apHistory)
+   for (auto* pFile : m_apFile)
       delete pFile;
-   m_apHistory.clear ();
+   m_apFile.clear ();
 }
 
-void MANAGER::NullifyHistoryEntries (ENTRY* pEntry)
+void MANAGER::ResetEntry (ENTRY* pEntry)
 {
-   for (auto* pFile : m_apHistory)
-   {
-      if (pFile->GetEntry () == pEntry)
-         pFile->NullEntry ();
-   }
-}
-
-void MANAGER::DestroyEntry (ENTRY* pEntry)
-{
-   NullifyHistoryEntries (pEntry);
-
    if (!pEntry->GetDiskPath ().empty ())
    {
       std::error_code ec;
       std::filesystem::remove (pEntry->GetDiskPath (), ec);
    }
 
-   std::string sUrl = pEntry->GetUrl ();
-   m_mapEntries.erase (sUrl);
+   pEntry->ResetState ();
 }
 
 // ---------------------------------------------------------------------------
@@ -251,33 +238,47 @@ void MANAGER::DispatchFetch (ENTRY* pEntry)
 // Request / Release
 // ---------------------------------------------------------------------------
 
-FILE* MANAGER::Request (const std::string& sUrl, IFILE* pListener)
+FILE* MANAGER::Request (IFILE* pListener, const std::string& sStore, const std::string& sUrl)
 {
-   return Request (sUrl, std::string (), pListener, kREQUEST_DEFAULT);
+   return Request (pListener, sStore, sUrl, std::string (), kREQUEST_DEFAULT);
 }
 
-FILE* MANAGER::Request (const std::string& sUrl, const std::string& sHash, IFILE* pListener,
-                        uint32_t bFlags)
+FILE* MANAGER::Request (IFILE* pListener, const std::string& sStore, const std::string& sUrl, const std::string& sHash, uint32_t bFlags)
 {
    bool bCreate = (bFlags & REQUEST_CREATE) != 0;
-   bool bFetch  = (bFlags & REQUEST_FETCH)  != 0;
 
    FILE* pFile = nullptr;
-   bool bNotifyReady  = false;
-   bool bNotifyFailed = false;
 
    {
-      std::lock_guard<std::mutex> guard (m_mutex);
+      std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
+      STORE* pStore = FindOrCreateStore (sStore);
+
+      // Resolve entry: find existing or create new
       auto it = m_mapEntries.find (sUrl);
+      if (it == m_mapEntries.end ()  &&  bCreate)
+      {
+         auto pEntryPtr = std::make_unique<ENTRY> (this, sUrl, sHash);
+         m_mapEntries[sUrl] = std::move (pEntryPtr);
+         it = m_mapEntries.find (sUrl);
+      }
+
       if (it != m_mapEntries.end ())
       {
          ENTRY* pEntry = it->second.get ();
 
-         // Upgrade unhashed -> hashed if hash now provided
-         if (bFetch  &&  pEntry->GetState () == STATE_READY
-             &&  !sHash.empty ()  &&  !pEntry->IsHashed ())
+         // Create the FILE — once
+         pFile = new FILE (this, pEntry, pStore, pListener, m_nNextSequence++);
+         pEntry->AttachFile (pFile);
+         m_apFile.push_back (pFile);
+
+         // Decide what the entry needs
+         STATE bState      = pEntry->GetState ();
+         bool  bNeedsFetch = false;
+
+         if (bState == STATE_READY  &&  !sHash.empty ()  &&  !pEntry->IsHashed ())
          {
+            // Upgrade unhashed -> hashed
             std::string sAlgo, sDigest;
             if (ParseSriHash (sHash, sAlgo, sDigest))
             {
@@ -285,356 +286,183 @@ FILE* MANAGER::Request (const std::string& sUrl, const std::string& sHash, IFILE
                if (sComputed == sDigest)
                {
                   pEntry->SetHash (sHash);
-
-                  std::string sDiskKey = ComputeDiskKey (sUrl);
-                  std::string sPersistPath = DiskKeyToPath (sDiskKey, true);
-                  std::filesystem::create_directories (
-                     std::filesystem::path (sPersistPath).parent_path ());
-
-                  std::error_code ec;
-                  std::filesystem::rename (pEntry->GetDiskPath (), sPersistPath, ec);
-                  if (!ec)
-                     pEntry->SetDiskPath (sPersistPath);
-
                   pEntry->TouchAccess ();
                   pEntry->SetServedFromCache (true);
-
-                  pFile = new FILE (this, pEntry, pListener);
-                  pFile->SetSequence (m_nNextSequence++);
-                  pEntry->AttachFile (pFile);
-                  m_apHistory.push_back (pFile);
                }
                else
                {
                   pEntry->SetHash (sHash);
-                  pEntry->SetFetching ();
-                  pEntry->SetFetchStartTime (SecondsSinceEpoch ());
-
-                  pFile = new FILE (this, pEntry, pListener);
-                  pFile->SetSequence (m_nNextSequence++);
-                  pEntry->AttachFile (pFile);
-                  m_apHistory.push_back (pFile);
-
-                  DispatchFetch (pEntry);
+                  bNeedsFetch = true;
                }
             }
          }
-
-         if (!pFile  &&  bFetch)
+         else if (bState != STATE_FETCHING  &&  !sHash.empty ()  &&  pEntry->IsHashed ()  &&  pEntry->GetHash () != sHash)
          {
             // Hash changed — re-fetch
-            if (!sHash.empty ()  &&  pEntry->IsHashed ()  &&  pEntry->GetHash () != sHash
-                &&  pEntry->GetState () != STATE_FETCHING)
-            {
-               pEntry->SetHash (sHash);
-               pEntry->SetFetching ();
-               pEntry->SetFetchStartTime (SecondsSinceEpoch ());
-
-               pFile = new FILE (this, pEntry, pListener);
-               pFile->SetSequence (m_nNextSequence++);
-               pEntry->AttachFile (pFile);
-               m_apHistory.push_back (pFile);
-
-               DispatchFetch (pEntry);
-            }
+            pEntry->SetHash (sHash);
+            bNeedsFetch = true;
          }
-
-         if (!pFile)
+         else if (bState == STATE_READY  &&  !m_bCacheEnabled)
+         {
+            // Cache bypass
+            pEntry->SetServedFromCache (false);
+            bNeedsFetch = true;
+         }
+         else if (bState == STATE_READY)
          {
             pEntry->TouchAccess ();
-
-            bool bServed = (pEntry->GetState () == STATE_READY);
-            if (bServed)
-               pEntry->SetServedFromCache (true);
-
-            pFile = new FILE (this, pEntry, pListener);
-            pFile->SetSequence (m_nNextSequence++);
-            pEntry->AttachFile (pFile);
-            m_apHistory.push_back (pFile);
-
-            if (pEntry->GetState () == STATE_READY)
-               bNotifyReady = true;
-            else if (pEntry->GetState () == STATE_FAILED)
-               bNotifyFailed = true;
+            pEntry->SetServedFromCache (true);
+            if (pListener)
+               pListener->OnFileReady (pFile);
          }
-      }
-      else
-      {
-         if (!bCreate)
-            return nullptr;
-
-         // New entry
-         auto pEntryPtr = std::make_unique<ENTRY> (this, sUrl, sHash);
-         ENTRY* pRaw = pEntryPtr.get ();
-         m_mapEntries[sUrl] = std::move (pEntryPtr);
-
-         pFile = new FILE (this, pRaw, pListener);
-         pFile->SetSequence (m_nNextSequence++);
-         pRaw->AttachFile (pFile);
-         m_apHistory.push_back (pFile);
-
-         if (!pRaw->GetDiskPath ().empty ()  &&  std::filesystem::exists (pRaw->GetDiskPath ()))
+         else if (bState == STATE_FAILED)
          {
-            pRaw->TouchAccess ();
-            pRaw->SetServedFromCache (true);
-            pRaw->Complete (pRaw->GetDiskPath (), pRaw->GetSizeBytes ());
-            bNotifyReady = true;
+            if (pListener)
+               pListener->OnFileFailed (pFile);
          }
-         else if (bFetch)
+         else if (bState == STATE_IDLE)
          {
-            pRaw->SetFetching ();
-            pRaw->SetFetchStartTime (SecondsSinceEpoch ());
-            DispatchFetch (pRaw);
+            if (!sHash.empty ())
+               pEntry->SetHash (sHash);
+            bNeedsFetch = true;
          }
+
+         if (bNeedsFetch)
+         {
+            pEntry->SetFetching ();
+            pEntry->SetFetchStartTime (SecondsSinceEpoch ());
+            DispatchFetch (pEntry);
+         }
+
+         // Display toggle: auto-clear when display is off
+         if (!m_bDisplayEnabled)
+            pFile->SetPendingClear (true);
+
+         if (!pFile->IsPendingClear ())
+            m_pSneeze->NotifyCacheFileCreated (pFile);
       }
    }
 
-   // All notifications dispatched outside m_mutex to prevent deadlock
-   if (bNotifyReady  &&  pListener)
-      pListener->OnFileReady (pFile);
-   else if (bNotifyFailed  &&  pListener)
-      pListener->OnFileFailed (pFile);
-
-   if (pFile)
-      m_pSneeze->NotifyCacheFileCreated (pFile);
    return pFile;
 }
 
 void MANAGER::Release (FILE* pFile)
 {
-   if (!pFile)
-      return;
-
-   bool bSaveManifest = false;
-   FILE* pToDelete    = nullptr;
-
+   if (pFile)
    {
-      std::lock_guard<std::mutex> guard (m_mutex);
+      std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
       ENTRY* pEntry = pFile->GetEntry ();
-      if (pEntry)
-         pEntry->DetachFile (pFile);
+      pEntry->DetachFile (pFile);
 
       pFile->SetReleased ();
 
       if (pFile->IsPendingClear ())
       {
-         auto it = std::find (m_apHistory.begin (), m_apHistory.end (), pFile);
-         if (it != m_apHistory.end ())
-            m_apHistory.erase (it);
-         pToDelete = pFile;
+         auto it = std::find (m_apFile.begin (), m_apFile.end (), pFile);
+         if (it != m_apFile.end ())
+            m_apFile.erase (it);
+         delete pFile;
       }
 
-      if (pEntry  &&  pEntry->IsPendingReset ()  &&  pEntry->GetFileCount () == 0)
-      {
-         bSaveManifest = pEntry->IsHashed ();
-         DestroyEntry (pEntry);
-      }
-   }
-
-   if (bSaveManifest)
-      SaveManifest ();
-
-   if (pToDelete)
-   {
-      m_pSneeze->NotifyCacheFileDeleted (pToDelete);
-      delete pToDelete;
+      if (pEntry->IsPendingReset ()  &&  pEntry->GetFileCount () == 0)
+         ResetEntry (pEntry);
    }
 }
 
-void MANAGER::Clear (FILE* pFile)
+void MANAGER::Clear (FILE* pFile, bool b)
 {
-   if (!pFile)
-      return;
+   if (pFile)
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-   pFile->Clear ();
+      if (pFile->SetPendingClear (b))
+      {
+         if (b)
+         {
+            m_pSneeze->NotifyCacheFileDeleted (pFile);
+
+            if (pFile->IsReleased ())
+            {
+               auto it = std::find (m_apFile.begin (), m_apFile.end (), pFile);
+               if (it != m_apFile.end ())
+                  m_apFile.erase (it);
+               delete pFile;
+            }
+         }
+         else
+         {
+            m_pSneeze->NotifyCacheFileCreated (pFile);
+         }
+      }
+   }
 }
 
 void MANAGER::Reset (FILE* pFile, bool b)
 {
-   if (!pFile)
-      return;
-
-   std::lock_guard<std::mutex> guard (m_mutex);
-   ENTRY* pEntry = pFile->GetEntry ();
-   if (pEntry)
-      pEntry->SetPendingReset (b);
+   if (pFile)
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+      pFile->GetEntry ()->SetPendingReset (b);
+   }
 }
 
 // ---------------------------------------------------------------------------
 // Cache management
 // ---------------------------------------------------------------------------
 
-void MANAGER::ClearSession ()
+void MANAGER::Clear ()
 {
-   std::vector<FILE*> apToDelete;
+   std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
+   auto it = m_apFile.begin ();
+   while (it != m_apFile.end ())
    {
-      std::lock_guard<std::mutex> guard (m_mutex);
+      FILE* pFile = *it;
 
-      auto it = m_apHistory.begin ();
-      while (it != m_apHistory.end ())
+      if (pFile->SetPendingClear (true))
+         m_pSneeze->NotifyCacheFileDeleted (pFile);
+
+      if (pFile->IsReleased ())
       {
-         FILE* pFile   = *it;
-         ENTRY* pEntry = pFile->GetEntry ();
-
-         if (pEntry  &&  !pEntry->IsHashed ())
-         {
-            if (pFile->IsReleased ())
-            {
-               apToDelete.push_back (pFile);
-               it = m_apHistory.erase (it);
-            }
-            else
-            {
-               pFile->Clear ();
-               ++it;
-            }
-         }
-         else if (!pEntry  &&  pFile->IsReleased ())
-         {
-            apToDelete.push_back (pFile);
-            it = m_apHistory.erase (it);
-         }
-         else
-         {
-            ++it;
-         }
+         it = m_apFile.erase (it);
+         delete pFile;
       }
-   }
-
-   for (auto* p : apToDelete)
-   {
-      m_pSneeze->NotifyCacheFileDeleted (p);
-      delete p;
+      else
+      {
+         ++it;
+      }
    }
 }
 
-void MANAGER::ClearAll ()
+void MANAGER::Reset ()
 {
-   std::vector<FILE*> apToDelete;
+   std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
+   for (auto& [sUrl, pEntryPtr] : m_mapEntries)
    {
-      std::lock_guard<std::mutex> guard (m_mutex);
-
-      auto it = m_apHistory.begin ();
-      while (it != m_apHistory.end ())
-      {
-         FILE* pFile = *it;
-         if (pFile->IsReleased ())
-         {
-            apToDelete.push_back (pFile);
-            it = m_apHistory.erase (it);
-         }
-         else
-         {
-            pFile->Clear ();
-            ++it;
-         }
-      }
+      ENTRY* pEntry = pEntryPtr.get ();
+      pEntry->SetPendingReset (true);
+      if (pEntry->GetFileCount () == 0)
+         ResetEntry (pEntry);
    }
-
-   for (auto* p : apToDelete)
-   {
-      m_pSneeze->NotifyCacheFileDeleted (p);
-      delete p;
-   }
-}
-
-void MANAGER::ResetSession ()
-{
-   bool bSaveManifest = false;
-
-   {
-      std::lock_guard<std::mutex> guard (m_mutex);
-
-      auto it = m_mapEntries.begin ();
-      while (it != m_mapEntries.end ())
-      {
-         ENTRY* pEntry = it->second.get ();
-         if (!pEntry->IsHashed ())
-         {
-            pEntry->SetPendingReset (true);
-            if (pEntry->GetFileCount () == 0)
-            {
-               NullifyHistoryEntries (pEntry);
-               if (!pEntry->GetDiskPath ().empty ())
-               {
-                  std::error_code ec;
-                  std::filesystem::remove (pEntry->GetDiskPath (), ec);
-               }
-               it = m_mapEntries.erase (it);
-            }
-            else
-            {
-               ++it;
-            }
-         }
-         else
-         {
-            ++it;
-         }
-      }
-   }
-
-   std::error_code ec;
-   std::filesystem::remove_all (m_sSessionPath, ec);
-   std::filesystem::create_directories (m_sSessionPath);
-}
-
-void MANAGER::ResetAll ()
-{
-   {
-      std::lock_guard<std::mutex> guard (m_mutex);
-
-      auto it = m_mapEntries.begin ();
-      while (it != m_mapEntries.end ())
-      {
-         ENTRY* pEntry = it->second.get ();
-         pEntry->SetPendingReset (true);
-         if (pEntry->GetFileCount () == 0)
-         {
-            NullifyHistoryEntries (pEntry);
-            if (!pEntry->GetDiskPath ().empty ())
-            {
-               std::error_code ec;
-               std::filesystem::remove (pEntry->GetDiskPath (), ec);
-            }
-            it = m_mapEntries.erase (it);
-         }
-         else
-         {
-            ++it;
-         }
-      }
-   }
-
-   SaveManifest ();
 
    std::error_code ec;
    std::filesystem::remove_all (m_sCachePath, ec);
    std::filesystem::create_directories (m_sCachePath);
-   std::filesystem::create_directories (m_sSessionPath);
 }
 
 // ---------------------------------------------------------------------------
 // Path helpers
 // ---------------------------------------------------------------------------
 
-std::string MANAGER::GetPersistentCachePath () const
+std::string MANAGER::GetCachePath () const
 {
+   std::string sResult;
    std::string sAppData = m_pSneeze->GetHost ()->sAppDataPath;
-   if (sAppData.empty ())
-      return "";
-
-   std::filesystem::path pPath = std::filesystem::path (sAppData) / "Cache";
-   return pPath.string ();
-}
-
-std::string MANAGER::GetSessionCachePath () const
-{
-   std::filesystem::path pPath = std::filesystem::path (m_sCachePath) / "tmp";
-   return pPath.string ();
+   if (!sAppData.empty ())
+      sResult = (std::filesystem::path (sAppData) / "Cache").string ();
+   return sResult;
 }
 
 std::string MANAGER::ComputeDiskKey (const std::string& sUrl) const
@@ -651,18 +479,17 @@ std::string MANAGER::ComputeDiskKey (const std::string& sUrl) const
    return std::string (szHex);
 }
 
-std::string MANAGER::DiskKeyToPath (const std::string& sDiskKey, bool bPersistent) const
+std::string MANAGER::DiskKeyToPath (const std::string& sDiskKey) const
 {
    std::string sDir = sDiskKey.substr (0, 2);
    std::string sFile = sDiskKey.substr (2);
-   std::string sBase = bPersistent ? m_sCachePath : m_sSessionPath;
-   std::filesystem::path pPath = std::filesystem::path (sBase) / sDir / sFile;
+   std::filesystem::path pPath = std::filesystem::path (m_sCachePath) / sDir / sFile;
    return pPath.string ();
 }
 
 std::string MANAGER::DiskKeyToTmpPath (const std::string& sDiskKey) const
 {
-   std::filesystem::path pPath = std::filesystem::path (m_sSessionPath) / (sDiskKey + ".tmp");
+   std::filesystem::path pPath = std::filesystem::path (m_sCachePath) / (sDiskKey + ".tmp");
    return pPath.string ();
 }
 
@@ -702,42 +529,43 @@ std::string MANAGER::ComputeFileHash (const std::string& sFilePath, const std::s
    std::string sResult;
 
    const EVP_MD* pMd = GetEvpMd (sAlgo);
-   if (!pMd)
-      return sResult;
-
-   std::ifstream file (sFilePath, std::ios::binary);
-   if (!file.is_open ())
-      return sResult;
-
-   EVP_MD_CTX* pCtx = EVP_MD_CTX_new ();
-   if (!pCtx)
-      return sResult;
-
-   EVP_DigestInit_ex (pCtx, pMd, nullptr);
-
-   char aBuffer[8192];
-   while (file.read (aBuffer, sizeof (aBuffer))  ||  file.gcount () > 0)
+   if (pMd)
    {
-      EVP_DigestUpdate (pCtx, aBuffer, static_cast<size_t> (file.gcount ()));
-      if (file.eof ())
-         break;
+      std::ifstream file (sFilePath, std::ios::binary);
+      if (file.is_open ())
+      {
+         EVP_MD_CTX* pCtx = EVP_MD_CTX_new ();
+         if (pCtx)
+         {
+            EVP_DigestInit_ex (pCtx, pMd, nullptr);
+
+            char aBuffer[8192];
+            while (file.read (aBuffer, sizeof (aBuffer))  ||  file.gcount () > 0)
+            {
+               EVP_DigestUpdate (pCtx, aBuffer, static_cast<size_t> (file.gcount ()));
+               if (file.eof ())
+                  break;
+            }
+
+            unsigned char aDigest[EVP_MAX_MD_SIZE];
+            unsigned int nDigestLen = 0;
+            EVP_DigestFinal_ex (pCtx, aDigest, &nDigestLen);
+            EVP_MD_CTX_free (pCtx);
+
+            std::string sHex;
+            sHex.reserve (nDigestLen * 2);
+            for (unsigned int i = 0; i < nDigestLen; i++)
+            {
+               char szByte[3];
+               std::sprintf (szByte, "%02x", aDigest[i]);
+               sHex += szByte;
+            }
+
+            sResult = sHex;
+         }
+      }
    }
 
-   unsigned char aDigest[EVP_MAX_MD_SIZE];
-   unsigned int nDigestLen = 0;
-   EVP_DigestFinal_ex (pCtx, aDigest, &nDigestLen);
-   EVP_MD_CTX_free (pCtx);
-
-   std::string sHex;
-   sHex.reserve (nDigestLen * 2);
-   for (unsigned int i = 0; i < nDigestLen; i++)
-   {
-      char szByte[3];
-      std::sprintf (szByte, "%02x", aDigest[i]);
-      sHex += szByte;
-   }
-
-   sResult = sHex;
    return sResult;
 }
 
@@ -746,23 +574,24 @@ std::string MANAGER::ComputeDataHash (const uint8_t* pData, size_t nLen, const s
    std::string sResult;
 
    const EVP_MD* pMd = GetEvpMd (sAlgo);
-   if (!pMd  ||  !pData)
-      return sResult;
-
-   unsigned char aDigest[EVP_MAX_MD_SIZE];
-   unsigned int nDigestLen = 0;
-   EVP_Digest (pData, nLen, aDigest, &nDigestLen, pMd, nullptr);
-
-   std::string sHex;
-   sHex.reserve (nDigestLen * 2);
-   for (unsigned int i = 0; i < nDigestLen; i++)
+   if (pMd  &&  pData)
    {
-      char szByte[3];
-      std::sprintf (szByte, "%02x", aDigest[i]);
-      sHex += szByte;
+      unsigned char aDigest[EVP_MAX_MD_SIZE];
+      unsigned int nDigestLen = 0;
+      EVP_Digest (pData, nLen, aDigest, &nDigestLen, pMd, nullptr);
+
+      std::string sHex;
+      sHex.reserve (nDigestLen * 2);
+      for (unsigned int i = 0; i < nDigestLen; i++)
+      {
+         char szByte[3];
+         std::sprintf (szByte, "%02x", aDigest[i]);
+         sHex += szByte;
+      }
+
+      sResult = sHex;
    }
 
-   sResult = sHex;
    return sResult;
 }
 
@@ -774,108 +603,102 @@ void MANAGER::LoadManifest ()
 {
    std::string sManifestPath = (std::filesystem::path (m_sCachePath) / "manifest.json").string ();
    std::ifstream file (sManifestPath);
-   if (!file.is_open ())
-      return;
-
-   nlohmann::json jDoc;
-   try
+   if (file.is_open ())
    {
-      file >> jDoc;
-   }
-   catch (...)
-   {
-      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "CACHE",
-         "Failed to parse manifest.json — starting fresh");
-      return;
-   }
+      nlohmann::json jDoc;
+      bool bParsed = false;
 
-   if (!jDoc.contains ("version")  ||  !jDoc.contains ("entries"))
-      return;
-
-   for (auto& [sUrl, jEntry] : jDoc["entries"].items ())
-   {
-      std::string sHash     = jEntry.value ("hash", "");
-      std::string sDiskPath = jEntry.value ("diskPath", "");
-
-      if (sHash.empty ()  ||  sDiskPath.empty ())
-         continue;
-
-      if (!std::filesystem::exists (sDiskPath))
-         continue;
-
-      auto pEntry = std::make_unique<ENTRY> (this, sUrl, sHash);
-      pEntry->SetDiskPath (sDiskPath);
-      pEntry->SetSizeBytes (jEntry.value ("sizeBytes", static_cast<uint64_t> (0)));
-      pEntry->SetCreatedTime (jEntry.value ("createdAt", ""));
-
-      if (jEntry.contains ("headers"))
+      try
       {
-         std::unordered_map<std::string, std::string> mapHeaders;
-         for (auto& [sKey, sVal] : jEntry["headers"].items ())
-            mapHeaders[sKey] = sVal.get<std::string> ();
-         pEntry->SetHeaders (mapHeaders);
+         file >> jDoc;
+         bParsed = true;
+      }
+      catch (...)
+      {
+         m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "CACHE", "Failed to parse manifest.json — starting fresh");
       }
 
-      pEntry->SetServedFromCache (true);
-      pEntry->Complete (sDiskPath, pEntry->GetSizeBytes ());
+      if (bParsed  &&  jDoc.contains ("version")  &&  jDoc.contains ("entries"))
+      {
+         for (auto& [sUrl, jEntry] : jDoc["entries"].items ())
+         {
+            std::string sHash     = jEntry.value ("hash", "");
+            std::string sDiskPath = jEntry.value ("diskPath", "");
 
-      m_mapEntries[sUrl] = std::move (pEntry);
+            if (!sHash.empty ()  &&  !sDiskPath.empty ()
+                &&  std::filesystem::exists (sDiskPath))
+            {
+               auto pEntry = std::make_unique<ENTRY> (this, sUrl, sHash);
+               pEntry->SetDiskPath (sDiskPath);
+               pEntry->SetSizeBytes (jEntry.value ("sizeBytes", static_cast<uint64_t> (0)));
+               pEntry->SetCreatedTime (jEntry.value ("createdAt", ""));
+
+               if (jEntry.contains ("headers"))
+               {
+                  std::unordered_map<std::string, std::string> mapHeaders;
+                  for (auto& [sKey, sVal] : jEntry["headers"].items ())
+                     mapHeaders[sKey] = sVal.get<std::string> ();
+                  pEntry->SetHeaders (mapHeaders);
+               }
+
+               pEntry->SetServedFromCache (true);
+               pEntry->Complete (sDiskPath, pEntry->GetSizeBytes ());
+
+               m_mapEntries[sUrl] = std::move (pEntry);
+            }
+         }
+      }
    }
 }
 
 void MANAGER::SaveManifest ()
 {
-   if (m_sCachePath.empty ())
-      return;
-
-   // Build the JSON snapshot under lock
-   nlohmann::json jDoc;
-   jDoc["version"] = 1;
-   nlohmann::json jEntries = nlohmann::json::object ();
-
+   if (!m_sCachePath.empty ())
    {
-      std::lock_guard<std::mutex> guard (m_mutex);
+      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+
+      nlohmann::json jDoc;
+      jDoc["version"] = 1;
+      nlohmann::json jEntries = nlohmann::json::object ();
 
       for (auto& [sUrl, pEntry] : m_mapEntries)
       {
-         if (!pEntry->IsHashed ()  ||  pEntry->GetState () != STATE_READY)
-            continue;
+         if (pEntry->GetState () == STATE_READY)
+         {
+            nlohmann::json jEntry;
+            jEntry["hash"]           = pEntry->GetHash ();
+            jEntry["diskPath"]       = pEntry->GetDiskPath ();
+            jEntry["sizeBytes"]      = pEntry->GetSizeBytes ();
+            jEntry["createdAt"]      = pEntry->GetCreatedTime ();
+            jEntry["lastAccessedAt"] = pEntry->GetLastAccessTime ();
+            jEntry["accessCount"]    = pEntry->GetAccessCount ();
 
-         nlohmann::json jEntry;
-         jEntry["hash"]           = pEntry->GetHash ();
-         jEntry["diskPath"]       = pEntry->GetDiskPath ();
-         jEntry["sizeBytes"]      = pEntry->GetSizeBytes ();
-         jEntry["createdAt"]      = pEntry->GetCreatedTime ();
-         jEntry["lastAccessedAt"] = pEntry->GetLastAccessTime ();
-         jEntry["accessCount"]    = pEntry->GetAccessCount ();
+            nlohmann::json jHeaders = nlohmann::json::object ();
+            for (auto& [sKey, sVal] : pEntry->GetHeaders ())
+               jHeaders[sKey] = sVal;
+            jEntry["headers"] = jHeaders;
 
-         nlohmann::json jHeaders = nlohmann::json::object ();
-         for (auto& [sKey, sVal] : pEntry->GetHeaders ())
-            jHeaders[sKey] = sVal;
-         jEntry["headers"] = jHeaders;
-
-         jEntries[sUrl] = jEntry;
+            jEntries[sUrl] = jEntry;
+         }
       }
-   }
 
-   jDoc["entries"] = jEntries;
+      jDoc["entries"] = jEntries;
 
-   // Write to disk outside the lock
-   std::string sManifestPath = (std::filesystem::path (m_sCachePath) / "manifest.json").string ();
-   std::string sTmpPath      = (std::filesystem::path (m_sCachePath) / "manifest.json.tmp").string ();
+      std::string sManifestPath = (std::filesystem::path (m_sCachePath) / "manifest.json"    ).string ();
+      std::string sTmpPath      = (std::filesystem::path (m_sCachePath) / "manifest.json.tmp").string ();
 
-   std::ofstream file (sTmpPath, std::ios::trunc);
-   if (file.is_open ())
-   {
-      file << jDoc.dump (2);
-      file.close ();
-
-      std::error_code ec;
-      std::filesystem::rename (sTmpPath, sManifestPath, ec);
-      if (ec)
+      std::ofstream file (sTmpPath, std::ios::trunc);
+      if (file.is_open ())
       {
-         m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "CACHE",
-            "Failed to rename manifest temp file: " + ec.message ());
+         file << jDoc.dump (2);
+         file.close ();
+
+         std::error_code ec;
+         std::filesystem::rename (sTmpPath, sManifestPath, ec);
+         if (ec)
+         {
+            m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "CACHE", "Failed to rename manifest temp file: " + ec.message ());
+         }
       }
    }
 }
@@ -886,129 +709,85 @@ void MANAGER::SaveManifest ()
 
 void MANAGER::FetchEntry (ENTRY* pEntry)
 {
-   if (m_bShuttingDown.load ())
+   std::string sUrl;
+   std::string sHash;
    {
-      std::vector<FILE*> apNotify;
-      {
-         std::lock_guard<std::mutex> guard (m_mutex);
-         pEntry->SetFetchEndTime (SecondsSinceEpoch ());
-         pEntry->Fail ();
-         apNotify = pEntry->CollectFiles ();
-      }
-      NotifyFiles (apNotify, STATE_FAILED);
-      return;
+      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+      sUrl  = pEntry->GetUrl ();
+      sHash = pEntry->GetHash ();
    }
-
-   std::string sUrl  = pEntry->GetUrl ();
-   std::string sHash = pEntry->GetHash ();
-   bool bPersistent  = !sHash.empty ();
-
-   std::string sDiskKey = ComputeDiskKey (sUrl);
-   std::string sTmpPath = DiskKeyToTmpPath (sDiskKey);
-
-   std::filesystem::create_directories (m_sSessionPath);
-
-   std::FILE* pTmpFile = nullptr;
-#ifdef _WIN32
-   fopen_s (&pTmpFile, sTmpPath.c_str (), "wb");
-#else
-   pTmpFile = std::fopen (sTmpPath.c_str (), "wb");
-#endif
-
-   if (!pTmpFile)
-   {
-      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Error, "CACHE",
-         "Failed to open temp file: " + sTmpPath);
-
-      std::vector<FILE*> apNotify;
-      {
-         std::lock_guard<std::mutex> guard (m_mutex);
-         pEntry->SetFetchEndTime (SecondsSinceEpoch ());
-         pEntry->Fail ();
-         apNotify = pEntry->CollectFiles ();
-      }
-      NotifyFiles (apNotify, STATE_FAILED);
-      DispatchNextFromQueue ();
-      return;
-   }
-
+   std::string sDiskKey  = ComputeDiskKey (sUrl);
+   std::string sTmpPath  = DiskKeyToTmpPath (sDiskKey);
+   std::string sFinalPath;
+   uint64_t    nSizeBytes = 0;
+   bool        bOk        = !m_bShuttingDown.load ();
+   bool        bHaveTmp   = false;
    CURL_FETCH_CONTEXT ctx = {};
-   ctx.pFile     = pTmpFile;
    ctx.nHttpCode = 0;
 
-   CURL* pCurl = curl_easy_init ();
-   if (!pCurl)
+   // Stage 1: Open temp file
+   if (bOk)
    {
-      std::fclose (pTmpFile);
+      std::FILE* pTmpFile = nullptr;
+#ifdef _WIN32
+      fopen_s (&pTmpFile, sTmpPath.c_str (), "wb");
+#else
+      pTmpFile = std::fopen (sTmpPath.c_str (), "wb");
+#endif
 
-      std::vector<FILE*> apNotify;
+      if (pTmpFile)
       {
-         std::lock_guard<std::mutex> guard (m_mutex);
-         pEntry->SetFetchEndTime (SecondsSinceEpoch ());
-         pEntry->Fail ();
-         apNotify = pEntry->CollectFiles ();
+         bHaveTmp  = true;
+         ctx.pFile = pTmpFile;
       }
-      NotifyFiles (apNotify, STATE_FAILED);
-      DispatchNextFromQueue ();
-      return;
+      else
+      {
+         m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Error, "CACHE", "Failed to open temp file: " + sTmpPath);
+         bOk = false;
+      }
    }
 
-   curl_easy_setopt (pCurl, CURLOPT_URL, sUrl.c_str ());
-   curl_easy_setopt (pCurl, CURLOPT_WRITEFUNCTION, FetchWriteCallback);
-   curl_easy_setopt (pCurl, CURLOPT_WRITEDATA, &ctx);
-   curl_easy_setopt (pCurl, CURLOPT_HEADERFUNCTION, FetchHeaderCallback);
-   curl_easy_setopt (pCurl, CURLOPT_HEADERDATA, &ctx);
-   curl_easy_setopt (pCurl, CURLOPT_FOLLOWLOCATION, 1L);
-   curl_easy_setopt (pCurl, CURLOPT_TIMEOUT, 300L);
-
-   CURLcode nCode = curl_easy_perform (pCurl);
-
-   if (nCode == CURLE_OK)
-      curl_easy_getinfo (pCurl, CURLINFO_RESPONSE_CODE, &ctx.nHttpCode);
-
-   curl_easy_cleanup (pCurl);
-   std::fclose (pTmpFile);
-
-   pEntry->SetHttpStatus (ctx.nHttpCode);
-
-   if (m_bShuttingDown.load ())
+   // Stage 2: Perform HTTP fetch
+   if (bOk)
    {
-      std::error_code ec;
-      std::filesystem::remove (sTmpPath, ec);
-
-      std::vector<FILE*> apNotify;
+      CURL* pCurl = curl_easy_init ();
+      if (pCurl)
       {
-         std::lock_guard<std::mutex> guard (m_mutex);
-         pEntry->SetFetchEndTime (SecondsSinceEpoch ());
-         pEntry->Fail ();
-         apNotify = pEntry->CollectFiles ();
+         curl_easy_setopt (pCurl, CURLOPT_URL, sUrl.c_str ());
+         curl_easy_setopt (pCurl, CURLOPT_WRITEFUNCTION, FetchWriteCallback);
+         curl_easy_setopt (pCurl, CURLOPT_WRITEDATA, &ctx);
+         curl_easy_setopt (pCurl, CURLOPT_HEADERFUNCTION, FetchHeaderCallback);
+         curl_easy_setopt (pCurl, CURLOPT_HEADERDATA, &ctx);
+         curl_easy_setopt (pCurl, CURLOPT_FOLLOWLOCATION, 1L);
+         curl_easy_setopt (pCurl, CURLOPT_TIMEOUT, 300L);
+
+         CURLcode nCode = curl_easy_perform (pCurl);
+
+         if (nCode == CURLE_OK)
+            curl_easy_getinfo (pCurl, CURLINFO_RESPONSE_CODE, &ctx.nHttpCode);
+
+         curl_easy_cleanup (pCurl);
+         std::fclose (ctx.pFile);
+         ctx.pFile = nullptr;
+
+         if (m_bShuttingDown.load ())
+            bOk = false;
+         else if (nCode != CURLE_OK  ||  ctx.nHttpCode < 200  ||  ctx.nHttpCode >= 300)
+         {
+            m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "CACHE", "Fetch failed for " + sUrl + " (HTTP " + std::to_string (ctx.nHttpCode) + ")");
+            bOk = false;
+         }
       }
-      NotifyFiles (apNotify, STATE_FAILED);
-      DispatchNextFromQueue ();
-      return;
+      else
+      {
+         std::fclose (ctx.pFile);
+         ctx.pFile = nullptr;
+         bOk = false;
+      }
    }
 
-   if (nCode != CURLE_OK  ||  ctx.nHttpCode < 200  ||  ctx.nHttpCode >= 300)
-   {
-      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "CACHE",
-         "Fetch failed for " + sUrl + " (HTTP " + std::to_string (ctx.nHttpCode) + ")");
-      std::error_code ec;
-      std::filesystem::remove (sTmpPath, ec);
-
-      std::vector<FILE*> apNotify;
-      {
-         std::lock_guard<std::mutex> guard (m_mutex);
-         pEntry->SetFetchEndTime (SecondsSinceEpoch ());
-         pEntry->SetHeaders (ctx.mapHeaders);
-         pEntry->Fail ();
-         apNotify = pEntry->CollectFiles ();
-      }
-      NotifyFiles (apNotify, STATE_FAILED);
-      DispatchNextFromQueue ();
-      return;
-   }
-
-   if (bPersistent)
+   // Stage 3: Hash verification
+   if (bOk  &&  !sHash.empty ())
    {
       std::string sAlgo, sExpected;
       if (ParseSriHash (sHash, sAlgo, sExpected))
@@ -1016,90 +795,105 @@ void MANAGER::FetchEntry (ENTRY* pEntry)
          std::string sActual = ComputeFileHash (sTmpPath, sAlgo);
          if (sActual != sExpected)
          {
-            m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "CACHE",
-               "Hash mismatch for " + sUrl + " (expected " + sExpected + ", got " + sActual + ")");
-            std::error_code ec;
-            std::filesystem::remove (sTmpPath, ec);
-
-            std::vector<FILE*> apNotify;
-            {
-               std::lock_guard<std::mutex> guard (m_mutex);
-               pEntry->SetFetchEndTime (SecondsSinceEpoch ());
-               pEntry->SetHeaders (ctx.mapHeaders);
-               pEntry->Fail ();
-               apNotify = pEntry->CollectFiles ();
-            }
-            NotifyFiles (apNotify, STATE_FAILED);
-            DispatchNextFromQueue ();
-            return;
+            m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "CACHE", "Hash mismatch for " + sUrl + " (expected " + sExpected + ", got " + sActual + ")");
+            bOk = false;
          }
       }
    }
 
-   std::string sFinalPath = DiskKeyToPath (sDiskKey, bPersistent);
-   std::filesystem::create_directories (
-      std::filesystem::path (sFinalPath).parent_path ());
-
-   std::error_code ec;
-   std::filesystem::rename (sTmpPath, sFinalPath, ec);
-   if (ec)
+   // Stage 4: Rename temp to final path
+   if (bOk)
    {
-      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "CACHE",
-         "Failed to rename " + sTmpPath + " -> " + sFinalPath + ": " + ec.message ());
-      std::filesystem::remove (sTmpPath, ec);
+      sFinalPath = DiskKeyToPath (sDiskKey);
+      std::filesystem::create_directories (std::filesystem::path (sFinalPath).parent_path ());
 
-      std::vector<FILE*> apNotify;
+      std::error_code ec;
+      std::filesystem::rename (sTmpPath, sFinalPath, ec);
+      if (ec)
       {
-         std::lock_guard<std::mutex> guard (m_mutex);
-         pEntry->SetFetchEndTime (SecondsSinceEpoch ());
-         pEntry->Fail ();
-         apNotify = pEntry->CollectFiles ();
+         m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "CACHE", "Failed to rename " + sTmpPath + " -> " + sFinalPath + ": " + ec.message ());
+         bOk = false;
       }
-      NotifyFiles (apNotify, STATE_FAILED);
-      DispatchNextFromQueue ();
-      return;
+      else
+      {
+         bHaveTmp = false;
+
+         std::error_code ecSize;
+         auto nFsSize = std::filesystem::file_size (sFinalPath, ecSize);
+         if (!ecSize)
+            nSizeBytes = static_cast<uint64_t> (nFsSize);
+      }
    }
 
-   uint64_t nSizeBytes = 0;
+   // Cleanup temp file on failure
+   if (bHaveTmp)
    {
-      std::error_code ecSize;
-      auto nFsSize = std::filesystem::file_size (sFinalPath, ecSize);
-      if (!ecSize)
-         nSizeBytes = static_cast<uint64_t> (nFsSize);
+      std::error_code ec;
+      std::filesystem::remove (sTmpPath, ec);
    }
 
-   std::vector<FILE*> apNotify;
+   // Notify
    {
-      std::lock_guard<std::mutex> guard (m_mutex);
-      pEntry->SetHeaders (ctx.mapHeaders);
+      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+
+      pEntry->SetHttpStatus (ctx.nHttpCode);
       pEntry->SetFetchEndTime (SecondsSinceEpoch ());
-      pEntry->Complete (sFinalPath, nSizeBytes);
-      apNotify = pEntry->CollectFiles ();
+
+      if (bOk)
+      {
+         pEntry->SetHeaders (ctx.mapHeaders);
+         pEntry->Complete (sFinalPath, nSizeBytes);
+         NotifyFiles (pEntry->CollectFiles (), STATE_READY);
+      }
+      else
+      {
+         if (!ctx.mapHeaders.empty ())
+            pEntry->SetHeaders (ctx.mapHeaders);
+         pEntry->Fail ();
+         NotifyFiles (pEntry->CollectFiles (), STATE_FAILED);
+      }
    }
 
-   NotifyFiles (apNotify, STATE_READY);
-
-   m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Trace, "CACHE",
-      "Cached " + sUrl + " (" + std::to_string (nSizeBytes) + " bytes" +
-      (bPersistent ? ", persistent" : ", session") + ")");
-
-   if (bPersistent)
-      SaveManifest ();
+   if (bOk)
+   {
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Trace, "CACHE", "Cached " + sUrl + " (" + std::to_string (nSizeBytes) + " bytes)");
+   }
 
    DispatchNextFromQueue ();
 }
 
 // ---------------------------------------------------------------------------
-// Notification helpers (called outside m_mutex to prevent deadlock)
+// STORE lookup
+// ---------------------------------------------------------------------------
+
+STORE* MANAGER::FindOrCreateStore (const std::string& sName)
+{
+   STORE* pResult = nullptr;
+
+   auto it = m_mapStores.find (sName);
+   if (it != m_mapStores.end ())
+   {
+      pResult = it->second.get ();
+   }
+   else
+   {
+      auto pStore = std::make_unique<STORE> ();
+      pStore->sName = sName;
+      pResult = pStore.get ();
+      m_mapStores[sName] = std::move (pStore);
+   }
+
+   return pResult;
+}
+
+// ---------------------------------------------------------------------------
+// Notification helpers (called under m_mutex — recursive lock allows re-entry)
 // ---------------------------------------------------------------------------
 
 void MANAGER::NotifyFiles (const std::vector<FILE*>& apFiles, STATE bState)
 {
    for (auto* pFile : apFiles)
    {
-      if (!pFile)
-         continue;
-
       IFILE* pListener = pFile->GetListener ();
       if (pListener)
       {
@@ -1109,17 +903,17 @@ void MANAGER::NotifyFiles (const std::vector<FILE*>& apFiles, STATE bState)
             pListener->OnFileFailed (pFile);
       }
 
-      m_pSneeze->NotifyCacheFileChanged (pFile);
+      if (!pFile->IsPendingClear ())
+         m_pSneeze->NotifyCacheFileChanged (pFile);
    }
 }
 
 void MANAGER::DispatchNextFromQueue ()
 {
-   std::lock_guard<std::mutex> guard (m_mutex);
+   std::lock_guard<std::recursive_mutex> guard (m_mutex);
    SweepCompletedThreads ();
 
-   if (!m_aFetchQueue.empty ()
-       &&  static_cast<int> (m_apFetchSlots.size ()) < kMAX_CONCURRENT_FETCHES)
+   if (!m_aFetchQueue.empty ()  &&  static_cast<int> (m_apFetchSlots.size ()) < kMAX_CONCURRENT_FETCHES)
    {
       ENTRY* pNext = m_aFetchQueue.front ();
       m_aFetchQueue.pop ();

@@ -521,7 +521,7 @@ void SNEEZE::Logout ()
    // --- Phase 4: Destroy ---
    // Clear session caches.
    if (m_pCache)
-      m_pCache->ClearSession ();
+      m_pCache->Clear ();
 
    Log (ISNEEZE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 4 (destroy)");
 
@@ -552,7 +552,7 @@ void SNEEZE::ChangePrimaryFabric (const std::string& sUrl)
 
    // --- Phase 4: Destroy and rebuild ---
    if (m_pCache)
-      m_pCache->ClearSession ();
+      m_pCache->Clear ();
 
    // Tear down existing primary fabric content
    if (m_pAstroService)

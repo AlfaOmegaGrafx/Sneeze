@@ -1,11 +1,11 @@
 # Cache — Type-Agnostic Resource Caching
 
-The `cache` module (`SNEEZE::CACHE`) provides a handle-based, type-agnostic file caching system. It distinguishes between two classes of cached files based on whether a cryptographic hash is provided at request time:
+The `cache` module (`SNEEZE::CACHE`) provides a handle-based, type-agnostic file caching system. All cached files persist on disk across restarts. Files with a cryptographic hash are additionally integrity-verified.
 
-| Mode       | Hash Provided | Lifetime    | Verified | Storage              |
-|------------|---------------|-------------|----------|----------------------|
-| Session    | No            | Session     | No       | `Cache/tmp/<fan>/`   |
-| Persistent | Yes (SRI)     | Permanent   | Yes      | `Cache/<fan>/`       |
+| Hash Provided | Verified | Storage         |
+|---------------|----------|-----------------|
+| No            | No       | `Cache/<fan>/`  |
+| Yes (SRI)     | Yes      | `Cache/<fan>/`  |
 
 All files are stored on disk, never solely in memory. Fetches stream to a temporary file and are atomically renamed on completion/verification.
 
@@ -14,10 +14,11 @@ All files are stored on disk, never solely in memory. Fetches stream to a tempor
 ```
 MANAGER (singleton)
  ├── ENTRY_MAP: URL -> unique_ptr<ENTRY>
+ ├── STORE_MAP: name -> unique_ptr<STORE>
  ├── Fetch thread pool (capped at 16) + overflow queue
  ├── History list: all FILE* handles ever created
- ├── manifest.json (persistent entries only)
- └── Session epoch (steady_clock time point)
+ ├── manifest.json (all completed entries)
+ └── Epoch (steady_clock time point)
 
 ENTRY (internal shared state, one per URL)
  ├── MANAGER* (parent back-pointer)
@@ -30,11 +31,15 @@ ENTRY (internal shared state, one per URL)
 FILE (per-caller handle)
  ├── MANAGER* (parent back-pointer)
  ├── wraps ENTRY*
+ ├── STORE* (identity of requesting container)
  ├── IFILE* listener for notifications
  ├── Sequence number (monotonically increasing)
  ├── m_bPendingClear (deferred history removal flag)
  ├── m_bReleased (detached from ENTRY)
  └── read-only metadata accessors + Release/Clear/Reset
+
+STORE (identity record, one per unique name)
+ └── sName (display name of the WASM store/container)
 ```
 
 ## Namespace
@@ -46,13 +51,14 @@ All types live under `SNEEZE::CACHE`:
 | MANAGER  | Singleton cache manager. Owns entries and threads. |
 | ENTRY    | Internal shared state per URL. Not exposed.        |
 | FILE     | Per-caller handle. Returned by Request().          |
+| STORE    | Identity record for a WASM store (container).      |
 | IFILE    | Observer interface (OnFileReady, OnFileFailed).    |
 | STATE    | Enum: IDLE, FETCHING, VALIDATING, READY, FAILED.  |
-| REQUEST  | Flags: REQUEST_CREATE, REQUEST_FETCH.              |
+| REQUEST  | Flags: REQUEST_CREATE.                             |
 
 ## Usage
 
-### Basic session-only fetch (no hash)
+### Basic fetch (no hash)
 
 ```cpp
 #include "cache/Manager.h"
@@ -75,23 +81,22 @@ public:
    }
 };
 
-// Request a file (2-arg: no hash, default flags)
+// Request a file (no hash, default flags)
 MY_LISTENER listener;
-SNEEZE::CACHE::FILE* pFile = pCache->Request ("https://example.com/model.glb", &listener);
+SNEEZE::CACHE::FILE* pFile = pCache->Request (&listener, "MyStore", "https://example.com/model.glb");
 
 // ... later, when done:
 pFile->Release ();
 ```
 
-### Hash-verified persistent fetch
+### Hash-verified fetch
 
 ```cpp
 std::string sSri = "sha256-a1b2c3d4e5f6...";  // SRI-format hash
 
-SNEEZE::CACHE::FILE* pModule = pCache->Request ("https://cdn.example.com/game.wasm", sSri, &listener);
+SNEEZE::CACHE::FILE* pModule = pCache->Request (&listener, "MyStore", "https://cdn.example.com/game.wasm", sSri);
 
-// If the hash matches, OnFileReady fires and the file persists
-// across sessions. If mismatch, OnFileFailed fires.
+// If the hash matches, OnFileReady fires. If mismatch, OnFileFailed fires.
 ```
 
 ### Checking file metadata
@@ -110,68 +115,86 @@ void OnFileReady (SNEEZE::CACHE::FILE* pFile) override
 
 ### Request flags
 
-The 3-arg `Request()` accepts an optional `bFlags` parameter controlling whether to create the entry and whether to fetch it. Defaults to `kREQUEST_DEFAULT` (both `REQUEST_CREATE` and `REQUEST_FETCH`).
+The 5-arg `Request()` accepts an optional `bFlags` parameter controlling whether to create the entry. Defaults to `kREQUEST_DEFAULT` (`REQUEST_CREATE`).
 
 ```cpp
 using namespace SNEEZE::CACHE;
 
 // Find only — returns nullptr if the URL isn't already cached
-FILE* pExisting = pCache->Request (url, "", &listener, 0);
+FILE* pExisting = pCache->Request (&listener, "MyStore", url, "", 0);
 
 // Create without fetching — registers the entry in IDLE state
-FILE* pPlaceholder = pCache->Request (url, "", &listener, REQUEST_CREATE);
+FILE* pPlaceholder = pCache->Request (&listener, "MyStore", url, "", REQUEST_CREATE);
 
-// Default behavior — create + fetch (same as omitting the flag)
-FILE* pFile = pCache->Request (url, &listener);
+// Default behavior — create + fetch (same as using the 3-arg overload)
+FILE* pFile = pCache->Request (&listener, "MyStore", url);
 ```
 
 | Flag             | Effect                                            |
 |------------------|---------------------------------------------------|
 | `REQUEST_CREATE` | Create the ENTRY if it doesn't already exist.     |
-| `REQUEST_FETCH`  | Trigger a network fetch for IDLE/new entries.     |
 
-Without `CREATE`, a missing entry returns `nullptr`. Without `FETCH`, a new entry is created in `STATE_IDLE` and no network activity occurs.
+Without `CREATE`, a missing entry returns `nullptr`.
 
-### Release, Clear, and Reset (Deferred-Flag Pattern)
+### Store Identity
 
-The cache uses a deferred-flag pattern for safe teardown. `Clear()` and
-`Reset()` only set flags — all real work happens in `Release()` when
-the FILE is detached from its ENTRY. This decouples intent from
-execution and prevents dangling pointers when multiple callers share
-an ENTRY.
+Every `Request()` call includes a store name string identifying which WASM store (container) originated the request. The MANAGER creates a `STORE` object per unique name and attaches it to each FILE. STORE objects are owned by the MANAGER and outlive the containers that created them, so FILE pointers remain valid after a container is unloaded.
+
+```cpp
+// FILE exposes the store identity
+STORE* pStore = pFile->GetStore ();
+std::string sName = pFile->GetStoreName ();
+```
+
+Currently STORE holds only `sName`. Additional properties (fingerprint, container, persona, company) will be added as they become available.
+
+### Cache Bypass
+
+The cache can be globally disabled at runtime via `SetCacheEnabled(false)`. When disabled, every `Request()` that would normally serve data from disk instead triggers a fresh network fetch. Existing entries and disk files are not destroyed (unlike `Reset()`); the flag only affects the cache-hit decision path.
+
+```cpp
+pCache->SetCacheEnabled (false);   // all subsequent requests bypass the cache
+pCache->SetCacheEnabled (true);    // restore normal caching behavior
+bool b = pCache->IsCacheEnabled ();
+```
+
+This is intended for the inspector's "Disable cache" toggle, analogous to the same checkbox in browser developer tools.
+
+### Release, Clear, and Reset
 
 **Release** detaches the FILE from its ENTRY. If the FILE has a pending
-clear flag, it is removed from the inspector history. If the ENTRY has
-a pending reset flag and no remaining attached FILEs, the ENTRY and its
-disk file are destroyed.
+clear flag, it is deleted. If the ENTRY has a pending reset flag and no
+remaining attached FILEs, the ENTRY and its disk file are destroyed.
 
-**Clear** marks a FILE for removal from the inspector history list. The
-FILE record is deleted when released. The ENTRY and its cached data are
-not affected — this is purely inspector housekeeping.
+**Clear** is an immediate visibility toggle for the inspector. `Clear(true)`
+removes the FILE from the history list and fires `OnCacheFileDeleted`
+immediately — the inspector row vanishes on the spot. If the FILE is
+already released, it is also deleted. `Clear(false)` adds the FILE back
+to the history list and fires `OnCacheFileCreated`. The ENTRY and its
+cached data are not affected — this is purely inspector housekeeping.
+
+The clear flag also acts as a deferred destruction flag: when a cleared
+FILE is eventually released, it is deleted rather than kept in history.
 
 **Reset** marks the ENTRY for destruction. When the last attached FILE
 is released and the count reaches zero, the ENTRY's disk file is deleted,
-the ENTRY is removed from the map, and the manifest is updated if the
-entry was persistent. FILE handles in the history that pointed to the
-destroyed ENTRY have their ENTRY pointer nulled (accessors return safe
-defaults).
+the ENTRY is removed from the map, and the manifest is updated. FILE
+handles in the history that pointed to the destroyed ENTRY have their
+ENTRY pointer nulled (accessors return safe defaults).
 
 Both `Clear()` and `Reset()` accept a `bool` parameter (default `true`)
-so the flag can be toggled on/off before release:
+so the flag can be toggled on/off:
 
 ```cpp
+pFile->Clear ();              // immediately remove from inspector
+pFile->Clear (false);         // immediately add back to inspector
+
 pFile->Reset ();              // mark ENTRY for destruction
 pFile->Release ();            // triggers it (if last holder)
 
 pFile->Reset ();              // mark for reset
 pFile->Reset (false);         // changed my mind
 pFile->Release ();            // normal release, no reset
-
-pFile->Reset (bShouldReset);  // conditional
-pFile->Release ();
-
-pFile->Clear ();              // mark for history removal
-pFile->Release ();            // FILE removed from inspector history
 ```
 
 All three actions are available on both FILE and MANAGER:
@@ -180,12 +203,31 @@ All three actions are available on both FILE and MANAGER:
 pFile->Release ();             // via FILE
 pCache->Release (pFile);       // via MANAGER (equivalent)
 
-pFile->Clear ();               // via FILE
-pCache->Clear (pFile);         // via MANAGER (equivalent)
+pFile->Clear ();               // via FILE (routes through MANAGER)
+pCache->Clear (pFile);         // via MANAGER
 
 pFile->Reset ();               // via FILE (routes through MANAGER)
 pCache->Reset (pFile);         // via MANAGER
 ```
+
+### Display Toggle
+
+The display can be globally toggled via `SetDisplayEnabled(bool)`. When
+disabled, every new FILE created by `Request()` is automatically cleared
+— it is never added to the inspector history and no `OnCacheFileCreated`
+notification fires. The FILE still functions normally for its consumer
+(IFILE listener receives `OnFileReady`/`OnFileFailed`), and data is
+still cached to disk. When the FILE is released, it is deleted silently.
+
+```cpp
+pCache->SetDisplayEnabled (false);   // new requests are invisible to inspector
+pCache->SetDisplayEnabled (true);    // restore normal inspector visibility
+bool b = pCache->IsDisplayEnabled ();
+```
+
+This is intended for the inspector's stop/play toggle. Existing FILEs
+already in the history are not affected — only newly created FILEs are
+auto-cleared.
 
 ### Bulk Cache Management
 
@@ -194,25 +236,17 @@ process any that are already eligible (released FILEs, zero-attach ENTRYs).
 In-use items are cleaned up automatically when their last holder releases.
 
 ```cpp
-// Clear released FILE records from history (session entries only)
-pCache->ClearSession ();
-
 // Clear all released FILE records from history
-pCache->ClearAll ();
-
-// Reset all session entries (destroy when last holder releases)
-pCache->ResetSession ();
+pCache->Clear ();
 
 // Reset all entries (destroy when last holder releases)
-pCache->ResetAll ();
+pCache->Reset ();
 ```
 
-| Method          | Scope     | Effect                                              |
-|-----------------|-----------|------------------------------------------------------|
-| `ClearSession`  | History   | Remove released FILEs for session entries; flag rest |
-| `ClearAll`      | History   | Remove all released FILEs; flag rest                 |
-| `ResetSession`  | Entries   | Destroy idle session ENTRYs; flag in-use ones        |
-| `ResetAll`      | Entries   | Destroy all idle ENTRYs; flag in-use ones            |
+| Method  | Scope     | Effect                                       |
+|---------|-----------|----------------------------------------------|
+| `Clear` | History   | Remove all released FILEs; flag rest          |
+| `Reset` | Entries   | Destroy all idle ENTRYs; flag in-use ones     |
 
 ## Network Inspector Data
 
@@ -239,17 +273,17 @@ uint32_t nSeq = pFile->GetSequence ();
 
 ### History List
 
-`MANAGER::GetHistory()` returns a `const std::vector<FILE*>&` containing FILE handles created during the session, in creation order. `Release()` detaches the FILE from its ENTRY (stops notifications) but does **not** remove it from the history list unless the FILE has a pending clear flag. The history is the data backing the inspector's request table.
+`MANAGER::GetFiles()` returns a `const std::vector<FILE*>&` containing all FILE handles, in creation order. `Release()` detaches the FILE from its ENTRY (stops notifications) but does **not** remove it from the list unless the FILE has a pending clear flag. This list is the data backing the inspector's request table.
 
 ```cpp
-const auto& aHistory = pCache->GetHistory ();
+const auto& aHistory = pCache->GetFiles ();
 for (auto* pFile : aHistory)
 {
    // pFile->GetUrl(), GetSequence(), GetHttpStatus(), ...
 }
 ```
 
-FILEs are removed from history via `Clear()` + `Release()`, or bulk via `ClearSession()` / `ClearAll()`. All remaining FILEs are deleted on `Shutdown()`.
+FILEs are removed from history via `Clear()` + `Release()`, or bulk via `Clear()`. All remaining FILEs are deleted on `Shutdown()`.
 
 ### Served-from-Cache Detection
 
@@ -271,9 +305,9 @@ virtual void OnCacheFileDeleted (CACHE::FILE* pFile) { (void)pFile; }
 
 - **OnCacheFileCreated** — fired when `Request()` creates a new FILE handle. Artemis adds a new row to the inspector table.
 - **OnCacheFileChanged** — fired when a fetch completes (success or failure). Artemis updates the existing row (status, size, duration, etc.).
-- **OnCacheFileDeleted** — fired when a FILE is removed from the history list (via `Clear()` + `Release()`, or bulk `ClearSession()` / `ClearAll()`). Artemis removes the corresponding row. The FILE pointer is valid for the duration of the callback but will be deleted immediately after.
+- **OnCacheFileDeleted** — fired when a FILE is removed from the history list (via `Clear()` + `Release()`, or bulk `Clear()`). Artemis removes the corresponding row. The FILE pointer is valid for the duration of the callback but will be deleted immediately after.
 
-The MANAGER routes these through `SNEEZE::NotifyCacheFileCreated()`, `SNEEZE::NotifyCacheFileChanged()`, and `SNEEZE::NotifyCacheFileDeleted()`. All notifications fire outside `m_mutex`.
+The MANAGER routes these through `SNEEZE::NotifyCacheFileCreated()`, `SNEEZE::NotifyCacheFileChanged()`, and `SNEEZE::NotifyCacheFileDeleted()`. Notifications fire under `m_mutex` (a `recursive_mutex`), which allows listeners to safely call back into MANAGER (e.g., `Request()` or `Release()` from a callback).
 
 ### Inspector Column Mapping
 
@@ -286,14 +320,15 @@ The MANAGER routes these through `SNEEZE::NotifyCacheFileCreated()`, `SNEEZE::No
 | Time         | `GetFetchDuration()`                                  |
 | Waterfall    | `GetFetchStartTime()` / `GetFetchEndTime()` vs epoch  |
 | Sequence     | `GetSequence()`                                       |
+| Initiator    | `GetStoreName()`                                      |
 
 ## Request Deduplication
 
 If multiple callers request the same URL before the first fetch completes, they share a single ENTRY. Each caller gets their own FILE handle with their own IFILE listener, and all listeners are notified when the fetch resolves.
 
 ```cpp
-FILE* pA = pCache->Request (url, &listenerA);
-FILE* pB = pCache->Request (url, &listenerB);
+FILE* pA = pCache->Request (&listenerA, "MyStore", url);
+FILE* pB = pCache->Request (&listenerB, "MyStore", url);
 // pA and pB wrap the same ENTRY; both listeners fire on completion.
 
 pA->Release ();
@@ -316,11 +351,9 @@ This is self-describing — the algorithm is embedded in the hash string. New al
 
 All files are streamed to disk during fetch:
 
-1. Fetch begins -> data streams to `Cache/tmp/<diskkey>.tmp`
+1. Fetch begins -> data streams to `Cache/<diskkey>.tmp`
 2. On completion -> hash verified (if applicable)
-3. On success -> atomically renamed to final path:
-   - Persistent: `Cache/<2-char>/<remaining-diskkey>`
-   - Session: `Cache/tmp/<2-char>/<remaining-diskkey>`
+3. On success -> atomically renamed to final path: `Cache/<2-char>/<remaining-diskkey>`
 4. On failure -> temp file deleted
 
 The disk key is the SHA-256 hex digest of the URL. The first two characters form a subdirectory (fan-out, like git objects) for filesystem scalability.
@@ -328,19 +361,16 @@ The disk key is the SHA-256 hex digest of the URL. The first two characters form
 ### Directory structure
 
 ```
-%APPDATA%/Sneeze/Cache/
+<AppDataPath>/Cache/
 ├── manifest.json
-├── a1/                    <-- persistent (hashed) files
+├── a1/                    <-- cached files (fan-out by disk key)
 │   └── b2c3d4e5f6...
-├── tmp/                   <-- session files and in-flight temps
-│   ├── a1/
-│   │   └── b2c3d4e5f6...
-│   └── <diskkey>.tmp      <-- in-flight download
+├── <diskkey>.tmp          <-- in-flight download
 ```
 
 ## Manifest
 
-`manifest.json` tracks metadata for persistent (hashed) entries only. Session entries are not persisted to the manifest.
+`manifest.json` tracks metadata for all completed entries. Entries are restored on restart.
 
 ```json
 {
@@ -363,9 +393,7 @@ The disk key is the SHA-256 hex digest of the URL. The first two characters form
 }
 ```
 
-The manifest is written atomically (write to `.tmp`, then rename) to prevent corruption on crash. It is loaded on `Initialize()` and saved on `Shutdown()` and after each persistent entry is completed.
-
-The manifest JSON is built under `m_mutex` but written to disk after releasing the lock, so fetch threads are never blocked on I/O.
+The manifest is written atomically (write to `.tmp`, then rename) to prevent corruption on crash. It is loaded on `Initialize()` and saved only on `Shutdown()`. If the application crashes, the cache reverts to the prior session's manifest state — cached files remain on disk but must be re-fetched and re-verified on next launch. This avoids the performance cost of serializing the entire manifest under mutex after every fetch completion (which would be prohibitive at scale with 100K+ entries).
 
 The `version` field enables future schema migrations without breaking existing caches.
 
@@ -390,9 +418,9 @@ Three specific race conditions were identified and addressed:
 
 1. **`ENTRY::m_bState` is `std::atomic<STATE>`** — allows safe reads from any thread without holding the MANAGER lock. State transitions still happen under `m_mutex` for consistency with the rest of the ENTRY fields.
 
-2. **IFILE notifications fire outside `m_mutex`** — in `FetchEntry()`, the list of attached FILE handles is collected under lock (`CollectFiles()`), then the lock is released before calling `OnFileReady`/`OnFileFailed`. This prevents deadlock if a listener calls back into MANAGER (e.g., calling `Request()` or `Release()` from a callback).
+2. **`m_mutex` is a `recursive_mutex`** — IFILE notifications and ISNEEZE callbacks fire under the lock. The recursive mutex allows listeners to safely call back into MANAGER (e.g., calling `Request()` or `Release()` from a callback) without deadlocking.
 
-3. **`SaveManifest()` builds JSON under lock, writes outside** — the manifest serialization iterates `m_mapEntries` under `m_mutex`, builds the complete JSON document, then releases the lock before writing to disk. This prevents fetch threads from blocking on manifest I/O.
+3. **`SaveManifest()` runs only at shutdown** — the manifest is saved once during `Shutdown()`, under `m_mutex`. No concurrent fetch activity exists at that point (all threads are joined first), so there is no contention.
 
 ### Deferred: Non-Blocking I/O Thread Pool
 
@@ -448,11 +476,11 @@ The `CacheTest` suite (`SneezeTest --cache`) validates:
 | Test                        | What it proves                                          |
 |-----------------------------|---------------------------------------------------------|
 | Manager initialization      | Cache path creation, manifest loading                   |
-| Session fetch               | Unhashed file fetched, stored, readable                 |
+| Unhashed fetch              | Unhashed file fetched, stored, readable, persisted      |
 | Deduplication               | Same URL shares ENTRY, both listeners notified          |
 | Hash-verified fetch         | SRI hash computed, verified, persistent                  |
 | Hash mismatch               | Wrong hash causes FAILED state                           |
-| ResetSession                | Session entries reset, triggers re-fetch                  |
+| Reset                       | Entries reset, triggers re-fetch                         |
 | Reset flag                  | Deferred flag destroys entry and disk file on release     |
 | Failed fetch                | Invalid host causes FAILED state                         |
 | Manifest persistence        | Entry survives shutdown/reinit cycle                     |
@@ -462,12 +490,13 @@ The `CacheTest` suite (`SneezeTest --cache`) validates:
 | Notifications               | OnCacheFileCreated and OnCacheFileChanged fire            |
 | Served-from-cache            | Second request for same URL detects cache hit             |
 | Failed fetch HTTP status     | 404 response records correct HTTP status code             |
-| Clear flag                   | Clear + Release removes FILE from history                 |
+| Clear flag                   | Clear immediately removes FILE from history               |
+| Clear flag toggle            | Clear(false) adds FILE back to history                    |
 | Reset flag toggle            | Reset(true) then Reset(false) preserves entry             |
 | Deferred reset               | Reset deferred until last handle releases                 |
-| ClearAll                     | Released FILEs removed, in-use FILEs survive              |
-| ResetAll                     | Entries destroyed, disk files removed, triggers re-fetch  |
-| OnCacheFileDeleted           | Notification fires on Clear + Release                     |
+| Clear                        | Released FILEs removed, in-use FILEs survive              |
+| Reset (all)                  | Entries destroyed, disk files removed, triggers re-fetch  |
+| OnCacheFileDeleted           | Notification fires immediately on Clear                   |
 
 ## Deferred Items
 

@@ -563,6 +563,7 @@ set (CACHE_HEADERS
    cache/Types.h
    cache/Entry.h
    cache/File.h
+   cache/Store.h
    cache/Manager.h)
 
 set (STORAGE_SOURCES  storage/Storage.cpp)

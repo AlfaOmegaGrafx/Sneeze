@@ -33,13 +33,14 @@ namespace SNEEZE { namespace CACHE {
 
 class ENTRY;
 class FILE;
+class STORE;
 
 // ---------------------------------------------------------------------------
 // MANAGER — singleton cache manager.
 //
 // Callers request files via Request(), which returns a FILE* handle. When
-// done, they must return it via Release(). Files with a hash are persistent
-// on disk and verified; files without a hash are session-only.
+// done, they must return it via Release(). All files are persisted on disk
+// across restarts. Files with a hash are additionally verified.
 //
 // All files are streamed to disk during fetch and renamed atomically on
 // completion. A manifest.json tracks persistent entries.
@@ -63,30 +64,33 @@ public:
 
    // --- Primary API ---
 
-   FILE* Request (const std::string& sUrl, IFILE* pListener);
-   FILE* Request (const std::string& sUrl, const std::string& sHash, IFILE* pListener,
-                  uint32_t bFlags = kREQUEST_DEFAULT);
+   FILE* Request (IFILE* pListener, const std::string& sStore, const std::string& sUrl);
+   FILE* Request (IFILE* pListener, const std::string& sStore, const std::string& sUrl,
+                  const std::string& sHash, uint32_t bFlags = kREQUEST_DEFAULT);
    void  Release (FILE* pFile);
-   void  Clear   (FILE* pFile);
+   void  Clear   (FILE* pFile, bool b = true);
    void  Reset   (FILE* pFile, bool b = true);
 
    // --- Cache management ---
 
-   void ClearSession ();
-   void ClearAll ();
-   void ResetSession ();
-   void ResetAll ();
+   void SetCacheEnabled   (bool b) { m_bCacheEnabled = b; }
+   bool IsCacheEnabled    () const { return m_bCacheEnabled; }
+
+   void SetDisplayEnabled (bool b) { m_bDisplayEnabled = b; }
+   bool IsDisplayEnabled  () const { return m_bDisplayEnabled; }
+
+   void Clear ();
+   void Reset ();
 
    // --- Network inspector ---
 
-   const std::vector<FILE*>& GetHistory () const { return m_apHistory; }
+   const std::vector<FILE*>& GetFiles () const { return m_apFile; }
    double                    GetEpochAge () const;
 
 private:
-   std::string GetPersistentCachePath () const;
-   std::string GetSessionCachePath () const;
+   std::string GetCachePath () const;
    std::string ComputeDiskKey (const std::string& sUrl) const;
-   std::string DiskKeyToPath (const std::string& sDiskKey, bool bPersistent) const;
+   std::string DiskKeyToPath (const std::string& sDiskKey) const;
    std::string DiskKeyToTmpPath (const std::string& sDiskKey) const;
 
    bool ParseSriHash (const std::string& sSri, std::string& sAlgo, std::string& sDigest) const;
@@ -103,17 +107,20 @@ private:
    void NotifyFiles (const std::vector<FILE*>& apFiles, STATE bState);
    double SecondsSinceEpoch () const;
 
-   void DeleteHistory ();
-   void DestroyEntry (ENTRY* pEntry);
-   void NullifyHistoryEntries (ENTRY* pEntry);
+   void DeleteFiles ();
+   void ResetEntry (ENTRY* pEntry);
+
+   STORE* FindOrCreateStore (const std::string& sName);
 
    CORE::SNEEZE*             m_pSneeze;
    std::string               m_sCachePath;
-   std::string               m_sSessionPath;
 
    using ENTRY_MAP = std::unordered_map<std::string, std::unique_ptr<ENTRY>>;
    ENTRY_MAP                 m_mapEntries;
-   mutable std::mutex        m_mutex;
+
+   using STORE_MAP = std::unordered_map<std::string, std::unique_ptr<STORE>>;
+   STORE_MAP                 m_mapStores;
+   mutable std::recursive_mutex m_mutex;
 
    // Fetch thread pool (capped at kMAX_CONCURRENT_FETCHES)
    static const int          kMAX_CONCURRENT_FETCHES = 16;
@@ -129,9 +136,11 @@ private:
    std::queue<ENTRY*>        m_aFetchQueue;
 
    std::atomic<bool>         m_bShuttingDown;
+   bool                      m_bCacheEnabled;
+   bool                      m_bDisplayEnabled;
 
    // Network inspector
-   std::vector<FILE*>        m_apHistory;
+   std::vector<FILE*>        m_apFile;
    uint32_t                  m_nNextSequence;
    std::chrono::steady_clock::time_point m_tpEpoch;
 };

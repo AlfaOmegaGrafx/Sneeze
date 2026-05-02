@@ -12,39 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef SNEEZE_CACHE_TYPES_H
-#define SNEEZE_CACHE_TYPES_H
+#ifndef SNEEZE_CACHE_STORE_H
+#define SNEEZE_CACHE_STORE_H
 
-#include <cstdint>
+#include <string>
 
 namespace SNEEZE { namespace CACHE {
 
-class FILE;
+// ---------------------------------------------------------------------------
+// STORE — identity record for a WASM store (container) that requested cached
+// files. Owned by MANAGER, outlives the container itself so FILE pointers
+// remain valid after the container is unloaded.
+//
+// Currently holds only a display name. Additional properties (fingerprint,
+// container, persona, company) will be added as they become available.
+// ---------------------------------------------------------------------------
 
-enum STATE
-{
-   STATE_IDLE       = 0,
-   STATE_FETCHING   = 1,
-   STATE_VALIDATING = 2,
-   STATE_READY      = 3,
-   STATE_FAILED     = 4,
-};
-
-enum REQUEST
-{
-   REQUEST_CREATE = 0x01,
-};
-
-static const uint32_t kREQUEST_DEFAULT = REQUEST_CREATE;
-
-class IFILE
+class STORE
 {
 public:
-   virtual ~IFILE () {}
-   virtual void OnFileReady  (FILE* pFile) = 0;
-   virtual void OnFileFailed (FILE* pFile) = 0;
+   std::string sName;
 };
 
 }} // namespace SNEEZE::CACHE
 
-#endif // SNEEZE_CACHE_TYPES_H
+#endif // SNEEZE_CACHE_STORE_H

@@ -126,6 +126,9 @@ bool ASTRO_SERVICE::Initialize (SNEEZE::som::FABRIC* pPrimaryFabric)
       pNode->SetMapObject (pMapObj);
       pRoot->AddChild (pNode);
 
+      if (!pMapObj->m_sTextureUrl.empty ()  &&  pCache)
+         pMapObj->m_pCacheFile = pCache->Request (pMapObj, "Solar System", pMapObj->m_sTextureUrl);
+
       m_apNodes.push_back (pNode);
       m_apMapObjects.push_back (pMapObj);
    }
@@ -173,18 +176,15 @@ bool ASTRO_SERVICE::Initialize (SNEEZE::som::FABRIC* pPrimaryFabric)
       pNode->SetMapObject (pMapObj);
       pRoot->AddChild (pNode);
 
+      if (!pMapObj->m_sTextureUrl.empty ()  &&  pCache)
+         pMapObj->m_pCacheFile = pCache->Request (pMapObj, "Solar System", pMapObj->m_sTextureUrl);
+
       m_apNodes.push_back (pNode);
       m_apMapObjects.push_back (pMapObj);
    }
 
    m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "ASTRO_SERVICE",
       "Populated " + std::to_string (static_cast<int> (m_apNodes.size ())) + " SOM nodes");
-
-   for (auto* pObj : m_apMapObjects)
-   {
-      if (!pObj->m_sTextureUrl.empty ()  &&  pCache)
-         pObj->m_pCacheFile = pCache->Request (pObj->m_sTextureUrl, pObj);
-   }
 
    return true;
 }

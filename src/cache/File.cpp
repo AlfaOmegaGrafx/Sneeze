@@ -15,14 +15,16 @@
 #include "File.h"
 #include "Entry.h"
 #include "Manager.h"
+#include "Store.h"
 
 namespace SNEEZE { namespace CACHE {
 
-FILE::FILE (MANAGER* pManager, ENTRY* pEntry, IFILE* pListener) :
+FILE::FILE (MANAGER* pManager, ENTRY* pEntry, STORE* pStore, IFILE* pListener, uint32_t nSequence) :
    m_pManager      (pManager),
    m_pEntry        (pEntry),
+   m_pStore        (pStore),
    m_pListener     (pListener),
-   m_nSequence     (0),
+   m_nSequence     (nSequence),
    m_bPendingClear (false),
    m_bReleased     (false)
 {
@@ -38,10 +40,7 @@ FILE::~FILE ()
 
 STATE FILE::GetState () const
 {
-   STATE bResult = STATE_IDLE;
-   if (m_pEntry)
-      bResult = m_pEntry->GetState ();
-   return bResult;
+   return m_pEntry->GetState ();
 }
 
 bool FILE::IsReady () const
@@ -51,19 +50,17 @@ bool FILE::IsReady () const
 
 void FILE::Release ()
 {
-   if (m_pManager)
-      m_pManager->Release (this);
+   m_pManager->Release (this);
 }
 
 void FILE::Clear (bool b)
 {
-   m_bPendingClear = b;
+   m_pManager->Clear (this, b);
 }
 
 void FILE::Reset (bool b)
 {
-   if (m_pManager)
-      m_pManager->Reset (this, b);
+   m_pManager->Reset (this, b);
 }
 
 // ---------------------------------------------------------------------------
@@ -72,26 +69,25 @@ void FILE::Reset (bool b)
 
 std::string FILE::GetUrl () const
 {
-   std::string sResult;
-   if (m_pEntry)
-      sResult = m_pEntry->GetUrl ();
-   return sResult;
+   return m_pEntry->GetUrl ();
 }
 
 std::string FILE::GetHash () const
 {
-   std::string sResult;
-   if (m_pEntry)
-      sResult = m_pEntry->GetHash ();
-   return sResult;
+   return m_pEntry->GetHash ();
 }
 
 bool FILE::IsHashed () const
 {
-   bool bResult = false;
-   if (m_pEntry)
-      bResult = m_pEntry->IsHashed ();
-   return bResult;
+   return m_pEntry->IsHashed ();
+}
+
+std::string FILE::GetStoreName () const
+{
+   std::string sResult;
+   if (m_pStore)
+      sResult = m_pStore->sName;
+   return sResult;
 }
 
 // ---------------------------------------------------------------------------
@@ -100,10 +96,7 @@ bool FILE::IsHashed () const
 
 std::vector<uint8_t> FILE::ReadData () const
 {
-   std::vector<uint8_t> aResult;
-   if (m_pEntry)
-      aResult = m_pEntry->ReadData ();
-   return aResult;
+   return m_pEntry->ReadData ();
 }
 
 // ---------------------------------------------------------------------------
@@ -112,42 +105,27 @@ std::vector<uint8_t> FILE::ReadData () const
 
 long FILE::GetHttpStatus () const
 {
-   long nResult = 0;
-   if (m_pEntry)
-      nResult = m_pEntry->GetHttpStatus ();
-   return nResult;
+   return m_pEntry->GetHttpStatus ();
 }
 
 double FILE::GetFetchStartTime () const
 {
-   double dResult = 0.0;
-   if (m_pEntry)
-      dResult = m_pEntry->GetFetchStartTime ();
-   return dResult;
+   return m_pEntry->GetFetchStartTime ();
 }
 
 double FILE::GetFetchEndTime () const
 {
-   double dResult = 0.0;
-   if (m_pEntry)
-      dResult = m_pEntry->GetFetchEndTime ();
-   return dResult;
+   return m_pEntry->GetFetchEndTime ();
 }
 
 double FILE::GetFetchDuration () const
 {
-   double dResult = 0.0;
-   if (m_pEntry)
-      dResult = m_pEntry->GetFetchDuration ();
-   return dResult;
+   return m_pEntry->GetFetchDuration ();
 }
 
 bool FILE::IsServedFromCache () const
 {
-   bool bResult = false;
-   if (m_pEntry)
-      bResult = m_pEntry->IsServedFromCache ();
-   return bResult;
+   return m_pEntry->IsServedFromCache ();
 }
 
 // ---------------------------------------------------------------------------
@@ -156,10 +134,7 @@ bool FILE::IsServedFromCache () const
 
 std::string FILE::GetHeader (const std::string& sName) const
 {
-   std::string sResult;
-   if (m_pEntry)
-      sResult = m_pEntry->GetHeader (sName);
-   return sResult;
+   return m_pEntry->GetHeader (sName);
 }
 
 std::string FILE::GetContentType () const
@@ -169,50 +144,32 @@ std::string FILE::GetContentType () const
 
 uint64_t FILE::GetSizeBytes () const
 {
-   uint64_t nResult = 0;
-   if (m_pEntry)
-      nResult = m_pEntry->GetSizeBytes ();
-   return nResult;
+   return m_pEntry->GetSizeBytes ();
 }
 
 std::string FILE::GetDiskPath () const
 {
-   std::string sResult;
-   if (m_pEntry)
-      sResult = m_pEntry->GetDiskPath ();
-   return sResult;
+   return m_pEntry->GetDiskPath ();
 }
 
 std::string FILE::GetCreatedTime () const
 {
-   std::string sResult;
-   if (m_pEntry)
-      sResult = m_pEntry->GetCreatedTime ();
-   return sResult;
+   return m_pEntry->GetCreatedTime ();
 }
 
 std::string FILE::GetLastAccessTime () const
 {
-   std::string sResult;
-   if (m_pEntry)
-      sResult = m_pEntry->GetLastAccessTime ();
-   return sResult;
+   return m_pEntry->GetLastAccessTime ();
 }
 
 uint32_t FILE::GetAccessCount () const
 {
-   uint32_t nResult = 0;
-   if (m_pEntry)
-      nResult = m_pEntry->GetAccessCount ();
-   return nResult;
+   return m_pEntry->GetAccessCount ();
 }
 
 const std::unordered_map<std::string, std::string>& FILE::GetHeaders () const
 {
-   static const std::unordered_map<std::string, std::string> s_empty;
-   if (m_pEntry)
-      return m_pEntry->GetHeaders ();
-   return s_empty;
+   return m_pEntry->GetHeaders ();
 }
 
 }} // namespace SNEEZE::CACHE

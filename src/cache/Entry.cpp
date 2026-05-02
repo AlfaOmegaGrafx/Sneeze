@@ -131,6 +131,20 @@ void ENTRY::Fail ()
    m_bState.store (STATE_FAILED);
 }
 
+void ENTRY::ResetState ()
+{
+   m_bState.store (STATE_IDLE);
+   m_sDiskPath.clear ();
+   m_sHash.clear ();
+   m_nSizeBytes       = 0;
+   m_nHttpStatus      = 0;
+   m_dFetchStartTime  = 0.0;
+   m_dFetchEndTime    = 0.0;
+   m_bServedFromCache = false;
+   m_bPendingReset    = false;
+   m_mapHeaders.clear ();
+}
+
 std::vector<FILE*> ENTRY::CollectFiles () const
 {
    return m_apFiles;
@@ -144,20 +158,21 @@ std::vector<uint8_t> ENTRY::ReadData () const
 {
    std::vector<uint8_t> aData;
 
-   if (m_bState.load () != STATE_READY  ||  m_sDiskPath.empty ())
-      return aData;
+   if (m_bState.load () == STATE_READY  &&  !m_sDiskPath.empty ())
+   {
+      std::ifstream file (m_sDiskPath, std::ios::binary | std::ios::ate);
+      if (file.is_open ())
+      {
+         auto nSize = file.tellg ();
+         if (nSize > 0)
+         {
+            aData.resize (static_cast<size_t> (nSize));
+            file.seekg (0, std::ios::beg);
+            file.read (reinterpret_cast<char*> (aData.data ()), nSize);
+         }
+      }
+   }
 
-   std::ifstream file (m_sDiskPath, std::ios::binary | std::ios::ate);
-   if (!file.is_open ())
-      return aData;
-
-   auto nSize = file.tellg ();
-   if (nSize <= 0)
-      return aData;
-
-   aData.resize (static_cast<size_t> (nSize));
-   file.seekg (0, std::ios::beg);
-   file.read (reinterpret_cast<char*> (aData.data ()), nSize);
    return aData;
 }
 
