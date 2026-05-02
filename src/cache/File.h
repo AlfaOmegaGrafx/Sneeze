@@ -81,7 +81,9 @@ public:
 
    // --- Actions ---
 
-   void        Reset ();
+   void        Release ();
+   void        Clear (bool b = true);
+   void        Reset (bool b = true);
 
    // --- Listener ---
 
@@ -89,15 +91,21 @@ public:
 
    // --- Internal (MANAGER use only) ---
 
-   ENTRY*      GetEntry () const { return m_pEntry; }
+   ENTRY*      GetEntry () const          { return m_pEntry; }
+   bool        IsPendingClear () const    { return m_bPendingClear; }
+   bool        IsReleased () const        { return m_bReleased; }
 
    void        SetSequence (uint32_t nSeq) { m_nSequence = nSeq; }
+   void        SetReleased ()              { m_bReleased = true; }
+   void        NullEntry ()               { m_pEntry = nullptr; }
 
 private:
    MANAGER*    m_pManager;
    ENTRY*      m_pEntry;
    IFILE*      m_pListener;
    uint32_t    m_nSequence;
+   bool        m_bPendingClear;
+   bool        m_bReleased;
 };
 
 }} // namespace SNEEZE::CACHE

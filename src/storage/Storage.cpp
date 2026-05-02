@@ -18,10 +18,6 @@
 #include <fstream>
 #include <filesystem>
 
-#ifdef _WIN32
-#include <windows.h>
-#include <shlobj.h>
-#endif
 
 namespace SNEEZE { namespace storage {
 
@@ -235,13 +231,13 @@ bool STORAGE_SYSTEM::Initialize ()
    m_sRootPath = GetStorageRootPath ();
    if (m_sRootPath.empty ())
    {
-      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Error, "STORAGE",
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Error, "STORAGE",
          "Failed to determine storage root path");
       return false;
    }
 
    std::filesystem::create_directories (m_sRootPath);
-   m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "STORAGE",
+   m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "STORAGE",
       "Initialized (root: " + m_sRootPath + ")");
    return true;
 }
@@ -269,25 +265,12 @@ PERSONA_STORE* STORAGE_SYSTEM::GetPersona (const std::string& sPersonaHash)
 
 std::string STORAGE_SYSTEM::GetStorageRootPath () const
 {
-#ifdef _WIN32
-   char szPath[MAX_PATH] = {};
-   if (SUCCEEDED (SHGetFolderPathA (nullptr, CSIDL_APPDATA, nullptr, 0, szPath)))
-   {
-      std::string sPath (szPath);
-      sPath += "\\Sneeze\\Storage";
-      return sPath;
-   }
-   return "";
-#else
-   const char* pHome = std::getenv ("HOME");
-   if (pHome)
-   {
-      std::string sPath (pHome);
-      sPath += "/.sneeze/storage";
-      return sPath;
-   }
-   return "";
-#endif
+   std::string sAppData = m_pSneeze->GetHost ()->sAppDataPath;
+   if (sAppData.empty ())
+      return "";
+
+   std::filesystem::path pPath = std::filesystem::path (sAppData) / "Storage";
+   return pPath.string ();
 }
 
 }} // namespace SNEEZE::storage

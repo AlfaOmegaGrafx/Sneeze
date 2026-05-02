@@ -27,7 +27,7 @@ WASM_STORE::WASM_STORE (CORE::SNEEZE* pSneeze, wasm_engine_t* pEngine, const STO
 {
    m_pStore = wasmtime_store_new (pEngine, nullptr, nullptr);
    if (!m_pStore)
-      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Error, "WASM_STORE",
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Error, "WASM_STORE",
          "Failed to create native store for [" + pIdentity.sContainer + "]");
 }
 

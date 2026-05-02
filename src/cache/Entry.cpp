@@ -56,7 +56,8 @@ ENTRY::ENTRY (MANAGER* pManager, const std::string& sUrl, const std::string& sHa
    m_nHttpStatus      (0),
    m_dFetchStartTime  (0.0),
    m_dFetchEndTime    (0.0),
-   m_bServedFromCache (false)
+   m_bServedFromCache (false),
+   m_bPendingReset    (false)
 {
    m_sCreatedAt      = NowIso8601 ();
    m_sLastAccessedAt = m_sCreatedAt;
@@ -128,18 +129,6 @@ void ENTRY::Complete (const std::string& sDiskPath, uint64_t nSizeBytes)
 void ENTRY::Fail ()
 {
    m_bState.store (STATE_FAILED);
-}
-
-void ENTRY::Reset ()
-{
-   m_bState.store (STATE_IDLE);
-   m_sDiskPath.clear ();
-   m_mapHeaders.clear ();
-   m_nSizeBytes       = 0;
-   m_nHttpStatus      = 0;
-   m_dFetchStartTime  = 0.0;
-   m_dFetchEndTime    = 0.0;
-   m_bServedFromCache = false;
 }
 
 std::vector<FILE*> ENTRY::CollectFiles () const

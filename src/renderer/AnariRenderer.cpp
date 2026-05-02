@@ -156,7 +156,7 @@ bool ANARI_RENDERER::Initialize (int nWidth, int nHeight)
 #if defined(__ANDROID__)
       ANARI_LOGI ("lib dir: '%s'", sLibDir.c_str ());
 #else
-      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Trace, "ANARI",
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Trace, "ANARI",
          "lib dir: '" + sLibDir + "'");
 #endif
    }
@@ -165,7 +165,7 @@ bool ANARI_RENDERER::Initialize (int nWidth, int nHeight)
 #if defined(__ANDROID__)
       ANARI_LOGE ("could not resolve local lib dir via dladdr");
 #else
-      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Warning, "ANARI",
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "ANARI",
          "could not resolve local lib dir via dladdr");
 #endif
    }
@@ -174,7 +174,7 @@ bool ANARI_RENDERER::Initialize (int nWidth, int nHeight)
 #if defined(__ANDROID__)
    ANARI_LOGI ("loading library '%s'", sLibraryArg.c_str ());
 #else
-   m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "ANARI",
+   m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "ANARI",
       "loading library '" + sLibraryArg + "'");
 #endif
    m_pLibrary = anariLoadLibrary (sLibraryArg.c_str (), nullptr, nullptr);
@@ -183,7 +183,7 @@ bool ANARI_RENDERER::Initialize (int nWidth, int nHeight)
 #if defined(__ANDROID__)
       ANARI_LOGE ("failed to load library '%s'", sLibraryArg.c_str ());
 #else
-      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Error, "ANARI",
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Error, "ANARI",
          "failed to load library '" + sLibraryArg + "'");
 #endif
    }
@@ -192,7 +192,7 @@ bool ANARI_RENDERER::Initialize (int nWidth, int nHeight)
 #if defined(__ANDROID__)
       ANARI_LOGI ("creating device 'default'");
 #else
-      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "ANARI",
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "ANARI",
          "creating device 'default'");
 #endif
       m_pDevice = anariNewDevice (m_pLibrary, "default");
@@ -201,7 +201,7 @@ bool ANARI_RENDERER::Initialize (int nWidth, int nHeight)
 #if defined(__ANDROID__)
          ANARI_LOGE ("failed to create device from library '%s'", m_sLibrary.c_str ());
 #else
-         m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Error, "ANARI",
+         m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Error, "ANARI",
             "failed to create device from library '" + m_sLibrary + "'");
 #endif
          anariUnloadLibrary (m_pLibrary);

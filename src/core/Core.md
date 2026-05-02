@@ -14,9 +14,15 @@ management, and subsystem accessors.
 ```cpp
 #include "core/Sneeze.h"
 
-SNEEZE::CORE::SNEEZE engine (&myListener);
-engine.SetNativeWindow (hWnd);
-engine.Initialize (1280, 720, "anari");
+auto* pHost = new SNEEZE_HOST ();
+pHost->sAppDataPath  = sPath;
+pHost->sRenderer     = "halogen";
+pHost->pNativeWindow = hWnd;
+pHost->nWidth        = 1280;
+pHost->nHeight       = 720;
+
+SNEEZE::CORE::SNEEZE engine (pHost);
+engine.Initialize ();
 
 // Application event loop feeds input
 engine.SetMouseInput (dx, dy, scroll, bLeft, bRight);
@@ -60,16 +66,28 @@ engine.ChangePrimaryFabric ("https://example.com/world.msf");  // Teardown + fab
 3. **Shutdown** — call Shutdown on instances, destroy all WASM stores
 4. **Destroy** — clear session caches, logout persona (or reload fabric)
 
-### SNEEZE_LISTENER
+### ISNEEZE
 
-The host application implements `SNEEZE_LISTENER` to receive frame-ready
-callbacks from the compositor:
+`ISNEEZE` is the interface between the host application and the engine.
+The host creates a concrete subclass (e.g. `SNEEZE_HOST`), populates
+the public configuration members, and passes it to the `SNEEZE`
+constructor. Sneeze reads configuration during `Initialize()` and
+dispatches callbacks through the virtual methods.
 
 ```cpp
-class SNEEZE_LISTENER
+class ISNEEZE
 {
 public:
+   // Configuration (set by host before Initialize)
+   std::string sAppDataPath;
+   std::string sRenderer;
+   void*       pNativeWindow = nullptr;
+   int         nWidth        = 0;
+   int         nHeight       = 0;
+
+   // Callbacks
    virtual void OnFrameReady (const uint32_t* pFB, int nFbW, int nFbH) = 0;
+   virtual void Log (eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage) = 0;
 };
 ```
 

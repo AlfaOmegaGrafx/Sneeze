@@ -19,10 +19,12 @@
 namespace SNEEZE { namespace CACHE {
 
 FILE::FILE (MANAGER* pManager, ENTRY* pEntry, IFILE* pListener) :
-   m_pManager  (pManager),
-   m_pEntry    (pEntry),
-   m_pListener (pListener),
-   m_nSequence (0)
+   m_pManager      (pManager),
+   m_pEntry        (pEntry),
+   m_pListener     (pListener),
+   m_nSequence     (0),
+   m_bPendingClear (false),
+   m_bReleased     (false)
 {
 }
 
@@ -47,10 +49,21 @@ bool FILE::IsReady () const
    return GetState () == STATE_READY;
 }
 
-void FILE::Reset ()
+void FILE::Release ()
 {
    if (m_pManager)
-      m_pManager->Reset (this);
+      m_pManager->Release (this);
+}
+
+void FILE::Clear (bool b)
+{
+   m_bPendingClear = b;
+}
+
+void FILE::Reset (bool b)
+{
+   if (m_pManager)
+      m_pManager->Reset (this, b);
 }
 
 // ---------------------------------------------------------------------------

@@ -63,9 +63,9 @@ bool XR_RUNTIME::Initialize (CORE::SNEEZE* pSneeze)
    if (XR_FAILED (nResult))
    {
       bHasRuntime = false;
-      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Warning, "XR_RUNTIME",
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "XR_RUNTIME",
          "OpenXR loader initialized - no XR runtime detected (code " + std::to_string (nResult) + ")");
-      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Warning, "XR_RUNTIME",
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "XR_RUNTIME",
          "This is normal on machines without a VR/AR headset or runtime installed.");
       return true;
    }
@@ -76,7 +76,7 @@ bool XR_RUNTIME::Initialize (CORE::SNEEZE* pSneeze)
    if (XR_SUCCEEDED (xrGetInstanceProperties (hInstance, &pProps)))
    {
       sRuntimeName = pProps.runtimeName;
-      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "XR_RUNTIME",
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "XR_RUNTIME",
          "OpenXR " + std::to_string (XR_VERSION_MAJOR (XR_CURRENT_API_VERSION)) + "."
          + std::to_string (XR_VERSION_MINOR (XR_CURRENT_API_VERSION)) + "."
          + std::to_string (XR_VERSION_PATCH (XR_CURRENT_API_VERSION))

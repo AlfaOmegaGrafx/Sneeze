@@ -88,28 +88,27 @@ static ui::UI_CONTEXT       s_pUiContext;
 
 // ---------------------------------------------------------------------------
 
-SNEEZE::SNEEZE (SNEEZE_LISTENER* pListener)
-   : m_pListener (pListener)
-   , m_pEngineThread (nullptr)
-   , m_bShutdown (false)
-   , m_bReady (false)
-   , m_nFbWidth (0)
-   , m_nFbHeight (0)
-   , m_nWidth (0)
-   , m_nHeight (0)
-   , m_bResizePending (false)
-   , m_nResizeWidth (0)
-   , m_nResizeHeight (0)
-   , m_pNativeWindow (nullptr)
-   , m_pRootFabric (nullptr)
-   , m_pRootFabricRootNode (nullptr)
-   , m_pPrimaryAttachNode (nullptr)
-   , m_pPrimaryFabric (nullptr)
-   , m_pPrimaryFabricRootNode (nullptr)
-   , m_pAstroService (nullptr)
-   , m_pCache (nullptr)
-   , m_pStorage (nullptr)
-   , m_pPersona (nullptr)
+SNEEZE::SNEEZE (ISNEEZE* pHost) :
+   m_pHost                  (pHost),
+   m_pEngineThread          (nullptr),
+   m_bShutdown              (false),
+   m_bReady                 (false),
+   m_nFbWidth               (0),
+   m_nFbHeight              (0),
+   m_nWidth                 (0),
+   m_nHeight                (0),
+   m_bResizePending         (false),
+   m_nResizeWidth           (0),
+   m_nResizeHeight          (0),
+   m_pRootFabric            (nullptr),
+   m_pRootFabricRootNode    (nullptr),
+   m_pPrimaryAttachNode     (nullptr),
+   m_pPrimaryFabric         (nullptr),
+   m_pPrimaryFabricRootNode (nullptr),
+   m_pAstroService          (nullptr),
+   m_pCache                 (nullptr),
+   m_pStorage               (nullptr),
+   m_pPersona               (nullptr)
 {
 }
 
@@ -118,13 +117,18 @@ SNEEZE::~SNEEZE ()
    Shutdown ();
 }
 
-bool SNEEZE::Initialize (int nWidth, int nHeight, const std::string& sRenderer)
+bool SNEEZE::Initialize ()
 {
    bool bResult = false;
 
-   m_sRenderer = sRenderer;
-   m_nWidth    = nWidth;
-   m_nHeight   = nHeight;
+   if (!m_pHost  ||  m_pHost->sAppDataPath.empty ()  ||  !m_pHost->pNativeWindow)
+   {
+      Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Host configuration incomplete (sAppDataPath and pNativeWindow required)");
+      return false;
+   }
+
+   m_nWidth  = m_pHost->nWidth;
+   m_nHeight = m_pHost->nHeight;
 
    if (s_pWasmRuntime.Initialize (this))
    {
@@ -162,7 +166,7 @@ bool SNEEZE::Initialize (int nWidth, int nHeight, const std::string& sRenderer)
                   m_pPrimaryAttachNode->SetAttachedFabric (m_pPrimaryFabric);
                   m_pRootFabric->AddChildFabric (m_pPrimaryFabric);
 
-                  Log (SNEEZE_LISTENER::kLOGLEVEL_Info, "SNEEZE", "SOM initialized (root fabric + primary fabric)");
+                  Log (ISNEEZE::kLOGLEVEL_Info, "SNEEZE", "SOM initialized (root fabric + primary fabric)");
 
                   // --- Initialize subsystems (cache, storage, persona) ---
 
@@ -184,7 +188,7 @@ bool SNEEZE::Initialize (int nWidth, int nHeight, const std::string& sRenderer)
                   for (auto* pBody : aBodies)
                      pBody->ConvertToOutput ();
 
-                  Log (SNEEZE_LISTENER::kLOGLEVEL_Info, "SNEEZE",
+                  Log (ISNEEZE::kLOGLEVEL_Info, "SNEEZE",
                      "Created " + std::to_string (aBodies.size ()) + " bodies");
 
                   m_pAstroService = new astro::ASTRO_SERVICE (this);
@@ -211,7 +215,7 @@ bool SNEEZE::Initialize (int nWidth, int nHeight, const std::string& sRenderer)
                      }
                      else
                      {
-                        Log (SNEEZE_LISTENER::kLOGLEVEL_Error, "SNEEZE", "Worker failed to initialize");
+                        Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Worker failed to initialize");
                         delete pWorker;
                         bResult = false;
                      }
@@ -226,7 +230,7 @@ bool SNEEZE::Initialize (int nWidth, int nHeight, const std::string& sRenderer)
                      std::unique_lock<std::mutex> lock (m_mutex);
                      m_condVar.wait (lock, [this] { return m_bReady; });
 
-                     Log (SNEEZE_LISTENER::kLOGLEVEL_Info, "SNEEZE",
+                     Log (ISNEEZE::kLOGLEVEL_Info, "SNEEZE",
                         "Initialized (1 engine thread + " + std::to_string (m_apWorkers.size ()) + " workers)");
                   }
 
@@ -246,29 +250,29 @@ bool SNEEZE::Initialize (int nWidth, int nHeight, const std::string& sRenderer)
                   if (!bResult)
                      s_pUiContext.Shutdown ();
                }
-               else Log (SNEEZE_LISTENER::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize UI context");
+               else Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize UI context");
 
                if (!bResult)
                   s_pHttpClient.Shutdown ();
             }
-            else Log (SNEEZE_LISTENER::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize HTTP client");
+            else Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize HTTP client");
 
 #ifdef SNEEZE_HAS_XR
             if (!bResult)
                s_pXrRuntime.Shutdown ();
          }
-         else Log (SNEEZE_LISTENER::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize XR runtime");
+         else Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize XR runtime");
 #endif
 
          if (!bResult)
             s_pSpvPipeline.Shutdown ();
       }
-      else Log (SNEEZE_LISTENER::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize SPIR-V pipeline");
+      else Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize SPIR-V pipeline");
 
       if (!bResult)
          s_pWasmRuntime.Shutdown ();
    }
-   else Log (SNEEZE_LISTENER::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize WASM runtime");
+   else Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize WASM runtime");
 
    return bResult;
 }
@@ -349,7 +353,7 @@ void SNEEZE::Shutdown ()
    s_pSpvPipeline.Shutdown ();
    s_pWasmRuntime.Shutdown ();
 
-   Log (SNEEZE_LISTENER::kLOGLEVEL_Info, "SNEEZE", "Shutdown complete");
+   Log (ISNEEZE::kLOGLEVEL_Info, "SNEEZE", "Shutdown complete");
 }
 
 // ---------------------------------------------------------------------------
@@ -440,18 +444,13 @@ bool SNEEZE::ConsumePendingResize (int& nWidth, int& nHeight)
 }
 
 // ---------------------------------------------------------------------------
-// Listener
+// Logging and notifications
 // ---------------------------------------------------------------------------
 
-SNEEZE_LISTENER* SNEEZE::GetListener () const
+void SNEEZE::Log (ISNEEZE::eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage)
 {
-   return m_pListener;
-}
-
-void SNEEZE::Log (SNEEZE_LISTENER::eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage)
-{
-   if (m_pListener)
-      m_pListener->Log (Level, sModule, sMessage);
+   if (m_pHost)
+      m_pHost->Log (Level, sModule, sMessage);
 }
 
 // ---------------------------------------------------------------------------
@@ -477,14 +476,20 @@ net::HTTP_CLIENT* SNEEZE::GetHttpClient () const
 
 void SNEEZE::NotifyCacheFileCreated (CACHE::FILE* pFile)
 {
-   if (m_pListener)
-      m_pListener->OnCacheFileCreated (pFile);
+   if (m_pHost)
+      m_pHost->OnCacheFileCreated (pFile);
 }
 
 void SNEEZE::NotifyCacheFileChanged (CACHE::FILE* pFile)
 {
-   if (m_pListener)
-      m_pListener->OnCacheFileChanged (pFile);
+   if (m_pHost)
+      m_pHost->OnCacheFileChanged (pFile);
+}
+
+void SNEEZE::NotifyCacheFileDeleted (CACHE::FILE* pFile)
+{
+   if (m_pHost)
+      m_pHost->OnCacheFileDeleted (pFile);
 }
 
 // ---------------------------------------------------------------------------
@@ -501,16 +506,16 @@ void SNEEZE::Logout ()
 {
    // --- Phase 1: Signal ---
    // Notify all active stores that a teardown is imminent.
-   Log (SNEEZE_LISTENER::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 1 (signal)");
+   Log (ISNEEZE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 1 (signal)");
 
    // --- Phase 2: Communicate ---
    // Give instances time to communicate with their services.
    // (In the future, this would await async acknowledgements.)
-   Log (SNEEZE_LISTENER::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 2 (communicate)");
+   Log (ISNEEZE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 2 (communicate)");
 
    // --- Phase 3: Shutdown ---
    // Call Shutdown on all active instances, destroy all stores.
-   Log (SNEEZE_LISTENER::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 3 (shutdown)");
+   Log (ISNEEZE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 3 (shutdown)");
    s_pWasmRuntime.DestroyAllStores ();
 
    // --- Phase 4: Destroy ---
@@ -518,7 +523,7 @@ void SNEEZE::Logout ()
    if (m_pCache)
       m_pCache->ClearSession ();
 
-   Log (SNEEZE_LISTENER::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 4 (destroy)");
+   Log (ISNEEZE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 4 (destroy)");
 
    if (m_pPersona)
       m_pPersona->Logout ();
@@ -533,16 +538,16 @@ void SNEEZE::ChangePersona (const std::string& sFirst, const std::string& sSecon
 void SNEEZE::ChangePrimaryFabric (const std::string& sUrl)
 {
    // Same phased teardown as Logout, but we stay logged in and switch fabric.
-   Log (SNEEZE_LISTENER::kLOGLEVEL_Info, "SNEEZE", "ChangePrimaryFabric -> " + sUrl);
+   Log (ISNEEZE::kLOGLEVEL_Info, "SNEEZE", "ChangePrimaryFabric -> " + sUrl);
 
    // --- Phase 1: Signal ---
-   Log (SNEEZE_LISTENER::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 1 (signal)");
+   Log (ISNEEZE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 1 (signal)");
 
    // --- Phase 2: Communicate ---
-   Log (SNEEZE_LISTENER::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 2 (communicate)");
+   Log (ISNEEZE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 2 (communicate)");
 
    // --- Phase 3: Shutdown ---
-   Log (SNEEZE_LISTENER::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 3 (shutdown)");
+   Log (ISNEEZE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 3 (shutdown)");
    s_pWasmRuntime.DestroyAllStores ();
 
    // --- Phase 4: Destroy and rebuild ---
@@ -561,7 +566,7 @@ void SNEEZE::ChangePrimaryFabric (const std::string& sUrl)
    // In the future, this is where we'd fetch the new MSF at sUrl,
    // create the new primary fabric content, and repopulate the SOM.
 
-   Log (SNEEZE_LISTENER::kLOGLEVEL_Info, "SNEEZE", "Primary fabric cleared, ready for new content from [" + sUrl + "]");
+   Log (ISNEEZE::kLOGLEVEL_Info, "SNEEZE", "Primary fabric cleared, ready for new content from [" + sUrl + "]");
 }
 
 // ---------------------------------------------------------------------------
@@ -623,7 +628,7 @@ void SNEEZE::EngineThreadLoop ()
             sMetronome += "  [" + std::to_string (nIz) + "] " + std::to_string (m_anWorkerSignalCount[nIz]) + "/" + std::to_string (nHz) + " Hz";
             m_anWorkerSignalCount[nIz] = 0;
          }
-      // Log (SNEEZE_LISTENER::kLOGLEVEL_Trace, "METRONOME", sMetronome);
+      // Log (ISNEEZE::kLOGLEVEL_Trace, "METRONOME", sMetronome);
          nLastReport = nCurrentSecond;
       }
    }

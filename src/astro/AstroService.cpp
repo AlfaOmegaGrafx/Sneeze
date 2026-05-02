@@ -14,16 +14,73 @@
 
 #include "AstroService.h"
 #include "core/Sneeze.h"
-#include "net/HttpClient.h"
+#include "cache/Manager.h"
+#include "cache/File.h"
 #include "RMCObject.h"
 #include "Orbit.h"
 #include "stb/stb_image.h"
 
 namespace SNEEZE { namespace astro {
 
-ASTRO_SERVICE::ASTRO_SERVICE (CORE::SNEEZE* pSneeze)
-   : m_pSneeze (pSneeze)
-   , m_pFabric (nullptr)
+// ---------------------------------------------------------------------------
+// CELESTIAL_MAP_OBJECT
+// ---------------------------------------------------------------------------
+
+CELESTIAL_MAP_OBJECT::CELESTIAL_MAP_OBJECT (CORE::SNEEZE* pSneeze) :
+   m_pBody      (nullptr),
+   m_pOrbit     (nullptr),
+   m_pCacheFile (nullptr),
+   m_pSneeze    (pSneeze)
+{
+}
+
+void CELESTIAL_MAP_OBJECT::OnFileReady (CACHE::FILE* pFile)
+{
+   std::vector<uint8_t> aData = pFile->ReadData ();
+   if (aData.empty ())
+      return;
+
+   int nW = 0, nH = 0, nChannels = 0;
+   unsigned char* pPixels = stbi_load_from_memory (
+      aData.data (),
+      static_cast<int> (aData.size ()),
+      &nW, &nH, &nChannels, 4);
+
+   if (!pPixels)
+   {
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "ASTRO_SERVICE",
+         "Failed to decode texture: " + pFile->GetUrl ());
+      return;
+   }
+
+   {
+      std::lock_guard<std::mutex> lock (m_textureMutex);
+      m_aTexturePixels.assign (pPixels, pPixels + nW * nH * 4);
+      m_nTextureWidth    = nW;
+      m_nTextureHeight   = nH;
+      m_nTextureChannels = 4;
+   }
+   m_bTextureReady.store (true);
+   stbi_image_free (pPixels);
+
+   m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Trace, "ASTRO_SERVICE",
+      "Loaded texture " + pFile->GetUrl () +
+      " (" + std::to_string (nW) + "x" + std::to_string (nH) + ")");
+}
+
+void CELESTIAL_MAP_OBJECT::OnFileFailed (CACHE::FILE* pFile)
+{
+   m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "ASTRO_SERVICE",
+      "Failed to fetch texture: " + pFile->GetUrl ());
+}
+
+// ---------------------------------------------------------------------------
+// ASTRO_SERVICE
+// ---------------------------------------------------------------------------
+
+ASTRO_SERVICE::ASTRO_SERVICE (CORE::SNEEZE* pSneeze) :
+   m_pSneeze (pSneeze),
+   m_pFabric (nullptr)
 {
 }
 
@@ -48,11 +105,13 @@ bool ASTRO_SERVICE::Initialize (SNEEZE::som::FABRIC* pPrimaryFabric)
 
    SNEEZE::som::NODE* pRoot = m_pFabric->GetRootNode ();
 
+   CACHE::MANAGER* pCache = m_pSneeze->GetCache ();
+
    // --- Sun node (no orbit, sits at origin) ---
    {
       RMCOBJECT* pSun = RMCOBJECT::Find ("sun");
 
-      auto* pMapObj = new CELESTIAL_MAP_OBJECT ();
+      auto* pMapObj = new CELESTIAL_MAP_OBJECT (m_pSneeze);
       pMapObj->m_dPosX       = 0.0;
       pMapObj->m_dPosY       = 0.0;
       pMapObj->m_dPosZ       = 0.0;
@@ -102,7 +161,7 @@ bool ASTRO_SERVICE::Initialize (SNEEZE::som::FABRIC* pPrimaryFabric)
       if (pChildBody  &&  !pChildBody->sTexture.empty ())
          sTexture = pChildBody->sTexture;
 
-      auto* pMapObj = new CELESTIAL_MAP_OBJECT ();
+      auto* pMapObj = new CELESTIAL_MAP_OBJECT (m_pSneeze);
       pMapObj->m_dRadius     = dRadius;
       pMapObj->m_nColor      = nColor;
       pMapObj->m_pBody       = pBody;
@@ -118,71 +177,25 @@ bool ASTRO_SERVICE::Initialize (SNEEZE::som::FABRIC* pPrimaryFabric)
       m_apMapObjects.push_back (pMapObj);
    }
 
-   m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "ASTRO_SERVICE",
+   m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "ASTRO_SERVICE",
       "Populated " + std::to_string (static_cast<int> (m_apNodes.size ())) + " SOM nodes");
 
    for (auto* pObj : m_apMapObjects)
    {
-      if (!pObj->m_sTextureUrl.empty ())
-         m_aFetchThreads.emplace_back (&ASTRO_SERVICE::FetchTexture, this, pObj);
+      if (!pObj->m_sTextureUrl.empty ()  &&  pCache)
+         pObj->m_pCacheFile = pCache->Request (pObj->m_sTextureUrl, pObj);
    }
 
    return true;
 }
 
-void ASTRO_SERVICE::FetchTexture (CELESTIAL_MAP_OBJECT* pMapObj)
-{
-   net::HTTP_CLIENT* pHttp = m_pSneeze->GetHttpClient ();
-   if (!pHttp)
-      return;
-
-   std::string sData;
-   long nHttpCode = 0;
-   bool bOk = pHttp->Get (pMapObj->m_sTextureUrl, sData, nHttpCode);
-   if (!bOk  ||  nHttpCode != 200)
-   {
-      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Warning, "ASTRO_SERVICE",
-         "Failed to fetch texture: " + pMapObj->m_sTextureUrl +
-         " (http " + std::to_string (nHttpCode) + ")");
-      return;
-   }
-
-   int nW = 0, nH = 0, nChannels = 0;
-   unsigned char* pPixels = stbi_load_from_memory (
-      reinterpret_cast<const unsigned char*> (sData.data ()),
-      static_cast<int> (sData.size ()),
-      &nW, &nH, &nChannels, 4);
-
-   if (!pPixels)
-   {
-      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Warning, "ASTRO_SERVICE",
-         "Failed to decode texture: " + pMapObj->m_sTextureUrl);
-      return;
-   }
-
-   {
-      std::lock_guard<std::mutex> lock (pMapObj->m_textureMutex);
-      pMapObj->m_aTexturePixels.assign (pPixels, pPixels + nW * nH * 4);
-      pMapObj->m_nTextureWidth    = nW;
-      pMapObj->m_nTextureHeight   = nH;
-      pMapObj->m_nTextureChannels = 4;
-   }
-   pMapObj->m_bTextureReady.store (true);
-   stbi_image_free (pPixels);
-
-   m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "ASTRO_SERVICE",
-      "Loaded texture " + pMapObj->m_sTextureUrl +
-      " (" + std::to_string (nW) + "x" + std::to_string (nH) + ")");
-}
-
 void ASTRO_SERVICE::Shutdown ()
 {
-   for (auto& thread : m_aFetchThreads)
+   for (auto* pObj : m_apMapObjects)
    {
-      if (thread.joinable ())
-         thread.join ();
+      if (pObj->m_pCacheFile)
+         pObj->m_pCacheFile->Release ();
    }
-   m_aFetchThreads.clear ();
 
    for (auto* pNode : m_apNodes)
       delete pNode;

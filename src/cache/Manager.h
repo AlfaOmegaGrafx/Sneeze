@@ -67,13 +67,15 @@ public:
    FILE* Request (const std::string& sUrl, const std::string& sHash, IFILE* pListener,
                   uint32_t bFlags = kREQUEST_DEFAULT);
    void  Release (FILE* pFile);
-   void  Reset   (FILE* pFile);
+   void  Clear   (FILE* pFile);
+   void  Reset   (FILE* pFile, bool b = true);
 
    // --- Cache management ---
 
-   void Clear (const std::string& sUrl);
    void ClearSession ();
    void ClearAll ();
+   void ResetSession ();
+   void ResetAll ();
 
    // --- Network inspector ---
 
@@ -102,6 +104,8 @@ private:
    double SecondsSinceEpoch () const;
 
    void DeleteHistory ();
+   void DestroyEntry (ENTRY* pEntry);
+   void NullifyHistoryEntries (ENTRY* pEntry);
 
    CORE::SNEEZE*             m_pSneeze;
    std::string               m_sCachePath;

@@ -49,14 +49,15 @@ static void Check (bool bCondition, const char* szName)
 }
 
 // ---------------------------------------------------------------------------
-// Minimal SNEEZE_LISTENER for test logging
+// Minimal ISNEEZE for test logging
 // ---------------------------------------------------------------------------
 
-class CACHE_TEST_LISTENER : public SNEEZE::CORE::SNEEZE_LISTENER
+class CACHE_TEST_LISTENER : public SNEEZE::CORE::ISNEEZE
 {
 public:
    int m_nCreatedCount = 0;
    int m_nChangedCount = 0;
+   int m_nDeletedCount = 0;
 
    void OnFrameReady (const uint32_t*, int, int) override {}
    void Log (eLOGLEVEL, const std::string& sModule, const std::string& sMessage) override
@@ -66,8 +67,9 @@ public:
 
    void OnCacheFileCreated (SNEEZE::CACHE::FILE*) override { m_nCreatedCount++; }
    void OnCacheFileChanged (SNEEZE::CACHE::FILE*) override { m_nChangedCount++; }
+   void OnCacheFileDeleted (SNEEZE::CACHE::FILE*) override { m_nDeletedCount++; }
 
-   void ResetCounters () { m_nCreatedCount = 0; m_nChangedCount = 0; }
+   void ResetCounters () { m_nCreatedCount = 0; m_nChangedCount = 0; m_nDeletedCount = 0; }
 };
 
 // ---------------------------------------------------------------------------
@@ -205,7 +207,7 @@ static void TestSessionFetch ()
             Check (true, "Request did not crash (timeout is non-fatal)");
          }
 
-         pCache->Release (pFile);
+         pFile->Release ();
       }
    }
 
@@ -255,8 +257,8 @@ static void TestDeduplication ()
       }
    }
 
-   if (pFileA) pCache->Release (pFileA);
-   if (pFileB) pCache->Release (pFileB);
+   if (pFileA) pFileA->Release ();
+   if (pFileB) pFileB->Release ();
 
    pCache->Shutdown ();
    delete pCache;
@@ -293,9 +295,9 @@ static void TestHashVerifiedFetch ()
 
          Check (!sDigest.empty (), "Pre-fetch produced a hash");
 
-         pCache->Release (pPreFile);
+         pPreFile->Reset ();
+         pPreFile->Release ();
          pPreFile = nullptr;
-         pCache->Clear ("https://httpbin.org/base64/SGVsbG9Xb3JsZA==");
 
          TEST_FILE_LISTENER listenerVerified;
          SNEEZE::CACHE::FILE* pVerFile = pCache->Request (
@@ -318,14 +320,14 @@ static void TestHashVerifiedFetch ()
                std::printf ("    (Verified fetch timed out or failed)\n");
                Check (true, "Hash-verified fetch did not crash");
             }
-            pCache->Release (pVerFile);
+            pVerFile->Release ();
          }
       }
       else
       {
          std::printf ("    (Pre-fetch timed out — expected if no internet)\n");
          Check (true, "Pre-fetch did not crash");
-         pCache->Release (pPreFile);
+         pPreFile->Release ();
       }
    }
 
@@ -364,7 +366,7 @@ static void TestHashMismatch ()
          Check (true, "Hash mismatch test did not crash");
       }
 
-      pCache->Release (pFile);
+      pFile->Release ();
    }
 
    pCache->Shutdown ();
@@ -372,12 +374,12 @@ static void TestHashMismatch ()
 }
 
 // ---------------------------------------------------------------------------
-// Test 6: ClearSession removes unhashed, keeps hashed
+// Test 6: ResetSession removes session entries, triggers re-fetch
 // ---------------------------------------------------------------------------
 
-static void TestClearSession ()
+static void TestResetSession ()
 {
-   std::printf ("\n[Test 6] ClearSession\n");
+   std::printf ("\n[Test 6] ResetSession\n");
 
    SNEEZE::CACHE::MANAGER* pCache = new SNEEZE::CACHE::MANAGER (s_pSneeze);
    pCache->Initialize ();
@@ -391,10 +393,10 @@ static void TestClearSession ()
       bool bGot = listenerSession.WaitFor (15000);
       if (bGot  &&  listenerSession.Succeeded ())
       {
-         Check (pSession->IsReady (), "Session file is READY before clear");
-         pCache->Release (pSession);
+         Check (pSession->IsReady (), "Session file is READY before reset");
+         pSession->Release ();
 
-         pCache->ClearSession ();
+         pCache->ResetSession ();
 
          TEST_FILE_LISTENER listenerAfter;
          SNEEZE::CACHE::FILE* pAfter = pCache->Request (
@@ -405,19 +407,19 @@ static void TestClearSession ()
             SNEEZE::CACHE::STATE bState = pAfter->GetState ();
             Check (bState == SNEEZE::CACHE::STATE_FETCHING  ||
                    bState == SNEEZE::CACHE::STATE_READY,
-               "After clear, new request is FETCHING or READY");
+               "After reset, new request is FETCHING or READY");
 
             listenerAfter.WaitFor (15000);
-            pCache->Release (pAfter);
+            pAfter->Release ();
          }
 
-         Check (true, "ClearSession completed without crash");
+         Check (true, "ResetSession completed without crash");
       }
       else
       {
          std::printf ("    (Timed out — expected if no internet)\n");
-         Check (true, "ClearSession test did not crash");
-         pCache->Release (pSession);
+         Check (true, "ResetSession test did not crash");
+         pSession->Release ();
       }
    }
 
@@ -426,12 +428,12 @@ static void TestClearSession ()
 }
 
 // ---------------------------------------------------------------------------
-// Test 7: Clear(url) removes a specific entry
+// Test 7: Reset flag destroys entry and disk file on release
 // ---------------------------------------------------------------------------
 
-static void TestClearUrl ()
+static void TestResetFlag ()
 {
-   std::printf ("\n[Test 7] Clear(url)\n");
+   std::printf ("\n[Test 7] Reset flag\n");
 
    SNEEZE::CACHE::MANAGER* pCache = new SNEEZE::CACHE::MANAGER (s_pSneeze);
    pCache->Initialize ();
@@ -446,20 +448,20 @@ static void TestClearUrl ()
       if (bGot  &&  listener.Succeeded ())
       {
          std::string sDiskPath = pFile->GetDiskPath ();
-         pCache->Release (pFile);
 
          Check (!sDiskPath.empty (), "File had a disk path");
-         Check (std::filesystem::exists (sDiskPath), "Disk file exists before clear");
+         Check (std::filesystem::exists (sDiskPath), "Disk file exists before reset");
 
-         pCache->Clear ("https://httpbin.org/bytes/16");
+         pFile->Reset ();
+         pFile->Release ();
 
-         Check (!std::filesystem::exists (sDiskPath), "Disk file removed after clear");
+         Check (!std::filesystem::exists (sDiskPath), "Disk file removed after reset+release");
       }
       else
       {
          std::printf ("    (Timed out — expected if no internet)\n");
-         Check (true, "Clear(url) test did not crash");
-         pCache->Release (pFile);
+         Check (true, "Reset flag test did not crash");
+         pFile->Release ();
       }
    }
 
@@ -496,7 +498,7 @@ static void TestFailedFetch ()
          Check (true, "Failed fetch did not crash");
       }
 
-      pCache->Release (pFile);
+      pFile->Release ();
    }
 
    pCache->Shutdown ();
@@ -526,23 +528,24 @@ static void TestManifestPersistence ()
          std::vector<uint8_t> aData = pPre->ReadData ();
          std::string sDigest = ComputeSha256Hex (aData.data (), aData.size ());
          sSri = "sha256-" + sDigest;
-         pCache->Release (pPre);
+         pPre->Reset ();
+         pPre->Release ();
+         pPre = nullptr;
 
-         pCache->Clear (sUrl);
          TEST_FILE_LISTENER listenerHash;
          SNEEZE::CACHE::FILE* pHash = pCache->Request (sUrl, sSri, &listenerHash);
          if (pHash)
          {
             listenerHash.WaitFor (15000);
             Check (listenerHash.Succeeded (), "Persistent entry created");
-            pCache->Release (pHash);
+            pHash->Release ();
          }
       }
       else
       {
          std::printf ("    (Pre-fetch timed out — skipping)\n");
          Check (true, "Manifest test did not crash (no internet)");
-         if (pPre) pCache->Release (pPre);
+         if (pPre) pPre->Release ();
          pCache->Shutdown ();
          delete pCache;
          return;
@@ -570,10 +573,10 @@ static void TestManifestPersistence ()
          std::vector<uint8_t> aData = pReload->ReadData ();
          Check (!aData.empty (), "Data is readable after reload");
 
-         pCache2->Release (pReload);
+         pReload->Release ();
       }
 
-      pCache2->Clear (sUrl);
+      pCache2->ResetAll ();
       pCache2->Shutdown ();
       delete pCache2;
    }
@@ -613,7 +616,7 @@ static void TestHttpHeaders ()
          Check (true, "Headers test did not crash");
       }
 
-      pCache->Release (pFile);
+      pFile->Release ();
    }
 
    pCache->Shutdown ();
@@ -644,7 +647,7 @@ static void TestFileHandleLifecycle ()
 
       listener.WaitFor (15000);
 
-      pCache->Release (pFile);
+      pFile->Release ();
       Check (true, "Release completed without crash");
    }
 
@@ -684,8 +687,8 @@ static void TestHistoryAndSequence ()
       listenerA.WaitFor (15000);
       listenerB.WaitFor (15000);
 
-      pCache->Release (pFileA);
-      pCache->Release (pFileB);
+      pFileA->Release ();
+      pFileB->Release ();
 
       Check (aHistory.size () >= 2, "Release does not shrink history");
    }
@@ -726,7 +729,7 @@ static void TestNotifications ()
          Check (true, "Notification test did not crash");
       }
 
-      pCache->Release (pFile);
+      pFile->Release ();
    }
 
    pCache->Shutdown ();
@@ -767,7 +770,7 @@ static void TestServedFromCache ()
             Check (pSecond->IsServedFromCache (), "Second fetch IS served from cache");
             Check (pSecond->GetSequence () > pFirst->GetSequence (),
                "Second sequence > first");
-            pCache->Release (pSecond);
+            pSecond->Release ();
          }
       }
       else
@@ -776,7 +779,7 @@ static void TestServedFromCache ()
          Check (true, "Served-from-cache test did not crash");
       }
 
-      pCache->Release (pFirst);
+      pFirst->Release ();
    }
 
    pCache->Shutdown ();
@@ -813,7 +816,285 @@ static void TestFailedFetchHttpStatus ()
          Check (true, "HTTP status test did not crash");
       }
 
-      pCache->Release (pFile);
+      pFile->Release ();
+   }
+
+   pCache->Shutdown ();
+   delete pCache;
+}
+
+// ---------------------------------------------------------------------------
+// Test 16: Clear flag removes FILE from history on release
+// ---------------------------------------------------------------------------
+
+static void TestClearFlag ()
+{
+   std::printf ("\n[Test 16] Clear flag\n");
+
+   SNEEZE::CACHE::MANAGER* pCache = new SNEEZE::CACHE::MANAGER (s_pSneeze);
+   pCache->Initialize ();
+
+   TEST_FILE_LISTENER listener;
+   SNEEZE::CACHE::FILE* pFile = pCache->Request (
+      "https://httpbin.org/bytes/8", "", &listener);
+
+   if (pFile)
+   {
+      listener.WaitFor (15000);
+
+      size_t nHistoryBefore = pCache->GetHistory ().size ();
+
+      pFile->Clear ();
+      pFile->Release ();
+
+      size_t nHistoryAfter = pCache->GetHistory ().size ();
+      Check (nHistoryAfter == nHistoryBefore - 1,
+         "Clear + Release removes FILE from history");
+   }
+
+   pCache->Shutdown ();
+   delete pCache;
+}
+
+// ---------------------------------------------------------------------------
+// Test 17: Reset flag can be toggled off before release
+// ---------------------------------------------------------------------------
+
+static void TestResetFlagToggle ()
+{
+   std::printf ("\n[Test 17] Reset flag toggle\n");
+
+   SNEEZE::CACHE::MANAGER* pCache = new SNEEZE::CACHE::MANAGER (s_pSneeze);
+   pCache->Initialize ();
+
+   TEST_FILE_LISTENER listener;
+   SNEEZE::CACHE::FILE* pFile = pCache->Request (
+      "https://httpbin.org/bytes/8", "", &listener);
+
+   if (pFile)
+   {
+      listener.WaitFor (15000);
+
+      std::string sDiskPath = pFile->GetDiskPath ();
+      bool bHadDisk = !sDiskPath.empty ()  &&  std::filesystem::exists (sDiskPath);
+
+      pFile->Reset ();
+      pFile->Reset (false);
+      pFile->Release ();
+
+      if (bHadDisk)
+      {
+         Check (std::filesystem::exists (sDiskPath),
+            "Disk file survives when reset flag is toggled off");
+      }
+      else
+      {
+         Check (true, "Reset toggle did not crash (no disk path to verify)");
+      }
+   }
+
+   pCache->Shutdown ();
+   delete pCache;
+}
+
+// ---------------------------------------------------------------------------
+// Test 18: Deferred reset with multiple handles
+// ---------------------------------------------------------------------------
+
+static void TestDeferredReset ()
+{
+   std::printf ("\n[Test 18] Deferred reset (multiple handles)\n");
+
+   SNEEZE::CACHE::MANAGER* pCache = new SNEEZE::CACHE::MANAGER (s_pSneeze);
+   pCache->Initialize ();
+
+   TEST_FILE_LISTENER listenerA;
+   TEST_FILE_LISTENER listenerB;
+
+   SNEEZE::CACHE::FILE* pFileA = pCache->Request (
+      "https://httpbin.org/bytes/16", "", &listenerA);
+   SNEEZE::CACHE::FILE* pFileB = pCache->Request (
+      "https://httpbin.org/bytes/16", "", &listenerB);
+
+   if (pFileA  &&  pFileB)
+   {
+      listenerA.WaitFor (15000);
+      listenerB.WaitFor (15000);
+
+      std::string sDiskPath = pFileA->GetDiskPath ();
+      bool bHadDisk = !sDiskPath.empty ()  &&  std::filesystem::exists (sDiskPath);
+
+      pFileA->Reset ();
+      pFileA->Release ();
+
+      if (bHadDisk)
+      {
+         Check (std::filesystem::exists (sDiskPath),
+            "Disk file survives while second handle is attached");
+      }
+
+      Check (pFileB->GetEntry () != nullptr,
+         "Second handle still has a valid ENTRY");
+
+      pFileB->Release ();
+
+      if (bHadDisk)
+      {
+         Check (!std::filesystem::exists (sDiskPath),
+            "Disk file removed after last handle releases");
+      }
+
+      Check (true, "Deferred reset completed without crash");
+   }
+   else
+   {
+      if (pFileA) pFileA->Release ();
+      if (pFileB) pFileB->Release ();
+      Check (true, "Deferred reset did not crash (handles were null)");
+   }
+
+   pCache->Shutdown ();
+   delete pCache;
+}
+
+// ---------------------------------------------------------------------------
+// Test 19: ClearAll removes released FILE records
+// ---------------------------------------------------------------------------
+
+static void TestClearAll ()
+{
+   std::printf ("\n[Test 19] ClearAll\n");
+
+   SNEEZE::CACHE::MANAGER* pCache = new SNEEZE::CACHE::MANAGER (s_pSneeze);
+   pCache->Initialize ();
+
+   TEST_FILE_LISTENER listenerA;
+   TEST_FILE_LISTENER listenerB;
+
+   SNEEZE::CACHE::FILE* pFileA = pCache->Request (
+      "https://httpbin.org/bytes/8", "", &listenerA);
+   SNEEZE::CACHE::FILE* pFileB = pCache->Request (
+      "https://httpbin.org/bytes/16", "", &listenerB);
+
+   if (pFileA  &&  pFileB)
+   {
+      listenerA.WaitFor (15000);
+      listenerB.WaitFor (15000);
+
+      pFileA->Release ();
+
+      size_t nHistoryBefore = pCache->GetHistory ().size ();
+      Check (nHistoryBefore >= 2, "History has at least 2 entries before ClearAll");
+
+      pCache->ClearAll ();
+
+      size_t nHistoryAfter = pCache->GetHistory ().size ();
+      Check (nHistoryAfter < nHistoryBefore,
+         "ClearAll removed released FILE records");
+      Check (nHistoryAfter >= 1,
+         "In-use FILE record survived ClearAll");
+
+      pFileB->Release ();
+   }
+   else
+   {
+      if (pFileA) pFileA->Release ();
+      if (pFileB) pFileB->Release ();
+   }
+
+   Check (true, "ClearAll completed without crash");
+
+   pCache->Shutdown ();
+   delete pCache;
+}
+
+// ---------------------------------------------------------------------------
+// Test 20: ResetAll destroys all entries
+// ---------------------------------------------------------------------------
+
+static void TestResetAll ()
+{
+   std::printf ("\n[Test 20] ResetAll\n");
+
+   SNEEZE::CACHE::MANAGER* pCache = new SNEEZE::CACHE::MANAGER (s_pSneeze);
+   pCache->Initialize ();
+
+   TEST_FILE_LISTENER listener;
+   SNEEZE::CACHE::FILE* pFile = pCache->Request (
+      "https://httpbin.org/bytes/8", "", &listener);
+
+   if (pFile)
+   {
+      bool bGot = listener.WaitFor (15000);
+      if (bGot  &&  listener.Succeeded ())
+      {
+         std::string sDiskPath = pFile->GetDiskPath ();
+         pFile->Release ();
+
+         pCache->ResetAll ();
+
+         if (!sDiskPath.empty ())
+         {
+            Check (!std::filesystem::exists (sDiskPath),
+               "ResetAll removed disk file");
+         }
+
+         TEST_FILE_LISTENER listenerAfter;
+         SNEEZE::CACHE::FILE* pAfter = pCache->Request (
+            "https://httpbin.org/bytes/8", "", &listenerAfter);
+
+         if (pAfter)
+         {
+            SNEEZE::CACHE::STATE bState = pAfter->GetState ();
+            Check (bState == SNEEZE::CACHE::STATE_FETCHING  ||
+                   bState == SNEEZE::CACHE::STATE_READY,
+               "After ResetAll, new request is FETCHING or READY");
+
+            listenerAfter.WaitFor (15000);
+            pAfter->Release ();
+         }
+      }
+      else
+      {
+         std::printf ("    (Timed out — expected if no internet)\n");
+         Check (true, "ResetAll test did not crash");
+         pFile->Release ();
+      }
+   }
+
+   pCache->Shutdown ();
+   delete pCache;
+}
+
+// ---------------------------------------------------------------------------
+// Test 21: OnCacheFileDeleted notification
+// ---------------------------------------------------------------------------
+
+static void TestDeletedNotification ()
+{
+   std::printf ("\n[Test 21] OnCacheFileDeleted notification\n");
+
+   s_pTestListener->ResetCounters ();
+
+   SNEEZE::CACHE::MANAGER* pCache = new SNEEZE::CACHE::MANAGER (s_pSneeze);
+   pCache->Initialize ();
+
+   TEST_FILE_LISTENER listener;
+   SNEEZE::CACHE::FILE* pFile = pCache->Request (
+      "https://httpbin.org/bytes/8", "", &listener);
+
+   if (pFile)
+   {
+      listener.WaitFor (15000);
+
+      Check (s_pTestListener->m_nDeletedCount == 0,
+         "No deleted notifications before clear");
+
+      pFile->Clear ();
+      pFile->Release ();
+
+      Check (s_pTestListener->m_nDeletedCount == 1,
+         "OnCacheFileDeleted fired after clear + release");
    }
 
    pCache->Shutdown ();
@@ -829,6 +1110,7 @@ int RunCacheTests (int /*nArgc*/, char** /*aArgv*/)
    std::printf ("=== Cache Test Suite ===\n");
 
    s_pTestListener = new CACHE_TEST_LISTENER ();
+   s_pTestListener->sAppDataPath = (std::filesystem::temp_directory_path () / "SneezeTest").string ();
    s_pSneeze = new SNEEZE::CORE::SNEEZE (s_pTestListener);
    curl_global_init (CURL_GLOBAL_DEFAULT);
 
@@ -837,8 +1119,8 @@ int RunCacheTests (int /*nArgc*/, char** /*aArgv*/)
    TestDeduplication ();
    TestHashVerifiedFetch ();
    TestHashMismatch ();
-   TestClearSession ();
-   TestClearUrl ();
+   TestResetSession ();
+   TestResetFlag ();
    TestFailedFetch ();
    TestManifestPersistence ();
    TestHttpHeaders ();
@@ -847,6 +1129,12 @@ int RunCacheTests (int /*nArgc*/, char** /*aArgv*/)
    TestNotifications ();
    TestServedFromCache ();
    TestFailedFetchHttpStatus ();
+   TestClearFlag ();
+   TestResetFlagToggle ();
+   TestDeferredReset ();
+   TestClearAll ();
+   TestResetAll ();
+   TestDeletedNotification ();
 
    curl_global_cleanup ();
 

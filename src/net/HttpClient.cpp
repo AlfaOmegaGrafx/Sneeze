@@ -47,7 +47,7 @@ bool HTTP_CLIENT::Initialize (CORE::SNEEZE* pSneeze)
    CURLcode nCode = curl_global_init (CURL_GLOBAL_DEFAULT);
    if (nCode != CURLE_OK)
    {
-      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Error, "HTTP_CLIENT",
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Error, "HTTP_CLIENT",
          "curl_global_init failed (code " + std::to_string (static_cast<int> (nCode)) + ")");
    }
    else
@@ -55,7 +55,7 @@ bool HTTP_CLIENT::Initialize (CORE::SNEEZE* pSneeze)
       bInitialized = true;
 
       curl_version_info_data* pInfo = curl_version_info (CURLVERSION_NOW);
-      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "HTTP_CLIENT",
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "HTTP_CLIENT",
          "libcurl " + std::string (pInfo->version) + " initialized (SSL: " +
          std::string (pInfo->ssl_version ? pInfo->ssl_version : "none") + ")");
    }
@@ -116,7 +116,7 @@ bool HTTP_CLIENT::DownloadToFile (const std::string& sUrl, const std::string& sF
 
    if (!pFile)
    {
-      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Error, "HTTP_CLIENT",
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Error, "HTTP_CLIENT",
          "failed to open " + sFilePath + " for writing");
       return false;
    }

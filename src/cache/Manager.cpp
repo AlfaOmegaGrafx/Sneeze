@@ -30,10 +30,6 @@
 #include <cstring>
 #include <algorithm>
 
-#ifdef _WIN32
-#include <windows.h>
-#include <shlobj.h>
-#endif
 
 namespace SNEEZE { namespace CACHE {
 
@@ -112,14 +108,14 @@ bool MANAGER::Initialize ()
 
       LoadManifest ();
 
-      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "CACHE",
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "CACHE",
          "Initialized (path: " + m_sCachePath + ", entries: " +
          std::to_string (m_mapEntries.size ()) + ")");
       bResult = true;
    }
    else
    {
-      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Error, "CACHE",
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Error, "CACHE",
          "Failed to determine cache path");
    }
 
@@ -182,6 +178,29 @@ void MANAGER::DeleteHistory ()
    for (auto* pFile : m_apHistory)
       delete pFile;
    m_apHistory.clear ();
+}
+
+void MANAGER::NullifyHistoryEntries (ENTRY* pEntry)
+{
+   for (auto* pFile : m_apHistory)
+   {
+      if (pFile->GetEntry () == pEntry)
+         pFile->NullEntry ();
+   }
+}
+
+void MANAGER::DestroyEntry (ENTRY* pEntry)
+{
+   NullifyHistoryEntries (pEntry);
+
+   if (!pEntry->GetDiskPath ().empty ())
+   {
+      std::error_code ec;
+      std::filesystem::remove (pEntry->GetDiskPath (), ec);
+   }
+
+   std::string sUrl = pEntry->GetUrl ();
+   m_mapEntries.erase (sUrl);
 }
 
 // ---------------------------------------------------------------------------
@@ -386,109 +405,216 @@ void MANAGER::Release (FILE* pFile)
    if (!pFile)
       return;
 
-   std::lock_guard<std::mutex> guard (m_mutex);
-   ENTRY* pEntry = pFile->GetEntry ();
-   if (pEntry)
-      pEntry->DetachFile (pFile);
+   bool bSaveManifest = false;
+   FILE* pToDelete    = nullptr;
 
-   // FILE remains in m_apHistory for network inspector access
+   {
+      std::lock_guard<std::mutex> guard (m_mutex);
+
+      ENTRY* pEntry = pFile->GetEntry ();
+      if (pEntry)
+         pEntry->DetachFile (pFile);
+
+      pFile->SetReleased ();
+
+      if (pFile->IsPendingClear ())
+      {
+         auto it = std::find (m_apHistory.begin (), m_apHistory.end (), pFile);
+         if (it != m_apHistory.end ())
+            m_apHistory.erase (it);
+         pToDelete = pFile;
+      }
+
+      if (pEntry  &&  pEntry->IsPendingReset ()  &&  pEntry->GetFileCount () == 0)
+      {
+         bSaveManifest = pEntry->IsHashed ();
+         DestroyEntry (pEntry);
+      }
+   }
+
+   if (bSaveManifest)
+      SaveManifest ();
+
+   if (pToDelete)
+   {
+      m_pSneeze->NotifyCacheFileDeleted (pToDelete);
+      delete pToDelete;
+   }
 }
 
-void MANAGER::Reset (FILE* pFile)
+void MANAGER::Clear (FILE* pFile)
 {
    if (!pFile)
       return;
 
-   bool bWasPersistent = false;
+   pFile->Clear ();
+}
 
-   {
-      std::lock_guard<std::mutex> guard (m_mutex);
-      ENTRY* pEntry = pFile->GetEntry ();
-      if (!pEntry)
-         return;
+void MANAGER::Reset (FILE* pFile, bool b)
+{
+   if (!pFile)
+      return;
 
-      bWasPersistent = pEntry->IsHashed ();
-
-      if (!pEntry->GetDiskPath ().empty ())
-      {
-         std::error_code ec;
-         std::filesystem::remove (pEntry->GetDiskPath (), ec);
-      }
-
-      pEntry->Reset ();
-   }
-
-   if (bWasPersistent)
-      SaveManifest ();
+   std::lock_guard<std::mutex> guard (m_mutex);
+   ENTRY* pEntry = pFile->GetEntry ();
+   if (pEntry)
+      pEntry->SetPendingReset (b);
 }
 
 // ---------------------------------------------------------------------------
 // Cache management
 // ---------------------------------------------------------------------------
 
-void MANAGER::Clear (const std::string& sUrl)
+void MANAGER::ClearSession ()
 {
+   std::vector<FILE*> apToDelete;
+
    {
       std::lock_guard<std::mutex> guard (m_mutex);
 
-      auto it = m_mapEntries.find (sUrl);
-      if (it != m_mapEntries.end ())
+      auto it = m_apHistory.begin ();
+      while (it != m_apHistory.end ())
       {
-         ENTRY* pEntry = it->second.get ();
-         if (!pEntry->GetDiskPath ().empty ())
+         FILE* pFile   = *it;
+         ENTRY* pEntry = pFile->GetEntry ();
+
+         if (pEntry  &&  !pEntry->IsHashed ())
          {
-            std::error_code ec;
-            std::filesystem::remove (pEntry->GetDiskPath (), ec);
+            if (pFile->IsReleased ())
+            {
+               apToDelete.push_back (pFile);
+               it = m_apHistory.erase (it);
+            }
+            else
+            {
+               pFile->Clear ();
+               ++it;
+            }
          }
-         m_mapEntries.erase (it);
+         else if (!pEntry  &&  pFile->IsReleased ())
+         {
+            apToDelete.push_back (pFile);
+            it = m_apHistory.erase (it);
+         }
+         else
+         {
+            ++it;
+         }
       }
    }
 
-   SaveManifest ();
+   for (auto* p : apToDelete)
+   {
+      m_pSneeze->NotifyCacheFileDeleted (p);
+      delete p;
+   }
 }
 
-void MANAGER::ClearSession ()
+void MANAGER::ClearAll ()
 {
-   std::lock_guard<std::mutex> guard (m_mutex);
+   std::vector<FILE*> apToDelete;
 
-   auto it = m_mapEntries.begin ();
-   while (it != m_mapEntries.end ())
    {
-      if (!it->second->IsHashed ())
+      std::lock_guard<std::mutex> guard (m_mutex);
+
+      auto it = m_apHistory.begin ();
+      while (it != m_apHistory.end ())
       {
-         if (!it->second->GetDiskPath ().empty ())
+         FILE* pFile = *it;
+         if (pFile->IsReleased ())
          {
-            std::error_code ec;
-            std::filesystem::remove (it->second->GetDiskPath (), ec);
+            apToDelete.push_back (pFile);
+            it = m_apHistory.erase (it);
          }
-         it = m_mapEntries.erase (it);
-      }
-      else
-      {
-         ++it;
+         else
+         {
+            pFile->Clear ();
+            ++it;
+         }
       }
    }
 
-   DeleteHistory ();
+   for (auto* p : apToDelete)
+   {
+      m_pSneeze->NotifyCacheFileDeleted (p);
+      delete p;
+   }
+}
+
+void MANAGER::ResetSession ()
+{
+   bool bSaveManifest = false;
+
+   {
+      std::lock_guard<std::mutex> guard (m_mutex);
+
+      auto it = m_mapEntries.begin ();
+      while (it != m_mapEntries.end ())
+      {
+         ENTRY* pEntry = it->second.get ();
+         if (!pEntry->IsHashed ())
+         {
+            pEntry->SetPendingReset (true);
+            if (pEntry->GetFileCount () == 0)
+            {
+               NullifyHistoryEntries (pEntry);
+               if (!pEntry->GetDiskPath ().empty ())
+               {
+                  std::error_code ec;
+                  std::filesystem::remove (pEntry->GetDiskPath (), ec);
+               }
+               it = m_mapEntries.erase (it);
+            }
+            else
+            {
+               ++it;
+            }
+         }
+         else
+         {
+            ++it;
+         }
+      }
+   }
 
    std::error_code ec;
    std::filesystem::remove_all (m_sSessionPath, ec);
    std::filesystem::create_directories (m_sSessionPath);
 }
 
-void MANAGER::ClearAll ()
+void MANAGER::ResetAll ()
 {
-   std::lock_guard<std::mutex> guard (m_mutex);
-   m_mapEntries.clear ();
+   {
+      std::lock_guard<std::mutex> guard (m_mutex);
 
-   DeleteHistory ();
+      auto it = m_mapEntries.begin ();
+      while (it != m_mapEntries.end ())
+      {
+         ENTRY* pEntry = it->second.get ();
+         pEntry->SetPendingReset (true);
+         if (pEntry->GetFileCount () == 0)
+         {
+            NullifyHistoryEntries (pEntry);
+            if (!pEntry->GetDiskPath ().empty ())
+            {
+               std::error_code ec;
+               std::filesystem::remove (pEntry->GetDiskPath (), ec);
+            }
+            it = m_mapEntries.erase (it);
+         }
+         else
+         {
+            ++it;
+         }
+      }
+   }
+
+   SaveManifest ();
 
    std::error_code ec;
    std::filesystem::remove_all (m_sCachePath, ec);
    std::filesystem::create_directories (m_sCachePath);
    std::filesystem::create_directories (m_sSessionPath);
-
-   SaveManifest ();
 }
 
 // ---------------------------------------------------------------------------
@@ -497,25 +623,12 @@ void MANAGER::ClearAll ()
 
 std::string MANAGER::GetPersistentCachePath () const
 {
-#ifdef _WIN32
-   char szPath[MAX_PATH] = {};
-   if (SUCCEEDED (SHGetFolderPathA (nullptr, CSIDL_APPDATA, nullptr, 0, szPath)))
-   {
-      std::string sPath (szPath);
-      sPath += "\\Sneeze\\Cache";
-      return sPath;
-   }
-   return "";
-#else
-   const char* pHome = std::getenv ("HOME");
-   if (pHome)
-   {
-      std::string sPath (pHome);
-      sPath += "/.sneeze/cache";
-      return sPath;
-   }
-   return "";
-#endif
+   std::string sAppData = m_pSneeze->GetHost ()->sAppDataPath;
+   if (sAppData.empty ())
+      return "";
+
+   std::filesystem::path pPath = std::filesystem::path (sAppData) / "Cache";
+   return pPath.string ();
 }
 
 std::string MANAGER::GetSessionCachePath () const
@@ -671,7 +784,7 @@ void MANAGER::LoadManifest ()
    }
    catch (...)
    {
-      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Warning, "CACHE",
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "CACHE",
          "Failed to parse manifest.json — starting fresh");
       return;
    }
@@ -761,7 +874,7 @@ void MANAGER::SaveManifest ()
       std::filesystem::rename (sTmpPath, sManifestPath, ec);
       if (ec)
       {
-         m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Warning, "CACHE",
+         m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "CACHE",
             "Failed to rename manifest temp file: " + ec.message ());
       }
    }
@@ -804,7 +917,7 @@ void MANAGER::FetchEntry (ENTRY* pEntry)
 
    if (!pTmpFile)
    {
-      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Error, "CACHE",
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Error, "CACHE",
          "Failed to open temp file: " + sTmpPath);
 
       std::vector<FILE*> apNotify;
@@ -877,7 +990,7 @@ void MANAGER::FetchEntry (ENTRY* pEntry)
 
    if (nCode != CURLE_OK  ||  ctx.nHttpCode < 200  ||  ctx.nHttpCode >= 300)
    {
-      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Warning, "CACHE",
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "CACHE",
          "Fetch failed for " + sUrl + " (HTTP " + std::to_string (ctx.nHttpCode) + ")");
       std::error_code ec;
       std::filesystem::remove (sTmpPath, ec);
@@ -903,7 +1016,7 @@ void MANAGER::FetchEntry (ENTRY* pEntry)
          std::string sActual = ComputeFileHash (sTmpPath, sAlgo);
          if (sActual != sExpected)
          {
-            m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Warning, "CACHE",
+            m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "CACHE",
                "Hash mismatch for " + sUrl + " (expected " + sExpected + ", got " + sActual + ")");
             std::error_code ec;
             std::filesystem::remove (sTmpPath, ec);
@@ -931,7 +1044,7 @@ void MANAGER::FetchEntry (ENTRY* pEntry)
    std::filesystem::rename (sTmpPath, sFinalPath, ec);
    if (ec)
    {
-      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Warning, "CACHE",
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "CACHE",
          "Failed to rename " + sTmpPath + " -> " + sFinalPath + ": " + ec.message ());
       std::filesystem::remove (sTmpPath, ec);
 
@@ -966,7 +1079,7 @@ void MANAGER::FetchEntry (ENTRY* pEntry)
 
    NotifyFiles (apNotify, STATE_READY);
 
-   m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "CACHE",
+   m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Trace, "CACHE",
       "Cached " + sUrl + " (" + std::to_string (nSizeBytes) + " bytes" +
       (bPersistent ? ", persistent" : ", session") + ")");
 

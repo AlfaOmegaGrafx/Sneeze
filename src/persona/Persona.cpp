@@ -35,13 +35,13 @@ void PERSONA::Login (const std::string& sFirst, const std::string& sSecond)
    m_sHash = ComputeHash (m_sName);
    m_bLoggedIn = true;
 
-   m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "PERSONA",
+   m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "PERSONA",
       "Logged in as \"" + m_sName + "\" (hash: " + m_sHash + ")");
 }
 
 void PERSONA::Logout ()
 {
-   m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "PERSONA",
+   m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "PERSONA",
       "Logged out \"" + m_sName + "\"");
    m_bLoggedIn = false;
    m_sName.clear ();

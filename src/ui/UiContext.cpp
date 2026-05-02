@@ -48,10 +48,10 @@ public:
       if (!m_pSneeze)
          return true;
 
-      SNEEZE::CORE::SNEEZE_LISTENER::eLOGLEVEL eLevel = SNEEZE::CORE::SNEEZE_LISTENER::kLOGLEVEL_Info;
-      if (nType == Rml::Log::LT_ERROR)   eLevel = SNEEZE::CORE::SNEEZE_LISTENER::kLOGLEVEL_Error;
-      if (nType == Rml::Log::LT_WARNING) eLevel = SNEEZE::CORE::SNEEZE_LISTENER::kLOGLEVEL_Warning;
-      if (nType == Rml::Log::LT_DEBUG)   eLevel = SNEEZE::CORE::SNEEZE_LISTENER::kLOGLEVEL_Trace;
+      SNEEZE::CORE::ISNEEZE::eLOGLEVEL eLevel = SNEEZE::CORE::ISNEEZE::kLOGLEVEL_Info;
+      if (nType == Rml::Log::LT_ERROR)   eLevel = SNEEZE::CORE::ISNEEZE::kLOGLEVEL_Error;
+      if (nType == Rml::Log::LT_WARNING) eLevel = SNEEZE::CORE::ISNEEZE::kLOGLEVEL_Warning;
+      if (nType == Rml::Log::LT_DEBUG)   eLevel = SNEEZE::CORE::ISNEEZE::kLOGLEVEL_Trace;
 
       m_pSneeze->Log (eLevel, "UI_CONTEXT", sMessage);
       return true;
@@ -151,7 +151,7 @@ bool UI_CONTEXT::Initialize (CORE::SNEEZE* pSneeze)
    bool bOk = Rml::Initialise ();
    if (!bOk)
    {
-      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Error, "UI_CONTEXT",
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Error, "UI_CONTEXT",
          "Rml::Initialise failed");
       bInitialized = false;
    }
@@ -159,7 +159,7 @@ bool UI_CONTEXT::Initialize (CORE::SNEEZE* pSneeze)
    {
       bInitialized = true;
       Rml::String sVersion = Rml::GetVersion ();
-      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "UI_CONTEXT",
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "UI_CONTEXT",
          "RmlUi " + std::string (sVersion.c_str ()) + " initialized (stub renderer)");
    }
 

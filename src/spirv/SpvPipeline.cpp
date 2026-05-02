@@ -37,7 +37,7 @@ bool SPV_PIPELINE::Initialize (CORE::SNEEZE* pSneeze)
 {
    m_pSneeze = pSneeze;
    bInitialized = true;
-   m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Info, "SPV_PIPELINE",
+   m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "SPV_PIPELINE",
       "SPIR-V validation pipeline initialized (SPIRV-Tools)");
    return true;
 }

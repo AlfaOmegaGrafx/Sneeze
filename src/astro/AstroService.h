@@ -18,10 +18,11 @@
 #include "som/Fabric.h"
 #include "som/Node.h"
 #include "som/MapObject.h"
+#include "cache/Types.h"
 #include <vector>
-#include <thread>
 
 namespace SNEEZE { namespace CORE { class SNEEZE; }}
+namespace SNEEZE { namespace CACHE { class FILE; class MANAGER; }}
 
 namespace SNEEZE { namespace astro {
 
@@ -32,15 +33,28 @@ class ORBIT;
 // CELESTIAL_MAP_OBJECT — a MAP_OBJECT_CELESTIAL that also references the
 // source RMCOBJECT for orbit computation. This is the bridge between the
 // disposable astro proof-of-concept and the SOM.
+//
+// Implements CACHE::IFILE so the cache system can deliver texture data
+// asynchronously. The map object decodes the image on callback and stores
+// the pixels for the renderer to consume.
 // ---------------------------------------------------------------------------
 
-class CELESTIAL_MAP_OBJECT : public SNEEZE::som::MAP_OBJECT_CELESTIAL
+class CELESTIAL_MAP_OBJECT : public SNEEZE::som::MAP_OBJECT_CELESTIAL,
+                              public SNEEZE::CACHE::IFILE
 {
 public:
-   CELESTIAL_MAP_OBJECT () : m_pBody (nullptr), m_pOrbit (nullptr) {}
+   CELESTIAL_MAP_OBJECT (CORE::SNEEZE* pSneeze);
 
-   RMCOBJECT* m_pBody;
-   ORBIT*     m_pOrbit;
+   // CACHE::IFILE
+   void OnFileReady  (CACHE::FILE* pFile) override;
+   void OnFileFailed (CACHE::FILE* pFile) override;
+
+   RMCOBJECT*    m_pBody;
+   ORBIT*        m_pOrbit;
+   CACHE::FILE*  m_pCacheFile;
+
+private:
+   CORE::SNEEZE* m_pSneeze;
 };
 
 // ---------------------------------------------------------------------------
@@ -61,13 +75,10 @@ public:
    void Shutdown ();
 
 private:
-   void FetchTexture (CELESTIAL_MAP_OBJECT* pMapObj);
-
    CORE::SNEEZE*                           m_pSneeze;
    SNEEZE::som::FABRIC*                    m_pFabric;
    std::vector<SNEEZE::som::NODE*>         m_apNodes;
    std::vector<CELESTIAL_MAP_OBJECT*>      m_apMapObjects;
-   std::vector<std::thread>                m_aFetchThreads;
 };
 
 }} // namespace SNEEZE::astro

@@ -34,11 +34,16 @@ namespace SNEEZE { namespace CORE {
 class WORKER;
 
 // ---------------------------------------------------------------------------
-// Callback interface for notifying the owning application
+// ISNEEZE — interface between the host application and the engine.
+//
+// The host application creates a concrete subclass (e.g. SNEEZE_HOST),
+// populates the public configuration members, and passes it to the SNEEZE
+// constructor. Sneeze reads configuration from these members during
+// Initialize() and dispatches callbacks through the virtual methods.
 // ---------------------------------------------------------------------------
 
 class SNEEZE;
-class SNEEZE_LISTENER
+class ISNEEZE
 {
 public:
    enum eLOGLEVEL
@@ -49,15 +54,24 @@ public:
       kLOGLEVEL_Error
    };
 
-public:
+   virtual ~ISNEEZE () = default;
 
-   virtual ~SNEEZE_LISTENER () = default;
+   // --- Configuration (set by host before Initialize) ---
+
+   std::string sAppDataPath;
+   std::string sRenderer;
+   void*       pNativeWindow  = nullptr;
+   int         nWidth         = 0;
+   int         nHeight        = 0;
+
+   // --- Callbacks (host must implement) ---
 
    virtual void OnFrameReady (const uint32_t* pFB, int nFbW, int nFbH) = 0;
    virtual void Log (eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage) = 0;
 
    virtual void OnCacheFileCreated (CACHE::FILE* pFile) { (void)pFile; }
    virtual void OnCacheFileChanged (CACHE::FILE* pFile) { (void)pFile; }
+   virtual void OnCacheFileDeleted (CACHE::FILE* pFile) { (void)pFile; }
 };
 
 // ---------------------------------------------------------------------------
@@ -82,13 +96,12 @@ struct SNEEZE_INPUT
 class SNEEZE
 {
 public:
-   explicit SNEEZE (SNEEZE_LISTENER* pListener);
+   explicit SNEEZE (ISNEEZE* pHost);
    ~SNEEZE ();
 
-   void SetNativeWindow (void* pHandle) { m_pNativeWindow = pHandle; }
-   void* GetNativeWindow () const      { return m_pNativeWindow; }
+   ISNEEZE* GetHost () const { return m_pHost; }
 
-   bool Initialize (int nWidth, int nHeight, const std::string& sRenderer);
+   bool Initialize ();
    void Shutdown ();
 
    // --- Input (called by application from its event loop) ---
@@ -116,8 +129,7 @@ public:
 
    // --- Shared state accessed by workers ---
 
-   SNEEZE_LISTENER*         GetListener () const;
-   void                     Log (SNEEZE_LISTENER::eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage);
+   void                     Log (ISNEEZE::eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage);
    SNEEZE_INPUT             ConsumeInput ();
    void                     WriteFrameBuffer (const uint32_t* pPixels, int nWidth, int nHeight);
    std::vector<void*>&      GetBodies ();
@@ -143,11 +155,12 @@ public:
 
    void NotifyCacheFileCreated (CACHE::FILE* pFile);
    void NotifyCacheFileChanged (CACHE::FILE* pFile);
+   void NotifyCacheFileDeleted (CACHE::FILE* pFile);
 
 private:
    void EngineThreadLoop ();
 
-   SNEEZE_LISTENER*         m_pListener;
+   ISNEEZE*                 m_pHost;
 
    // Engine thread
    std::thread*             m_pEngineThread;
@@ -173,10 +186,8 @@ private:
    int                      m_nFbHeight;
 
    // Renderer configuration
-   std::string              m_sRenderer;
    int                      m_nWidth;
    int                      m_nHeight;
-   void*                    m_pNativeWindow;
 
    // Resize request
    std::mutex               m_resizeMutex;

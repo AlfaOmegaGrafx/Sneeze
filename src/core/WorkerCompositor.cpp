@@ -51,7 +51,7 @@ static void ColorFromU32 (uint32_t nColor, float& r, float& g, float& b)
 
 WORKER_COMPOSITOR::WORKER_COMPOSITOR (SNEEZE* pSneeze)
    : WORKER (pSneeze)
-   , m_pRenderer (pSneeze, "halogen")
+   , m_pRenderer (pSneeze, pSneeze->GetHost ()->sRenderer)
    , m_tmNow (0)
    , m_dTimeScale (1.0)
    , m_bPaused (false)
@@ -84,7 +84,7 @@ void WORKER_COMPOSITOR::Tick ()
 
 void WORKER_COMPOSITOR::ThreadLoop ()
 {
-   void* pNativeWindow = m_pSneeze->GetNativeWindow ();
+   void* pNativeWindow = m_pSneeze->GetHost ()->pNativeWindow;
    if (pNativeWindow)
       m_pRenderer.SetNativeWindow (pNativeWindow);
 
@@ -92,9 +92,9 @@ void WORKER_COMPOSITOR::ThreadLoop ()
 
    bool bNativeSurface = m_pRenderer.IsRenderingToNativeSurface ();
    if (bNativeSurface)
-      m_pSneeze->Log (SNEEZE_LISTENER::kLOGLEVEL_Info, "COMPOSITOR", "Rendering to native surface (direct-to-window)");
+      m_pSneeze->Log (ISNEEZE::kLOGLEVEL_Info, "COMPOSITOR", "Rendering to native surface (direct-to-window)");
    else
-      m_pSneeze->Log (SNEEZE_LISTENER::kLOGLEVEL_Info, "COMPOSITOR", "Rendering to CPU framebuffer (readback path)");
+      m_pSneeze->Log (ISNEEZE::kLOGLEVEL_Info, "COMPOSITOR", "Rendering to CPU framebuffer (readback path)");
    m_tpLastFrame = std::chrono::steady_clock::now ();
 
    SignalReady ();
@@ -139,7 +139,7 @@ void WORKER_COMPOSITOR::ThreadLoop ()
          std::snprintf (szFps, sizeof (szFps),
             "%d  (frame %.1f ms | input %.1f ms | scene %.1f ms | submit %.1f ms | render %.1f ms | publish %.1f ms | flush %.1f ms)",
             m_nFrameCount, dAvgFrame, dAvgInput, dAvgScene, dAvgSubmit, dAvgRender, dAvgPublish, dAvgFlush);
-         m_pSneeze->Log (SNEEZE_LISTENER::kLOGLEVEL_Trace, "FPS", std::string (szFps));
+         m_pSneeze->Log (ISNEEZE::kLOGLEVEL_Trace, "FPS", std::string (szFps));
          m_nFrameCount    = 0;
          m_dFpsAccum     -= 1.0;
          m_dAccumInput    = 0.0;
@@ -316,14 +316,14 @@ void WORKER_COMPOSITOR::ThreadLoop ()
             m_pSneeze->WriteFrameBuffer (pPixels,
                m_pRenderer.GetWidth (), m_pRenderer.GetHeight ());
 
-            SNEEZE_LISTENER* pListener = m_pSneeze->GetListener ();
-            if (pListener)
+            ISNEEZE* pHost = m_pSneeze->GetHost ();
+            if (pHost)
             {
                int nFbW, nFbH;
                const uint32_t* pFB = m_pSneeze->LockFrameBuffer (nFbW, nFbH);
 
                if (pFB != nullptr)
-                  pListener->OnFrameReady (pFB, nFbW, nFbH);
+                  pHost->OnFrameReady (pFB, nFbW, nFbH);
 
                m_pSneeze->UnlockFrameBuffer ();
             }

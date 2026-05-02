@@ -103,7 +103,7 @@ bool MSF_FILE::Parse (const std::string& sJws)
       }
       catch (const std::exception& ex)
       {
-         m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Error, "MSF_FILE", std::string ("Parse: ") + ex.what ());
+         m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Error, "MSF_FILE", std::string ("Parse: ") + ex.what ());
       }
    }
 
@@ -156,13 +156,13 @@ std::string MSF_FILE::Sign (const std::string& sPrivateKeyPem,
             sResult = pBuilder.sign (jwt::algorithm::es512 ("", sPrivateKeyPem));
          else
          {
-            m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Error, "MSF_FILE", "Sign: unknown algorithm \"" + sAlgorithm + "\"");
+            m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Error, "MSF_FILE", "Sign: unknown algorithm \"" + sAlgorithm + "\"");
          }
       }
    }
    catch (const std::exception& ex)
    {
-      m_pSneeze->Log (CORE::SNEEZE_LISTENER::kLOGLEVEL_Error, "MSF_FILE", std::string ("Sign: exception: ") + ex.what ());
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Error, "MSF_FILE", std::string ("Sign: exception: ") + ex.what ());
 
       sResult.clear ();
    }

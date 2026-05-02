@@ -82,7 +82,10 @@ public:
    void SetValidating ();
    void Complete (const std::string& sDiskPath, uint64_t nSizeBytes);
    void Fail ();
-   void Reset ();
+
+   void SetPendingReset (bool b)           { m_bPendingReset = b; }
+   bool IsPendingReset () const            { return m_bPendingReset; }
+   size_t GetFileCount () const            { return m_apFiles.size (); }
 
    std::vector<FILE*> CollectFiles () const;
 
@@ -109,6 +112,7 @@ private:
    double                   m_dFetchStartTime;
    double                   m_dFetchEndTime;
    bool                     m_bServedFromCache;
+   bool                     m_bPendingReset;
 
    std::vector<FILE*>       m_apFiles;
    mutable std::mutex       m_mutex;
