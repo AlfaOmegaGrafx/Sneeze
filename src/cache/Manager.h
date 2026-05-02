@@ -81,6 +81,7 @@ public:
 
    void Clear ();
    void Reset ();
+   void Enumerate (IENUM* pEnum);
 
    // --- Network inspector ---
 

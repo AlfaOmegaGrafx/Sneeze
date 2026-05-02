@@ -475,3 +475,17 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 - **Cleaned up test artifacts** — Deleted `test_stderr.txt`, identified `test_out.txt`, `test_output.txt`, `test_stdout.txt` as leftover debug output files.
 - **Updated `project.mdc`** — Fixed stale references to `REQUEST_FETCH`, `GetHistory()` (now `GetFiles()`). Added manifest-only-on-shutdown and `recursive_mutex` notes to MANAGER entry. Updated ENTRY (ResetState, pending-reset flag) and FILE (no null guards, SetPendingClear returns bool, sequence at construction) entries.
 - **Logged session.**
+
+### 2026-05-02 (Sat) — ~11:08 AM – 12:35 PM PDT
+**Dean Abramson**
+
+- **Recovered from second power outage** — verified working tree clean, branch up to date with origin.
+- **Added `SaveManifest()` to bulk `Reset()`** — manifest now saved after wiping cache directory, keeping disk and manifest in sync. Runs inside the lock guard (appropriate for a bulk destructive operation).
+- **Added `Enumerate(IENUM*)` method to MANAGER** — walks all cached entries under the lock, passes a temporary FILE handle to the callback for inspection and selective Reset/Clear. `IENUM` interface added to `Types.h` with `OnEntry(FILE*)` callback. Single FILE object reused across iterations via `SetEntry()` on FILE (new internal setter). FILE attached/detached from each ENTRY per iteration.
+- **Added `m_bEnumeration` flag to FILE** — guards `Release()` to prevent accidental double-detach during enumeration. `Release()` no-ops when flag is set. Comment in `Release()` warns that future entry pruning would invalidate the Enumerate iterator.
+- **Fixed manifest load bug** — `LoadManifest()` was filtering out non-hashed entries (`if (!sHash.empty())` gate), a leftover from the old session/persistent split. Since all files now persist, this was silently dropping non-hashed entries on restart. Removed the hash check so all entries are restored.
+- **Wired up MSF purge in Artemis** — `AppFrame_Win32.cpp` calls `Enumerate()` immediately after `SNEEZE::Initialize()` to reset cached MSF files (content-type `application/jose+msf`). Local `ENUM_PURGE` struct implements `IENUM`. MSF files are trust anchors that should always be re-fetched fresh on startup. Policy lives in Artemis, not the engine.
+- **Decided against `REQUEST_FETCH` flag** — considered bringing it back with "force fetch" semantics (per-request cache bypass), but `Enumerate` covers the startup purge use case and per-request force-fetch has no near-term consumer.
+- **Decided MSF content-type** — `application/jose+msf` (JOSE encoding, MSF payload, follows RFC 6838 structured syntax convention).
+- **Updated `project.mdc`** — cache module description, MANAGER (Enumerate, SaveManifest in Reset), FILE (enumeration flag, SetEntry, pruning warning), new IENUM entry, Artemis startup purge.
+- **Updated `Cache.md`** — added Enumerate section with usage example and MSF purge use case, updated FILE architecture diagram (m_bEnumeration), updated manifest section (saved on Reset too, non-hashed entries restored), updated eviction deferred item (entries never pruned).

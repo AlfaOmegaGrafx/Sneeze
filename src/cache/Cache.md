@@ -36,6 +36,7 @@ FILE (per-caller handle)
  ├── Sequence number (monotonically increasing)
  ├── m_bPendingClear (deferred history removal flag)
  ├── m_bReleased (detached from ENTRY)
+ ├── m_bEnumeration (guards Release during Enumerate)
  └── read-only metadata accessors + Release/Clear/Reset
 
 STORE (identity record, one per unique name)
@@ -53,6 +54,7 @@ All types live under `SNEEZE::CACHE`:
 | FILE     | Per-caller handle. Returned by Request().          |
 | STORE    | Identity record for a WASM store (container).      |
 | IFILE    | Observer interface (OnFileReady, OnFileFailed).    |
+| IENUM    | Enumeration callback interface (OnEntry).          |
 | STATE    | Enum: IDLE, FETCHING, VALIDATING, READY, FAILED.  |
 | REQUEST  | Flags: REQUEST_CREATE.                             |
 
@@ -248,6 +250,29 @@ pCache->Reset ();
 | `Clear` | History   | Remove all released FILEs; flag rest          |
 | `Reset` | Entries   | Destroy all idle ENTRYs; flag in-use ones     |
 
+### Enumerate
+
+`Enumerate(IENUM*)` walks all cached entries, passing a temporary FILE handle to the callback for each one. The callback can inspect the FILE (URL, content-type, headers, hash, state) and call `Reset()` or `Clear()` on it. `Release()` is guarded — it no-ops on enumeration FILEs to prevent double-detach.
+
+Internally, a single FILE object is allocated before the loop, with `m_bEnumeration` set to true. On each iteration, `SetEntry()` swaps the ENTRY pointer, `AttachFile` / `DetachFile` manage the attachment, and the callback fires. The FILE is deleted after the loop completes.
+
+```cpp
+struct ENUM_PURGE : SNEEZE::CACHE::IENUM
+{
+   void OnEntry (SNEEZE::CACHE::FILE* pFile) override
+   {
+      if (pFile->GetContentType () == "application/jose+msf")
+         pFile->Reset ();
+   }
+};
+ENUM_PURGE pEnum_Purge;
+pCache->Enumerate (&pEnum_Purge);
+```
+
+**Use case: MSF file freshness.** Artemis calls `Enumerate()` immediately after `SNEEZE::Initialize()` to reset all cached entries with content-type `application/jose+msf`. MSF files are trust anchors (signed service manifests) that should always be re-fetched from the network on startup rather than served from stale cache. The policy decision lives in Artemis, not the engine — Sneeze's `Enumerate` is type-agnostic.
+
+**WARNING:** The enumeration holds `m_mutex` and iterates `m_mapEntries`. If entry pruning (removing entries from the map when file count drops to zero) is ever added to `Release()` or `ResetEntry()`, it will invalidate the iterator. The `m_bEnumeration` flag on FILE prevents the `Release()` path today, but any future pruning logic must account for active enumerations.
+
 ## Network Inspector Data
 
 The cache captures all the data needed to implement a Chrome DevTools-style Network inspector tab. Artemis builds the UI using native OS windowing; Sneeze provides the data model and notifications described here.
@@ -393,7 +418,7 @@ The disk key is the SHA-256 hex digest of the URL. The first two characters form
 }
 ```
 
-The manifest is written atomically (write to `.tmp`, then rename) to prevent corruption on crash. It is loaded on `Initialize()` and saved only on `Shutdown()`. If the application crashes, the cache reverts to the prior session's manifest state — cached files remain on disk but must be re-fetched and re-verified on next launch. This avoids the performance cost of serializing the entire manifest under mutex after every fetch completion (which would be prohibitive at scale with 100K+ entries).
+The manifest is written atomically (write to `.tmp`, then rename) to prevent corruption on crash. It is loaded on `Initialize()` and saved on `Shutdown()` and after bulk `Reset()`. All completed entries (hashed and non-hashed) are saved to and restored from the manifest. If the application crashes, the cache reverts to the prior session's manifest state — cached files remain on disk but must be re-fetched and re-verified on next launch. This avoids the performance cost of serializing the entire manifest under mutex after every fetch completion (which would be prohibitive at scale with 100K+ entries).
 
 The `version` field enables future schema migrations without breaking existing caches.
 
@@ -514,7 +539,7 @@ Implementation: iterate `Cache/<2-char>/` subdirectories, collect all filenames,
 
 ### Cache Eviction
 
-Currently unbounded — every persistent file is retained forever. The metadata infrastructure is already in place (size, creation time, last access time, access count) to support eviction policies:
+Currently unbounded — every persistent file is retained forever. Entries are never removed from `m_mapEntries` except during bulk `Reset()` (which wipes everything). Over a long session, the entry map grows monotonically. The metadata infrastructure is already in place (size, creation time, last access time, access count) to support eviction policies:
 
 - **LRU**: Evict entries with the oldest `lastAccessedAt`
 - **Size-based**: Evict entries when total cache size exceeds a threshold

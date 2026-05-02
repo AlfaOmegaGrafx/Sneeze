@@ -403,6 +403,7 @@ void MANAGER::Reset (FILE* pFile, bool b)
    if (pFile)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
+
       pFile->GetEntry ()->SetPendingReset (b);
    }
 }
@@ -450,6 +451,30 @@ void MANAGER::Reset ()
    std::error_code ec;
    std::filesystem::remove_all (m_sCachePath, ec);
    std::filesystem::create_directories (m_sCachePath);
+
+   SaveManifest ();
+}
+
+void MANAGER::Enumerate (IENUM* pEnum)
+{
+   std::lock_guard<std::recursive_mutex> guard (m_mutex);
+
+   FILE* pFile = new FILE (this, nullptr, nullptr, nullptr, 0);
+   pFile->SetEnumeration (true);
+
+   for (auto& [sUrl, pEntryPtr] : m_mapEntries)
+   {
+      ENTRY* pEntry = pEntryPtr.get ();
+      pFile->SetEntry (pEntry);
+      pEntry->AttachFile (pFile);
+
+      pEnum->OnEntry (pFile);
+
+      pEntry->DetachFile (pFile);
+   }
+
+   pFile->SetEntry (nullptr);
+   delete pFile;
 }
 
 // ---------------------------------------------------------------------------
@@ -625,8 +650,7 @@ void MANAGER::LoadManifest ()
             std::string sHash     = jEntry.value ("hash", "");
             std::string sDiskPath = jEntry.value ("diskPath", "");
 
-            if (!sHash.empty ()  &&  !sDiskPath.empty ()
-                &&  std::filesystem::exists (sDiskPath))
+            if (!sDiskPath.empty ()  &&  std::filesystem::exists (sDiskPath))
             {
                auto pEntry = std::make_unique<ENTRY> (this, sUrl, sHash);
                pEntry->SetDiskPath (sDiskPath);
@@ -713,6 +737,7 @@ void MANAGER::FetchEntry (ENTRY* pEntry)
    std::string sHash;
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
+
       sUrl  = pEntry->GetUrl ();
       sHash = pEntry->GetHash ();
    }
@@ -911,6 +936,7 @@ void MANAGER::NotifyFiles (const std::vector<FILE*>& apFiles, STATE bState)
 void MANAGER::DispatchNextFromQueue ()
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
+   
    SweepCompletedThreads ();
 
    if (!m_aFetchQueue.empty ()  &&  static_cast<int> (m_apFetchSlots.size ()) < kMAX_CONCURRENT_FETCHES)

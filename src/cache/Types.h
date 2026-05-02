@@ -45,6 +45,13 @@ public:
    virtual void OnFileFailed (FILE* pFile) = 0;
 };
 
+class IENUM
+{
+public:
+   virtual ~IENUM () {}
+   virtual void OnEntry (FILE* pFile) = 0;
+};
+
 }} // namespace SNEEZE::CACHE
 
 #endif // SNEEZE_CACHE_TYPES_H

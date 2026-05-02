@@ -98,11 +98,13 @@ public:
    // --- Internal (MANAGER use only) ---
 
    ENTRY*      GetEntry () const          { return m_pEntry; }
+   void        SetEntry (ENTRY* pEntry)    { m_pEntry = pEntry; }
    bool        IsPendingClear () const    { return m_bPendingClear; }
    bool        IsReleased () const        { return m_bReleased; }
 
    void        SetReleased ()               { m_bReleased = true; }
    bool        SetPendingClear (bool b)     { bool bChanged = (b != m_bPendingClear); m_bPendingClear = b; return bChanged; }
+   void        SetEnumeration (bool b)      { m_bEnumeration = b; }
 
 private:
    MANAGER*    m_pManager;
@@ -112,6 +114,7 @@ private:
    uint32_t    m_nSequence;
    bool        m_bPendingClear;
    bool        m_bReleased;
+   bool        m_bEnumeration;
 };
 
 }} // namespace SNEEZE::CACHE

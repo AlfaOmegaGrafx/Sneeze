@@ -26,7 +26,8 @@ FILE::FILE (MANAGER* pManager, ENTRY* pEntry, STORE* pStore, IFILE* pListener, u
    m_pListener     (pListener),
    m_nSequence     (nSequence),
    m_bPendingClear (false),
-   m_bReleased     (false)
+   m_bReleased     (false),
+   m_bEnumeration  (false)
 {
 }
 
@@ -50,7 +51,13 @@ bool FILE::IsReady () const
 
 void FILE::Release ()
 {
-   m_pManager->Release (this);
+   // NOTE: If ENTRY pruning is ever added (removing entries from the map when
+   // file count drops to zero), it will invalidate the iterator inside
+   // MANAGER::Enumerate(). The enumeration flag prevents that path today,
+   // but any future pruning logic in MANAGER::Release() or ResetEntry()
+   // must account for active enumerations.
+   if (!m_bEnumeration)
+      m_pManager->Release (this);
 }
 
 void FILE::Clear (bool b)
