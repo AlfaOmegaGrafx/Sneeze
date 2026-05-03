@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Manager.h"
-#include "Meta.h"
-#include "File.h"
+#include "Network.h"
 #include "core/Sneeze.h"
 #include "net/HttpClient.h"
 
@@ -30,15 +28,15 @@
 #include <cstring>
 #include <algorithm>
 
-namespace SNEEZE { namespace CACHE {
+namespace SNEEZE {
 
-size_t MANAGER::FetchWriteCallback (char* pData, size_t nSize, size_t nMembers, void* pUser)
+size_t NETWORK::FetchWriteCallback (char* pData, size_t nSize, size_t nMembers, void* pUser)
 {
    FETCH_CONTEXT* pCtx = static_cast<FETCH_CONTEXT*> (pUser);
    return std::fwrite (pData, nSize, nMembers, pCtx->pFile);
 }
 
-size_t MANAGER::FetchHeaderCallback (char* pData, size_t nSize, size_t nMembers, void* pUser)
+size_t NETWORK::FetchHeaderCallback (char* pData, size_t nSize, size_t nMembers, void* pUser)
 {
    FETCH_CONTEXT* pCtx = static_cast<FETCH_CONTEXT*> (pUser);
    size_t nTotal = nSize * nMembers;
@@ -65,10 +63,10 @@ size_t MANAGER::FetchHeaderCallback (char* pData, size_t nSize, size_t nMembers,
 }
 
 // ---------------------------------------------------------------------------
-// MANAGER
+// NETWORK
 // ---------------------------------------------------------------------------
 
-MANAGER::MANAGER (CORE::SNEEZE* pSneeze) :
+NETWORK::NETWORK (CORE::SNEEZE* pSneeze) :
    m_pSneeze         (pSneeze),
    m_bShuttingDown   (false),
    m_bCacheEnabled   (true),
@@ -79,12 +77,12 @@ MANAGER::MANAGER (CORE::SNEEZE* pSneeze) :
 {
 }
 
-MANAGER::~MANAGER ()
+NETWORK::~NETWORK ()
 {
    Shutdown ();
 }
 
-bool MANAGER::Initialize ()
+bool NETWORK::Initialize ()
 {
    bool bResult = false;
 
@@ -97,19 +95,19 @@ bool MANAGER::Initialize ()
 
       LoadRules ();
 
-      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "CACHE", "Initialized (path: " + m_sCachePath + ", rules: " + std::to_string (m_aRules.size ()) + ", nMetaIx: " + std::to_string (m_nNextMetaIx) + ")");
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "NETWORK", "Initialized (path: " + m_sCachePath + ", rules: " + std::to_string (m_aRules.size ()) + ", nMetaIx: " + std::to_string (m_nNextMetaIx) + ")");
 
       bResult = true;
    }
    else
    {
-      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Error, "CACHE", "Failed to determine cache path");
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Error, "NETWORK", "Failed to determine cache path");
    }
 
    return bResult;
 }
 
-void MANAGER::Shutdown ()
+void NETWORK::Shutdown ()
 {
    if (!m_sCachePath.empty ())
    {
@@ -150,14 +148,14 @@ void MANAGER::Shutdown ()
 // Timing helpers
 // ---------------------------------------------------------------------------
 
-double MANAGER::SecondsSinceEpoch () const
+double NETWORK::SecondsSinceEpoch () const
 {
    auto tpNow = std::chrono::steady_clock::now ();
 
    return std::chrono::duration<double> (tpNow - m_tpEpoch).count ();
 }
 
-double MANAGER::GetEpochAge () const
+double NETWORK::GetEpochAge () const
 {
    return SecondsSinceEpoch ();
 }
@@ -166,14 +164,14 @@ double MANAGER::GetEpochAge () const
 // File ownership
 // ---------------------------------------------------------------------------
 
-void MANAGER::DeleteFiles ()
+void NETWORK::DeleteFiles ()
 {
    for (auto* pFile : m_apFile)
       delete pFile;
    m_apFile.clear ();
 }
 
-void MANAGER::ResetMeta (META* pMeta)
+void NETWORK::ResetMeta (META* pMeta)
 {
    std::string sDiskKey = ComputeDiskKey (pMeta->GetUrl ());
    std::error_code ec;
@@ -190,7 +188,7 @@ void MANAGER::ResetMeta (META* pMeta)
 // Fetch thread management (capped at kMAX_CONCURRENT_FETCHES)
 // ---------------------------------------------------------------------------
 
-void MANAGER::SweepCompletedThreads ()
+void NETWORK::SweepCompletedThreads ()
 {
    auto it = m_apFetchSlots.begin ();
    while (it != m_apFetchSlots.end ())
@@ -210,7 +208,7 @@ void MANAGER::SweepCompletedThreads ()
    }
 }
 
-void MANAGER::DispatchFetch (META* pMeta)
+void NETWORK::DispatchFetch (META* pMeta)
 {
    SweepCompletedThreads ();
 
@@ -234,12 +232,12 @@ void MANAGER::DispatchFetch (META* pMeta)
 // Request / Release
 // ---------------------------------------------------------------------------
 
-FILE* MANAGER::Request (IFILE* pListener, std::shared_ptr<CONTAINER::NAME> pName, const std::string& sUrl)
+NETWORK::FILE* NETWORK::Request (IFILE* pListener, std::shared_ptr<CONTAINER::NAME> pName, const std::string& sUrl)
 {
    return Request (pListener, pName, sUrl, std::string (), kREQUEST_DEFAULT);
 }
 
-FILE* MANAGER::Request (IFILE* pListener, std::shared_ptr<CONTAINER::NAME> pName, const std::string& sUrl, const std::string& sHash, uint32_t bFlags, uint32_t nMetaIx)
+NETWORK::FILE* NETWORK::Request (IFILE* pListener, std::shared_ptr<CONTAINER::NAME> pName, const std::string& sUrl, const std::string& sHash, uint32_t bFlags, uint32_t nMetaIx)
 {
    bool bCreate = (bFlags & REQUEST_CREATE) != 0;
    bool bFetch  = (bFlags & REQUEST_FETCH)  != 0;
@@ -376,14 +374,14 @@ FILE* MANAGER::Request (IFILE* pListener, std::shared_ptr<CONTAINER::NAME> pName
             pFile->SetPendingClear (true);
 
          if (!pFile->IsPendingClear ())
-            m_pSneeze->NotifyCacheFileCreated (pFile);
+            m_pSneeze->OnNetworkFileCreated (pFile);
       }
    }
 
    return pFile;
 }
 
-void MANAGER::Release (FILE* pFile)
+void NETWORK::Release (FILE* pFile)
 {
    if (pFile)
    {
@@ -421,7 +419,7 @@ void MANAGER::Release (FILE* pFile)
    }
 }
 
-bool MANAGER::ReopenFile (FILE* pFile)
+bool NETWORK::ReopenFile (FILE* pFile)
 {
    bool bResult = false;
 
@@ -467,7 +465,7 @@ bool MANAGER::ReopenFile (FILE* pFile)
    return bResult;
 }
 
-void MANAGER::Clear (FILE* pFile, bool b)
+void NETWORK::Clear (FILE* pFile, bool b)
 {
    if (pFile)
    {
@@ -477,7 +475,7 @@ void MANAGER::Clear (FILE* pFile, bool b)
       {
          if (b)
          {
-            m_pSneeze->NotifyCacheFileDeleted (pFile);
+            m_pSneeze->OnNetworkFileDeleted (pFile);
 
             if (pFile->IsReleased ())
             {
@@ -489,13 +487,13 @@ void MANAGER::Clear (FILE* pFile, bool b)
          }
          else
          {
-            m_pSneeze->NotifyCacheFileCreated (pFile);
+            m_pSneeze->OnNetworkFileCreated (pFile);
          }
       }
    }
 }
 
-void MANAGER::Reset (FILE* pFile, bool b)
+void NETWORK::Reset (FILE* pFile, bool b)
 {
    if (pFile  &&  pFile->GetMeta ())
    {
@@ -509,7 +507,7 @@ void MANAGER::Reset (FILE* pFile, bool b)
 // Cache management
 // ---------------------------------------------------------------------------
 
-void MANAGER::Clear ()
+void NETWORK::Clear ()
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -519,7 +517,7 @@ void MANAGER::Clear ()
       FILE* pFile = *it;
 
       if (pFile->SetPendingClear (true))
-         m_pSneeze->NotifyCacheFileDeleted (pFile);
+         m_pSneeze->OnNetworkFileDeleted (pFile);
 
       if (pFile->IsReleased ())
       {
@@ -533,7 +531,7 @@ void MANAGER::Clear ()
    }
 }
 
-void MANAGER::Reset ()
+void NETWORK::Reset ()
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -552,7 +550,7 @@ void MANAGER::Reset ()
    SaveRules ();
 }
 
-void MANAGER::Enumerate (IENUM* pEnum)
+void NETWORK::Enumerate (IENUM* pEnum)
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -640,7 +638,7 @@ void MANAGER::Enumerate (IENUM* pEnum)
 // Path helpers
 // ---------------------------------------------------------------------------
 
-std::string MANAGER::GetCachePath () const
+std::string NETWORK::GetCachePath () const
 {
    std::string sResult;
    std::string sSession = m_pSneeze->GetHost ()->SessionPath ();
@@ -649,7 +647,7 @@ std::string MANAGER::GetCachePath () const
    return sResult;
 }
 
-std::string MANAGER::ComputeDiskKey (const std::string& sUrl) const
+std::string NETWORK::ComputeDiskKey (const std::string& sUrl) const
 {
    unsigned char aDigest[SHA_DIGEST_LENGTH];
    SHA1 (reinterpret_cast<const unsigned char*> (sUrl.data ()),
@@ -664,7 +662,7 @@ std::string MANAGER::ComputeDiskKey (const std::string& sUrl) const
    return std::string (szHex);
 }
 
-std::string MANAGER::DiskKeyToPath (const std::string& sDiskKey, DISKFILE eType) const
+std::string NETWORK::DiskKeyToPath (const std::string& sDiskKey, DISKFILE eType) const
 {
    static const char* aExt[] = { ".data", ".temp", ".meta" };
 
@@ -677,7 +675,7 @@ std::string MANAGER::DiskKeyToPath (const std::string& sDiskKey, DISKFILE eType)
 // SRI hash parsing and verification
 // ---------------------------------------------------------------------------
 
-bool MANAGER::ParseSriHash (const std::string& sSri, std::string& sAlgo, std::string& sDigest) const
+bool NETWORK::ParseSriHash (const std::string& sSri, std::string& sAlgo, std::string& sDigest) const
 {
    bool bResult = false;
 
@@ -704,7 +702,7 @@ static const EVP_MD* GetEvpMd (const std::string& sAlgo)
    return pMd;
 }
 
-std::string MANAGER::ComputeFileHash (const std::string& sFilePath, const std::string& sAlgo) const
+std::string NETWORK::ComputeFileHash (const std::string& sFilePath, const std::string& sAlgo) const
 {
    std::string sResult;
 
@@ -749,7 +747,7 @@ std::string MANAGER::ComputeFileHash (const std::string& sFilePath, const std::s
    return sResult;
 }
 
-std::string MANAGER::ComputeDataHash (const uint8_t* pData, size_t nLen, const std::string& sAlgo) const
+std::string NETWORK::ComputeDataHash (const uint8_t* pData, size_t nLen, const std::string& sAlgo) const
 {
    std::string sResult;
 
@@ -779,7 +777,7 @@ std::string MANAGER::ComputeDataHash (const uint8_t* pData, size_t nLen, const s
 // Sidecar metadata (per-meta .meta files)
 // ---------------------------------------------------------------------------
 
-void MANAGER::SaveMeta (META* pMeta)
+void NETWORK::SaveMeta (META* pMeta)
 {
    std::string sDiskKey  = ComputeDiskKey (pMeta->GetUrl ());
    std::string sMetaPath = DiskKeyToPath (sDiskKey, DISKFILE_META);
@@ -811,11 +809,11 @@ void MANAGER::SaveMeta (META* pMeta)
       std::error_code ec;
       std::filesystem::rename (sTmpPath, sMetaPath, ec);
       if (ec)
-         m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "CACHE", "Failed to rename meta temp: " + ec.message ());
+         m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "NETWORK", "Failed to rename meta temp: " + ec.message ());
    }
 }
 
-bool MANAGER::LoadMeta (const std::string& sDiskKey, const std::string& sUrl)
+bool NETWORK::LoadMeta (const std::string& sDiskKey, const std::string& sUrl)
 {
    bool bResult = false;
 
@@ -835,7 +833,7 @@ bool MANAGER::LoadMeta (const std::string& sDiskKey, const std::string& sUrl)
       }
       catch (...)
       {
-         m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "CACHE", "Failed to parse sidecar: " + sMetaPath);
+         m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "NETWORK", "Failed to parse sidecar: " + sMetaPath);
       }
 
       if (bParsed)
@@ -875,7 +873,7 @@ bool MANAGER::LoadMeta (const std::string& sDiskKey, const std::string& sUrl)
 // Staleness rules (persisted in rules.json)
 // ---------------------------------------------------------------------------
 
-void MANAGER::LoadRules ()
+void NETWORK::LoadRules ()
 {
    std::string sRulesPath = (std::filesystem::path (m_sCachePath) / "rules.json").string ();
    std::ifstream file (sRulesPath);
@@ -891,7 +889,7 @@ void MANAGER::LoadRules ()
       }
       catch (...)
       {
-         m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "CACHE", "Failed to parse rules.json -- defaulting to stale");
+         m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "NETWORK", "Failed to parse rules.json -- defaulting to stale");
       }
 
       if (bParsed)
@@ -912,12 +910,12 @@ void MANAGER::LoadRules ()
    }
    else
    {
-      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "CACHE", "No rules.json -- creating fresh");
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "NETWORK", "No rules.json -- creating fresh");
       SaveRules ();
    }
 }
 
-void MANAGER::SaveRules ()
+void NETWORK::SaveRules ()
 {
    if (!m_sCachePath.empty ())
    {
@@ -949,7 +947,7 @@ void MANAGER::SaveRules ()
    }
 }
 
-void MANAGER::AddRule (const std::string& sContentType, const std::string& sOlderThan)
+void NETWORK::AddRule (const std::string& sContentType, const std::string& sOlderThan)
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -964,7 +962,7 @@ void MANAGER::AddRule (const std::string& sContentType, const std::string& sOlde
    SaveRules ();
 }
 
-bool MANAGER::IsMetaStale (META* pMeta) const
+bool NETWORK::IsMetaStale (META* pMeta) const
 {
    bool bResult = false;
 
@@ -990,7 +988,7 @@ bool MANAGER::IsMetaStale (META* pMeta) const
 // Background fetch
 // ---------------------------------------------------------------------------
 
-void MANAGER::FetchMeta (META* pMeta)
+void NETWORK::FetchMeta (META* pMeta)
 {
    std::string sUrl;
    std::string sHash;
@@ -1029,7 +1027,7 @@ void MANAGER::FetchMeta (META* pMeta)
       }
       else
       {
-         m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Error, "CACHE", "Failed to open temp file: " + sTmpPath);
+         m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Error, "NETWORK", "Failed to open temp file: " + sTmpPath);
          bOk = false;
       }
    }
@@ -1061,7 +1059,7 @@ void MANAGER::FetchMeta (META* pMeta)
             bOk = false;
          else if (nCode != CURLE_OK  ||  ctx.nHttpCode < 200  ||  ctx.nHttpCode >= 300)
          {
-            m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "CACHE", "Fetch failed for " + sUrl + " (HTTP " + std::to_string (ctx.nHttpCode) + ")");
+            m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "NETWORK", "Fetch failed for " + sUrl + " (HTTP " + std::to_string (ctx.nHttpCode) + ")");
             bOk = false;
          }
       }
@@ -1082,7 +1080,7 @@ void MANAGER::FetchMeta (META* pMeta)
          std::string sActual = ComputeFileHash (sTmpPath, sAlgo);
          if (sActual != sExpected)
          {
-            m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "CACHE", "Hash mismatch for " + sUrl + " (expected " + sExpected + ", got " + sActual + ")");
+            m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "NETWORK", "Hash mismatch for " + sUrl + " (expected " + sExpected + ", got " + sActual + ")");
             bOk = false;
          }
       }
@@ -1097,7 +1095,7 @@ void MANAGER::FetchMeta (META* pMeta)
       std::filesystem::rename (sTmpPath, sFinalPath, ec);
       if (ec)
       {
-         m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "CACHE", "Failed to rename " + sTmpPath + " -> " + sFinalPath + ": " + ec.message ());
+         m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "NETWORK", "Failed to rename " + sTmpPath + " -> " + sFinalPath + ": " + ec.message ());
          bOk = false;
       }
       else
@@ -1142,7 +1140,7 @@ void MANAGER::FetchMeta (META* pMeta)
 
    if (bOk)
    {
-      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Trace, "CACHE", "Cached " + sUrl + " (" + std::to_string (nSizeBytes) + " bytes)");
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Trace, "NETWORK", "Cached " + sUrl + " (" + std::to_string (nSizeBytes) + " bytes)");
    }
 
    DispatchNextFromQueue ();
@@ -1152,7 +1150,7 @@ void MANAGER::FetchMeta (META* pMeta)
 // Notification helpers (called under m_mutex -- recursive lock allows re-entry)
 // ---------------------------------------------------------------------------
 
-void MANAGER::NotifyFiles (const std::vector<FILE*>& apFiles, STATE bState)
+void NETWORK::NotifyFiles (const std::vector<NETWORK::FILE*>& apFiles, NETWORK::STATE bState)
 {
    for (auto* pFile : apFiles)
    {
@@ -1168,11 +1166,11 @@ void MANAGER::NotifyFiles (const std::vector<FILE*>& apFiles, STATE bState)
       }
 
       if (!pFile->IsPendingClear ())
-         m_pSneeze->NotifyCacheFileChanged (pFile);
+         m_pSneeze->OnNetworkFileChanged (pFile);
    }
 }
 
-void MANAGER::DispatchNextFromQueue ()
+void NETWORK::DispatchNextFromQueue ()
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -1193,4 +1191,4 @@ void MANAGER::DispatchNextFromQueue ()
    }
 }
 
-}} // namespace SNEEZE::CACHE
+} // namespace SNEEZE

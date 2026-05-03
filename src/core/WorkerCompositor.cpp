@@ -19,9 +19,9 @@
 #include "astro/AstroService.h"
 #include "astro/RMCObject.h"
 #include "astro/Orbit.h"
-#include "som/Node.h"
-#include "som/Fabric.h"
-#include "som/MapObject.h"
+#include "scene/Node.h"
+#include "scene/Fabric.h"
+#include "scene/MapObject.h"
 #include <cmath>
 #include <cstdio>
 

@@ -12,16 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "File.h"
-#include "Meta.h"
-#include "Manager.h"
+#include "Network.h"
 
-namespace SNEEZE { namespace CACHE {
+namespace SNEEZE {
 
-const std::unordered_map<std::string, std::string> FILE::s_mapEmpty;
+const std::unordered_map<std::string, std::string> NETWORK::FILE::s_mapEmpty;
 
-FILE::FILE (MANAGER* pManager, META* pMeta, std::shared_ptr<CONTAINER::NAME> pName, IFILE* pListener, uint32_t nFileIx) :
-   m_pManager         (pManager),
+NETWORK::FILE::FILE (NETWORK* pNetwork, META* pMeta, std::shared_ptr<CONTAINER::NAME> pName, IFILE* pListener, uint32_t nFileIx) :
+   m_pNetwork         (pNetwork),
    m_pMeta            (pMeta),
    m_pName            (std::move (pName)),
    m_pListener        (pListener),
@@ -41,7 +39,7 @@ FILE::FILE (MANAGER* pManager, META* pMeta, std::shared_ptr<CONTAINER::NAME> pNa
    SnapshotInitial ();
 }
 
-FILE::~FILE ()
+NETWORK::FILE::~FILE ()
 {
 }
 
@@ -49,7 +47,7 @@ FILE::~FILE ()
 // Snapshot — copies display fields from the attached META
 // ---------------------------------------------------------------------------
 
-void FILE::SnapshotInitial ()
+void NETWORK::FILE::SnapshotInitial ()
 {
    if (m_pMeta)
    {
@@ -58,7 +56,7 @@ void FILE::SnapshotInitial ()
    }
 }
 
-void FILE::SnapshotProgress ()
+void NETWORK::FILE::SnapshotProgress ()
 {
    if (m_pMeta)
    {
@@ -68,7 +66,7 @@ void FILE::SnapshotProgress ()
    }
 }
 
-void FILE::SnapshotFinal ()
+void NETWORK::FILE::SnapshotFinal ()
 {
    if (m_pMeta)
    {
@@ -88,33 +86,33 @@ void FILE::SnapshotFinal ()
 // Actions
 // ---------------------------------------------------------------------------
 
-bool FILE::Request (IFILE* pListener)
+bool NETWORK::FILE::Request (IFILE* pListener)
 {
    m_pListener = pListener;
-   return m_pManager->ReopenFile (this);
+   return m_pNetwork->ReopenFile (this);
 }
 
-void FILE::Release ()
+void NETWORK::FILE::Release ()
 {
    if (!m_bEnumeration)
-      m_pManager->Release (this);
+      m_pNetwork->Release (this);
 }
 
-void FILE::Clear (bool b)
+void NETWORK::FILE::Clear (bool b)
 {
-   m_pManager->Clear (this, b);
+   m_pNetwork->Clear (this, b);
 }
 
-void FILE::Reset (bool b)
+void NETWORK::FILE::Reset (bool b)
 {
-   m_pManager->Reset (this, b);
+   m_pNetwork->Reset (this, b);
 }
 
 // ---------------------------------------------------------------------------
 // META-dependent accessors (require attached META)
 // ---------------------------------------------------------------------------
 
-std::vector<uint8_t> FILE::ReadData () const
+std::vector<uint8_t> NETWORK::FILE::ReadData () const
 {
    std::vector<uint8_t> aResult;
    if (m_pMeta)
@@ -122,7 +120,7 @@ std::vector<uint8_t> FILE::ReadData () const
    return aResult;
 }
 
-std::string FILE::GetHeader (const std::string& sName) const
+std::string NETWORK::FILE::GetHeader (const std::string& sName) const
 {
    std::string sResult;
    if (m_pMeta)
@@ -130,7 +128,7 @@ std::string FILE::GetHeader (const std::string& sName) const
    return sResult;
 }
 
-std::string FILE::GetDiskPath () const
+std::string NETWORK::FILE::GetDiskPath () const
 {
    std::string sResult;
    if (m_pMeta)
@@ -138,7 +136,7 @@ std::string FILE::GetDiskPath () const
    return sResult;
 }
 
-std::string FILE::GetCreatedTime () const
+std::string NETWORK::FILE::GetCreatedTime () const
 {
    std::string sResult;
    if (m_pMeta)
@@ -146,7 +144,7 @@ std::string FILE::GetCreatedTime () const
    return sResult;
 }
 
-std::string FILE::GetLastAccessTime () const
+std::string NETWORK::FILE::GetLastAccessTime () const
 {
    std::string sResult;
    if (m_pMeta)
@@ -154,7 +152,7 @@ std::string FILE::GetLastAccessTime () const
    return sResult;
 }
 
-uint32_t FILE::GetAccessCount () const
+uint32_t NETWORK::FILE::GetAccessCount () const
 {
    uint32_t nResult = 0;
    if (m_pMeta)
@@ -162,16 +160,16 @@ uint32_t FILE::GetAccessCount () const
    return nResult;
 }
 
-const std::unordered_map<std::string, std::string>& FILE::GetHeaders () const
+const std::unordered_map<std::string, std::string>& NETWORK::FILE::GetHeaders () const
 {
    const std::unordered_map<std::string, std::string>& mapResult =
       m_pMeta ? m_pMeta->GetHeaders () : s_mapEmpty;
    return mapResult;
 }
 
-std::string FILE::GetContainerName () const
+std::string NETWORK::FILE::GetContainerName () const
 {
    return m_pName->DisplayName ();
 }
 
-}} // namespace SNEEZE::CACHE
+} // namespace SNEEZE

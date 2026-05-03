@@ -15,9 +15,9 @@
 #ifndef SNEEZE_ASTRO_ASTROSERVICE_H
 #define SNEEZE_ASTRO_ASTROSERVICE_H
 
-#include "som/Fabric.h"
-#include "som/Node.h"
-#include "som/MapObject.h"
+#include "scene/Fabric.h"
+#include "scene/Node.h"
+#include "scene/MapObject.h"
 #include <vector>
 
 namespace SNEEZE { namespace CORE { class SNEEZE; }}

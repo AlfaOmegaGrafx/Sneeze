@@ -540,32 +540,29 @@ set (ASTRO_HEADERS
    astro/AstroService.h)
 
 set (SOM_SOURCES
-   som/Node.cpp
-   som/Fabric.cpp
-   som/Scene.cpp
-   som/MapObject.cpp
-   som/AccessControl.cpp
-   som/Events.cpp
-   som/SpatialIndex.cpp)
+   scene/Node.cpp
+   scene/Fabric.cpp
+   scene/Scene.cpp
+   scene/MapObject.cpp
+   scene/AccessControl.cpp
+   scene/Events.cpp
+   scene/SpatialIndex.cpp)
 set (SOM_HEADERS
-   som/Types.h
-   som/Node.h
-   som/Fabric.h
-   som/Scene.h
-   som/MapObject.h
-   som/AccessControl.h
-   som/Events.h
-   som/SpatialIndex.h)
+   scene/Types.h
+   scene/Node.h
+   scene/Fabric.h
+   scene/Scene.h
+   scene/MapObject.h
+   scene/AccessControl.h
+   scene/Events.h
+   scene/SpatialIndex.h)
 
-set (CACHE_SOURCES
-   cache/Meta.cpp
-   cache/File.cpp
-   cache/Manager.cpp)
-set (CACHE_HEADERS
-   cache/Types.h
-   cache/Meta.h
-   cache/File.h
-   cache/Manager.h)
+set (NETWORK_SOURCES
+   network/Meta.cpp
+   network/File.cpp
+   network/Network.cpp)
+set (NETWORK_HEADERS
+   network/Network.h)
 
 set (CONTAINER_HEADERS  container/Container.h)
 
@@ -632,7 +629,7 @@ add_library (Sneeze STATIC
    ${CORE_SOURCES}      ${CORE_HEADERS}
    ${ASTRO_SOURCES}     ${ASTRO_HEADERS}
    ${SOM_SOURCES}       ${SOM_HEADERS}
-   ${CACHE_SOURCES}     ${CACHE_HEADERS}
+   ${NETWORK_SOURCES}   ${NETWORK_HEADERS}
    ${CONTAINER_HEADERS}
    ${STORAGE_SOURCES}   ${STORAGE_HEADERS}
    ${PERSONA_SOURCES}   ${PERSONA_HEADERS}
@@ -726,8 +723,8 @@ endif ()
 
 source_group ("core"     FILES ${CORE_SOURCES} ${CORE_HEADERS})
 source_group ("astro"    FILES ${ASTRO_SOURCES} ${ASTRO_HEADERS})
-source_group ("som"      FILES ${SOM_SOURCES} ${SOM_HEADERS})
-source_group ("cache"     FILES ${CACHE_SOURCES} ${CACHE_HEADERS})
+source_group ("scene"     FILES ${SOM_SOURCES} ${SOM_HEADERS})
+source_group ("network"   FILES ${NETWORK_SOURCES} ${NETWORK_HEADERS})
 source_group ("container" FILES ${CONTAINER_HEADERS})
 source_group ("storage"   FILES ${STORAGE_SOURCES} ${STORAGE_HEADERS})
 source_group ("persona"  FILES ${PERSONA_SOURCES} ${PERSONA_HEADERS})

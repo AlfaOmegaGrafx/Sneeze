@@ -17,8 +17,6 @@
 #include "Scene.h"
 #include "MapObject.h"
 #include "core/Sneeze.h"
-#include "cache/Manager.h"
-#include "cache/File.h"
 #include "container/Container.h"
 #include "stb/stb_image.h"
 #include <algorithm>
@@ -123,7 +121,7 @@ void NODE::RemoveChild (NODE* pChild)
 
 // ---------------------------------------------------------------------------
 // SetMapObject — assigns the map object and initiates a texture fetch if the
-// object has a texture URL and the node can reach the cache.
+// object has a texture URL and the node can reach the network.
 // ---------------------------------------------------------------------------
 
 void NODE::SetMapObject (MAP_OBJECT* pMapObject)
@@ -135,7 +133,7 @@ void NODE::SetMapObject (MAP_OBJECT* pMapObject)
 
 // ---------------------------------------------------------------------------
 // RequestTexture — if the map object has a texture URL, request it from the
-// cache via NODE -> FABRIC -> SCENE -> SNEEZE -> Cache().
+// network via NODE -> FABRIC -> SCENE -> SNEEZE -> Network().
 // ---------------------------------------------------------------------------
 
 void NODE::RequestTexture ()
@@ -150,12 +148,12 @@ void NODE::RequestTexture ()
       pName->sPersonaHash   = "ZklkNVZTY0cxb2ZqUmtTWGpMVHE2bHkyQT09IiwiTUlJRFBUQ0NBaVdnQXdJQkFn";
       pName->bValidated     = true;
 
-      m_pFile = m_pFabric->Scene ()->Sneeze ()->Cache ()->Request (this, pName, m_pMapObject->m_sTextureUrl);
+      m_pFile = m_pFabric->Scene ()->Sneeze ()->Network ()->Request (this, pName, m_pMapObject->m_sTextureUrl);
    }
 }
 
 // ---------------------------------------------------------------------------
-// ReleaseTexture — release any outstanding cache file handle.
+// ReleaseTexture — release any outstanding network file handle.
 // ---------------------------------------------------------------------------
 
 void NODE::ReleaseTexture ()
@@ -171,7 +169,7 @@ void NODE::ReleaseTexture ()
 // OnFileReady — decode the fetched texture data and populate the map object.
 // ---------------------------------------------------------------------------
 
-void NODE::OnFileReady (CACHE::FILE* pFile)
+void NODE::OnFileReady (NETWORK::FILE* pFile)
 {
    std::vector<uint8_t> aData;
 
@@ -205,10 +203,10 @@ void NODE::OnFileReady (CACHE::FILE* pFile)
 }
 
 // ---------------------------------------------------------------------------
-// OnFileFailed — release the cache file handle.
+// OnFileFailed — release the network file handle.
 // ---------------------------------------------------------------------------
 
-void NODE::OnFileFailed (CACHE::FILE* pFile)
+void NODE::OnFileFailed (NETWORK::FILE* pFile)
 {
    pFile->Release ();
    m_pFile = nullptr;

@@ -25,7 +25,7 @@
 
 namespace SNEEZE { namespace som { class FABRIC; class NODE; class SCENE; }}
 namespace SNEEZE { namespace astro { class ASTRO_SERVICE; }}
-namespace SNEEZE { namespace CACHE { class MANAGER; class FILE; }}
+#include "network/Network.h"
 namespace SNEEZE { namespace storage { class STORAGE_SYSTEM; }}
 namespace SNEEZE { namespace persona { class PERSONA; }}
 namespace SNEEZE { namespace net { class HTTP_CLIENT; }}
@@ -73,9 +73,9 @@ public:
    virtual void OnFrameReady (const uint32_t* pFB, int nFbW, int nFbH) = 0;
    virtual void Log (eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage) = 0;
 
-   virtual void OnCacheFileCreated (CACHE::FILE* pFile) { (void)pFile; }
-   virtual void OnCacheFileChanged (CACHE::FILE* pFile) { (void)pFile; }
-   virtual void OnCacheFileDeleted (CACHE::FILE* pFile) { (void)pFile; }
+   virtual void OnNetworkFileCreated (NETWORK::FILE* pFile) { (void)pFile; }
+   virtual void OnNetworkFileChanged (NETWORK::FILE* pFile) { (void)pFile; }
+   virtual void OnNetworkFileDeleted (NETWORK::FILE* pFile) { (void)pFile; }
 };
 
 // ---------------------------------------------------------------------------
@@ -152,14 +152,14 @@ public:
 
    // --- Subsystems ---
 
-   CACHE::MANAGER*          Cache () const { return m_pCache; }
+   NETWORK*                 Network () const { return m_pNetwork; }
    storage::STORAGE_SYSTEM* GetStorage () const { return m_pStorage; }
    persona::PERSONA*        GetPersona () const { return m_pPersona; }
    net::HTTP_CLIENT*        GetHttpClient () const;
 
-   void NotifyCacheFileCreated (CACHE::FILE* pFile);
-   void NotifyCacheFileChanged (CACHE::FILE* pFile);
-   void NotifyCacheFileDeleted (CACHE::FILE* pFile);
+   void OnNetworkFileCreated (NETWORK::FILE* pFile);
+   void OnNetworkFileChanged (NETWORK::FILE* pFile);
+   void OnNetworkFileDeleted (NETWORK::FILE* pFile);
 
 private:
    void EngineThreadLoop ();
@@ -209,7 +209,7 @@ private:
    astro::ASTRO_SERVICE*  m_pAstroService;
 
    // Subsystems
-   CACHE::MANAGER*          m_pCache;
+   NETWORK*                 m_pNetwork;
    storage::STORAGE_SYSTEM* m_pStorage;
    persona::PERSONA*        m_pPersona;
 };

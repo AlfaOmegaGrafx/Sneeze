@@ -26,11 +26,11 @@
 #include "astro/BodyData.h"
 #include "astro/RMCObject.h"
 #include "astro/AstroService.h"
-#include "som/Fabric.h"
-#include "som/Scene.h"
-#include "som/Node.h"
-#include "som/MapObject.h"
-#include "cache/Manager.h"
+#include "scene/Fabric.h"
+#include "scene/Scene.h"
+#include "scene/Node.h"
+#include "scene/MapObject.h"
+#include "network/Network.h"
 #include "storage/Storage.h"
 #include "persona/Persona.h"
 #include "wasm/WasmRuntime.h"
@@ -108,7 +108,7 @@ SNEEZE::SNEEZE (ISNEEZE* pHost) :
    m_pPrimaryFabricRootNode (nullptr),
    m_pScene                 (nullptr),
    m_pAstroService          (nullptr),
-   m_pCache                 (nullptr),
+   m_pNetwork                 (nullptr),
    m_pStorage               (nullptr),
    m_pPersona               (nullptr)
 {
@@ -169,10 +169,10 @@ bool SNEEZE::Initialize ()
 
                   Log (ISNEEZE::kLOGLEVEL_Info, "SNEEZE", "SOM initialized (root fabric + primary fabric)");
 
-                  // --- Initialize subsystems (cache, storage, persona) ---
+                  // --- Initialize subsystems (network, storage, persona) ---
 
-                  m_pCache = new CACHE::MANAGER (this);
-                  m_pCache->Initialize ();
+                  m_pNetwork = new NETWORK (this);
+                  m_pNetwork->Initialize ();
 
                   m_pStorage = new storage::STORAGE_SYSTEM (this);
                   m_pStorage->Initialize ();
@@ -315,7 +315,7 @@ void SNEEZE::Shutdown ()
       m_pStorage = nullptr;
    }
 
-   // --- Destroy SOM (before cache, because node destructors release cache files) ---
+   // --- Destroy SOM (before network, because node destructors release network files) ---
 
    if (m_pAstroService)
    {
@@ -342,13 +342,13 @@ void SNEEZE::Shutdown ()
    delete m_pScene;
    m_pScene = nullptr;
 
-   // --- Destroy cache (after SOM) ---
+   // --- Destroy network (after SOM) ---
 
-   if (m_pCache)
+   if (m_pNetwork)
    {
-      m_pCache->Shutdown ();
-      delete m_pCache;
-      m_pCache = nullptr;
+      m_pNetwork->Shutdown ();
+      delete m_pNetwork;
+      m_pNetwork = nullptr;
    }
 
    s_pUiContext.Shutdown ();
@@ -480,22 +480,22 @@ net::HTTP_CLIENT* SNEEZE::GetHttpClient () const
    return &s_pHttpClient;
 }
 
-void SNEEZE::NotifyCacheFileCreated (CACHE::FILE* pFile)
+void SNEEZE::OnNetworkFileCreated (NETWORK::FILE* pFile)
 {
    if (m_pHost)
-      m_pHost->OnCacheFileCreated (pFile);
+      m_pHost->OnNetworkFileCreated (pFile);
 }
 
-void SNEEZE::NotifyCacheFileChanged (CACHE::FILE* pFile)
+void SNEEZE::OnNetworkFileChanged (NETWORK::FILE* pFile)
 {
    if (m_pHost)
-      m_pHost->OnCacheFileChanged (pFile);
+      m_pHost->OnNetworkFileChanged (pFile);
 }
 
-void SNEEZE::NotifyCacheFileDeleted (CACHE::FILE* pFile)
+void SNEEZE::OnNetworkFileDeleted (NETWORK::FILE* pFile)
 {
    if (m_pHost)
-      m_pHost->OnCacheFileDeleted (pFile);
+      m_pHost->OnNetworkFileDeleted (pFile);
 }
 
 // ---------------------------------------------------------------------------
@@ -525,9 +525,9 @@ void SNEEZE::Logout ()
    s_pWasmRuntime.DestroyAllStores ();
 
    // --- Phase 4: Destroy ---
-   // Clear session caches.
-   if (m_pCache)
-      m_pCache->Clear ();
+   // Clear session network files.
+   if (m_pNetwork)
+      m_pNetwork->Clear ();
 
    Log (ISNEEZE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 4 (destroy)");
 
@@ -557,8 +557,8 @@ void SNEEZE::ChangePrimaryFabric (const std::string& sUrl)
    s_pWasmRuntime.DestroyAllStores ();
 
    // --- Phase 4: Destroy and rebuild ---
-   if (m_pCache)
-      m_pCache->Clear ();
+   if (m_pNetwork)
+      m_pNetwork->Clear ();
 
    // Tear down existing primary fabric content
    if (m_pAstroService)

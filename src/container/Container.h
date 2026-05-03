@@ -37,7 +37,7 @@ namespace SNEEZE {
 // The display name is always sCommonName + "/" + sContainerName
 // (e.g. "Metaversal/Solar System").
 //
-// NAME objects are lightweight identity cards — subsystems like the cache and
+// NAME objects are lightweight identity cards — subsystems like the network and
 // storage hold their own copies, independent of the container's lifecycle.
 // ---------------------------------------------------------------------------
 

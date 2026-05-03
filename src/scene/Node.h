@@ -16,7 +16,7 @@
 #define SNEEZE_SOM_NODE_H
 
 #include "Types.h"
-#include "cache/Types.h"
+#include "network/Network.h"
 #include <atomic>
 #include <mutex>
 #include <vector>
@@ -42,10 +42,10 @@ class MAP_OBJECT;
 // this node.
 //
 // When a MAP_OBJECT with a non-empty texture URL is assigned, the node
-// requests the texture from the cache and decodes it on completion.
+// requests the texture from the network and decodes it on completion.
 // ---------------------------------------------------------------------------
 
-class NODE : public CACHE::IFILE
+class NODE : public NETWORK::IFILE
 {
 public:
    explicit NODE (FABRIC* pFabric);
@@ -93,10 +93,10 @@ public:
 
    SEQLOCK& GetSeqlock () { return m_pSeqlock; }
 
-   // --- CACHE::IFILE ---
+   // --- NETWORK::IFILE ---
 
-   void OnFileReady  (CACHE::FILE* pFile) override;
-   void OnFileFailed (CACHE::FILE* pFile) override;
+   void OnFileReady  (NETWORK::FILE* pFile) override;
+   void OnFileFailed (NETWORK::FILE* pFile) override;
 
 private:
    void RequestTexture ();
@@ -118,7 +118,7 @@ private:
 
    SEQLOCK              m_pSeqlock;
 
-   CACHE::FILE*         m_pFile;
+   NETWORK::FILE*         m_pFile;
 };
 
 }} // namespace SNEEZE::som

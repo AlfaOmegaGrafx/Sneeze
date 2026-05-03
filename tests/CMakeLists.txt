@@ -26,7 +26,7 @@ set (TEST_SOURCES
    ComputeTest.cpp
    VoxTest.cpp
    JwsTest.cpp
-   CacheTest.cpp
+   NetworkTest.cpp
 )
 
 if (SNEEZE_ENABLE_WASM)

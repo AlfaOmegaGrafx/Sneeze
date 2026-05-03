@@ -24,7 +24,7 @@ namespace SNEEZE { namespace som {
 //
 // Owned by CORE::SNEEZE. Every FABRIC in the scene holds a back-pointer to
 // the SCENE, giving any NODE a path to engine services:
-//     NODE -> FABRIC -> SCENE -> SNEEZE -> Cache(), etc.
+//     NODE -> FABRIC -> SCENE -> SNEEZE -> Network(), etc.
 // ---------------------------------------------------------------------------
 
 class SCENE

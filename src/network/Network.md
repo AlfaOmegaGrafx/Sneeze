@@ -1,6 +1,6 @@
-# Cache — Type-Agnostic Resource Caching
+# Network — Resource Fetching and Caching
 
-The `cache` module (`SNEEZE::CACHE`) provides a handle-based, type-agnostic file caching system. All cached files persist on disk across restarts. Files with a cryptographic hash are additionally integrity-verified.
+The `network` module (`SNEEZE::NETWORK`) provides a handle-based, type-agnostic resource fetching and caching system. All fetched files persist on disk across restarts. Files with a cryptographic hash are additionally integrity-verified.
 
 | Hash Provided | Verified | Storage         |
 |---------------|----------|-----------------|
@@ -12,7 +12,7 @@ All files are stored on disk, never solely in memory. Fetches stream to a tempor
 ## Architecture
 
 ```
-MANAGER (singleton)
+NETWORK (singleton)
  ├── META_MAP: URL -> unique_ptr<META>        (only metas with active FILE handles)
  ├── Fetch thread pool (capped at 16) + overflow queue
  ├── History list: all FILE* handles ever created
@@ -23,7 +23,7 @@ MANAGER (singleton)
  └── Epoch (steady_clock time point)
 
 META (internal shared state, one per URL)
- ├── MANAGER* (parent back-pointer)
+ ├── NETWORK* (parent back-pointer)
  ├── STATE lifecycle (atomic)
  ├── nMetaIx: monotonic content-version index (assigned at creation/reset)
  ├── Disk path, headers, metadata
@@ -33,7 +33,7 @@ META (internal shared state, one per URL)
  └── list<FILE*> attached handles
 
 FILE (per-caller handle)
- ├── MANAGER* (parent back-pointer)
+ ├── NETWORK* (parent back-pointer)
  ├── META* (attached while live, null after Release)
  ├── shared_ptr<CONTAINER::NAME> (identity of requesting container)
  ├── IFILE* listener for notifications
@@ -60,43 +60,41 @@ CONTAINER::NAME (identity record, shared via shared_ptr)
  └── DisplayName() -> sCommonName + "/" + sContainerName
 ```
 
-## Namespace
+## Nested Types
 
-All types live under `SNEEZE::CACHE`:
+All types are nested inside `SNEEZE::NETWORK`:
 
 | Type            | Role                                              |
 |-----------------|---------------------------------------------------|
-| MANAGER         | Singleton cache manager. Owns metas and threads.  |
-| META            | Internal shared state per URL. Not exposed.        |
-| FILE            | Per-caller handle. Returned by Request().          |
+| NETWORK         | Singleton network manager. Owns metas and threads.|
+| NETWORK::META   | Internal shared state per URL. Not exposed.        |
+| NETWORK::FILE   | Per-caller handle. Returned by Request().          |
+| NETWORK::IFILE  | Observer interface (OnFileReady, OnFileFailed).    |
+| NETWORK::IENUM  | Enumeration callback interface (OnMeta).           |
+| NETWORK::STATE  | Enum: IDLE, FETCHING, VALIDATING, READY, FAILED.  |
+| NETWORK::REQUEST| Flags: REQUEST_CREATE, REQUEST_FETCH.              |
+| NETWORK::DISKFILE| Enum: DISKFILE_DATA, DISKFILE_TEMP, DISKFILE_META.|
+| NETWORK::RULE   | Staleness rule (content-type + olderThan).         |
 | CONTAINER::NAME | Identity record for a container.                   |
-| IFILE           | Observer interface (OnFileReady, OnFileFailed).    |
-| IENUM           | Enumeration callback interface (OnMeta).           |
-| STATE           | Enum: IDLE, FETCHING, VALIDATING, READY, FAILED.  |
-| REQUEST         | Flags: REQUEST_CREATE, REQUEST_FETCH.              |
-| DISKFILE        | Enum: DISKFILE_DATA, DISKFILE_TEMP, DISKFILE_META. |
-| RULE            | Staleness rule (content-type + olderThan).         |
 
 ## Usage
 
 ### Basic fetch (no hash)
 
 ```cpp
-#include "cache/Manager.h"
-#include "cache/File.h"
-#include "cache/Types.h"
+#include "network/Network.h"
 
-class MY_LISTENER : public SNEEZE::CACHE::IFILE
+class MY_LISTENER : public SNEEZE::NETWORK::IFILE
 {
 public:
-   void OnFileReady (SNEEZE::CACHE::FILE* pFile) override
+   void OnFileReady (SNEEZE::NETWORK::FILE* pFile) override
    {
       std::vector<uint8_t> aData = pFile->ReadData ();
       std::string sMime = pFile->GetContentType ();
       // ... use the data
    }
 
-   void OnFileFailed (SNEEZE::CACHE::FILE* pFile) override
+   void OnFileFailed (SNEEZE::NETWORK::FILE* pFile) override
    {
       // handle failure
    }
@@ -108,7 +106,7 @@ auto pName = std::make_shared<SNEEZE::CONTAINER::NAME> ();
 pName->sCommonName    = "Metaversal";
 pName->sContainerName = "Solar System";
 pName->bValidated     = true;
-SNEEZE::CACHE::FILE* pFile = pCache->Request (&listener, pName, "https://example.com/model.glb");
+SNEEZE::NETWORK::FILE* pFile = pNetwork->Request (&listener, pName, "https://example.com/model.glb");
 
 // ... later, when done:
 pFile->Release ();
@@ -119,7 +117,7 @@ pFile->Release ();
 ```cpp
 std::string sSri = "sha256-a1b2c3d4e5f6...";  // SRI-format hash
 
-SNEEZE::CACHE::FILE* pModule = pCache->Request (&listener, pName, "https://cdn.example.com/game.wasm", sSri);
+SNEEZE::NETWORK::FILE* pModule = pNetwork->Request (&listener, pName, "https://cdn.example.com/game.wasm", sSri);
 
 // If the hash matches, OnFileReady fires. If mismatch, OnFileFailed fires.
 ```
@@ -127,7 +125,7 @@ SNEEZE::CACHE::FILE* pModule = pCache->Request (&listener, pName, "https://cdn.e
 ### Checking file metadata
 
 ```cpp
-void OnFileReady (SNEEZE::CACHE::FILE* pFile) override
+void OnFileReady (SNEEZE::NETWORK::FILE* pFile) override
 {
    uint64_t nSize        = pFile->GetSizeBytes ();
    std::string sMime     = pFile->GetContentType ();
@@ -143,16 +141,15 @@ void OnFileReady (SNEEZE::CACHE::FILE* pFile) override
 The 5-arg `Request()` accepts an optional `bFlags` parameter controlling whether to create and/or fetch the meta. Defaults to `kREQUEST_DEFAULT` (`REQUEST_CREATE | REQUEST_FETCH`).
 
 ```cpp
-using namespace SNEEZE::CACHE;
-
 // Find only — returns nullptr if the URL isn't already cached
-FILE* pExisting = pCache->Request (&listener, pName, url, "", 0);
+SNEEZE::NETWORK::FILE* pExisting = pNetwork->Request (&listener, pName, url, "", 0);
 
 // Create + fetch (default behavior, same as the 3-arg overload)
-FILE* pFile = pCache->Request (&listener, pName, url);
+SNEEZE::NETWORK::FILE* pFile = pNetwork->Request (&listener, pName, url);
 
 // Create + fetch with explicit flags
-FILE* pFile2 = pCache->Request (&listener, pName, url, "", REQUEST_CREATE | REQUEST_FETCH);
+SNEEZE::NETWORK::FILE* pFile2 = pNetwork->Request (&listener, pName, url, "",
+   SNEEZE::NETWORK::REQUEST_CREATE | SNEEZE::NETWORK::REQUEST_FETCH);
 ```
 
 | Flag             | Effect                                            |
@@ -177,9 +174,9 @@ std::string sDisplay = pFile->GetContainerName ();  // "Metaversal/Solar System"
 The cache can be globally disabled at runtime via `SetCacheEnabled(false)`. When disabled, every `Request()` that would normally serve data from disk instead triggers a fresh network fetch. Existing metas and disk files are not destroyed (unlike `Reset()`); the flag only affects the cache-hit decision path.
 
 ```cpp
-pCache->SetCacheEnabled (false);   // all subsequent requests bypass the cache
-pCache->SetCacheEnabled (true);    // restore normal caching behavior
-bool b = pCache->IsCacheEnabled ();
+pNetwork->SetCacheEnabled (false);   // all subsequent requests bypass the cache
+pNetwork->SetCacheEnabled (true);    // restore normal caching behavior
+bool b = pNetwork->IsCacheEnabled ();
 ```
 
 This is intended for the inspector's "Disable cache" toggle, analogous to the same checkbox in browser developer tools.
@@ -192,7 +189,7 @@ This is intended for the inspector's "Disable cache" toggle, analogous to the sa
 
 This means metas don't accumulate in memory indefinitely — only metas with active FILE handles live in the map.
 
-**Clear** is an immediate visibility toggle for the inspector. `Clear(true)` removes the FILE from the history list and fires `OnCacheFileDeleted` immediately — the inspector row vanishes on the spot. If the FILE is already released, it is also deleted. `Clear(false)` adds the FILE back to the history list and fires `OnCacheFileCreated`. The META and its cached data are not affected — this is purely inspector housekeeping.
+**Clear** is an immediate visibility toggle for the inspector. `Clear(true)` removes the FILE from the history list and fires `OnNetworkFileDeleted` immediately — the inspector row vanishes on the spot. If the FILE is already released, it is also deleted. `Clear(false)` adds the FILE back to the history list and fires `OnNetworkFileCreated`. The META and its cached data are not affected — this is purely inspector housekeeping.
 
 The clear flag also acts as a deferred destruction flag: when a cleared FILE is eventually released, it is deleted rather than kept in history.
 
@@ -212,17 +209,17 @@ pFile->Reset (false);         // changed my mind
 pFile->Release ();            // normal release, no reset
 ```
 
-All three actions are available on both FILE and MANAGER:
+All three actions are available on both FILE and NETWORK:
 
 ```cpp
 pFile->Release ();             // via FILE
-pCache->Release (pFile);       // via MANAGER (equivalent)
+pNetwork->Release (pFile);     // via NETWORK (equivalent)
 
-pFile->Clear ();               // via FILE (routes through MANAGER)
-pCache->Clear (pFile);         // via MANAGER
+pFile->Clear ();               // via FILE (routes through NETWORK)
+pNetwork->Clear (pFile);       // via NETWORK
 
-pFile->Reset ();               // via FILE (routes through MANAGER)
-pCache->Reset (pFile);         // via MANAGER
+pFile->Reset ();               // via FILE (routes through NETWORK)
+pNetwork->Reset (pFile);       // via NETWORK
 ```
 
 ### FILE::Request() — Reopen
@@ -237,7 +234,7 @@ if (!bOk)
 }
 ```
 
-Internally, `Request()` calls `MANAGER::ReopenFile()`:
+Internally, `Request()` calls `NETWORK::ReopenFile()`:
 1. Looks up the META in `m_mapMetas` by the FILE's snapshotted URL.
 2. If not in memory, loads the META from its `.meta` sidecar on disk.
 3. Validates that the META's `nMetaIx` matches the FILE's snapshotted `nMetaIx`.
@@ -248,26 +245,26 @@ An optional `IFILE*` parameter can replace the listener; passing `nullptr` keeps
 
 ### Display Toggle
 
-The display can be globally toggled via `SetDisplayEnabled(bool)`. When disabled, every new FILE created by `Request()` is automatically cleared — it is never added to the inspector history and no `OnCacheFileCreated` notification fires. The FILE still functions normally for its consumer (IFILE listener receives `OnFileReady`/`OnFileFailed`), and data is still cached to disk. When the FILE is released, it is deleted silently.
+The display can be globally toggled via `SetDisplayEnabled(bool)`. When disabled, every new FILE created by `Request()` is automatically cleared — it is never added to the inspector history and no `OnNetworkFileCreated` notification fires. The FILE still functions normally for its consumer (IFILE listener receives `OnFileReady`/`OnFileFailed`), and data is still cached to disk. When the FILE is released, it is deleted silently.
 
 ```cpp
-pCache->SetDisplayEnabled (false);   // new requests are invisible to inspector
-pCache->SetDisplayEnabled (true);    // restore normal inspector visibility
-bool b = pCache->IsDisplayEnabled ();
+pNetwork->SetDisplayEnabled (false);   // new requests are invisible to inspector
+pNetwork->SetDisplayEnabled (true);    // restore normal inspector visibility
+bool b = pNetwork->IsDisplayEnabled ();
 ```
 
 This is intended for the inspector's stop/play toggle. Existing FILEs already in the history are not affected — only newly created FILEs are auto-cleared.
 
-### Bulk Cache Management
+### Bulk Management
 
 Bulk operations set flags on all matching metas/files, then immediately process any that are already eligible (released FILEs, zero-attach METAs). In-use items are cleaned up automatically when their last holder releases.
 
 ```cpp
 // Clear all released FILE records from history
-pCache->Clear ();
+pNetwork->Clear ();
 
 // Reset all metas (destroy when last holder releases)
-pCache->Reset ();
+pNetwork->Reset ();
 ```
 
 | Method  | Scope     | Effect                                       |
@@ -284,16 +281,16 @@ For metas already in `m_mapMetas`, the existing META is used. For metas only on 
 Internally, a single FILE object is allocated before the loop, with `m_bEnumeration` set to true. On each iteration, `SetMeta()` swaps the META pointer, `AttachFile` / `DetachFile` manage the attachment, and the callback fires. The FILE is deleted after the loop completes.
 
 ```cpp
-struct ENUM_PURGE : SNEEZE::CACHE::IENUM
+struct ENUM_PURGE : SNEEZE::NETWORK::IENUM
 {
-   void OnMeta (SNEEZE::CACHE::FILE* pFile) override
+   void OnMeta (SNEEZE::NETWORK::FILE* pFile) override
    {
       if (pFile->GetContentType () == "application/jose+msf")
          pFile->Reset ();
    }
 };
 ENUM_PURGE pEnum_Purge;
-pCache->Enumerate (&pEnum_Purge);
+pNetwork->Enumerate (&pEnum_Purge);
 ```
 
 **Use case: MSF file freshness.** Artemis calls `Enumerate()` immediately after `SNEEZE::Initialize()` to reset all cached metas with content-type `application/jose+msf`. MSF files are trust anchors (signed service manifests) that should always be re-fetched from the network on startup rather than served from stale cache. The policy decision lives in Artemis, not the engine — Sneeze's `Enumerate` is type-agnostic.
@@ -343,11 +340,11 @@ Getters on FILE read from these snapshot members, not from the META. META-depend
 
 ## Network Inspector Data
 
-The cache captures all the data needed to implement a Chrome DevTools-style Network inspector tab. Artemis builds the UI using native OS windowing; Sneeze provides the data model and notifications described here.
+The network system captures all the data needed to implement a Chrome DevTools-style Network inspector tab. Artemis builds the UI using native OS windowing; Sneeze provides the data model and notifications described here.
 
 ### Timing Model
 
-All timing values are `double` seconds relative to a per-session epoch (`steady_clock` time point set at `MANAGER::Initialize()`). This gives a stable, monotonic timeline for waterfall rendering.
+All timing values are `double` seconds relative to a per-session epoch (`steady_clock` time point set at `NETWORK::Initialize()`). This gives a stable, monotonic timeline for waterfall rendering.
 
 | Accessor               | Source         | Description                              |
 |------------------------|----------------|------------------------------------------|
@@ -356,7 +353,7 @@ All timing values are `double` seconds relative to a per-session epoch (`steady_
 | `GetFetchEndTime()`    | `META`/`FILE`  | Seconds since epoch when fetch ended     |
 | `GetFetchDuration()`   | `META`/`FILE`  | Derived: end - start                     |
 | `GetQueueDuration()`   | `META`/`FILE`  | Derived: start - queued                  |
-| `GetEpochAge()`        | `MANAGER`      | Current seconds since epoch              |
+| `GetEpochAge()`        | `NETWORK`      | Current seconds since epoch              |
 
 `m_dFetchQueuedTime` records when the META enters the fetch queue (set in `Request()` before `DispatchFetch()`). `m_dFetchStartTime` records when the HTTP request actually begins (set at the start of `FetchMeta()`). The difference (`GetQueueDuration()`) measures how long the meta waited in the overflow queue before a thread became available.
 
@@ -364,19 +361,19 @@ All timing values are `double` seconds relative to a per-session epoch (`steady_
 
 Each `FILE` handle receives a monotonically increasing `uint32_t` file index (`nFileIx`) at creation. This provides a stable sort key for the inspector's request list, independent of fetch completion order. Each `META` receives a separate monotonically increasing index (`nMetaIx`) at creation or reset, identifying the version of the cached content.
 
-`nMetaIx` is persisted in `.meta` sidecar files and in `rules.json` (as `nNextMetaIx`). `m_nNextFileIx` and `m_nNextMetaIx` are maintained on MANAGER.
+`nMetaIx` is persisted in `.meta` sidecar files and in `rules.json` (as `nNextMetaIx`). `m_nNextFileIx` and `m_nNextMetaIx` are maintained on NETWORK.
 
 ```cpp
-uint32_t nFileIx  = pFile->GetFileIx ();
+uint32_t nFileIx = pFile->GetFileIx ();
 uint32_t nMetaIx = pFile->GetMetaIx ();
 ```
 
 ### History List
 
-`MANAGER::GetFiles()` returns a `const std::vector<FILE*>&` containing all FILE handles, in creation order. `Release()` detaches the FILE from its META (stops notifications) but does **not** remove it from the list unless the FILE has a pending clear flag. This list is the data backing the inspector's request table.
+`NETWORK::GetFiles()` returns a `const std::vector<FILE*>&` containing all FILE handles, in creation order. `Release()` detaches the FILE from its META (stops notifications) but does **not** remove it from the list unless the FILE has a pending clear flag. This list is the data backing the inspector's request table.
 
 ```cpp
-const auto& aHistory = pCache->GetFiles ();
+const auto& aHistory = pNetwork->GetFiles ();
 for (auto* pFile : aHistory)
 {
    // pFile->GetUrl(), GetFileIx(), GetHttpStatus(), ...
@@ -396,19 +393,19 @@ FILEs are removed from history via `Clear()` + `Release()`, or bulk via `Clear()
 
 ### Notification Callbacks
 
-The `ISNEEZE` interface (Sneeze -> Artemis) provides two callbacks for real-time inspector updates:
+The `ISNEEZE` interface (Sneeze -> Artemis) provides three callbacks for real-time inspector updates:
 
 ```cpp
-virtual void OnCacheFileCreated (CACHE::FILE* pFile) { (void)pFile; }
-virtual void OnCacheFileChanged (CACHE::FILE* pFile) { (void)pFile; }
-virtual void OnCacheFileDeleted (CACHE::FILE* pFile) { (void)pFile; }
+virtual void OnNetworkFileCreated (NETWORK::FILE* pFile) { (void)pFile; }
+virtual void OnNetworkFileChanged (NETWORK::FILE* pFile) { (void)pFile; }
+virtual void OnNetworkFileDeleted (NETWORK::FILE* pFile) { (void)pFile; }
 ```
 
-- **OnCacheFileCreated** — fired when `Request()` creates a new FILE handle. Artemis adds a new row to the inspector table.
-- **OnCacheFileChanged** — fired when a fetch completes (success or failure). Artemis updates the existing row (status, size, duration, etc.).
-- **OnCacheFileDeleted** — fired when a FILE is removed from the history list (via `Clear()` + `Release()`, or bulk `Clear()`). Artemis removes the corresponding row. The FILE pointer is valid for the duration of the callback but will be deleted immediately after.
+- **OnNetworkFileCreated** — fired when `Request()` creates a new FILE handle. Artemis adds a new row to the inspector table.
+- **OnNetworkFileChanged** — fired when a fetch completes (success or failure). Artemis updates the existing row (status, size, duration, etc.).
+- **OnNetworkFileDeleted** — fired when a FILE is removed from the history list (via `Clear()` + `Release()`, or bulk `Clear()`). Artemis removes the corresponding row. The FILE pointer is valid for the duration of the callback but will be deleted immediately after.
 
-The MANAGER routes these through `SNEEZE::NotifyCacheFileCreated()`, `SNEEZE::NotifyCacheFileChanged()`, and `SNEEZE::NotifyCacheFileDeleted()`. Notifications fire under `m_mutex` (a `recursive_mutex`), which allows listeners to safely call back into MANAGER (e.g., `Request()` or `Release()` from a callback).
+The NETWORK routes these through `SNEEZE::OnNetworkFileCreated()`, `SNEEZE::OnNetworkFileChanged()`, and `SNEEZE::OnNetworkFileDeleted()`. Notifications fire under `m_mutex` (a `recursive_mutex`), which allows listeners to safely call back into NETWORK (e.g., `Request()` or `Release()` from a callback).
 
 ### Inspector Column Mapping
 
@@ -430,8 +427,8 @@ The MANAGER routes these through `SNEEZE::NotifyCacheFileCreated()`, `SNEEZE::No
 If multiple callers request the same URL before the first fetch completes, they share a single META. Each caller gets their own FILE handle with their own IFILE listener, and all listeners are notified when the fetch resolves.
 
 ```cpp
-FILE* pA = pCache->Request (&listenerA, pName, url);
-FILE* pB = pCache->Request (&listenerB, pName, url);
+NETWORK::FILE* pA = pNetwork->Request (&listenerA, pName, url);
+NETWORK::FILE* pB = pNetwork->Request (&listenerB, pName, url);
 // pA and pB wrap the same META; both listeners fire on completion.
 
 pA->Release ();
@@ -464,7 +461,7 @@ The disk key is a truncated SHA-1 hex digest of the URL (24 hex characters). The
 ### Directory Structure
 
 ```
-<AppDataPath>/Cache/
+<SessionPath>/Cache/
 ├── rules.json                              <-- staleness rules + nNextMetaIx
 ├── a1/                                     <-- fan-out directory (first 2 chars of disk key)
 │   ├── b2c3d4e5f6a7b8c9d0e1.data          <-- cached payload
@@ -546,7 +543,7 @@ Loading uses `file >> jDoc` inside a `try/catch` block. A corrupt `.meta` is log
 
 ### META Eviction
 
-METAs are actively evicted from `m_mapMetas` when their last FILE handle calls `Release()`. In `MANAGER::Release()`, when `pMeta->GetFileCount() == 0`:
+METAs are actively evicted from `m_mapMetas` when their last FILE handle calls `Release()`. In `NETWORK::Release()`, when `pMeta->GetFileCount() == 0`:
 
 - If the META has a pending reset flag: `ResetMeta()` deletes disk files and resets state, then the META is erased from the map.
 - If the META is READY: `SaveMeta()` persists the sidecar, then the META is erased from the map.
@@ -569,15 +566,15 @@ Background fetches run on dedicated `std::thread` instances, capped at 16 concur
 
 Each thread slot uses a `FETCH_SLOT` struct with an `std::atomic<bool> bDone` flag. Before dispatching a new fetch, completed slots are swept (joined and freed), making room for new work.
 
-`FetchWriteCallback` and `FetchHeaderCallback` are static methods on MANAGER (not free functions). `GetEvpMd` remains a file-local static in `Manager.cpp`. `NowIso8601` is a private static method on META.
+`FetchWriteCallback` and `FetchHeaderCallback` are static methods on NETWORK (not free functions). `GetEvpMd` remains a file-local static in `Network.cpp`. `NowIso8601` is a private static method on META.
 
 ### Race Condition Mitigations
 
 Three specific race conditions were identified and addressed:
 
-1. **`META::m_bState` is `std::atomic<STATE>`** — allows safe reads from any thread without holding the MANAGER lock. State transitions still happen under `m_mutex` for consistency with the rest of the META fields.
+1. **`META::m_bState` is `std::atomic<STATE>`** — allows safe reads from any thread without holding the NETWORK lock. State transitions still happen under `m_mutex` for consistency with the rest of the META fields.
 
-2. **`m_mutex` is a `recursive_mutex`** — IFILE notifications and ISNEEZE callbacks fire under the lock. The recursive mutex allows listeners to safely call back into MANAGER (e.g., calling `Request()` or `Release()` from a callback) without deadlocking.
+2. **`m_mutex` is a `recursive_mutex`** — IFILE notifications and ISNEEZE callbacks fire under the lock. The recursive mutex allows listeners to safely call back into NETWORK (e.g., calling `Request()` or `Release()` from a callback) without deadlocking.
 
 3. **`.meta` files are written only at eviction/shutdown** — sidecar files are saved when the last FILE handle releases (evicting the META from memory) or during `Shutdown()`. No concurrent fetch activity exists at shutdown (all threads are joined first), and eviction writes happen under `m_mutex`.
 
@@ -604,13 +601,13 @@ The current model creates one `std::thread` per active fetch. While capped at 16
 - Boost.Asio (C++ async I/O): https://www.boost.org/doc/libs/release/libs/asio/
 
 **Implementation notes:**
-- The `FETCH_SLOT` / `m_apFetchSlots` / `m_aFetchQueue` infrastructure can be replaced wholesale — the rest of the MANAGER API is unchanged.
+- The `FETCH_SLOT` / `m_apFetchSlots` / `m_aFetchQueue` infrastructure can be replaced wholesale — the rest of the NETWORK API is unchanged.
 - `FetchMeta()` would be refactored: the curl setup portion would prepare an easy handle and submit it to a worker, and the completion logic would run as a callback when the multi handle reports completion.
-- The `FETCH_CONTEXT` struct (`MANAGER::FETCH_CONTEXT`) and write/header callbacks (static methods on MANAGER) remain unchanged — they're already compatible with both easy and multi modes.
+- The `FETCH_CONTEXT` struct (`NETWORK::FETCH_CONTEXT`) and write/header callbacks (static methods on NETWORK) remain unchanged — they're already compatible with both easy and multi modes.
 
 ## Shutdown
 
-The MANAGER's `Shutdown()` method:
+The NETWORK's `Shutdown()` method:
 
 1. Sets the atomic shutdown flag (cancels in-flight fetches at next check)
 2. Joins all fetch threads and drains the fetch queue
@@ -631,11 +628,11 @@ IDLE -> FETCHING -> VALIDATING -> READY
 
 ## Test Suite
 
-The `CacheTest` suite (`SneezeTest --cache`) validates:
+The `NetworkTest` suite (`SneezeTest --network`) validates:
 
 | #  | Test                        | What it proves                                          |
 |----|-----------------------------|---------------------------------------------------------|
-| 1  | Manager initialization      | Cache path creation, rules loading                      |
+| 1  | Network initialization      | Cache path creation, rules loading                      |
 | 2  | Unhashed fetch              | Unhashed file fetched, stored, readable, persisted      |
 | 3  | Deduplication               | Same URL shares META, both listeners notified           |
 | 4  | Hash-verified fetch         | SRI hash computed, verified, persistent                 |
@@ -647,7 +644,7 @@ The `CacheTest` suite (`SneezeTest --cache`) validates:
 | 10 | HTTP headers                | Response headers captured on META                       |
 | 11 | FILE handle lifecycle       | Allocation, access, release without crash               |
 | 12 | History and nFileIx         | History accumulates, nFileIx is monotonic, Release keeps|
-| 13 | Notifications               | OnCacheFileCreated and OnCacheFileChanged fire           |
+| 13 | Notifications               | OnNetworkFileCreated and OnNetworkFileChanged fire       |
 | 14 | Served-from-cache           | Second request for same URL detects cache hit           |
 | 15 | Failed fetch HTTP status    | 404 response records correct HTTP status code           |
 | 16 | Clear flag                  | Clear immediately removes FILE from history             |
@@ -655,10 +652,9 @@ The `CacheTest` suite (`SneezeTest --cache`) validates:
 | 18 | Reset flag toggle           | Reset(true) then Reset(false) preserves meta            |
 | 19 | Deferred reset              | Reset deferred until last handle releases               |
 | 20 | Clear                       | Released FILEs removed, in-use FILEs survive            |
-| 21 | Reset (all)                 | Metas destroyed, disk files removed, triggers re-fetch  |
+| 21 | OnNetworkFileDeleted        | Notification fires immediately on Clear                 |
 | 22 | Staleness rules             | Rules mark metas stale, trigger re-fetch on request     |
 | 23 | Request with bFetch=false   | No-fetch request returns null for uncached URL          |
-| —  | OnCacheFileDeleted          | Notification fires immediately on Clear                 |
 
 ## Deferred Items
 
@@ -688,7 +684,7 @@ The eviction check should run on `Initialize()` and periodically (e.g. after eac
 
 No automatic retry on fetch failure. If a fetch fails (network error, timeout, non-2xx status), the meta transitions to FAILED and the caller is notified. The caller must explicitly re-request the URL to retry.
 
-A future enhancement could add configurable retry with exponential backoff (e.g. 3 retries, 1s/2s/4s delays) as a MANAGER option.
+A future enhancement could add configurable retry with exponential backoff (e.g. 3 retries, 1s/2s/4s delays) as a NETWORK option.
 
 ### Conditional Requests (ETag / If-Modified-Since)
 

@@ -12,20 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Meta.h"
-#include "File.h"
+#include "Network.h"
 #include <fstream>
 #include <chrono>
 #include <ctime>
 #include <cstdio>
 
-namespace SNEEZE { namespace CACHE {
+namespace SNEEZE {
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-std::string META::NowIso8601 ()
+std::string NETWORK::META::NowIso8601 ()
 {
    auto tpNow  = std::chrono::system_clock::now ();
    auto tmTime = std::chrono::system_clock::to_time_t (tpNow);
@@ -46,8 +45,8 @@ std::string META::NowIso8601 ()
 // META
 // ---------------------------------------------------------------------------
 
-META::META (MANAGER* pManager, const std::string& sUrl, const std::string& sHash) :
-   m_pManager         (pManager),
+NETWORK::META::META (NETWORK* pNetwork, const std::string& sUrl, const std::string& sHash) :
+   m_pNetwork         (pNetwork),
    m_sUrl             (sUrl),
    m_sHash            (sHash),
    m_bState           (STATE_IDLE),
@@ -65,12 +64,12 @@ META::META (MANAGER* pManager, const std::string& sUrl, const std::string& sHash
    m_sLastAccessedAt = m_sCreatedAt;
 }
 
-STATE META::GetState () const
+NETWORK::STATE NETWORK::META::GetState () const
 {
    return m_bState.load ();
 }
 
-std::string META::GetHeader (const std::string& sName) const
+std::string NETWORK::META::GetHeader (const std::string& sName) const
 {
    auto it = m_mapHeaders.find (sName);
    std::string sResult;
@@ -79,23 +78,23 @@ std::string META::GetHeader (const std::string& sName) const
    return sResult;
 }
 
-void META::SetHeaders (const std::unordered_map<std::string, std::string>& mapHeaders)
+void NETWORK::META::SetHeaders (const std::unordered_map<std::string, std::string>& mapHeaders)
 {
    m_mapHeaders = mapHeaders;
 }
 
-void META::TouchAccess ()
+void NETWORK::META::TouchAccess ()
 {
    m_sLastAccessedAt = NowIso8601 ();
    m_nAccessCount++;
 }
 
-void META::AttachFile (FILE* pFile)
+void NETWORK::META::AttachFile (FILE* pFile)
 {
    m_apFiles.push_back (pFile);
 }
 
-void META::DetachFile (FILE* pFile)
+void NETWORK::META::DetachFile (FILE* pFile)
 {
    for (auto it = m_apFiles.begin (); it != m_apFiles.end (); ++it)
    {
@@ -111,29 +110,29 @@ void META::DetachFile (FILE* pFile)
 // State transitions
 // ---------------------------------------------------------------------------
 
-void META::SetFetching ()
+void NETWORK::META::SetFetching ()
 {
    m_bState.store (STATE_FETCHING);
 }
 
-void META::SetValidating ()
+void NETWORK::META::SetValidating ()
 {
    m_bState.store (STATE_VALIDATING);
 }
 
-void META::Complete (const std::string& sDiskPath, uint64_t nSizeBytes)
+void NETWORK::META::Complete (const std::string& sDiskPath, uint64_t nSizeBytes)
 {
    m_sDiskPath  = sDiskPath;
    m_nSizeBytes = nSizeBytes;
    m_bState.store (STATE_READY);
 }
 
-void META::Fail ()
+void NETWORK::META::Fail ()
 {
    m_bState.store (STATE_FAILED);
 }
 
-void META::ResetState ()
+void NETWORK::META::ResetState ()
 {
    m_bState.store (STATE_IDLE);
    m_sDiskPath.clear ();
@@ -149,7 +148,7 @@ void META::ResetState ()
    m_mapHeaders.clear ();
 }
 
-std::vector<FILE*> META::CollectFiles () const
+std::vector<NETWORK::FILE*> NETWORK::META::CollectFiles () const
 {
    return m_apFiles;
 }
@@ -158,7 +157,7 @@ std::vector<FILE*> META::CollectFiles () const
 // Data access
 // ---------------------------------------------------------------------------
 
-std::vector<uint8_t> META::ReadData () const
+std::vector<uint8_t> NETWORK::META::ReadData () const
 {
    std::vector<uint8_t> aData;
 
@@ -180,4 +179,4 @@ std::vector<uint8_t> META::ReadData () const
    return aData;
 }
 
-}} // namespace SNEEZE::CACHE
+} // namespace SNEEZE
