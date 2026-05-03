@@ -27,6 +27,7 @@
 #include "astro/RMCObject.h"
 #include "astro/AstroService.h"
 #include "som/Fabric.h"
+#include "som/Scene.h"
 #include "som/Node.h"
 #include "som/MapObject.h"
 #include "cache/Manager.h"
@@ -105,6 +106,7 @@ SNEEZE::SNEEZE (ISNEEZE* pHost) :
    m_pPrimaryAttachNode     (nullptr),
    m_pPrimaryFabric         (nullptr),
    m_pPrimaryFabricRootNode (nullptr),
+   m_pScene                 (nullptr),
    m_pAstroService          (nullptr),
    m_pCache                 (nullptr),
    m_pStorage               (nullptr),
@@ -147,19 +149,18 @@ bool SNEEZE::Initialize ()
                   // root fabric -> root fabric root node -> primary attach node
                   //    -> primary fabric -> primary fabric root node (solar system)
 
-                  m_pRootFabric         = new som::FABRIC ();
-                  m_pRootFabricRootNode = new som::NODE ();
-                  m_pRootFabricRootNode->SetFabric (m_pRootFabric);
+                  m_pScene = new som::SCENE (this);
+
+                  m_pRootFabric         = new som::FABRIC (m_pScene);
+                  m_pRootFabricRootNode = new som::NODE (m_pRootFabric);
                   m_pRootFabric->SetRootNode (m_pRootFabricRootNode);
 
-                  m_pPrimaryAttachNode = new som::NODE ();
-                  m_pPrimaryAttachNode->SetFabric (m_pRootFabric);
+                  m_pPrimaryAttachNode = new som::NODE (m_pRootFabric);
                   m_pPrimaryAttachNode->SetPrimary (true);
                   m_pRootFabricRootNode->AddChild (m_pPrimaryAttachNode);
 
-                  m_pPrimaryFabric         = new som::FABRIC ();
-                  m_pPrimaryFabricRootNode = new som::NODE ();
-                  m_pPrimaryFabricRootNode->SetFabric (m_pPrimaryFabric);
+                  m_pPrimaryFabric         = new som::FABRIC (m_pScene);
+                  m_pPrimaryFabricRootNode = new som::NODE (m_pPrimaryFabric);
                   m_pPrimaryFabric->SetRootNode (m_pPrimaryFabricRootNode);
                   m_pPrimaryFabric->SetParent (m_pRootFabric);
                   m_pPrimaryFabric->SetAttachingNode (m_pPrimaryAttachNode);
@@ -314,14 +315,7 @@ void SNEEZE::Shutdown ()
       m_pStorage = nullptr;
    }
 
-   if (m_pCache)
-   {
-      m_pCache->Shutdown ();
-      delete m_pCache;
-      m_pCache = nullptr;
-   }
-
-   // --- Destroy SOM ---
+   // --- Destroy SOM (before cache, because node destructors release cache files) ---
 
    if (m_pAstroService)
    {
@@ -344,6 +338,18 @@ void SNEEZE::Shutdown ()
 
    delete m_pRootFabric;
    m_pRootFabric = nullptr;
+
+   delete m_pScene;
+   m_pScene = nullptr;
+
+   // --- Destroy cache (after SOM) ---
+
+   if (m_pCache)
+   {
+      m_pCache->Shutdown ();
+      delete m_pCache;
+      m_pCache = nullptr;
+   }
 
    s_pUiContext.Shutdown ();
    s_pHttpClient.Shutdown ();

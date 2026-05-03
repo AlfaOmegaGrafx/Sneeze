@@ -14,11 +14,8 @@
 
 #include "AstroService.h"
 #include "core/Sneeze.h"
-#include "cache/Manager.h"
-#include "cache/File.h"
 #include "RMCObject.h"
 #include "Orbit.h"
-#include "stb/stb_image.h"
 
 namespace SNEEZE { namespace astro {
 
@@ -26,52 +23,10 @@ namespace SNEEZE { namespace astro {
 // CELESTIAL_MAP_OBJECT
 // ---------------------------------------------------------------------------
 
-CELESTIAL_MAP_OBJECT::CELESTIAL_MAP_OBJECT (CORE::SNEEZE* pSneeze) :
+CELESTIAL_MAP_OBJECT::CELESTIAL_MAP_OBJECT () :
    m_pBody      (nullptr),
-   m_pOrbit     (nullptr),
-   m_pCacheFile (nullptr),
-   m_pSneeze    (pSneeze)
+   m_pOrbit     (nullptr)
 {
-}
-
-void CELESTIAL_MAP_OBJECT::OnFileReady (CACHE::FILE* pFile)
-{
-   std::vector<uint8_t> aData = pFile->ReadData ();
-   if (aData.empty ())
-      return;
-
-   int nW = 0, nH = 0, nChannels = 0;
-   unsigned char* pPixels = stbi_load_from_memory (
-      aData.data (),
-      static_cast<int> (aData.size ()),
-      &nW, &nH, &nChannels, 4);
-
-   if (!pPixels)
-   {
-      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "ASTRO_SERVICE",
-         "Failed to decode texture: " + pFile->GetUrl ());
-      return;
-   }
-
-   {
-      std::lock_guard<std::mutex> lock (m_textureMutex);
-      m_aTexturePixels.assign (pPixels, pPixels + nW * nH * 4);
-      m_nTextureWidth    = nW;
-      m_nTextureHeight   = nH;
-      m_nTextureChannels = 4;
-   }
-   m_bTextureReady.store (true);
-   stbi_image_free (pPixels);
-
-   m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Trace, "ASTRO_SERVICE",
-      "Loaded texture " + pFile->GetUrl () +
-      " (" + std::to_string (nW) + "x" + std::to_string (nH) + ")");
-}
-
-void CELESTIAL_MAP_OBJECT::OnFileFailed (CACHE::FILE* pFile)
-{
-   m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "ASTRO_SERVICE",
-      "Failed to fetch texture: " + pFile->GetUrl ());
 }
 
 // ---------------------------------------------------------------------------
@@ -105,13 +60,11 @@ bool ASTRO_SERVICE::Initialize (SNEEZE::som::FABRIC* pPrimaryFabric)
 
    SNEEZE::som::NODE* pRoot = m_pFabric->GetRootNode ();
 
-   CACHE::MANAGER* pCache = m_pSneeze->GetCache ();
-
    // --- Sun node (no orbit, sits at origin) ---
    {
       RMCOBJECT* pSun = RMCOBJECT::Find ("sun");
 
-      auto* pMapObj = new CELESTIAL_MAP_OBJECT (m_pSneeze);
+      auto* pMapObj = new CELESTIAL_MAP_OBJECT ();
       pMapObj->m_dPosX       = 0.0;
       pMapObj->m_dPosY       = 0.0;
       pMapObj->m_dPosZ       = 0.0;
@@ -121,13 +74,9 @@ bool ASTRO_SERVICE::Initialize (SNEEZE::som::FABRIC* pPrimaryFabric)
       pMapObj->m_pOrbit      = nullptr;
       pMapObj->m_sTextureUrl = pSun ? pSun->sTexture : "";
 
-      auto* pNode = new SNEEZE::som::NODE ();
-      pNode->SetFabric (m_pFabric);
+      auto* pNode = new SNEEZE::som::NODE (m_pFabric);
       pNode->SetMapObject (pMapObj);
       pRoot->AddChild (pNode);
-
-      if (!pMapObj->m_sTextureUrl.empty ()  &&  pCache)
-         pMapObj->m_pCacheFile = pCache->Request (pMapObj, "Solar System", pMapObj->m_sTextureUrl);
 
       m_apNodes.push_back (pNode);
       m_apMapObjects.push_back (pMapObj);
@@ -164,20 +113,16 @@ bool ASTRO_SERVICE::Initialize (SNEEZE::som::FABRIC* pPrimaryFabric)
       if (pChildBody  &&  !pChildBody->sTexture.empty ())
          sTexture = pChildBody->sTexture;
 
-      auto* pMapObj = new CELESTIAL_MAP_OBJECT (m_pSneeze);
+      auto* pMapObj = new CELESTIAL_MAP_OBJECT ();
       pMapObj->m_dRadius     = dRadius;
       pMapObj->m_nColor      = nColor;
       pMapObj->m_pBody       = pBody;
       pMapObj->m_pOrbit      = pBody->pOrbit.get ();
       pMapObj->m_sTextureUrl = sTexture;
 
-      auto* pNode = new SNEEZE::som::NODE ();
-      pNode->SetFabric (m_pFabric);
+      auto* pNode = new SNEEZE::som::NODE (m_pFabric);
       pNode->SetMapObject (pMapObj);
       pRoot->AddChild (pNode);
-
-      if (!pMapObj->m_sTextureUrl.empty ()  &&  pCache)
-         pMapObj->m_pCacheFile = pCache->Request (pMapObj, "Solar System", pMapObj->m_sTextureUrl);
 
       m_apNodes.push_back (pNode);
       m_apMapObjects.push_back (pMapObj);
@@ -191,12 +136,6 @@ bool ASTRO_SERVICE::Initialize (SNEEZE::som::FABRIC* pPrimaryFabric)
 
 void ASTRO_SERVICE::Shutdown ()
 {
-   for (auto* pObj : m_apMapObjects)
-   {
-      if (pObj->m_pCacheFile)
-         pObj->m_pCacheFile->Release ();
-   }
-
    for (auto* pNode : m_apNodes)
       delete pNode;
    m_apNodes.clear ();

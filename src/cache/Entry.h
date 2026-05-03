@@ -53,11 +53,14 @@ public:
    double             GetFetchStartTime () const   { return m_dFetchStartTime; }
    double             GetFetchEndTime () const     { return m_dFetchEndTime; }
    double             GetFetchDuration () const    { return m_dFetchEndTime - m_dFetchStartTime; }
+   double             GetFetchQueuedTime () const  { return m_dFetchQueuedTime; }
+   double             GetQueueDuration () const    { return m_dFetchStartTime - m_dFetchQueuedTime; }
    bool               IsServedFromCache () const   { return m_bServedFromCache; }
 
    void SetHttpStatus (long nStatus)               { m_nHttpStatus = nStatus; }
    void SetFetchStartTime (double dTime)           { m_dFetchStartTime = dTime; }
    void SetFetchEndTime (double dTime)             { m_dFetchEndTime = dTime; }
+   void SetFetchQueuedTime (double dTime)          { m_dFetchQueuedTime = dTime; }
    void SetServedFromCache (bool bServed)           { m_bServedFromCache = bServed; }
 
    const std::unordered_map<std::string, std::string>& GetHeaders () const { return m_mapHeaders; }
@@ -67,12 +70,14 @@ public:
    std::string GetCreatedTime ()    const { return m_sCreatedAt; }
    std::string GetLastAccessTime () const { return m_sLastAccessedAt; }
    uint32_t    GetAccessCount ()    const { return m_nAccessCount; }
+   uint32_t    GetEntryIx ()        const { return m_nEntryIx; }
 
    void SetDiskPath (const std::string& sPath) { m_sDiskPath = sPath; }
    void SetHash (const std::string& sHash) { m_sHash = sHash; }
    void SetHeaders (const std::unordered_map<std::string, std::string>& mapHeaders);
    void SetSizeBytes (uint64_t nBytes) { m_nSizeBytes = nBytes; }
    void SetCreatedTime (const std::string& sTime) { m_sCreatedAt = sTime; }
+   void SetEntryIx (uint32_t nEntryIx) { m_nEntryIx = nEntryIx; }
    void TouchAccess ();
 
    void AttachFile (FILE* pFile);
@@ -109,8 +114,10 @@ private:
    std::string              m_sCreatedAt;
    std::string              m_sLastAccessedAt;
    uint32_t                 m_nAccessCount;
+   uint32_t                 m_nEntryIx;
 
    long                     m_nHttpStatus;
+   double                   m_dFetchQueuedTime;
    double                   m_dFetchStartTime;
    double                   m_dFetchEndTime;
    bool                     m_bServedFromCache;

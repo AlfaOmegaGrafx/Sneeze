@@ -22,7 +22,7 @@
 #include <string>
 #include <cstdint>
 
-namespace SNEEZE { namespace som { class FABRIC; class NODE; }}
+namespace SNEEZE { namespace som { class FABRIC; class NODE; class SCENE; }}
 namespace SNEEZE { namespace astro { class ASTRO_SERVICE; }}
 namespace SNEEZE { namespace CACHE { class MANAGER; class FILE; }}
 namespace SNEEZE { namespace storage { class STORAGE_SYSTEM; }}
@@ -148,7 +148,7 @@ public:
 
    // --- Subsystems ---
 
-   CACHE::MANAGER*          GetCache () const { return m_pCache; }
+   CACHE::MANAGER*          Cache () const { return m_pCache; }
    storage::STORAGE_SYSTEM* GetStorage () const { return m_pStorage; }
    persona::PERSONA*        GetPersona () const { return m_pPersona; }
    net::HTTP_CLIENT*        GetHttpClient () const;
@@ -201,6 +201,7 @@ private:
    som::NODE*             m_pPrimaryAttachNode;
    som::FABRIC*           m_pPrimaryFabric;
    som::NODE*             m_pPrimaryFabricRootNode;
+   som::SCENE*            m_pScene;
    astro::ASTRO_SERVICE*  m_pAstroService;
 
    // Subsystems

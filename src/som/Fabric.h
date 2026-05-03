@@ -21,6 +21,7 @@
 namespace SNEEZE { namespace som {
 
 class NODE;
+class SCENE;
 
 // ---------------------------------------------------------------------------
 // SOM::FABRIC — represents a spatial fabric's branch in the scene graph.
@@ -34,8 +35,12 @@ class NODE;
 class FABRIC
 {
 public:
-   FABRIC ();
+   explicit FABRIC (SCENE* pScene);
    ~FABRIC ();
+
+   // --- Scene (owner — immutable after construction) ---
+
+   SCENE*  Scene () const { return m_pScene; }
 
    // --- Fabric hierarchy ---
 
@@ -77,6 +82,7 @@ private:
 
    NODE*                 m_pRootNode;
    NODE*                 m_pAttachingNode;
+   SCENE*                m_pScene;
    void*                 m_pOwner;
 
    bool                  m_bPrivate;

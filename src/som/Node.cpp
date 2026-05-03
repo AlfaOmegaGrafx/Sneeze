@@ -14,23 +14,31 @@
 
 #include "Node.h"
 #include "Fabric.h"
+#include "Scene.h"
+#include "MapObject.h"
+#include "core/Sneeze.h"
+#include "cache/Manager.h"
+#include "cache/File.h"
+#include "stb/stb_image.h"
 #include <algorithm>
 
 namespace SNEEZE { namespace som {
 
-NODE::NODE ()
+NODE::NODE (FABRIC* pFabric)
    : m_twObjectIx (0)
    , m_pParent (nullptr)
-   , m_pFabric (nullptr)
+   , m_pFabric (pFabric)
    , m_pMapObject (nullptr)
    , m_pAttachedFabric (nullptr)
    , m_bPrivate (false)
    , m_bPrimary (false)
+   , m_pFile (nullptr)
 {
 }
 
 NODE::~NODE ()
 {
+   ReleaseTexture ();
 }
 
 // ---------------------------------------------------------------------------
@@ -109,6 +117,89 @@ void NODE::RemoveChild (NODE* pChild)
       *it = m_apChildren.back ();
       m_apChildren.pop_back ();
    }
+}
+
+// ---------------------------------------------------------------------------
+// SetMapObject — assigns the map object and initiates a texture fetch if the
+// object has a texture URL and the node can reach the cache.
+// ---------------------------------------------------------------------------
+
+void NODE::SetMapObject (MAP_OBJECT* pMapObject)
+{
+   ReleaseTexture ();
+   m_pMapObject = pMapObject;
+   RequestTexture ();
+}
+
+// ---------------------------------------------------------------------------
+// RequestTexture — if the map object has a texture URL, request it from the
+// cache via NODE -> FABRIC -> SCENE -> SNEEZE -> Cache().
+// ---------------------------------------------------------------------------
+
+void NODE::RequestTexture ()
+{
+   if (m_pMapObject  &&  !m_pMapObject->m_sTextureUrl.empty ())
+      m_pFile = m_pFabric->Scene ()->Sneeze ()->Cache ()->Request (this, "Solar System", m_pMapObject->m_sTextureUrl);
+}
+
+// ---------------------------------------------------------------------------
+// ReleaseTexture — release any outstanding cache file handle.
+// ---------------------------------------------------------------------------
+
+void NODE::ReleaseTexture ()
+{
+   if (m_pFile)
+   {
+      m_pFile->Release ();
+      m_pFile = nullptr;
+   }
+}
+
+// ---------------------------------------------------------------------------
+// OnFileReady — decode the fetched texture data and populate the map object.
+// ---------------------------------------------------------------------------
+
+void NODE::OnFileReady (CACHE::FILE* pFile)
+{
+   std::vector<uint8_t> aData;
+
+   if (m_pMapObject)
+      aData = pFile->ReadData ();
+
+   pFile->Release ();
+   m_pFile = nullptr;
+
+   if (!aData.empty ()  &&  m_pMapObject)
+   {
+      int nW = 0, nH = 0, nChannels = 0;
+      unsigned char* pPixels = stbi_load_from_memory (
+         aData.data (),
+         static_cast<int> (aData.size ()),
+         &nW, &nH, &nChannels, 4);
+
+      if (pPixels)
+      {
+         {
+            std::lock_guard<std::mutex> lock (m_pMapObject->m_textureMutex);
+            m_pMapObject->m_aTexturePixels.assign (pPixels, pPixels + nW * nH * 4);
+            m_pMapObject->m_nTextureWidth    = nW;
+            m_pMapObject->m_nTextureHeight   = nH;
+            m_pMapObject->m_nTextureChannels = 4;
+         }
+         m_pMapObject->m_bTextureReady.store (true);
+         stbi_image_free (pPixels);
+      }
+   }
+}
+
+// ---------------------------------------------------------------------------
+// OnFileFailed — release the cache file handle.
+// ---------------------------------------------------------------------------
+
+void NODE::OnFileFailed (CACHE::FILE* pFile)
+{
+   pFile->Release ();
+   m_pFile = nullptr;
 }
 
 }} // namespace SNEEZE::som

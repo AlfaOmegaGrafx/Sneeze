@@ -16,6 +16,7 @@
 #define SNEEZE_SOM_NODE_H
 
 #include "Types.h"
+#include "cache/Types.h"
 #include <atomic>
 #include <mutex>
 #include <vector>
@@ -39,13 +40,16 @@ class MAP_OBJECT;
 // A node may serve as an attachment point for a child FABRIC (downward
 // traversal). The attached fabric's root node is the logical subtree beneath
 // this node.
+//
+// When a MAP_OBJECT with a non-empty texture URL is assigned, the node
+// requests the texture from the cache and decodes it on completion.
 // ---------------------------------------------------------------------------
 
-class NODE
+class NODE : public CACHE::IFILE
 {
 public:
-   NODE ();
-   ~NODE ();
+   explicit NODE (FABRIC* pFabric);
+   ~NODE () override;
 
    // --- Identity ---
 
@@ -63,15 +67,14 @@ public:
    void    AddChild (NODE* pChild);
    void    RemoveChild (NODE* pChild);
 
-   // --- Fabric ownership ---
+   // --- Fabric (owner — immutable after construction) ---
 
-   FABRIC* GetFabric () const { return m_pFabric; }
-   void    SetFabric (FABRIC* pFabric) { m_pFabric = pFabric; }
+   FABRIC* Fabric () const { return m_pFabric; }
 
    // --- Map object ---
 
    MAP_OBJECT* GetMapObject () const { return m_pMapObject; }
-   void        SetMapObject (MAP_OBJECT* pMapObject) { m_pMapObject = pMapObject; }
+   void        SetMapObject (MAP_OBJECT* pMapObject);
 
    // --- Attached fabric (this node is an attachment point) ---
 
@@ -90,7 +93,15 @@ public:
 
    SEQLOCK& GetSeqlock () { return m_pSeqlock; }
 
+   // --- CACHE::IFILE ---
+
+   void OnFileReady  (CACHE::FILE* pFile) override;
+   void OnFileFailed (CACHE::FILE* pFile) override;
+
 private:
+   void RequestTexture ();
+   void ReleaseTexture ();
+
    uint32_t             m_twObjectIx;
 
    NODE*                m_pParent;
@@ -106,6 +117,8 @@ private:
    bool                 m_bPrimary;
 
    SEQLOCK              m_pSeqlock;
+
+   CACHE::FILE*         m_pFile;
 };
 
 }} // namespace SNEEZE::som

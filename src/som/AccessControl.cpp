@@ -36,7 +36,7 @@ bool CanRead (const NODE* pNode, const void* pRequestingOwner)
    if (!pNode)
       return false;
 
-   const FABRIC* pFabric = pNode->GetFabric ();
+   const FABRIC* pFabric = pNode->Fabric ();
    if (!pFabric)
       return true;
 
@@ -65,7 +65,7 @@ bool CanWrite (const NODE* pNode, const void* pRequestingOwner)
    if (!pNode)
       return false;
 
-   const FABRIC* pFabric = pNode->GetFabric ();
+   const FABRIC* pFabric = pNode->Fabric ();
    if (!pFabric)
       return false;
 

@@ -33,9 +33,17 @@ enum STATE
 enum REQUEST
 {
    REQUEST_CREATE = 0x01,
+   REQUEST_FETCH  = 0x02,
 };
 
-static const uint32_t kREQUEST_DEFAULT = REQUEST_CREATE;
+static const uint32_t kREQUEST_DEFAULT = REQUEST_CREATE | REQUEST_FETCH;
+
+enum DISKFILE
+{
+   DISKFILE_DATA = 0,
+   DISKFILE_TEMP = 1,
+   DISKFILE_META = 2,
+};
 
 class IFILE
 {

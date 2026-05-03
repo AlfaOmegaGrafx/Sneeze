@@ -476,6 +476,20 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 - **Updated `project.mdc`** — Fixed stale references to `REQUEST_FETCH`, `GetHistory()` (now `GetFiles()`). Added manifest-only-on-shutdown and `recursive_mutex` notes to MANAGER entry. Updated ENTRY (ResetState, pending-reset flag) and FILE (no null guards, SetPendingClear returns bool, sequence at construction) entries.
 - **Logged session.**
 
+### 2026-05-02 (Sat) — ~10:52 PM – 11:58 PM PDT
+**Dean Abramson**
+
+- **Removed all cache/pFile code from AstroService** — `AstroService.cpp` and `AstroService.h` no longer reference the cache, `CACHE::FILE`, `stb_image`, or `CORE::SNEEZE`. `CELESTIAL_MAP_OBJECT` has a default constructor with no parameters.
+- **Created `som::SCENE` class** — new root container for the SOM. Constructor takes `CORE::SNEEZE*` (owner, immutable), `Sneeze()` getter. Owned by SNEEZE, sits between FABRIC and SNEEZE in the parent chain.
+- **Refactored owner/parent pointers across SOM** — FABRIC constructor now takes `SCENE*` (removed default constructor and `SetScene()`), NODE constructor now takes `FABRIC*` (removed `SetFabric()`). Getters renamed: `GetFabric()` → `Fabric()`, `GetScene()` → `Scene()`, `GetSneeze()` → `Sneeze()`, `GetCache()` → `Cache()`. Pattern: owner pointers are constructor invariants with no setters and getters that drop "Get".
+- **NODE implements `CACHE::IFILE`** — `SetMapObject()` triggers automatic texture fetch via `m_pFabric->Scene()->Sneeze()->Cache()->Request()`. `OnFileReady()` decodes with stb_image, populates MAP_OBJECT texture fields, releases FILE immediately. `OnFileFailed()` releases FILE. Destructor releases any outstanding FILE handle.
+- **Fixed shutdown order** — SOM destroyed before cache in `SNEEZE::Shutdown()` so node destructors can release cache FILE handles.
+- **ENTRY eviction confirmed working** — `.meta` files appear immediately after texture fetch completes (not at app close). Second launch serves from cache.
+- **Updated coding standards** — Added concrete WRONG/RIGHT examples for: no early returns, no unnecessary line breaks, variable names mirror their class. Added two architectural rules: owner pointers are constructor invariants, never null-check owner pointers.
+- **Updated `Cache.md`** — comprehensive rewrite reflecting sidecar `.meta` files, `rules.json`, FILE snapshotting, ENTRY eviction, `FILE::Request()` reopen, `nFileIx`/`nEntryIx` naming, `m_dFetchQueuedTime`, `DISKFILE` enum, staleness rules.
+- **Updated `project.mdc`** — SCENE, FABRIC, NODE, ASTRO_SERVICE, CELESTIAL_MAP_OBJECT, MANAGER, ENTRY, FILE, SNEEZE class descriptions updated.
+- **Discovered standards-coding.mdc sync error** — coding standard additions (WRONG/RIGHT examples) were written only to `~/.cursor/rules/standards-coding.mdc`, not to the authoritative `E:\Dev\Cursor\standards-coding.mdc`. Fix handled in a separate Cursor project session.
+
 ### 2026-05-02 (Sat) — ~11:08 AM – 12:35 PM PDT
 **Dean Abramson**
 

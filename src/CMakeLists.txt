@@ -542,6 +542,7 @@ set (ASTRO_HEADERS
 set (SOM_SOURCES
    som/Node.cpp
    som/Fabric.cpp
+   som/Scene.cpp
    som/MapObject.cpp
    som/AccessControl.cpp
    som/Events.cpp
@@ -550,6 +551,7 @@ set (SOM_HEADERS
    som/Types.h
    som/Node.h
    som/Fabric.h
+   som/Scene.h
    som/MapObject.h
    som/AccessControl.h
    som/Events.h

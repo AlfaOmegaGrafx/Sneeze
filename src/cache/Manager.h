@@ -40,10 +40,15 @@ class STORE;
 //
 // Callers request files via Request(), which returns a FILE* handle. When
 // done, they must return it via Release(). All files are persisted on disk
-// across restarts. Files with a hash are additionally verified.
+// as sidecar pairs: {hash}.data (payload) + {hash}.meta (metadata JSON).
+// The filesystem is the index — no manifest file, no startup scan.
 //
-// All files are streamed to disk during fetch and renamed atomically on
-// completion. A manifest.json tracks persistent entries.
+// Entries are loaded lazily on first Request(). Only entries with active
+// FILE handles live in m_mapEntries. The .meta is flushed to disk when
+// the last active handle releases.
+//
+// Staleness rules (persisted in rules.json) control re-fetch policy.
+// A monotonic entry index counter (also in rules.json) tracks content versions.
 //
 // Background fetches are capped at 16 concurrent threads. Overflow requests
 // queue and are dispatched as threads complete.
@@ -52,6 +57,12 @@ class STORE;
 // cache eviction, retry policy, conditional requests, progress tracking.
 // See Cache.md for full design notes on each deferred item.
 // ---------------------------------------------------------------------------
+
+struct RULE
+{
+   std::string sContentType;
+   std::string sOlderThan;
+};
 
 class MANAGER
 {
@@ -66,8 +77,10 @@ public:
 
    FILE* Request (IFILE* pListener, const std::string& sStore, const std::string& sUrl);
    FILE* Request (IFILE* pListener, const std::string& sStore, const std::string& sUrl,
-                  const std::string& sHash, uint32_t bFlags = kREQUEST_DEFAULT);
+                  const std::string& sHash, uint32_t bFlags = kREQUEST_DEFAULT,
+                  uint32_t nEntryIx = 0);
    void  Release (FILE* pFile);
+   bool  ReopenFile (FILE* pFile);
    void  Clear   (FILE* pFile, bool b = true);
    void  Reset   (FILE* pFile, bool b = true);
 
@@ -83,6 +96,8 @@ public:
    void Reset ();
    void Enumerate (IENUM* pEnum);
 
+   void AddRule (const std::string& sContentType, const std::string& sOlderThan);
+
    // --- Network inspector ---
 
    const std::vector<FILE*>& GetFiles () const { return m_apFile; }
@@ -91,15 +106,18 @@ public:
 private:
    std::string GetCachePath () const;
    std::string ComputeDiskKey (const std::string& sUrl) const;
-   std::string DiskKeyToPath (const std::string& sDiskKey) const;
-   std::string DiskKeyToTmpPath (const std::string& sDiskKey) const;
+   std::string DiskKeyToPath (const std::string& sDiskKey, DISKFILE eType) const;
 
    bool ParseSriHash (const std::string& sSri, std::string& sAlgo, std::string& sDigest) const;
    std::string ComputeFileHash (const std::string& sFilePath, const std::string& sAlgo) const;
    std::string ComputeDataHash (const uint8_t* pData, size_t nLen, const std::string& sAlgo) const;
 
-   void LoadManifest ();
-   void SaveManifest ();
+   void SaveMeta (ENTRY* pEntry);
+   bool LoadMeta (const std::string& sDiskKey, const std::string& sUrl);
+
+   void LoadRules ();
+   void SaveRules ();
+   bool IsEntryStale (ENTRY* pEntry) const;
 
    void FetchEntry (ENTRY* pEntry);
    void SweepCompletedThreads ();
@@ -140,9 +158,13 @@ private:
    bool                      m_bCacheEnabled;
    bool                      m_bDisplayEnabled;
 
+   // Staleness rules + entry index counter
+   std::vector<RULE>         m_aRules;
+   uint32_t                  m_nNextEntryIx;
+
    // Network inspector
    std::vector<FILE*>        m_apFile;
-   uint32_t                  m_nNextSequence;
+   uint32_t                  m_nNextFileIx;
    std::chrono::steady_clock::time_point m_tpEpoch;
 };
 

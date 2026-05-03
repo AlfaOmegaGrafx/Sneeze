@@ -178,7 +178,7 @@ static void TestUnhashedFetch ()
 
       if (pFile)
       {
-         Check (pFile->GetSequence () > 0, "Sequence number is non-zero");
+         Check (pFile->GetFileIx () > 0, "File index is non-zero");
 
          bool bGotResult = listener.WaitFor (15000);
 
@@ -507,17 +507,17 @@ static void TestFailedFetch ()
 }
 
 // ---------------------------------------------------------------------------
-// Test 9: Manifest persistence (survive shutdown/reinit)
+// Test 9: Sidecar persistence (survive shutdown/reinit)
 // ---------------------------------------------------------------------------
 
-static void TestManifestPersistence ()
+static void TestSidecarPersistence ()
 {
-   std::printf ("\n[Test 9] Manifest persistence\n");
+   std::printf ("\n[Test 9] Sidecar persistence\n");
 
    std::string sUrl = "https://httpbin.org/base64/UGVyc2lzdGVuY2VUZXN0";
    std::string sSri;
 
-   // Phase 1: Fetch with hash, shutdown (saves manifest)
+   // Phase 1: Fetch with hash, shutdown (saves .meta sidecar)
    {
       SNEEZE::CACHE::MANAGER* pCache = new SNEEZE::CACHE::MANAGER (s_pSneeze);
       pCache->Initialize ();
@@ -539,13 +539,14 @@ static void TestManifestPersistence ()
          {
             listenerHash.WaitFor (15000);
             Check (listenerHash.Succeeded (), "Persistent entry created");
+            Check (pHash->GetEntryIx () > 0, "Entry index assigned on creation");
             pHash->Release ();
          }
       }
       else
       {
          std::printf ("    (Pre-fetch timed out — skipping)\n");
-         Check (true, "Manifest test did not crash (no internet)");
+         Check (true, "Sidecar test did not crash (no internet)");
          if (pPre) pPre->Release ();
          pCache->Shutdown ();
          delete pCache;
@@ -556,7 +557,7 @@ static void TestManifestPersistence ()
       delete pCache;
    }
 
-   // Phase 2: Reinitialize and check if the entry survived
+   // Phase 2: Reinitialize and check if the entry survived via .meta sidecar
    if (!sSri.empty ())
    {
       SNEEZE::CACHE::MANAGER* pCache2 = new SNEEZE::CACHE::MANAGER (s_pSneeze);
@@ -567,9 +568,10 @@ static void TestManifestPersistence ()
 
       if (pReload)
       {
-         Check (pReload->IsReady (), "Entry survived shutdown (loaded from manifest)");
+         Check (pReload->IsReady (), "Entry survived shutdown (loaded from .meta sidecar)");
          Check (pReload->IsHashed (), "Entry is still hashed");
          Check (pReload->GetHash () == sSri, "Hash matches after reload");
+         Check (pReload->GetEntryIx () > 0, "Entry index preserved across sessions");
 
          std::vector<uint8_t> aData = pReload->ReadData ();
          Check (!aData.empty (), "Data is readable after reload");
@@ -657,12 +659,12 @@ static void TestFileHandleLifecycle ()
 }
 
 // ---------------------------------------------------------------------------
-// Test 12: History list and sequence numbers
+// Test 12: History list and file indexes
 // ---------------------------------------------------------------------------
 
-static void TestHistoryAndSequence ()
+static void TestHistoryAndFileIx ()
 {
-   std::printf ("\n[Test 12] History list and sequence numbers\n");
+   std::printf ("\n[Test 12] History list and file indexes\n");
 
    SNEEZE::CACHE::MANAGER* pCache = new SNEEZE::CACHE::MANAGER (s_pSneeze);
    pCache->Initialize ();
@@ -679,8 +681,8 @@ static void TestHistoryAndSequence ()
 
    if (pFileA  &&  pFileB)
    {
-      Check (pFileA->GetSequence () < pFileB->GetSequence (),
-         "Sequence numbers are monotonically increasing");
+      Check (pFileA->GetFileIx () < pFileB->GetFileIx (),
+         "File indexes are monotonically increasing");
 
       auto& aHistory = pCache->GetFiles ();
       Check (aHistory.size () >= 2, "History contains at least 2 entries");
@@ -713,7 +715,7 @@ static void TestNotifications ()
 
    TEST_FILE_LISTENER listener;
    SNEEZE::CACHE::FILE* pFile = pCache->Request (
-      &listener, "TestStore", "https://httpbin.org/bytes/8");
+      &listener, "TestStore", "https://httpbin.org/bytes/8?test=notifications");
 
    Check (s_pTestListener->m_nCreatedCount > 0, "OnCacheFileCreated fired");
 
@@ -769,8 +771,8 @@ static void TestServedFromCache ()
          if (pSecond)
          {
             Check (pSecond->IsServedFromCache (), "Second fetch IS served from cache");
-            Check (pSecond->GetSequence () > pFirst->GetSequence (),
-               "Second sequence > first");
+            Check (pSecond->GetFileIx () > pFirst->GetFileIx (),
+               "Second file index > first");
             pSecond->Release ();
          }
       }
@@ -1046,6 +1048,89 @@ static void TestDeletedNotification ()
 }
 
 // ---------------------------------------------------------------------------
+// Test 22: Staleness rules
+// ---------------------------------------------------------------------------
+
+static void TestStalenessRules ()
+{
+   std::printf ("\n[Test 22] Staleness rules\n");
+
+   std::string sUrl = "https://httpbin.org/base64/U3RhbGVuZXNzVGVzdA==";
+
+   // Phase 1: Fetch a file and shut down
+   {
+      SNEEZE::CACHE::MANAGER* pCache = new SNEEZE::CACHE::MANAGER (s_pSneeze);
+      pCache->Initialize ();
+
+      TEST_FILE_LISTENER listener;
+      SNEEZE::CACHE::FILE* pFile = pCache->Request (&listener, "TestStore", sUrl);
+
+      if (pFile)
+      {
+         bool bGot = listener.WaitFor (15000);
+         if (!bGot  ||  !listener.Succeeded ())
+         {
+            std::printf ("    (Timed out — skipping)\n");
+            Check (true, "Staleness test did not crash (no internet)");
+            pFile->Release ();
+            pCache->Shutdown ();
+            delete pCache;
+            return;
+         }
+
+         Check (pFile->IsReady (), "File fetched successfully");
+         pFile->Release ();
+      }
+
+      pCache->Shutdown ();
+      delete pCache;
+   }
+
+   // Phase 2: Reinit with a staleness rule, verify re-fetch
+   {
+      SNEEZE::CACHE::MANAGER* pCache2 = new SNEEZE::CACHE::MANAGER (s_pSneeze);
+      pCache2->Initialize ();
+
+      pCache2->AddRule ("", "9999-12-31T23:59:59Z");
+
+      TEST_FILE_LISTENER listener2;
+      SNEEZE::CACHE::FILE* pFile2 = pCache2->Request (&listener2, "TestStore", sUrl);
+
+      if (pFile2)
+      {
+         Check (!pFile2->IsServedFromCache (), "Stale entry triggered re-fetch");
+         listener2.WaitFor (15000);
+         pFile2->Release ();
+      }
+
+      pCache2->Reset ();
+      pCache2->Shutdown ();
+      delete pCache2;
+   }
+}
+
+// ---------------------------------------------------------------------------
+// Test 23: Request with bFetch=false (no network)
+// ---------------------------------------------------------------------------
+
+static void TestNoFetchRequest ()
+{
+   std::printf ("\n[Test 23] Request with bFetch=false\n");
+
+   SNEEZE::CACHE::MANAGER* pCache = new SNEEZE::CACHE::MANAGER (s_pSneeze);
+   pCache->Initialize ();
+
+   SNEEZE::CACHE::FILE* pFile = pCache->Request (
+      nullptr, "TestStore", "https://this-url-does-not-exist-in-cache.invalid/none",
+      std::string (), SNEEZE::CACHE::REQUEST_CREATE);
+
+   Check (pFile == nullptr, "bFetch=false returns null for uncached URL");
+
+   pCache->Shutdown ();
+   delete pCache;
+}
+
+// ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
 
@@ -1055,6 +1140,10 @@ int RunCacheTests (int /*nArgc*/, char** /*aArgv*/)
 
    s_pTestListener = new CACHE_TEST_LISTENER ();
    s_pTestListener->sAppDataPath = (std::filesystem::temp_directory_path () / "SneezeTest").string ();
+
+   auto sCachePath = std::filesystem::path (s_pTestListener->sAppDataPath) / "Cache";
+   std::filesystem::remove_all (sCachePath);
+
    s_pSneeze = new SNEEZE::CORE::SNEEZE (s_pTestListener);
    curl_global_init (CURL_GLOBAL_DEFAULT);
 
@@ -1066,10 +1155,10 @@ int RunCacheTests (int /*nArgc*/, char** /*aArgv*/)
    TestReset ();
    TestResetFlag ();
    TestFailedFetch ();
-   TestManifestPersistence ();
+   TestSidecarPersistence ();
    TestHttpHeaders ();
    TestFileHandleLifecycle ();
-   TestHistoryAndSequence ();
+   TestHistoryAndFileIx ();
    TestNotifications ();
    TestServedFromCache ();
    TestFailedFetchHttpStatus ();
@@ -1078,6 +1167,8 @@ int RunCacheTests (int /*nArgc*/, char** /*aArgv*/)
    TestDeferredReset ();
    TestClear ();
    TestDeletedNotification ();
+   TestStalenessRules ();
+   TestNoFetchRequest ();
 
    curl_global_cleanup ();
 

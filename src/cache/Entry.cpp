@@ -53,7 +53,9 @@ ENTRY::ENTRY (MANAGER* pManager, const std::string& sUrl, const std::string& sHa
    m_bState           (STATE_IDLE),
    m_nSizeBytes       (0),
    m_nAccessCount     (0),
+   m_nEntryIx         (0),
    m_nHttpStatus      (0),
+   m_dFetchQueuedTime (0.0),
    m_dFetchStartTime  (0.0),
    m_dFetchEndTime    (0.0),
    m_bServedFromCache (false),
@@ -138,10 +140,12 @@ void ENTRY::ResetState ()
    m_sHash.clear ();
    m_nSizeBytes       = 0;
    m_nHttpStatus      = 0;
+   m_dFetchQueuedTime = 0.0;
    m_dFetchStartTime  = 0.0;
    m_dFetchEndTime    = 0.0;
    m_bServedFromCache = false;
    m_bPendingReset    = false;
+   m_nEntryIx         = 0;
    m_mapHeaders.clear ();
 }
 

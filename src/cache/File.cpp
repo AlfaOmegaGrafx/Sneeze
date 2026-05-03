@@ -19,16 +19,28 @@
 
 namespace SNEEZE { namespace CACHE {
 
-FILE::FILE (MANAGER* pManager, ENTRY* pEntry, STORE* pStore, IFILE* pListener, uint32_t nSequence) :
-   m_pManager      (pManager),
-   m_pEntry        (pEntry),
-   m_pStore        (pStore),
-   m_pListener     (pListener),
-   m_nSequence     (nSequence),
-   m_bPendingClear (false),
-   m_bReleased     (false),
-   m_bEnumeration  (false)
+const std::unordered_map<std::string, std::string> FILE::s_mapEmpty;
+
+FILE::FILE (MANAGER* pManager, ENTRY* pEntry, STORE* pStore, IFILE* pListener, uint32_t nFileIx) :
+   m_pManager         (pManager),
+   m_pEntry           (pEntry),
+   m_pStore           (pStore),
+   m_pListener        (pListener),
+   m_nFileIx          (nFileIx),
+   m_nEntryIx         (0),
+   m_bState           (STATE_IDLE),
+   m_nSizeBytes       (0),
+   m_nHttpStatus      (0),
+   m_dFetchQueuedTime (0.0),
+   m_dFetchStartTime  (0.0),
+   m_dFetchEndTime    (0.0),
+   m_bServedFromCache (false),
+   m_bPendingClear    (false),
+   m_bReleased        (false),
+   m_bEnumeration     (false)
 {
+   if (m_pEntry)
+      SnapshotEntry ();
 }
 
 FILE::~FILE ()
@@ -36,26 +48,39 @@ FILE::~FILE ()
 }
 
 // ---------------------------------------------------------------------------
-// State
+// Snapshot — copies display fields from the attached ENTRY
 // ---------------------------------------------------------------------------
 
-STATE FILE::GetState () const
+void FILE::SnapshotEntry ()
 {
-   return m_pEntry->GetState ();
+   if (!m_pEntry)
+      return;
+
+   m_sUrl             = m_pEntry->GetUrl ();
+   m_sHash            = m_pEntry->GetHash ();
+   m_nEntryIx         = m_pEntry->GetEntryIx ();
+   m_bState           = m_pEntry->GetState ();
+   m_sContentType     = m_pEntry->GetHeader ("content-type");
+   m_nSizeBytes       = m_pEntry->GetSizeBytes ();
+   m_nHttpStatus      = m_pEntry->GetHttpStatus ();
+   m_dFetchQueuedTime = m_pEntry->GetFetchQueuedTime ();
+   m_dFetchStartTime  = m_pEntry->GetFetchStartTime ();
+   m_dFetchEndTime    = m_pEntry->GetFetchEndTime ();
+   m_bServedFromCache = m_pEntry->IsServedFromCache ();
 }
 
-bool FILE::IsReady () const
+// ---------------------------------------------------------------------------
+// Actions
+// ---------------------------------------------------------------------------
+
+bool FILE::Request (IFILE* pListener)
 {
-   return GetState () == STATE_READY;
+   m_pListener = pListener;
+   return m_pManager->ReopenFile (this);
 }
 
 void FILE::Release ()
 {
-   // NOTE: If ENTRY pruning is ever added (removing entries from the map when
-   // file count drops to zero), it will invalidate the iterator inside
-   // MANAGER::Enumerate(). The enumeration flag prevents that path today,
-   // but any future pruning logic in MANAGER::Release() or ResetEntry()
-   // must account for active enumerations.
    if (!m_bEnumeration)
       m_pManager->Release (this);
 }
@@ -71,22 +96,56 @@ void FILE::Reset (bool b)
 }
 
 // ---------------------------------------------------------------------------
-// Identity
+// ENTRY-dependent accessors (require attached ENTRY)
 // ---------------------------------------------------------------------------
 
-std::string FILE::GetUrl () const
+std::vector<uint8_t> FILE::ReadData () const
 {
-   return m_pEntry->GetUrl ();
+   if (m_pEntry)
+      return m_pEntry->ReadData ();
+   return {};
 }
 
-std::string FILE::GetHash () const
+std::string FILE::GetHeader (const std::string& sName) const
 {
-   return m_pEntry->GetHash ();
+   if (m_pEntry)
+      return m_pEntry->GetHeader (sName);
+   return {};
 }
 
-bool FILE::IsHashed () const
+std::string FILE::GetDiskPath () const
 {
-   return m_pEntry->IsHashed ();
+   if (m_pEntry)
+      return m_pEntry->GetDiskPath ();
+   return {};
+}
+
+std::string FILE::GetCreatedTime () const
+{
+   if (m_pEntry)
+      return m_pEntry->GetCreatedTime ();
+   return {};
+}
+
+std::string FILE::GetLastAccessTime () const
+{
+   if (m_pEntry)
+      return m_pEntry->GetLastAccessTime ();
+   return {};
+}
+
+uint32_t FILE::GetAccessCount () const
+{
+   if (m_pEntry)
+      return m_pEntry->GetAccessCount ();
+   return 0;
+}
+
+const std::unordered_map<std::string, std::string>& FILE::GetHeaders () const
+{
+   if (m_pEntry)
+      return m_pEntry->GetHeaders ();
+   return s_mapEmpty;
 }
 
 std::string FILE::GetStoreName () const
@@ -95,88 +154,6 @@ std::string FILE::GetStoreName () const
    if (m_pStore)
       sResult = m_pStore->sName;
    return sResult;
-}
-
-// ---------------------------------------------------------------------------
-// Data access
-// ---------------------------------------------------------------------------
-
-std::vector<uint8_t> FILE::ReadData () const
-{
-   return m_pEntry->ReadData ();
-}
-
-// ---------------------------------------------------------------------------
-// Network inspector
-// ---------------------------------------------------------------------------
-
-long FILE::GetHttpStatus () const
-{
-   return m_pEntry->GetHttpStatus ();
-}
-
-double FILE::GetFetchStartTime () const
-{
-   return m_pEntry->GetFetchStartTime ();
-}
-
-double FILE::GetFetchEndTime () const
-{
-   return m_pEntry->GetFetchEndTime ();
-}
-
-double FILE::GetFetchDuration () const
-{
-   return m_pEntry->GetFetchDuration ();
-}
-
-bool FILE::IsServedFromCache () const
-{
-   return m_pEntry->IsServedFromCache ();
-}
-
-// ---------------------------------------------------------------------------
-// Metadata
-// ---------------------------------------------------------------------------
-
-std::string FILE::GetHeader (const std::string& sName) const
-{
-   return m_pEntry->GetHeader (sName);
-}
-
-std::string FILE::GetContentType () const
-{
-   return GetHeader ("content-type");
-}
-
-uint64_t FILE::GetSizeBytes () const
-{
-   return m_pEntry->GetSizeBytes ();
-}
-
-std::string FILE::GetDiskPath () const
-{
-   return m_pEntry->GetDiskPath ();
-}
-
-std::string FILE::GetCreatedTime () const
-{
-   return m_pEntry->GetCreatedTime ();
-}
-
-std::string FILE::GetLastAccessTime () const
-{
-   return m_pEntry->GetLastAccessTime ();
-}
-
-uint32_t FILE::GetAccessCount () const
-{
-   return m_pEntry->GetAccessCount ();
-}
-
-const std::unordered_map<std::string, std::string>& FILE::GetHeaders () const
-{
-   return m_pEntry->GetHeaders ();
 }
 
 }} // namespace SNEEZE::CACHE

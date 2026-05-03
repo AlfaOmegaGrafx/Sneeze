@@ -12,43 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Fabric.h"
-#include "Node.h"
-#include <algorithm>
+#include "Scene.h"
 
 namespace SNEEZE { namespace som {
 
-FABRIC::FABRIC (SCENE* pScene)
-   : m_pScene (pScene)
-   , m_pParent (nullptr)
-   , m_pRootNode (nullptr)
-   , m_pAttachingNode (nullptr)
-   , m_pOwner (nullptr)
-   , m_bPrivate (false)
+SCENE::SCENE (CORE::SNEEZE* pSneeze)
+   : m_pSneeze (pSneeze)
 {
 }
 
-FABRIC::~FABRIC ()
+SCENE::~SCENE ()
 {
-}
-
-void FABRIC::AddChildFabric (FABRIC* pChild)
-{
-   pChild->m_pParent = this;
-   m_apChildren.push_back (pChild);
-}
-
-void FABRIC::RemoveChildFabric (FABRIC* pChild)
-{
-   if (!pChild)
-      return;
-
-   auto it = std::find (m_apChildren.begin (), m_apChildren.end (), pChild);
-   if (it != m_apChildren.end ())
-   {
-      (*it)->m_pParent = nullptr;
-      m_apChildren.erase (it);
-   }
 }
 
 }} // namespace SNEEZE::som
