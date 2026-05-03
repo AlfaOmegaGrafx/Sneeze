@@ -13,21 +13,20 @@
 // limitations under the License.
 
 #include "File.h"
-#include "Entry.h"
+#include "Meta.h"
 #include "Manager.h"
-#include "Store.h"
 
 namespace SNEEZE { namespace CACHE {
 
 const std::unordered_map<std::string, std::string> FILE::s_mapEmpty;
 
-FILE::FILE (MANAGER* pManager, ENTRY* pEntry, STORE* pStore, IFILE* pListener, uint32_t nFileIx) :
+FILE::FILE (MANAGER* pManager, META* pMeta, std::shared_ptr<CONTAINER::NAME> pName, IFILE* pListener, uint32_t nFileIx) :
    m_pManager         (pManager),
-   m_pEntry           (pEntry),
-   m_pStore           (pStore),
+   m_pMeta            (pMeta),
+   m_pName            (std::move (pName)),
    m_pListener        (pListener),
    m_nFileIx          (nFileIx),
-   m_nEntryIx         (0),
+   m_nMetaIx          (0),
    m_bState           (STATE_IDLE),
    m_nSizeBytes       (0),
    m_nHttpStatus      (0),
@@ -39,8 +38,7 @@ FILE::FILE (MANAGER* pManager, ENTRY* pEntry, STORE* pStore, IFILE* pListener, u
    m_bReleased        (false),
    m_bEnumeration     (false)
 {
-   if (m_pEntry)
-      SnapshotEntry ();
+   SnapshotInitial ();
 }
 
 FILE::~FILE ()
@@ -48,25 +46,42 @@ FILE::~FILE ()
 }
 
 // ---------------------------------------------------------------------------
-// Snapshot — copies display fields from the attached ENTRY
+// Snapshot — copies display fields from the attached META
 // ---------------------------------------------------------------------------
 
-void FILE::SnapshotEntry ()
+void FILE::SnapshotInitial ()
 {
-   if (!m_pEntry)
-      return;
+   if (m_pMeta)
+   {
+      m_sUrl    = m_pMeta->GetUrl ();
+      m_nMetaIx = m_pMeta->GetMetaIx ();
+   }
+}
 
-   m_sUrl             = m_pEntry->GetUrl ();
-   m_sHash            = m_pEntry->GetHash ();
-   m_nEntryIx         = m_pEntry->GetEntryIx ();
-   m_bState           = m_pEntry->GetState ();
-   m_sContentType     = m_pEntry->GetHeader ("content-type");
-   m_nSizeBytes       = m_pEntry->GetSizeBytes ();
-   m_nHttpStatus      = m_pEntry->GetHttpStatus ();
-   m_dFetchQueuedTime = m_pEntry->GetFetchQueuedTime ();
-   m_dFetchStartTime  = m_pEntry->GetFetchStartTime ();
-   m_dFetchEndTime    = m_pEntry->GetFetchEndTime ();
-   m_bServedFromCache = m_pEntry->IsServedFromCache ();
+void FILE::SnapshotProgress ()
+{
+   if (m_pMeta)
+   {
+      m_bState           = m_pMeta->GetState ();
+      m_dFetchQueuedTime = m_pMeta->GetFetchQueuedTime ();
+      m_dFetchStartTime  = m_pMeta->GetFetchStartTime ();
+   }
+}
+
+void FILE::SnapshotFinal ()
+{
+   if (m_pMeta)
+   {
+      m_bState           = m_pMeta->GetState ();
+      m_sHash            = m_pMeta->GetHash ();
+      m_sContentType     = m_pMeta->GetHeader ("content-type");
+      m_nSizeBytes       = m_pMeta->GetSizeBytes ();
+      m_nHttpStatus      = m_pMeta->GetHttpStatus ();
+      m_dFetchQueuedTime = m_pMeta->GetFetchQueuedTime ();
+      m_dFetchStartTime  = m_pMeta->GetFetchStartTime ();
+      m_dFetchEndTime    = m_pMeta->GetFetchEndTime ();
+      m_bServedFromCache = m_pMeta->IsServedFromCache ();
+   }
 }
 
 // ---------------------------------------------------------------------------
@@ -96,64 +111,67 @@ void FILE::Reset (bool b)
 }
 
 // ---------------------------------------------------------------------------
-// ENTRY-dependent accessors (require attached ENTRY)
+// META-dependent accessors (require attached META)
 // ---------------------------------------------------------------------------
 
 std::vector<uint8_t> FILE::ReadData () const
 {
-   if (m_pEntry)
-      return m_pEntry->ReadData ();
-   return {};
+   std::vector<uint8_t> aResult;
+   if (m_pMeta)
+      aResult = m_pMeta->ReadData ();
+   return aResult;
 }
 
 std::string FILE::GetHeader (const std::string& sName) const
 {
-   if (m_pEntry)
-      return m_pEntry->GetHeader (sName);
-   return {};
+   std::string sResult;
+   if (m_pMeta)
+      sResult = m_pMeta->GetHeader (sName);
+   return sResult;
 }
 
 std::string FILE::GetDiskPath () const
 {
-   if (m_pEntry)
-      return m_pEntry->GetDiskPath ();
-   return {};
+   std::string sResult;
+   if (m_pMeta)
+      sResult = m_pMeta->GetDiskPath ();
+   return sResult;
 }
 
 std::string FILE::GetCreatedTime () const
 {
-   if (m_pEntry)
-      return m_pEntry->GetCreatedTime ();
-   return {};
+   std::string sResult;
+   if (m_pMeta)
+      sResult = m_pMeta->GetCreatedTime ();
+   return sResult;
 }
 
 std::string FILE::GetLastAccessTime () const
 {
-   if (m_pEntry)
-      return m_pEntry->GetLastAccessTime ();
-   return {};
+   std::string sResult;
+   if (m_pMeta)
+      sResult = m_pMeta->GetLastAccessTime ();
+   return sResult;
 }
 
 uint32_t FILE::GetAccessCount () const
 {
-   if (m_pEntry)
-      return m_pEntry->GetAccessCount ();
-   return 0;
+   uint32_t nResult = 0;
+   if (m_pMeta)
+      nResult = m_pMeta->GetAccessCount ();
+   return nResult;
 }
 
 const std::unordered_map<std::string, std::string>& FILE::GetHeaders () const
 {
-   if (m_pEntry)
-      return m_pEntry->GetHeaders ();
-   return s_mapEmpty;
+   const std::unordered_map<std::string, std::string>& mapResult =
+      m_pMeta ? m_pMeta->GetHeaders () : s_mapEmpty;
+   return mapResult;
 }
 
-std::string FILE::GetStoreName () const
+std::string FILE::GetContainerName () const
 {
-   std::string sResult;
-   if (m_pStore)
-      sResult = m_pStore->sName;
-   return sResult;
+   return m_pName->DisplayName ();
 }
 
 }} // namespace SNEEZE::CACHE

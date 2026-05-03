@@ -13,61 +13,69 @@ All files are stored on disk, never solely in memory. Fetches stream to a tempor
 
 ```
 MANAGER (singleton)
- ├── ENTRY_MAP: URL -> unique_ptr<ENTRY>        (only entries with active FILE handles)
- ├── STORE_MAP: name -> unique_ptr<STORE>
+ ├── META_MAP: URL -> unique_ptr<META>        (only metas with active FILE handles)
  ├── Fetch thread pool (capped at 16) + overflow queue
  ├── History list: all FILE* handles ever created
  ├── m_nNextFileIx: monotonic FILE index counter
- ├── m_nNextEntryIx: monotonic ENTRY index counter (persisted in rules.json)
- ├── rules.json: staleness rules + nextEntryIx counter
- ├── Sidecar .meta files per ENTRY (replaces manifest.json)
+ ├── m_nNextMetaIx: monotonic META index counter (persisted in rules.json)
+ ├── rules.json: staleness rules + nNextMetaIx counter
+ ├── Sidecar .meta files per META (replaces manifest.json)
  └── Epoch (steady_clock time point)
 
-ENTRY (internal shared state, one per URL)
+META (internal shared state, one per URL)
  ├── MANAGER* (parent back-pointer)
  ├── STATE lifecycle (atomic)
- ├── nEntryIx: monotonic content-version index (assigned at creation/reset)
+ ├── nMetaIx: monotonic content-version index (assigned at creation/reset)
  ├── Disk path, headers, metadata
  ├── HTTP status, fetch queued/start/end times, served-from-cache flag
- ├── m_dFetchQueuedTime (when entry entered the fetch queue)
+ ├── m_dFetchQueuedTime (when meta entered the fetch queue)
  ├── m_bPendingReset (deferred destruction flag)
  └── list<FILE*> attached handles
 
 FILE (per-caller handle)
  ├── MANAGER* (parent back-pointer)
- ├── ENTRY* (attached while live, null after Release)
- ├── STORE* (identity of requesting container)
+ ├── META* (attached while live, null after Release)
+ ├── shared_ptr<CONTAINER::NAME> (identity of requesting container)
  ├── IFILE* listener for notifications
  ├── nFileIx: monotonic file-handle index (uint32_t)
- ├── Snapshot fields (owned copies of ENTRY display data):
- │   ├── URL, hash, nEntryIx, state, content-type
- │   ├── size, HTTP status, served-from-cache
- │   └── fetch queued/start/end times
+ ├── Snapshot fields (owned copies of META display data):
+ │   ├── Initial (set once at construction):
+ │   │   └── URL, nMetaIx
+ │   ├── Progress (updated during fetch):
+ │   │   └── state, fetch queued/start times
+ │   └── Final (set when fetch resolves):
+ │       └── hash, content-type, size, HTTP status, fetch end time, served-from-cache
  ├── m_bPendingClear (deferred history removal flag)
- ├── m_bReleased (detached from ENTRY)
+ ├── m_bReleased (detached from META)
  ├── m_bEnumeration (guards Release during Enumerate)
- └── Request() to reattach a released FILE to its ENTRY
+ └── Request() to reattach a released FILE to its META
 
-STORE (identity record, one per unique name)
- └── sName (display name of the WASM store/container)
+CONTAINER::NAME (identity record, shared via shared_ptr)
+ ├── sFingerprint (SHA-256 of cert public key)
+ ├── sOrganization
+ ├── sCommonName
+ ├── sContainerName
+ ├── sPersonaHash
+ ├── bValidated
+ └── DisplayName() -> sCommonName + "/" + sContainerName
 ```
 
 ## Namespace
 
 All types live under `SNEEZE::CACHE`:
 
-| Type     | Role                                              |
-|----------|---------------------------------------------------|
-| MANAGER  | Singleton cache manager. Owns entries and threads. |
-| ENTRY    | Internal shared state per URL. Not exposed.        |
-| FILE     | Per-caller handle. Returned by Request().          |
-| STORE    | Identity record for a WASM store (container).      |
-| IFILE    | Observer interface (OnFileReady, OnFileFailed).    |
-| IENUM    | Enumeration callback interface (OnEntry).          |
-| STATE    | Enum: IDLE, FETCHING, VALIDATING, READY, FAILED.  |
-| REQUEST  | Flags: REQUEST_CREATE, REQUEST_FETCH.              |
-| DISKFILE | Enum: DISKFILE_DATA, DISKFILE_TEMP, DISKFILE_META. |
-| RULE     | Staleness rule (content-type + olderThan).         |
+| Type            | Role                                              |
+|-----------------|---------------------------------------------------|
+| MANAGER         | Singleton cache manager. Owns metas and threads.  |
+| META            | Internal shared state per URL. Not exposed.        |
+| FILE            | Per-caller handle. Returned by Request().          |
+| CONTAINER::NAME | Identity record for a container.                   |
+| IFILE           | Observer interface (OnFileReady, OnFileFailed).    |
+| IENUM           | Enumeration callback interface (OnMeta).           |
+| STATE           | Enum: IDLE, FETCHING, VALIDATING, READY, FAILED.  |
+| REQUEST         | Flags: REQUEST_CREATE, REQUEST_FETCH.              |
+| DISKFILE        | Enum: DISKFILE_DATA, DISKFILE_TEMP, DISKFILE_META. |
+| RULE            | Staleness rule (content-type + olderThan).         |
 
 ## Usage
 
@@ -96,7 +104,11 @@ public:
 
 // Request a file (no hash, default flags)
 MY_LISTENER listener;
-SNEEZE::CACHE::FILE* pFile = pCache->Request (&listener, "MyStore", "https://example.com/model.glb");
+auto pName = std::make_shared<SNEEZE::CONTAINER::NAME> ();
+pName->sCommonName    = "Metaversal";
+pName->sContainerName = "Solar System";
+pName->bValidated     = true;
+SNEEZE::CACHE::FILE* pFile = pCache->Request (&listener, pName, "https://example.com/model.glb");
 
 // ... later, when done:
 pFile->Release ();
@@ -107,7 +119,7 @@ pFile->Release ();
 ```cpp
 std::string sSri = "sha256-a1b2c3d4e5f6...";  // SRI-format hash
 
-SNEEZE::CACHE::FILE* pModule = pCache->Request (&listener, "MyStore", "https://cdn.example.com/game.wasm", sSri);
+SNEEZE::CACHE::FILE* pModule = pCache->Request (&listener, pName, "https://cdn.example.com/game.wasm", sSri);
 
 // If the hash matches, OnFileReady fires. If mismatch, OnFileFailed fires.
 ```
@@ -128,43 +140,41 @@ void OnFileReady (SNEEZE::CACHE::FILE* pFile) override
 
 ### Request flags
 
-The 5-arg `Request()` accepts an optional `bFlags` parameter controlling whether to create and/or fetch the entry. Defaults to `kREQUEST_DEFAULT` (`REQUEST_CREATE | REQUEST_FETCH`).
+The 5-arg `Request()` accepts an optional `bFlags` parameter controlling whether to create and/or fetch the meta. Defaults to `kREQUEST_DEFAULT` (`REQUEST_CREATE | REQUEST_FETCH`).
 
 ```cpp
 using namespace SNEEZE::CACHE;
 
 // Find only — returns nullptr if the URL isn't already cached
-FILE* pExisting = pCache->Request (&listener, "MyStore", url, "", 0);
+FILE* pExisting = pCache->Request (&listener, pName, url, "", 0);
 
 // Create + fetch (default behavior, same as the 3-arg overload)
-FILE* pFile = pCache->Request (&listener, "MyStore", url);
+FILE* pFile = pCache->Request (&listener, pName, url);
 
 // Create + fetch with explicit flags
-FILE* pFile2 = pCache->Request (&listener, "MyStore", url, "", REQUEST_CREATE | REQUEST_FETCH);
+FILE* pFile2 = pCache->Request (&listener, pName, url, "", REQUEST_CREATE | REQUEST_FETCH);
 ```
 
 | Flag             | Effect                                            |
 |------------------|---------------------------------------------------|
-| `REQUEST_CREATE` | Create the ENTRY if it doesn't already exist.     |
-| `REQUEST_FETCH`  | Initiate a network fetch for IDLE entries.        |
+| `REQUEST_CREATE` | Create the META if it doesn't already exist.      |
+| `REQUEST_FETCH`  | Initiate a network fetch for IDLE metas.          |
 
-Without `CREATE`, a missing entry returns `nullptr`. Without `FETCH`, an IDLE entry is not fetched — a stale-but-READY entry is rejected rather than re-fetched (returns `nullptr`).
+Without `CREATE`, a missing meta returns `nullptr`. Without `FETCH`, an IDLE meta is not fetched — a stale-but-READY meta is rejected rather than re-fetched (returns `nullptr`).
 
-### Store Identity
+### Container Identity
 
-Every `Request()` call includes a store name string identifying which WASM store (container) originated the request. The MANAGER creates a `STORE` object per unique name and attaches it to each FILE. STORE objects are owned by the MANAGER and outlive the containers that created them, so FILE pointers remain valid after a container is unloaded.
+Every `Request()` call includes a `std::shared_ptr<CONTAINER::NAME>` identifying which container originated the request. The caller creates the shared_ptr (typically one per container, reused across all requests from that container). FILE stores a copy of the shared_ptr, so all FILEs from the same container share a single NAME object in memory. CONTAINER::NAME holds: `sFingerprint` (SHA-256 of cert public key), `sOrganization`, `sCommonName`, `sContainerName`, `sPersonaHash`, and `bValidated`. The display name is `sCommonName + "/" + sContainerName` via `DisplayName()`. For unauthenticated certs, `sOrganization` and `sCommonName` are set to `fingerprint[0..15]`.
 
 ```cpp
-// FILE exposes the store identity
-STORE* pStore = pFile->GetStore ();
-std::string sName = pFile->GetStoreName ();
+// FILE exposes the container identity
+const CONTAINER::NAME& name = pFile->GetName ();
+std::string sDisplay = pFile->GetContainerName ();  // "Metaversal/Solar System"
 ```
-
-Currently STORE holds only `sName`. Additional properties (fingerprint, container, persona, company) will be added as they become available.
 
 ### Cache Bypass
 
-The cache can be globally disabled at runtime via `SetCacheEnabled(false)`. When disabled, every `Request()` that would normally serve data from disk instead triggers a fresh network fetch. Existing entries and disk files are not destroyed (unlike `Reset()`); the flag only affects the cache-hit decision path.
+The cache can be globally disabled at runtime via `SetCacheEnabled(false)`. When disabled, every `Request()` that would normally serve data from disk instead triggers a fresh network fetch. Existing metas and disk files are not destroyed (unlike `Reset()`); the flag only affects the cache-hit decision path.
 
 ```cpp
 pCache->SetCacheEnabled (false);   // all subsequent requests bypass the cache
@@ -176,17 +186,17 @@ This is intended for the inspector's "Disable cache" toggle, analogous to the sa
 
 ### Release, Clear, and Reset
 
-**Release** detaches the FILE from its ENTRY and snapshots the ENTRY's current state into the FILE's local fields. If the FILE has a pending clear flag, it is deleted from the history list. When the ENTRY's last FILE handle releases:
-- If the ENTRY is READY: the `.meta` sidecar is saved and the ENTRY is evicted from `m_mapEntries`.
-- If the ENTRY has a pending reset: the ENTRY's disk files are destroyed, state is reset, and the ENTRY is evicted from `m_mapEntries`.
+**Release** detaches the FILE from its META and snapshots the META's current state into the FILE's local fields. If the FILE has a pending clear flag, it is deleted from the history list. When the META's last FILE handle releases:
+- If the META is READY: the `.meta` sidecar is saved and the META is evicted from `m_mapMetas`.
+- If the META has a pending reset: the META's disk files are destroyed, state is reset, and the META is evicted from `m_mapMetas`.
 
-This means entries don't accumulate in memory indefinitely — only entries with active FILE handles live in the map.
+This means metas don't accumulate in memory indefinitely — only metas with active FILE handles live in the map.
 
-**Clear** is an immediate visibility toggle for the inspector. `Clear(true)` removes the FILE from the history list and fires `OnCacheFileDeleted` immediately — the inspector row vanishes on the spot. If the FILE is already released, it is also deleted. `Clear(false)` adds the FILE back to the history list and fires `OnCacheFileCreated`. The ENTRY and its cached data are not affected — this is purely inspector housekeeping.
+**Clear** is an immediate visibility toggle for the inspector. `Clear(true)` removes the FILE from the history list and fires `OnCacheFileDeleted` immediately — the inspector row vanishes on the spot. If the FILE is already released, it is also deleted. `Clear(false)` adds the FILE back to the history list and fires `OnCacheFileCreated`. The META and its cached data are not affected — this is purely inspector housekeeping.
 
 The clear flag also acts as a deferred destruction flag: when a cleared FILE is eventually released, it is deleted rather than kept in history.
 
-**Reset** marks the ENTRY for destruction. When the last attached FILE is released and the count reaches zero, the ENTRY's disk files (`.data`, `.meta`, `.temp`) are deleted and the ENTRY is erased from `m_mapEntries`. FILE handles in the history that pointed to the destroyed ENTRY retain their snapshot data (getters return the snapshotted values).
+**Reset** marks the META for destruction. When the last attached FILE is released and the count reaches zero, the META's disk files (`.data`, `.meta`, `.temp`) are deleted and the META is erased from `m_mapMetas`. FILE handles in the history that pointed to the destroyed META retain their snapshot data (getters return the snapshotted values).
 
 Both `Clear()` and `Reset()` accept a `bool` parameter (default `true`) so the flag can be toggled on/off:
 
@@ -194,7 +204,7 @@ Both `Clear()` and `Reset()` accept a `bool` parameter (default `true`) so the f
 pFile->Clear ();              // immediately remove from inspector
 pFile->Clear (false);         // immediately add back to inspector
 
-pFile->Reset ();              // mark ENTRY for destruction
+pFile->Reset ();              // mark META for destruction
 pFile->Release ();            // triggers it (if last holder)
 
 pFile->Reset ();              // mark for reset
@@ -217,22 +227,22 @@ pCache->Reset (pFile);         // via MANAGER
 
 ### FILE::Request() — Reopen
 
-A released FILE can be re-attached to its ENTRY by calling `Request()`. This is used by the inspector detail pane to drill into a previously-released entry.
+A released FILE can be re-attached to its META by calling `Request()`. This is used by the inspector detail pane to drill into a previously-released cached resource.
 
 ```cpp
 bool bOk = pFile->Request (&listener);
 if (!bOk)
 {
-   // ENTRY was replaced (nEntryIx mismatch) or no longer exists on disk
+   // META was replaced (nMetaIx mismatch) or no longer exists on disk
 }
 ```
 
 Internally, `Request()` calls `MANAGER::ReopenFile()`:
-1. Looks up the ENTRY in `m_mapEntries` by the FILE's snapshotted URL.
-2. If not in memory, loads the ENTRY from its `.meta` sidecar on disk.
-3. Validates that the ENTRY's `nEntryIx` matches the FILE's snapshotted `nEntryIx`.
+1. Looks up the META in `m_mapMetas` by the FILE's snapshotted URL.
+2. If not in memory, loads the META from its `.meta` sidecar on disk.
+3. Validates that the META's `nMetaIx` matches the FILE's snapshotted `nMetaIx`.
 4. If matched: reattaches the FILE, snapshots, and fires the listener callback.
-5. Returns `false` if the content has been replaced (nEntryIx mismatch) or if no `.meta`/`.data` exists on disk.
+5. Returns `false` if the content has been replaced (nMetaIx mismatch) or if no `.meta`/`.data` exists on disk.
 
 An optional `IFILE*` parameter can replace the listener; passing `nullptr` keeps the existing listener.
 
@@ -250,33 +260,33 @@ This is intended for the inspector's stop/play toggle. Existing FILEs already in
 
 ### Bulk Cache Management
 
-Bulk operations set flags on all matching entries/files, then immediately process any that are already eligible (released FILEs, zero-attach ENTRYs). In-use items are cleaned up automatically when their last holder releases.
+Bulk operations set flags on all matching metas/files, then immediately process any that are already eligible (released FILEs, zero-attach METAs). In-use items are cleaned up automatically when their last holder releases.
 
 ```cpp
 // Clear all released FILE records from history
 pCache->Clear ();
 
-// Reset all entries (destroy when last holder releases)
+// Reset all metas (destroy when last holder releases)
 pCache->Reset ();
 ```
 
 | Method  | Scope     | Effect                                       |
 |---------|-----------|----------------------------------------------|
 | `Clear` | History   | Remove all released FILEs; flag rest          |
-| `Reset` | Entries   | Destroy all idle ENTRYs; flag in-use ones     |
+| `Reset` | Metas     | Destroy all idle METAs; flag in-use ones      |
 
 ### Enumerate
 
-`Enumerate(IENUM*)` walks all `.meta` files on disk (via `recursive_directory_iterator`), loading each entry's metadata and passing a temporary FILE handle to the callback. The callback can inspect the FILE (URL, content-type, headers, hash, state) and call `Reset()` or `Clear()` on it. `Release()` is guarded — it no-ops on enumeration FILEs to prevent double-detach.
+`Enumerate(IENUM*)` walks all `.meta` files on disk (via `recursive_directory_iterator`), loading each cached resource's metadata and passing a temporary FILE handle to the callback. The callback can inspect the FILE (URL, content-type, headers, hash, state) and call `Reset()` or `Clear()` on it. `Release()` is guarded — it no-ops on enumeration FILEs to prevent double-detach.
 
-For entries already in `m_mapEntries`, the existing ENTRY is used. For entries only on disk, a temporary ENTRY is created from the `.meta` sidecar, used for the callback, then discarded.
+For metas already in `m_mapMetas`, the existing META is used. For metas only on disk, a temporary META is created from the `.meta` sidecar, used for the callback, then discarded.
 
-Internally, a single FILE object is allocated before the loop, with `m_bEnumeration` set to true. On each iteration, `SetEntry()` swaps the ENTRY pointer, `AttachFile` / `DetachFile` manage the attachment, and the callback fires. The FILE is deleted after the loop completes.
+Internally, a single FILE object is allocated before the loop, with `m_bEnumeration` set to true. On each iteration, `SetMeta()` swaps the META pointer, `AttachFile` / `DetachFile` manage the attachment, and the callback fires. The FILE is deleted after the loop completes.
 
 ```cpp
 struct ENUM_PURGE : SNEEZE::CACHE::IENUM
 {
-   void OnEntry (SNEEZE::CACHE::FILE* pFile) override
+   void OnMeta (SNEEZE::CACHE::FILE* pFile) override
    {
       if (pFile->GetContentType () == "application/jose+msf")
          pFile->Reset ();
@@ -286,38 +296,50 @@ ENUM_PURGE pEnum_Purge;
 pCache->Enumerate (&pEnum_Purge);
 ```
 
-**Use case: MSF file freshness.** Artemis calls `Enumerate()` immediately after `SNEEZE::Initialize()` to reset all cached entries with content-type `application/jose+msf`. MSF files are trust anchors (signed service manifests) that should always be re-fetched from the network on startup rather than served from stale cache. The policy decision lives in Artemis, not the engine — Sneeze's `Enumerate` is type-agnostic.
+**Use case: MSF file freshness.** Artemis calls `Enumerate()` immediately after `SNEEZE::Initialize()` to reset all cached metas with content-type `application/jose+msf`. MSF files are trust anchors (signed service manifests) that should always be re-fetched from the network on startup rather than served from stale cache. The policy decision lives in Artemis, not the engine — Sneeze's `Enumerate` is type-agnostic.
 
 ## FILE Data Ownership (Snapshotting)
 
-FILE stores a local snapshot of display-relevant ENTRY fields so that inspector data remains valid even after `Release()` detaches the FILE from its ENTRY (and the ENTRY is potentially evicted from memory).
+FILE stores a local snapshot of display-relevant META fields so that inspector data remains valid even after `Release()` detaches the FILE from its META (and the META is potentially evicted from memory).
 
-### Snapshot Fields
+Snapshot fields are organized into three lifecycle phases, each with its own method:
+
+### SnapshotInitial() — Set Once at Construction
 
 | Field                | Type       | Source                              |
 |----------------------|------------|-------------------------------------|
-| `m_sUrl`             | `string`   | `ENTRY::GetUrl()`                   |
-| `m_sHash`            | `string`   | `ENTRY::GetHash()`                  |
-| `m_nEntryIx`         | `uint32_t` | `ENTRY::GetEntryIx()`               |
-| `m_bState`           | `STATE`    | `ENTRY::GetState()`                 |
-| `m_sContentType`     | `string`   | `ENTRY::GetHeader("content-type")`  |
-| `m_nSizeBytes`       | `uint64_t` | `ENTRY::GetSizeBytes()`             |
-| `m_nHttpStatus`      | `long`     | `ENTRY::GetHttpStatus()`            |
-| `m_dFetchQueuedTime` | `double`   | `ENTRY::GetFetchQueuedTime()`       |
-| `m_dFetchStartTime`  | `double`   | `ENTRY::GetFetchStartTime()`        |
-| `m_dFetchEndTime`    | `double`   | `ENTRY::GetFetchEndTime()`          |
-| `m_bServedFromCache` | `bool`     | `ENTRY::IsServedFromCache()`        |
+| `m_sUrl`             | `string`   | `META::GetUrl()`                    |
+| `m_nMetaIx`          | `uint32_t` | `META::GetMetaIx()`                |
 
-### When SnapshotEntry() is Called
+### SnapshotProgress() — Updated During Fetch
 
-- **At FILE creation** — in the FILE constructor, if an ENTRY is attached.
-- **On cache hits** — when `Request()` finds a READY entry and serves from cache.
-- **When fetch starts** — after `SetFetching()` and `SetFetchQueuedTime()`.
-- **In NotifyFiles** — before firing IFILE callbacks on fetch completion.
-- **On Release** — captures final state before detaching from ENTRY.
-- **On ReopenFile** — after reattaching to a loaded ENTRY.
+| Field                | Type       | Source                              |
+|----------------------|------------|-------------------------------------|
+| `m_bState`           | `STATE`    | `META::GetState()`                  |
+| `m_dFetchQueuedTime` | `double`   | `META::GetFetchQueuedTime()`        |
+| `m_dFetchStartTime`  | `double`   | `META::GetFetchStartTime()`         |
 
-Getters on FILE read from these snapshot members, not from the ENTRY. ENTRY-dependent accessors (`ReadData()`, `GetHeaders()`, `GetDiskPath()`, etc.) still require an attached ENTRY and return empty defaults after Release.
+### SnapshotFinal() — Set When Fetch Resolves
+
+| Field                | Type       | Source                              |
+|----------------------|------------|-------------------------------------|
+| `m_bState`           | `STATE`    | `META::GetState()`                  |
+| `m_sHash`            | `string`   | `META::GetHash()`                   |
+| `m_sContentType`     | `string`   | `META::GetHeader("content-type")`   |
+| `m_nSizeBytes`       | `uint64_t` | `META::GetSizeBytes()`              |
+| `m_nHttpStatus`      | `long`     | `META::GetHttpStatus()`             |
+| `m_dFetchQueuedTime` | `double`   | `META::GetFetchQueuedTime()`        |
+| `m_dFetchStartTime`  | `double`   | `META::GetFetchStartTime()`         |
+| `m_dFetchEndTime`    | `double`   | `META::GetFetchEndTime()`           |
+| `m_bServedFromCache` | `bool`     | `META::IsServedFromCache()`         |
+
+### When Each Snapshot Method is Called
+
+- **SnapshotInitial()** — in the FILE constructor.
+- **SnapshotProgress()** — when a fetch is dispatched (after `SetFetching()` and `SetFetchQueuedTime()`).
+- **SnapshotFinal()** — when the fetch resolves (READY/FAILED), on Release, on ReopenFile, and during Enumerate. In `Request()`, a single `SnapshotFinal()` covers all resolved-state branches.
+
+Getters on FILE read from these snapshot members, not from the META. META-dependent accessors (`ReadData()`, `GetHeaders()`, `GetDiskPath()`, etc.) still require an attached META and return empty defaults after Release.
 
 ## Network Inspector Data
 
@@ -329,29 +351,29 @@ All timing values are `double` seconds relative to a per-session epoch (`steady_
 
 | Accessor               | Source         | Description                              |
 |------------------------|----------------|------------------------------------------|
-| `GetFetchQueuedTime()` | `ENTRY`/`FILE` | Seconds since epoch when entry queued    |
-| `GetFetchStartTime()`  | `ENTRY`/`FILE` | Seconds since epoch when fetch began     |
-| `GetFetchEndTime()`    | `ENTRY`/`FILE` | Seconds since epoch when fetch ended     |
-| `GetFetchDuration()`   | `ENTRY`/`FILE` | Derived: end - start                     |
-| `GetQueueDuration()`   | `ENTRY`/`FILE` | Derived: start - queued                  |
+| `GetFetchQueuedTime()` | `META`/`FILE`  | Seconds since epoch when meta queued     |
+| `GetFetchStartTime()`  | `META`/`FILE`  | Seconds since epoch when fetch began     |
+| `GetFetchEndTime()`    | `META`/`FILE`  | Seconds since epoch when fetch ended     |
+| `GetFetchDuration()`   | `META`/`FILE`  | Derived: end - start                     |
+| `GetQueueDuration()`   | `META`/`FILE`  | Derived: start - queued                  |
 | `GetEpochAge()`        | `MANAGER`      | Current seconds since epoch              |
 
-`m_dFetchQueuedTime` records when the ENTRY enters the fetch queue (set in `Request()` before `DispatchFetch()`). `m_dFetchStartTime` records when the HTTP request actually begins (set at the start of `FetchEntry()`). The difference (`GetQueueDuration()`) measures how long the entry waited in the overflow queue before a thread became available.
+`m_dFetchQueuedTime` records when the META enters the fetch queue (set in `Request()` before `DispatchFetch()`). `m_dFetchStartTime` records when the HTTP request actually begins (set at the start of `FetchMeta()`). The difference (`GetQueueDuration()`) measures how long the meta waited in the overflow queue before a thread became available.
 
-### File & Entry Indexes
+### File & Meta Indexes
 
-Each `FILE` handle receives a monotonically increasing `uint32_t` file index (`nFileIx`) at creation. This provides a stable sort key for the inspector's request list, independent of fetch completion order. Each `ENTRY` receives a separate monotonically increasing index (`nEntryIx`) at creation or reset, identifying the version of the cached content.
+Each `FILE` handle receives a monotonically increasing `uint32_t` file index (`nFileIx`) at creation. This provides a stable sort key for the inspector's request list, independent of fetch completion order. Each `META` receives a separate monotonically increasing index (`nMetaIx`) at creation or reset, identifying the version of the cached content.
 
-`nEntryIx` is persisted in `.meta` sidecar files and in `rules.json` (as `nextEntryIx`). `m_nNextFileIx` and `m_nNextEntryIx` are maintained on MANAGER.
+`nMetaIx` is persisted in `.meta` sidecar files and in `rules.json` (as `nNextMetaIx`). `m_nNextFileIx` and `m_nNextMetaIx` are maintained on MANAGER.
 
 ```cpp
 uint32_t nFileIx  = pFile->GetFileIx ();
-uint32_t nEntryIx = pFile->GetEntryIx ();
+uint32_t nMetaIx = pFile->GetMetaIx ();
 ```
 
 ### History List
 
-`MANAGER::GetFiles()` returns a `const std::vector<FILE*>&` containing all FILE handles, in creation order. `Release()` detaches the FILE from its ENTRY (stops notifications) but does **not** remove it from the list unless the FILE has a pending clear flag. This list is the data backing the inspector's request table.
+`MANAGER::GetFiles()` returns a `const std::vector<FILE*>&` containing all FILE handles, in creation order. `Release()` detaches the FILE from its META (stops notifications) but does **not** remove it from the list unless the FILE has a pending clear flag. This list is the data backing the inspector's request table.
 
 ```cpp
 const auto& aHistory = pCache->GetFiles ();
@@ -400,17 +422,17 @@ The MANAGER routes these through `SNEEZE::NotifyCacheFileCreated()`, `SNEEZE::No
 | Queue        | `GetQueueDuration()`                                  |
 | Waterfall    | `GetFetchQueuedTime()` / `GetFetchStartTime()` / `GetFetchEndTime()` vs epoch |
 | File Index   | `GetFileIx()`                                         |
-| Entry Index  | `GetEntryIx()`                                        |
-| Initiator    | `GetStoreName()`                                      |
+| Meta Index   | `GetMetaIx()`                                         |
+| Initiator    | `GetContainerName()`                                  |
 
 ## Request Deduplication
 
-If multiple callers request the same URL before the first fetch completes, they share a single ENTRY. Each caller gets their own FILE handle with their own IFILE listener, and all listeners are notified when the fetch resolves.
+If multiple callers request the same URL before the first fetch completes, they share a single META. Each caller gets their own FILE handle with their own IFILE listener, and all listeners are notified when the fetch resolves.
 
 ```cpp
-FILE* pA = pCache->Request (&listenerA, "MyStore", url);
-FILE* pB = pCache->Request (&listenerB, "MyStore", url);
-// pA and pB wrap the same ENTRY; both listeners fire on completion.
+FILE* pA = pCache->Request (&listenerA, pName, url);
+FILE* pB = pCache->Request (&listenerB, pName, url);
+// pA and pB wrap the same META; both listeners fire on completion.
 
 pA->Release ();
 pB->Release ();
@@ -443,12 +465,19 @@ The disk key is a truncated SHA-1 hex digest of the URL (24 hex characters). The
 
 ```
 <AppDataPath>/Cache/
-├── rules.json                              <-- staleness rules + nextEntryIx
+├── rules.json                              <-- staleness rules + nNextMetaIx
 ├── a1/                                     <-- fan-out directory (first 2 chars of disk key)
 │   ├── b2c3d4e5f6a7b8c9d0e1.data          <-- cached payload
 │   └── b2c3d4e5f6a7b8c9d0e1.meta          <-- sidecar metadata (JSON)
 ├── <diskkey>.temp                          <-- in-flight download
 ```
+
+The host application (Artemis) sets `sAppDataPath` and `sSessionPath` on the `ISNEEZE` interface. The engine calls `SessionPath()` (which joins them) and appends the system name:
+
+- **Persistent mode:** `%APPDATA%\Metaversal\Artemis\Persistent\Cache\`
+- **Ephemeral mode:** `%APPDATA%\Metaversal\Artemis\Ephemeral\<session_id>\Cache\`
+
+The engine is agnostic to the mode — it just calls `SessionPath() / "Cache"`.
 
 ### Path Generation
 
@@ -462,7 +491,7 @@ The disk key is a truncated SHA-1 hex digest of the URL (24 hex characters). The
 
 ## Sidecar Metadata
 
-Each cache entry has its own `.meta` JSON file alongside the `.data` file. This replaces the previous monolithic `manifest.json`.
+Each cached resource has its own `.meta` JSON file alongside the `.data` file. This replaces the previous monolithic `manifest.json`.
 
 ### .meta File Format
 
@@ -472,7 +501,7 @@ Written via `SaveMeta()` using nlohmann::json. Atomically written (write to `.te
 {
    "url": "https://cdn.example.com/game.wasm",
    "hash": "sha256-a1b2c3d4...",
-   "entryIx": 42,
+   "nMetaIx": 42,
    "sizeBytes": 1048576,
    "createdAt": "2026-05-01T12:00:00Z",
    "lastAccessedAt": "2026-05-02T08:30:00Z",
@@ -488,19 +517,19 @@ Written via `SaveMeta()` using nlohmann::json. Atomically written (write to `.te
 
 ### .meta Lifecycle
 
-- **Written** when an ENTRY is evicted from memory (last FILE handle calls `Release()` and `GetFileCount()` drops to zero while state is READY), or during `Shutdown()` for all READY entries still in memory.
-- **Loaded** on demand by `LoadMeta()` when `Request()` looks up a URL that isn't in `m_mapEntries` but has a `.meta` on disk. Also loaded during `Enumerate()` for entries not currently in memory.
-- **Deleted** when an ENTRY is reset (`ResetEntry()` removes `.data`, `.meta`, and `.temp`).
+- **Written** when a META is evicted from memory (last FILE handle calls `Release()` and `GetFileCount()` drops to zero while state is READY), or during `Shutdown()` for all READY metas still in memory.
+- **Loaded** on demand by `LoadMeta()` when `Request()` looks up a URL that isn't in `m_mapMetas` but has a `.meta` on disk. Also loaded during `Enumerate()` for metas not currently in memory.
+- **Deleted** when a META is reset (`ResetMeta()` removes `.data`, `.meta`, and `.temp`).
 
-Loading uses `file >> jDoc` inside a `try/catch` block. A corrupt `.meta` is logged as a warning and skipped. The URL stored in the `.meta` is validated against the requested URL before the ENTRY is constructed.
+Loading uses `file >> jDoc` inside a `try/catch` block. A corrupt `.meta` is logged as a warning and skipped. The URL stored in the `.meta` is validated against the requested URL before the META is constructed.
 
 ### rules.json
 
-`rules.json` lives at `Cache/rules.json` and persists staleness rules and the `nextEntryIx` counter.
+`rules.json` lives at `Cache/rules.json` and persists staleness rules and the `nNextMetaIx` counter.
 
 ```json
 {
-   "nextEntryIx": 43,
+   "nNextMetaIx": 43,
    "rules": [
       {
          "contentType": "application/jose+msf",
@@ -510,45 +539,47 @@ Loading uses `file >> jDoc` inside a `try/catch` block. A corrupt `.meta` is log
 }
 ```
 
-- **`LoadRules()`** runs at `Initialize()`. Restores `m_nNextEntryIx` and `m_aRules`. If `rules.json` is missing, creates a fresh empty one via `SaveRules()`.
+- **`LoadRules()`** runs at `Initialize()`. Restores `m_nNextMetaIx` and `m_aRules`. If `rules.json` is missing, creates a fresh empty one via `SaveRules()`.
 - **`SaveRules()`** writes atomically (`.temp` then rename). Called at shutdown and after `AddRule()`.
-- **`IsEntryStale()`** checks a READY entry against all rules. A rule matches if its `sContentType` matches (or is empty = wildcard) **and** the entry's `createdAt` is older than `sOlderThan`.
-- On `Request()`, if an entry is READY but stale: if `bFetch` is set, the entry is reset and re-fetched; if `!bFetch`, the request is rejected (returns `nullptr`).
+- **`IsMetaStale()`** checks a READY meta against all rules. A rule matches if its `sContentType` matches (or is empty = wildcard) **and** the meta's `createdAt` is older than `sOlderThan`.
+- On `Request()`, if a meta is READY but stale: if `bFetch` is set, the meta is reset and re-fetched; if `!bFetch`, the request is rejected (returns `nullptr`).
 
-### ENTRY Eviction
+### META Eviction
 
-ENTRYs are actively evicted from `m_mapEntries` when their last FILE handle calls `Release()`. In `MANAGER::Release()`, when `pEntry->GetFileCount() == 0`:
+METAs are actively evicted from `m_mapMetas` when their last FILE handle calls `Release()`. In `MANAGER::Release()`, when `pMeta->GetFileCount() == 0`:
 
-- If the ENTRY has a pending reset flag: `ResetEntry()` deletes disk files and resets state, then the ENTRY is erased from the map.
-- If the ENTRY is READY: `SaveMeta()` persists the sidecar, then the ENTRY is erased from the map.
-- If the ENTRY is in any other state: it is erased from the map.
+- If the META has a pending reset flag: `ResetMeta()` deletes disk files and resets state, then the META is erased from the map.
+- If the META is READY: `SaveMeta()` persists the sidecar, then the META is erased from the map.
+- If the META is in any other state: it is erased from the map.
 
-This means only entries with active FILE handles live in memory. Re-requesting a previously evicted URL triggers `LoadMeta()` to reconstruct the ENTRY from disk.
+This means only metas with active FILE handles live in memory. Re-requesting a previously evicted URL triggers `LoadMeta()` to reconstruct the META from disk.
 
 ## HTTP Behavior
 
-- Only HTTP 2xx responses create valid cache entries. Non-2xx responses cause the entry to transition to FAILED.
+- Only HTTP 2xx responses create valid cached resources. Non-2xx responses cause the meta to transition to FAILED.
 - Redirects are followed transparently (CURLOPT_FOLLOWLOCATION).
 - Default timeout is 300 seconds (CURLOPT_TIMEOUT).
-- Response headers (Content-Type, ETag, Last-Modified, Content-Length, etc.) are captured and stored on the ENTRY and in the `.meta` sidecar.
+- Response headers (Content-Type, ETag, Last-Modified, Content-Length, etc.) are captured and stored on the META and in the `.meta` sidecar.
 
 ## Concurrency Model
 
 ### Current: Capped Thread Pool (16 threads)
 
-Background fetches run on dedicated `std::thread` instances, capped at 16 concurrent threads. When a fetch is requested and all 16 slots are occupied, the ENTRY is pushed to `m_aFetchQueue`. When a fetch completes, the thread checks the queue and dispatches the next pending entry.
+Background fetches run on dedicated `std::thread` instances, capped at 16 concurrent threads. When a fetch is requested and all 16 slots are occupied, the META is pushed to `m_aFetchQueue`. When a fetch completes, the thread checks the queue and dispatches the next pending meta.
 
 Each thread slot uses a `FETCH_SLOT` struct with an `std::atomic<bool> bDone` flag. Before dispatching a new fetch, completed slots are swept (joined and freed), making room for new work.
+
+`FetchWriteCallback` and `FetchHeaderCallback` are static methods on MANAGER (not free functions). `GetEvpMd` remains a file-local static in `Manager.cpp`. `NowIso8601` is a private static method on META.
 
 ### Race Condition Mitigations
 
 Three specific race conditions were identified and addressed:
 
-1. **`ENTRY::m_bState` is `std::atomic<STATE>`** — allows safe reads from any thread without holding the MANAGER lock. State transitions still happen under `m_mutex` for consistency with the rest of the ENTRY fields.
+1. **`META::m_bState` is `std::atomic<STATE>`** — allows safe reads from any thread without holding the MANAGER lock. State transitions still happen under `m_mutex` for consistency with the rest of the META fields.
 
 2. **`m_mutex` is a `recursive_mutex`** — IFILE notifications and ISNEEZE callbacks fire under the lock. The recursive mutex allows listeners to safely call back into MANAGER (e.g., calling `Request()` or `Release()` from a callback) without deadlocking.
 
-3. **`.meta` files are written only at eviction/shutdown** — sidecar files are saved when the last FILE handle releases (evicting the ENTRY from memory) or during `Shutdown()`. No concurrent fetch activity exists at shutdown (all threads are joined first), and eviction writes happen under `m_mutex`.
+3. **`.meta` files are written only at eviction/shutdown** — sidecar files are saved when the last FILE handle releases (evicting the META from memory) or during `Shutdown()`. No concurrent fetch activity exists at shutdown (all threads are joined first), and eviction writes happen under `m_mutex`.
 
 ### Deferred: Non-Blocking I/O Thread Pool
 
@@ -574,8 +605,8 @@ The current model creates one `std::thread` per active fetch. While capped at 16
 
 **Implementation notes:**
 - The `FETCH_SLOT` / `m_apFetchSlots` / `m_aFetchQueue` infrastructure can be replaced wholesale — the rest of the MANAGER API is unchanged.
-- `FetchEntry()` would be refactored: the curl setup portion would prepare an easy handle and submit it to a worker, and the completion logic would run as a callback when the multi handle reports completion.
-- The `CURL_FETCH_CONTEXT` struct and write/header callbacks remain unchanged — they're already compatible with both easy and multi modes.
+- `FetchMeta()` would be refactored: the curl setup portion would prepare an easy handle and submit it to a worker, and the completion logic would run as a callback when the multi handle reports completion.
+- The `FETCH_CONTEXT` struct (`MANAGER::FETCH_CONTEXT`) and write/header callbacks (static methods on MANAGER) remain unchanged — they're already compatible with both easy and multi modes.
 
 ## Shutdown
 
@@ -583,9 +614,9 @@ The MANAGER's `Shutdown()` method:
 
 1. Sets the atomic shutdown flag (cancels in-flight fetches at next check)
 2. Joins all fetch threads and drains the fetch queue
-3. Saves `.meta` sidecars for all READY entries still in memory
-4. Saves `rules.json` (persists `m_nNextEntryIx` and staleness rules)
-5. Clears all entries from `m_mapEntries`
+3. Saves `.meta` sidecars for all READY metas still in memory
+4. Saves `rules.json` (persists `m_nNextMetaIx` and staleness rules)
+5. Clears all metas from `m_mapMetas`
 6. Deletes all FILE handles in the history list
 
 In-flight fetches check the shutdown flag after `curl_easy_perform` returns and discard results if shutdown was requested. Pending clear/reset flags are irrelevant during shutdown — everything is torn down unconditionally.
@@ -606,14 +637,14 @@ The `CacheTest` suite (`SneezeTest --cache`) validates:
 |----|-----------------------------|---------------------------------------------------------|
 | 1  | Manager initialization      | Cache path creation, rules loading                      |
 | 2  | Unhashed fetch              | Unhashed file fetched, stored, readable, persisted      |
-| 3  | Deduplication               | Same URL shares ENTRY, both listeners notified          |
+| 3  | Deduplication               | Same URL shares META, both listeners notified           |
 | 4  | Hash-verified fetch         | SRI hash computed, verified, persistent                 |
 | 5  | Hash mismatch               | Wrong hash causes FAILED state                          |
-| 6  | Reset                       | Entries reset, triggers re-fetch                        |
-| 7  | Reset flag                  | Deferred flag destroys entry and disk file on release   |
+| 6  | Reset                       | Metas reset, triggers re-fetch                          |
+| 7  | Reset flag                  | Deferred flag destroys meta and disk file on release    |
 | 8  | Failed fetch                | Invalid host causes FAILED state                        |
-| 9  | Meta persistence            | Entry survives shutdown/reinit cycle via .meta sidecar  |
-| 10 | HTTP headers                | Response headers captured on ENTRY                      |
+| 9  | Meta persistence            | Meta survives shutdown/reinit cycle via .meta sidecar   |
+| 10 | HTTP headers                | Response headers captured on META                       |
 | 11 | FILE handle lifecycle       | Allocation, access, release without crash               |
 | 12 | History and nFileIx         | History accumulates, nFileIx is monotonic, Release keeps|
 | 13 | Notifications               | OnCacheFileCreated and OnCacheFileChanged fire           |
@@ -621,11 +652,11 @@ The `CacheTest` suite (`SneezeTest --cache`) validates:
 | 15 | Failed fetch HTTP status    | 404 response records correct HTTP status code           |
 | 16 | Clear flag                  | Clear immediately removes FILE from history             |
 | 17 | Clear flag toggle           | Clear(false) adds FILE back to history                  |
-| 18 | Reset flag toggle           | Reset(true) then Reset(false) preserves entry           |
+| 18 | Reset flag toggle           | Reset(true) then Reset(false) preserves meta            |
 | 19 | Deferred reset              | Reset deferred until last handle releases               |
 | 20 | Clear                       | Released FILEs removed, in-use FILEs survive            |
-| 21 | Reset (all)                 | Entries destroyed, disk files removed, triggers re-fetch|
-| 22 | Staleness rules             | Rules mark entries stale, trigger re-fetch on request   |
+| 21 | Reset (all)                 | Metas destroyed, disk files removed, triggers re-fetch  |
+| 22 | Staleness rules             | Rules mark metas stale, trigger re-fetch on request     |
 | 23 | Request with bFetch=false   | No-fetch request returns null for uncached URL          |
 | —  | OnCacheFileDeleted          | Notification fires immediately on Clear                 |
 
@@ -645,17 +676,17 @@ Implementation: iterate `Cache/<2-char>/` subdirectories, collect all `.data` fi
 
 ### Cache Eviction (Disk)
 
-ENTRY eviction from memory is implemented — entries are removed from `m_mapEntries` when their last FILE handle releases. However, `.meta` and `.data` files persist on disk indefinitely. The metadata infrastructure is already in place (size, creation time, last access time, access count) to support disk eviction policies:
+META eviction from memory is implemented — metas are removed from `m_mapMetas` when their last FILE handle releases. However, `.meta` and `.data` files persist on disk indefinitely. The metadata infrastructure is already in place (size, creation time, last access time, access count) to support disk eviction policies:
 
-- **LRU**: Evict entries with the oldest `lastAccessedAt`
-- **Size-based**: Evict entries when total cache size exceeds a threshold
-- **TTL**: Evict entries older than a configurable age
+- **LRU**: Evict metas with the oldest `lastAccessedAt`
+- **Size-based**: Evict metas when total cache size exceeds a threshold
+- **TTL**: Evict metas older than a configurable age
 
-The eviction check should run on `Initialize()` and periodically (e.g. after each new entry completes). Evicted entries should have their `.data` and `.meta` files deleted.
+The eviction check should run on `Initialize()` and periodically (e.g. after each new fetch completes). Evicted metas should have their `.data` and `.meta` files deleted.
 
 ### Retry Policy
 
-No automatic retry on fetch failure. If a fetch fails (network error, timeout, non-2xx status), the entry transitions to FAILED and the caller is notified. The caller must explicitly re-request the URL to retry.
+No automatic retry on fetch failure. If a fetch fails (network error, timeout, non-2xx status), the meta transitions to FAILED and the caller is notified. The caller must explicitly re-request the URL to retry.
 
 A future enhancement could add configurable retry with exponential backoff (e.g. 3 retries, 1s/2s/4s delays) as a MANAGER option.
 

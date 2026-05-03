@@ -57,7 +57,7 @@ class IENUM
 {
 public:
    virtual ~IENUM () {}
-   virtual void OnEntry (FILE* pFile) = 0;
+   virtual void OnMeta (FILE* pFile) = 0;
 };
 
 }} // namespace SNEEZE::CACHE

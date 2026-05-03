@@ -265,12 +265,11 @@ PERSONA_STORE* STORAGE_SYSTEM::GetPersona (const std::string& sPersonaHash)
 
 std::string STORAGE_SYSTEM::GetStorageRootPath () const
 {
-   std::string sAppData = m_pSneeze->GetHost ()->sAppDataPath;
-   if (sAppData.empty ())
-      return "";
-
-   std::filesystem::path pPath = std::filesystem::path (sAppData) / "Storage";
-   return pPath.string ();
+   std::string sResult;
+   std::string sSession = m_pSneeze->GetHost ()->SessionPath ();
+   if (!sSession.empty ())
+      sResult = (std::filesystem::path (sSession) / "Storage").string ();
+   return sResult;
 }
 
 }} // namespace SNEEZE::storage

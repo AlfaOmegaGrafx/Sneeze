@@ -20,6 +20,7 @@
 #include <condition_variable>
 #include <vector>
 #include <string>
+#include <filesystem>
 #include <cstdint>
 
 namespace SNEEZE { namespace som { class FABRIC; class NODE; class SCENE; }}
@@ -59,7 +60,10 @@ public:
    // --- Configuration (set by host before Initialize) ---
 
    std::string sAppDataPath;
+   std::string sSessionPath;
    std::string sRenderer;
+
+   std::string SessionPath () const { return (std::filesystem::path (sAppDataPath) / sSessionPath).string (); }
    void*       pNativeWindow  = nullptr;
    int         nWidth         = 0;
    int         nHeight        = 0;

@@ -14,8 +14,9 @@
 
 #include "cache/Manager.h"
 #include "cache/File.h"
-#include "cache/Entry.h"
+#include "cache/Meta.h"
 #include "cache/Types.h"
+#include "container/Container.h"
 #include "core/Sneeze.h"
 
 #include <openssl/sha.h>
@@ -141,6 +142,15 @@ static std::string ComputeSha256Hex (const uint8_t* pData, size_t nLen)
 static CACHE_TEST_LISTENER* s_pTestListener = nullptr;
 static SNEEZE::CORE::SNEEZE* s_pSneeze = nullptr;
 
+static auto s_pTestName = std::make_shared<SNEEZE::CONTAINER::NAME> (SNEEZE::CONTAINER::NAME {
+   "TestFingerprint_0123456789abcdef",
+   "TestOrg",
+   "TestCommon",
+   "TestStore",
+   "TestPersona",
+   true
+});
+
 // ---------------------------------------------------------------------------
 // Test 1: Manager initialization
 // ---------------------------------------------------------------------------
@@ -172,7 +182,7 @@ static void TestUnhashedFetch ()
    {
       TEST_FILE_LISTENER listener;
       SNEEZE::CACHE::FILE* pFile = pCache->Request (
-         &listener, "TestStore", "https://httpbin.org/bytes/128");
+         &listener, s_pTestName, "https://httpbin.org/bytes/128");
 
       Check (pFile != nullptr, "Request returned a handle");
 
@@ -217,7 +227,7 @@ static void TestUnhashedFetch ()
 }
 
 // ---------------------------------------------------------------------------
-// Test 3: Request deduplication (same URL returns shared ENTRY)
+// Test 3: Request deduplication (same URL returns shared META)
 // ---------------------------------------------------------------------------
 
 static void TestDeduplication ()
@@ -231,17 +241,17 @@ static void TestDeduplication ()
    TEST_FILE_LISTENER listenerB;
 
    SNEEZE::CACHE::FILE* pFileA = pCache->Request (
-      &listenerA, "TestStore", "https://httpbin.org/bytes/64");
+      &listenerA, s_pTestName, "https://httpbin.org/bytes/64");
    SNEEZE::CACHE::FILE* pFileB = pCache->Request (
-      &listenerB, "TestStore", "https://httpbin.org/bytes/64");
+      &listenerB, s_pTestName, "https://httpbin.org/bytes/64");
 
    Check (pFileA != nullptr, "First handle is valid");
    Check (pFileB != nullptr, "Second handle is valid");
 
    if (pFileA  &&  pFileB)
    {
-      Check (pFileA->GetEntry () == pFileB->GetEntry (),
-         "Both handles share the same ENTRY");
+      Check (pFileA->GetMeta () == pFileB->GetMeta (),
+         "Both handles share the same META");
 
       bool bGotA = listenerA.WaitFor (15000);
       bool bGotB = listenerB.WaitFor (15000);
@@ -278,7 +288,7 @@ static void TestHashVerifiedFetch ()
 
    TEST_FILE_LISTENER listenerPreFetch;
    SNEEZE::CACHE::FILE* pPreFile = pCache->Request (
-      &listenerPreFetch, "TestStore", "https://httpbin.org/base64/SGVsbG9Xb3JsZA==");
+      &listenerPreFetch, s_pTestName, "https://httpbin.org/base64/SGVsbG9Xb3JsZA==");
 
    if (pPreFile)
    {
@@ -302,7 +312,7 @@ static void TestHashVerifiedFetch ()
 
          TEST_FILE_LISTENER listenerVerified;
          SNEEZE::CACHE::FILE* pVerFile = pCache->Request (
-            &listenerVerified, "TestStore", "https://httpbin.org/base64/SGVsbG9Xb3JsZA==", sSri);
+            &listenerVerified, s_pTestName, "https://httpbin.org/base64/SGVsbG9Xb3JsZA==", sSri);
 
          if (pVerFile)
          {
@@ -351,7 +361,7 @@ static void TestHashMismatch ()
    std::string sBadHash = "sha256-0000000000000000000000000000000000000000000000000000000000000000";
 
    SNEEZE::CACHE::FILE* pFile = pCache->Request (
-      &listener, "TestStore", "https://httpbin.org/base64/SGVsbG9Xb3JsZA==", sBadHash);
+      &listener, s_pTestName, "https://httpbin.org/base64/SGVsbG9Xb3JsZA==", sBadHash);
 
    if (pFile)
    {
@@ -375,7 +385,7 @@ static void TestHashMismatch ()
 }
 
 // ---------------------------------------------------------------------------
-// Test 6: Reset removes entries, triggers re-fetch
+// Test 6: Reset removes metas, triggers re-fetch
 // ---------------------------------------------------------------------------
 
 static void TestReset ()
@@ -387,7 +397,7 @@ static void TestReset ()
 
    TEST_FILE_LISTENER listenerSession;
    SNEEZE::CACHE::FILE* pSession = pCache->Request (
-      &listenerSession, "TestStore", "https://httpbin.org/bytes/32");
+      &listenerSession, s_pTestName, "https://httpbin.org/bytes/32");
 
    if (pSession)
    {
@@ -401,7 +411,7 @@ static void TestReset ()
 
          TEST_FILE_LISTENER listenerAfter;
          SNEEZE::CACHE::FILE* pAfter = pCache->Request (
-            &listenerAfter, "TestStore", "https://httpbin.org/bytes/32");
+            &listenerAfter, s_pTestName, "https://httpbin.org/bytes/32");
 
          if (pAfter)
          {
@@ -429,7 +439,7 @@ static void TestReset ()
 }
 
 // ---------------------------------------------------------------------------
-// Test 7: Reset flag destroys entry and disk file on release
+// Test 7: Reset flag destroys meta and disk file on release
 // ---------------------------------------------------------------------------
 
 static void TestResetFlag ()
@@ -441,7 +451,7 @@ static void TestResetFlag ()
 
    TEST_FILE_LISTENER listener;
    SNEEZE::CACHE::FILE* pFile = pCache->Request (
-      &listener, "TestStore", "https://httpbin.org/bytes/16");
+      &listener, s_pTestName, "https://httpbin.org/bytes/16");
 
    if (pFile)
    {
@@ -483,7 +493,7 @@ static void TestFailedFetch ()
 
    TEST_FILE_LISTENER listener;
    SNEEZE::CACHE::FILE* pFile = pCache->Request (
-      &listener, "TestStore", "https://this-domain-does-not-exist-999.invalid/file.bin");
+      &listener, s_pTestName, "https://this-domain-does-not-exist-999.invalid/file.bin");
 
    if (pFile)
    {
@@ -523,7 +533,7 @@ static void TestSidecarPersistence ()
       pCache->Initialize ();
 
       TEST_FILE_LISTENER listenerPre;
-      SNEEZE::CACHE::FILE* pPre = pCache->Request (&listenerPre, "TestStore", sUrl);
+      SNEEZE::CACHE::FILE* pPre = pCache->Request (&listenerPre, s_pTestName, sUrl);
       if (pPre  &&  listenerPre.WaitFor (15000)  &&  listenerPre.Succeeded ())
       {
          std::vector<uint8_t> aData = pPre->ReadData ();
@@ -534,12 +544,12 @@ static void TestSidecarPersistence ()
          pPre = nullptr;
 
          TEST_FILE_LISTENER listenerHash;
-         SNEEZE::CACHE::FILE* pHash = pCache->Request (&listenerHash, "TestStore", sUrl, sSri);
+         SNEEZE::CACHE::FILE* pHash = pCache->Request (&listenerHash, s_pTestName, sUrl, sSri);
          if (pHash)
          {
             listenerHash.WaitFor (15000);
             Check (listenerHash.Succeeded (), "Persistent entry created");
-            Check (pHash->GetEntryIx () > 0, "Entry index assigned on creation");
+            Check (pHash->GetMetaIx () > 0, "Meta index assigned on creation");
             pHash->Release ();
          }
       }
@@ -557,21 +567,21 @@ static void TestSidecarPersistence ()
       delete pCache;
    }
 
-   // Phase 2: Reinitialize and check if the entry survived via .meta sidecar
+   // Phase 2: Reinitialize and check if the meta survived via .meta sidecar
    if (!sSri.empty ())
    {
       SNEEZE::CACHE::MANAGER* pCache2 = new SNEEZE::CACHE::MANAGER (s_pSneeze);
       pCache2->Initialize ();
 
       TEST_FILE_LISTENER listenerReload;
-      SNEEZE::CACHE::FILE* pReload = pCache2->Request (&listenerReload, "TestStore", sUrl, sSri);
+      SNEEZE::CACHE::FILE* pReload = pCache2->Request (&listenerReload, s_pTestName, sUrl, sSri);
 
       if (pReload)
       {
-         Check (pReload->IsReady (), "Entry survived shutdown (loaded from .meta sidecar)");
-         Check (pReload->IsHashed (), "Entry is still hashed");
+         Check (pReload->IsReady (), "Meta survived shutdown (loaded from .meta sidecar)");
+         Check (pReload->IsHashed (), "Meta is still hashed");
          Check (pReload->GetHash () == sSri, "Hash matches after reload");
-         Check (pReload->GetEntryIx () > 0, "Entry index preserved across sessions");
+         Check (pReload->GetMetaIx () > 0, "Meta index preserved across sessions");
 
          std::vector<uint8_t> aData = pReload->ReadData ();
          Check (!aData.empty (), "Data is readable after reload");
@@ -598,7 +608,7 @@ static void TestHttpHeaders ()
 
    TEST_FILE_LISTENER listener;
    SNEEZE::CACHE::FILE* pFile = pCache->Request (
-      &listener, "TestStore", "https://httpbin.org/response-headers?Content-Type=application/json");
+      &listener, s_pTestName, "https://httpbin.org/response-headers?Content-Type=application/json");
 
    if (pFile)
    {
@@ -639,13 +649,13 @@ static void TestFileHandleLifecycle ()
 
    TEST_FILE_LISTENER listener;
    SNEEZE::CACHE::FILE* pFile = pCache->Request (
-      &listener, "TestStore", "https://httpbin.org/bytes/8");
+      &listener, s_pTestName, "https://httpbin.org/bytes/8");
 
    Check (pFile != nullptr, "Handle allocated");
 
    if (pFile)
    {
-      Check (pFile->GetEntry () != nullptr, "Handle wraps a valid ENTRY");
+      Check (pFile->GetMeta () != nullptr, "Handle wraps a valid META");
       Check (!pFile->GetUrl ().empty (), "URL accessible from handle");
 
       listener.WaitFor (15000);
@@ -673,9 +683,9 @@ static void TestHistoryAndFileIx ()
    TEST_FILE_LISTENER listenerB;
 
    SNEEZE::CACHE::FILE* pFileA = pCache->Request (
-      &listenerA, "TestStore", "https://httpbin.org/bytes/16");
+      &listenerA, s_pTestName, "https://httpbin.org/bytes/16");
    SNEEZE::CACHE::FILE* pFileB = pCache->Request (
-      &listenerB, "TestStore", "https://httpbin.org/bytes/32");
+      &listenerB, s_pTestName, "https://httpbin.org/bytes/32");
 
    Check (pFileA != nullptr  &&  pFileB != nullptr, "Both handles allocated");
 
@@ -715,7 +725,7 @@ static void TestNotifications ()
 
    TEST_FILE_LISTENER listener;
    SNEEZE::CACHE::FILE* pFile = pCache->Request (
-      &listener, "TestStore", "https://httpbin.org/bytes/8?test=notifications");
+      &listener, s_pTestName, "https://httpbin.org/bytes/8?test=notifications");
 
    Check (s_pTestListener->m_nCreatedCount > 0, "OnCacheFileCreated fired");
 
@@ -755,7 +765,7 @@ static void TestServedFromCache ()
 
    // First fetch — should NOT be served from cache
    TEST_FILE_LISTENER listenerFirst;
-   SNEEZE::CACHE::FILE* pFirst = pCache->Request (&listenerFirst, "TestStore", sUrl);
+   SNEEZE::CACHE::FILE* pFirst = pCache->Request (&listenerFirst, s_pTestName, sUrl);
 
    if (pFirst)
    {
@@ -766,7 +776,7 @@ static void TestServedFromCache ()
 
          // Second request for the same URL — should be served from cache
          TEST_FILE_LISTENER listenerSecond;
-         SNEEZE::CACHE::FILE* pSecond = pCache->Request (&listenerSecond, "TestStore", sUrl);
+         SNEEZE::CACHE::FILE* pSecond = pCache->Request (&listenerSecond, s_pTestName, sUrl);
 
          if (pSecond)
          {
@@ -802,7 +812,7 @@ static void TestFailedFetchHttpStatus ()
 
    TEST_FILE_LISTENER listener;
    SNEEZE::CACHE::FILE* pFile = pCache->Request (
-      &listener, "TestStore", "https://httpbin.org/status/404");
+      &listener, s_pTestName, "https://httpbin.org/status/404");
 
    if (pFile)
    {
@@ -839,7 +849,7 @@ static void TestClearFlag ()
 
    TEST_FILE_LISTENER listener;
    SNEEZE::CACHE::FILE* pFile = pCache->Request (
-      &listener, "TestStore", "https://httpbin.org/bytes/8");
+      &listener, s_pTestName, "https://httpbin.org/bytes/8");
 
    if (pFile)
    {
@@ -872,7 +882,7 @@ static void TestResetFlagToggle ()
 
    TEST_FILE_LISTENER listener;
    SNEEZE::CACHE::FILE* pFile = pCache->Request (
-      &listener, "TestStore", "https://httpbin.org/bytes/8");
+      &listener, s_pTestName, "https://httpbin.org/bytes/8");
 
    if (pFile)
    {
@@ -915,9 +925,9 @@ static void TestDeferredReset ()
    TEST_FILE_LISTENER listenerB;
 
    SNEEZE::CACHE::FILE* pFileA = pCache->Request (
-      &listenerA, "TestStore", "https://httpbin.org/bytes/16");
+      &listenerA, s_pTestName, "https://httpbin.org/bytes/16");
    SNEEZE::CACHE::FILE* pFileB = pCache->Request (
-      &listenerB, "TestStore", "https://httpbin.org/bytes/16");
+      &listenerB, s_pTestName, "https://httpbin.org/bytes/16");
 
    if (pFileA  &&  pFileB)
    {
@@ -936,8 +946,8 @@ static void TestDeferredReset ()
             "Disk file survives while second handle is attached");
       }
 
-      Check (pFileB->GetEntry () != nullptr,
-         "Second handle still has a valid ENTRY");
+      Check (pFileB->GetMeta () != nullptr,
+         "Second handle still has a valid META");
 
       pFileB->Release ();
 
@@ -975,9 +985,9 @@ static void TestClear ()
    TEST_FILE_LISTENER listenerB;
 
    SNEEZE::CACHE::FILE* pFileA = pCache->Request (
-      &listenerA, "TestStore", "https://httpbin.org/bytes/8");
+      &listenerA, s_pTestName, "https://httpbin.org/bytes/8");
    SNEEZE::CACHE::FILE* pFileB = pCache->Request (
-      &listenerB, "TestStore", "https://httpbin.org/bytes/16");
+      &listenerB, s_pTestName, "https://httpbin.org/bytes/16");
 
    if (pFileA  &&  pFileB)
    {
@@ -1026,7 +1036,7 @@ static void TestDeletedNotification ()
 
    TEST_FILE_LISTENER listener;
    SNEEZE::CACHE::FILE* pFile = pCache->Request (
-      &listener, "TestStore", "https://httpbin.org/bytes/8");
+      &listener, s_pTestName, "https://httpbin.org/bytes/8");
 
    if (pFile)
    {
@@ -1063,7 +1073,7 @@ static void TestStalenessRules ()
       pCache->Initialize ();
 
       TEST_FILE_LISTENER listener;
-      SNEEZE::CACHE::FILE* pFile = pCache->Request (&listener, "TestStore", sUrl);
+      SNEEZE::CACHE::FILE* pFile = pCache->Request (&listener, s_pTestName, sUrl);
 
       if (pFile)
       {
@@ -1094,11 +1104,11 @@ static void TestStalenessRules ()
       pCache2->AddRule ("", "9999-12-31T23:59:59Z");
 
       TEST_FILE_LISTENER listener2;
-      SNEEZE::CACHE::FILE* pFile2 = pCache2->Request (&listener2, "TestStore", sUrl);
+      SNEEZE::CACHE::FILE* pFile2 = pCache2->Request (&listener2, s_pTestName, sUrl);
 
       if (pFile2)
       {
-         Check (!pFile2->IsServedFromCache (), "Stale entry triggered re-fetch");
+         Check (!pFile2->IsServedFromCache (), "Stale meta triggered re-fetch");
          listener2.WaitFor (15000);
          pFile2->Release ();
       }
@@ -1121,7 +1131,7 @@ static void TestNoFetchRequest ()
    pCache->Initialize ();
 
    SNEEZE::CACHE::FILE* pFile = pCache->Request (
-      nullptr, "TestStore", "https://this-url-does-not-exist-in-cache.invalid/none",
+      nullptr, s_pTestName, "https://this-url-does-not-exist-in-cache.invalid/none",
       std::string (), SNEEZE::CACHE::REQUEST_CREATE);
 
    Check (pFile == nullptr, "bFetch=false returns null for uncached URL");

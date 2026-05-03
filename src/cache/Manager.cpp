@@ -13,9 +13,8 @@
 // limitations under the License.
 
 #include "Manager.h"
-#include "Entry.h"
+#include "Meta.h"
 #include "File.h"
-#include "Store.h"
 #include "core/Sneeze.h"
 #include "net/HttpClient.h"
 
@@ -31,29 +30,17 @@
 #include <cstring>
 #include <algorithm>
 
-
 namespace SNEEZE { namespace CACHE {
 
-// ---------------------------------------------------------------------------
-// Curl callbacks for streaming to a file with header capture
-// ---------------------------------------------------------------------------
-
-struct CURL_FETCH_CONTEXT
+size_t MANAGER::FetchWriteCallback (char* pData, size_t nSize, size_t nMembers, void* pUser)
 {
-   std::FILE*   pFile;
-   std::unordered_map<std::string, std::string> mapHeaders;
-   long         nHttpCode;
-};
-
-static size_t FetchWriteCallback (char* pData, size_t nSize, size_t nMembers, void* pUser)
-{
-   CURL_FETCH_CONTEXT* pCtx = static_cast<CURL_FETCH_CONTEXT*> (pUser);
+   FETCH_CONTEXT* pCtx = static_cast<FETCH_CONTEXT*> (pUser);
    return std::fwrite (pData, nSize, nMembers, pCtx->pFile);
 }
 
-static size_t FetchHeaderCallback (char* pData, size_t nSize, size_t nMembers, void* pUser)
+size_t MANAGER::FetchHeaderCallback (char* pData, size_t nSize, size_t nMembers, void* pUser)
 {
-   CURL_FETCH_CONTEXT* pCtx = static_cast<CURL_FETCH_CONTEXT*> (pUser);
+   FETCH_CONTEXT* pCtx = static_cast<FETCH_CONTEXT*> (pUser);
    size_t nTotal = nSize * nMembers;
    std::string sLine (pData, nTotal);
 
@@ -86,7 +73,7 @@ MANAGER::MANAGER (CORE::SNEEZE* pSneeze) :
    m_bShuttingDown   (false),
    m_bCacheEnabled   (true),
    m_bDisplayEnabled (true),
-   m_nNextEntryIx    (1),
+   m_nNextMetaIx     (1),
    m_nNextFileIx     (1),
    m_tpEpoch         (std::chrono::steady_clock::now ())
 {
@@ -110,7 +97,7 @@ bool MANAGER::Initialize ()
 
       LoadRules ();
 
-      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "CACHE", "Initialized (path: " + m_sCachePath + ", rules: " + std::to_string (m_aRules.size ()) + ", entryIx: " + std::to_string (m_nNextEntryIx) + ")");
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "CACHE", "Initialized (path: " + m_sCachePath + ", rules: " + std::to_string (m_aRules.size ()) + ", nMetaIx: " + std::to_string (m_nNextMetaIx) + ")");
 
       bResult = true;
    }
@@ -142,15 +129,15 @@ void MANAGER::Shutdown ()
       {
          std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-         for (auto& [sUrl, pEntry] : m_mapEntries)
+         for (auto& [sUrl, pMeta] : m_mapMetas)
          {
-            if (pEntry->GetState () == STATE_READY)
-               SaveMeta (pEntry.get ());
+            if (pMeta->GetState () == STATE_READY)
+               SaveMeta (pMeta.get ());
          }
 
          SaveRules ();
 
-         m_mapEntries.clear ();
+         m_mapMetas.clear ();
       }
 
       DeleteFiles ();
@@ -166,7 +153,7 @@ void MANAGER::Shutdown ()
 double MANAGER::SecondsSinceEpoch () const
 {
    auto tpNow = std::chrono::steady_clock::now ();
- 
+
    return std::chrono::duration<double> (tpNow - m_tpEpoch).count ();
 }
 
@@ -186,17 +173,17 @@ void MANAGER::DeleteFiles ()
    m_apFile.clear ();
 }
 
-void MANAGER::ResetEntry (ENTRY* pEntry)
+void MANAGER::ResetMeta (META* pMeta)
 {
-   std::string sDiskKey = ComputeDiskKey (pEntry->GetUrl ());
+   std::string sDiskKey = ComputeDiskKey (pMeta->GetUrl ());
    std::error_code ec;
 
    std::filesystem::remove (DiskKeyToPath (sDiskKey, DISKFILE_DATA), ec);
    std::filesystem::remove (DiskKeyToPath (sDiskKey, DISKFILE_META), ec);
    std::filesystem::remove (DiskKeyToPath (sDiskKey, DISKFILE_TEMP), ec);
 
-   pEntry->ResetState ();
-   pEntry->SetEntryIx (m_nNextEntryIx++);
+   pMeta->ResetState ();
+   pMeta->SetMetaIx (m_nNextMetaIx++);
 }
 
 // ---------------------------------------------------------------------------
@@ -223,23 +210,23 @@ void MANAGER::SweepCompletedThreads ()
    }
 }
 
-void MANAGER::DispatchFetch (ENTRY* pEntry)
+void MANAGER::DispatchFetch (META* pMeta)
 {
    SweepCompletedThreads ();
 
    if (static_cast<int> (m_apFetchSlots.size ()) < kMAX_CONCURRENT_FETCHES)
    {
       FETCH_SLOT* pSlot = new FETCH_SLOT ();
-      pSlot->thread = std::thread ([this, pEntry, pSlot] ()
+      pSlot->thread = std::thread ([this, pMeta, pSlot] ()
       {
-         FetchEntry (pEntry);
+         FetchMeta (pMeta);
          pSlot->bDone.store (true);
       });
       m_apFetchSlots.push_back (pSlot);
    }
    else
    {
-      m_aFetchQueue.push (pEntry);
+      m_aFetchQueue.push (pMeta);
    }
 }
 
@@ -247,12 +234,12 @@ void MANAGER::DispatchFetch (ENTRY* pEntry)
 // Request / Release
 // ---------------------------------------------------------------------------
 
-FILE* MANAGER::Request (IFILE* pListener, const std::string& sStore, const std::string& sUrl)
+FILE* MANAGER::Request (IFILE* pListener, std::shared_ptr<CONTAINER::NAME> pName, const std::string& sUrl)
 {
-   return Request (pListener, sStore, sUrl, std::string (), kREQUEST_DEFAULT);
+   return Request (pListener, pName, sUrl, std::string (), kREQUEST_DEFAULT);
 }
 
-FILE* MANAGER::Request (IFILE* pListener, const std::string& sStore, const std::string& sUrl, const std::string& sHash, uint32_t bFlags, uint32_t nEntryIx)
+FILE* MANAGER::Request (IFILE* pListener, std::shared_ptr<CONTAINER::NAME> pName, const std::string& sUrl, const std::string& sHash, uint32_t bFlags, uint32_t nMetaIx)
 {
    bool bCreate = (bFlags & REQUEST_CREATE) != 0;
    bool bFetch  = (bFlags & REQUEST_FETCH)  != 0;
@@ -262,128 +249,128 @@ FILE* MANAGER::Request (IFILE* pListener, const std::string& sStore, const std::
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-      STORE* pStore = FindOrCreateStore (sStore);
+      // Resolve meta: map -> disk -> create
+      auto it = m_mapMetas.find (sUrl);
 
-      // Resolve entry: map → disk → create
-      auto it = m_mapEntries.find (sUrl);
-
-      if (it == m_mapEntries.end ())
+      if (it == m_mapMetas.end ())
       {
          std::string sDiskKey = ComputeDiskKey (sUrl);
          if (LoadMeta (sDiskKey, sUrl))
-            it = m_mapEntries.find (sUrl);
+            it = m_mapMetas.find (sUrl);
       }
 
-      if (it == m_mapEntries.end ()  &&  bCreate  &&  bFetch)
+      if (it == m_mapMetas.end ()  &&  bCreate  &&  bFetch)
       {
-         auto pEntryPtr = std::make_unique<ENTRY> (this, sUrl, sHash);
-         pEntryPtr->SetEntryIx (m_nNextEntryIx++);
-         m_mapEntries[sUrl] = std::move (pEntryPtr);
-         it = m_mapEntries.find (sUrl);
+         auto pMetaPtr = std::make_unique<META> (this, sUrl, sHash);
+         pMetaPtr->SetMetaIx (m_nNextMetaIx++);
+         m_mapMetas[sUrl] = std::move (pMetaPtr);
+         it = m_mapMetas.find (sUrl);
       }
 
-      if (it != m_mapEntries.end ())
+      if (it != m_mapMetas.end ())
       {
-         ENTRY* pEntry = it->second.get ();
+         META* pMeta = it->second.get ();
 
-         // Entry-index staleness: caller expected a specific version
-         if (nEntryIx != 0  &&  pEntry->GetEntryIx () != nEntryIx)
-            it = m_mapEntries.end ();
+         // Meta-index staleness: caller expected a specific version
+         if (nMetaIx != 0  &&  pMeta->GetMetaIx () != nMetaIx)
+            it = m_mapMetas.end ();
       }
 
-      if (it != m_mapEntries.end ())
+      if (it != m_mapMetas.end ())
       {
-         ENTRY* pEntry = it->second.get ();
+         META* pMeta = it->second.get ();
 
-         // Staleness check for entries loaded from disk
-         if (pEntry->GetState () == STATE_READY  &&  IsEntryStale (pEntry))
+         // Staleness check for metas loaded from disk
+         if (pMeta->GetState () == STATE_READY  &&  IsMetaStale (pMeta))
          {
             if (!bFetch)
             {
-               it = m_mapEntries.end ();
+               it = m_mapMetas.end ();
             }
             else
             {
-               ResetEntry (pEntry);
+               ResetMeta (pMeta);
             }
          }
       }
 
-      if (it != m_mapEntries.end ())
+      if (it != m_mapMetas.end ())
       {
-         ENTRY* pEntry = it->second.get ();
+         META* pMeta = it->second.get ();
 
-         pFile = new FILE (this, pEntry, pStore, pListener, m_nNextFileIx++);
-         pEntry->AttachFile (pFile);
+         pFile = new FILE (this, pMeta, pName, pListener, m_nNextFileIx++);
+         pMeta->AttachFile (pFile);
          m_apFile.push_back (pFile);
 
-         STATE bState      = pEntry->GetState ();
-         bool  bNeedsFetch = false;
+         STATE bState       = pMeta->GetState ();
+         bool  bNeedsFetch  = false;
+         bool  bNotifyReady = false;
+         bool  bNotifyFailed = false;
 
-         if (bState == STATE_READY  &&  !sHash.empty ()  &&  !pEntry->IsHashed ())
+         if (bState == STATE_READY  &&  !sHash.empty ()  &&  !pMeta->IsHashed ())
          {
             std::string sAlgo, sDigest;
             if (ParseSriHash (sHash, sAlgo, sDigest))
             {
-               std::string sComputed = ComputeFileHash (pEntry->GetDiskPath (), sAlgo);
+               std::string sComputed = ComputeFileHash (pMeta->GetDiskPath (), sAlgo);
                if (sComputed == sDigest)
                {
-                  pEntry->SetHash (sHash);
-                  pEntry->TouchAccess ();
-                  pEntry->SetServedFromCache (true);
-                  pFile->SnapshotEntry ();
+                  pMeta->SetHash (sHash);
+                  pMeta->TouchAccess ();
+                  pMeta->SetServedFromCache (true);
                }
                else
                {
-                  pEntry->SetHash (sHash);
+                  pMeta->SetHash (sHash);
                   bNeedsFetch = true;
                }
             }
          }
-         else if (bState != STATE_FETCHING  &&  !sHash.empty ()  &&  pEntry->IsHashed ()  &&  pEntry->GetHash () != sHash)
+         else if (bState != STATE_FETCHING  &&  !sHash.empty ()  &&  pMeta->IsHashed ()  &&  pMeta->GetHash () != sHash)
          {
-            pEntry->SetHash (sHash);
+            pMeta->SetHash (sHash);
             bNeedsFetch = true;
          }
          else if (bState == STATE_READY  &&  !m_bCacheEnabled)
          {
-            pEntry->SetServedFromCache (false);
+            pMeta->SetServedFromCache (false);
             bNeedsFetch = true;
          }
          else if (bState == STATE_READY)
          {
-            pEntry->TouchAccess ();
-            pEntry->SetServedFromCache (true);
-            pFile->SnapshotEntry ();
-            if (pListener)
-               pListener->OnFileReady (pFile);
+            pMeta->TouchAccess ();
+            pMeta->SetServedFromCache (true);
+            bNotifyReady = true;
          }
          else if (bState == STATE_FAILED)
          {
-            pFile->SnapshotEntry ();
-            if (pListener)
-               pListener->OnFileFailed (pFile);
+            bNotifyFailed = true;
          }
          else if (bState == STATE_IDLE)
          {
             if (!sHash.empty ())
-               pEntry->SetHash (sHash);
+               pMeta->SetHash (sHash);
             bNeedsFetch = true;
          }
 
          if (bNeedsFetch  &&  bFetch)
          {
-            pEntry->SetFetching ();
-            pEntry->SetFetchQueuedTime (SecondsSinceEpoch ());
-            pFile->SnapshotEntry ();
-            DispatchFetch (pEntry);
+            pMeta->SetFetching ();
+            pMeta->SetFetchQueuedTime (SecondsSinceEpoch ());
+            pFile->SnapshotProgress ();
+            DispatchFetch (pMeta);
          }
-         else if (bNeedsFetch  &&  !bFetch)
+         else if (bState != STATE_FETCHING)
          {
-            pFile->SnapshotEntry ();
-            if (pListener)
-               pListener->OnFileFailed (pFile);
+            pFile->SnapshotFinal ();
+            if (bNeedsFetch)
+               bNotifyFailed = true;
          }
+
+         if (bNotifyReady  &&  pListener)
+            pListener->OnFileReady (pFile);
+         else if (bNotifyFailed  &&  pListener)
+            pListener->OnFileFailed (pFile);
 
          if (!m_bDisplayEnabled)
             pFile->SetPendingClear (true);
@@ -402,23 +389,23 @@ void MANAGER::Release (FILE* pFile)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-      ENTRY* pEntry = pFile->GetEntry ();
+      META* pMeta = pFile->GetMeta ();
 
-      if (pEntry)
+      if (pMeta)
       {
-         pFile->SnapshotEntry ();
-         pEntry->DetachFile (pFile);
-         pFile->SetEntry (nullptr);
+         pFile->SnapshotFinal ();
+         pMeta->DetachFile (pFile);
+         pFile->SetMeta (nullptr);
 
-         if (pEntry->GetFileCount () == 0)
+         if (pMeta->GetFileCount () == 0)
          {
-            if (pEntry->IsPendingReset ())
-               ResetEntry (pEntry);
-            else if (pEntry->GetState () == STATE_READY)
-               SaveMeta (pEntry);
+            if (pMeta->IsPendingReset ())
+               ResetMeta (pMeta);
+            else if (pMeta->GetState () == STATE_READY)
+               SaveMeta (pMeta);
 
-            std::string sUrl = pEntry->GetUrl ();
-            m_mapEntries.erase (sUrl);
+            std::string sUrl = pMeta->GetUrl ();
+            m_mapMetas.erase (sUrl);
          }
       }
 
@@ -443,32 +430,32 @@ bool MANAGER::ReopenFile (FILE* pFile)
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
       std::string sUrl      = pFile->GetUrl ();
-      uint32_t    nEntryIx  = pFile->GetEntryIx ();
+      uint32_t    nMetaIx   = pFile->GetMetaIx ();
 
-      auto it = m_mapEntries.find (sUrl);
+      auto it = m_mapMetas.find (sUrl);
 
-      if (it == m_mapEntries.end ())
+      if (it == m_mapMetas.end ())
       {
          std::string sDiskKey = ComputeDiskKey (sUrl);
          if (LoadMeta (sDiskKey, sUrl))
-            it = m_mapEntries.find (sUrl);
+            it = m_mapMetas.find (sUrl);
       }
 
-      if (it != m_mapEntries.end ())
+      if (it != m_mapMetas.end ())
       {
-         ENTRY* pEntry = it->second.get ();
+         META* pMeta = it->second.get ();
 
-         if (pEntry->GetEntryIx () == nEntryIx)
+         if (pMeta->GetMetaIx () == nMetaIx)
          {
-            pFile->SetEntry (pEntry);
-            pEntry->AttachFile (pFile);
-            pFile->SnapshotEntry ();
+            pFile->SetMeta (pMeta);
+            pMeta->AttachFile (pFile);
+            pFile->SnapshotFinal ();
             bResult = true;
 
             IFILE* pListener = pFile->GetListener ();
             if (pListener)
             {
-               if (pEntry->GetState () == STATE_READY)
+               if (pMeta->GetState () == STATE_READY)
                   pListener->OnFileReady (pFile);
                else
                   pListener->OnFileFailed (pFile);
@@ -510,11 +497,11 @@ void MANAGER::Clear (FILE* pFile, bool b)
 
 void MANAGER::Reset (FILE* pFile, bool b)
 {
-   if (pFile  &&  pFile->GetEntry ())
+   if (pFile  &&  pFile->GetMeta ())
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-      pFile->GetEntry ()->SetPendingReset (b);
+      pFile->GetMeta ()->SetPendingReset (b);
    }
 }
 
@@ -550,12 +537,12 @@ void MANAGER::Reset ()
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-   for (auto& [sUrl, pEntryPtr] : m_mapEntries)
+   for (auto& [sUrl, pMetaPtr] : m_mapMetas)
    {
-      ENTRY* pEntry = pEntryPtr.get ();
-      pEntry->SetPendingReset (true);
-      if (pEntry->GetFileCount () == 0)
-         ResetEntry (pEntry);
+      META* pMeta = pMetaPtr.get ();
+      pMeta->SetPendingReset (true);
+      if (pMeta->GetFileCount () == 0)
+         ResetMeta (pMeta);
    }
 
    std::error_code ec;
@@ -599,53 +586,53 @@ void MANAGER::Enumerate (IENUM* pEnum)
       if (sUrl.empty ())
          continue;
 
-      auto it = m_mapEntries.find (sUrl);
-      if (it != m_mapEntries.end ())
+      auto it = m_mapMetas.find (sUrl);
+      if (it != m_mapMetas.end ())
       {
-         ENTRY* pEntry = it->second.get ();
-         pFile->SetEntry (pEntry);
-         pFile->SnapshotEntry ();
-         pEntry->AttachFile (pFile);
+         META* pMeta = it->second.get ();
+         pFile->SetMeta (pMeta);
+         pFile->SnapshotFinal ();
+         pMeta->AttachFile (pFile);
 
-         pEnum->OnEntry (pFile);
+         pEnum->OnMeta (pFile);
 
-         pEntry->DetachFile (pFile);
+         pMeta->DetachFile (pFile);
       }
       else
       {
          std::string sDataPath = pDirEntry.path ().string ();
          sDataPath = sDataPath.substr (0, sDataPath.size () - 5) + ".data";
 
-         auto pEntry = std::make_unique<ENTRY> (this, sUrl, sHash);
-         pEntry->SetDiskPath (sDataPath);
-         pEntry->SetSizeBytes (jMeta.value ("sizeBytes", static_cast<uint64_t> (0)));
-         pEntry->SetCreatedTime (jMeta.value ("createdAt", ""));
-         pEntry->SetEntryIx (jMeta.value ("entryIx", static_cast<uint32_t> (0)));
-         pEntry->SetHttpStatus (jMeta.value ("httpStatus", static_cast<long> (0)));
+         auto pMeta = std::make_unique<META> (this, sUrl, sHash);
+         pMeta->SetDiskPath (sDataPath);
+         pMeta->SetSizeBytes (jMeta.value ("sizeBytes", static_cast<uint64_t> (0)));
+         pMeta->SetCreatedTime (jMeta.value ("createdAt", ""));
+         pMeta->SetMetaIx (jMeta.value ("nMetaIx", static_cast<uint32_t> (0)));
+         pMeta->SetHttpStatus (jMeta.value ("httpStatus", static_cast<long> (0)));
 
          if (jMeta.contains ("headers"))
          {
             std::unordered_map<std::string, std::string> mapHeaders;
             for (auto& [sKey, sVal] : jMeta["headers"].items ())
                mapHeaders[sKey] = sVal.get<std::string> ();
-            pEntry->SetHeaders (mapHeaders);
+            pMeta->SetHeaders (mapHeaders);
          }
 
          if (std::filesystem::exists (sDataPath))
-            pEntry->Complete (sDataPath, pEntry->GetSizeBytes ());
+            pMeta->Complete (sDataPath, pMeta->GetSizeBytes ());
 
-         ENTRY* pRaw = pEntry.get ();
-         pFile->SetEntry (pRaw);
-         pFile->SnapshotEntry ();
+         META* pRaw = pMeta.get ();
+         pFile->SetMeta (pRaw);
+         pFile->SnapshotFinal ();
          pRaw->AttachFile (pFile);
 
-         pEnum->OnEntry (pFile);
+         pEnum->OnMeta (pFile);
 
          pRaw->DetachFile (pFile);
       }
    }
 
-   pFile->SetEntry (nullptr);
+   pFile->SetMeta (nullptr);
    delete pFile;
 }
 
@@ -656,9 +643,9 @@ void MANAGER::Enumerate (IENUM* pEnum)
 std::string MANAGER::GetCachePath () const
 {
    std::string sResult;
-   std::string sAppData = m_pSneeze->GetHost ()->sAppDataPath;
-   if (!sAppData.empty ())
-      sResult = (std::filesystem::path (sAppData) / "Cache").string ();
+   std::string sSession = m_pSneeze->GetHost ()->SessionPath ();
+   if (!sSession.empty ())
+      sResult = (std::filesystem::path (sSession) / "Cache").string ();
    return sResult;
 }
 
@@ -789,28 +776,28 @@ std::string MANAGER::ComputeDataHash (const uint8_t* pData, size_t nLen, const s
 }
 
 // ---------------------------------------------------------------------------
-// Sidecar metadata (per-entry .meta files)
+// Sidecar metadata (per-meta .meta files)
 // ---------------------------------------------------------------------------
 
-void MANAGER::SaveMeta (ENTRY* pEntry)
+void MANAGER::SaveMeta (META* pMeta)
 {
-   std::string sDiskKey  = ComputeDiskKey (pEntry->GetUrl ());
+   std::string sDiskKey  = ComputeDiskKey (pMeta->GetUrl ());
    std::string sMetaPath = DiskKeyToPath (sDiskKey, DISKFILE_META);
 
    std::filesystem::create_directories (std::filesystem::path (sMetaPath).parent_path ());
 
    nlohmann::json jMeta;
-   jMeta["url"]            = pEntry->GetUrl ();
-   jMeta["hash"]           = pEntry->GetHash ();
-   jMeta["entryIx"]        = pEntry->GetEntryIx ();
-   jMeta["sizeBytes"]      = pEntry->GetSizeBytes ();
-   jMeta["createdAt"]      = pEntry->GetCreatedTime ();
-   jMeta["lastAccessedAt"] = pEntry->GetLastAccessTime ();
-   jMeta["accessCount"]    = pEntry->GetAccessCount ();
-   jMeta["httpStatus"]     = pEntry->GetHttpStatus ();
+   jMeta["url"]            = pMeta->GetUrl ();
+   jMeta["hash"]           = pMeta->GetHash ();
+   jMeta["nMetaIx"]        = pMeta->GetMetaIx ();
+   jMeta["sizeBytes"]      = pMeta->GetSizeBytes ();
+   jMeta["createdAt"]      = pMeta->GetCreatedTime ();
+   jMeta["lastAccessedAt"] = pMeta->GetLastAccessTime ();
+   jMeta["accessCount"]    = pMeta->GetAccessCount ();
+   jMeta["httpStatus"]     = pMeta->GetHttpStatus ();
 
    nlohmann::json jHeaders = nlohmann::json::object ();
-   for (auto& [sKey, sVal] : pEntry->GetHeaders ())
+   for (auto& [sKey, sVal] : pMeta->GetHeaders ())
       jHeaders[sKey] = sVal;
    jMeta["headers"] = jHeaders;
 
@@ -857,25 +844,25 @@ bool MANAGER::LoadMeta (const std::string& sDiskKey, const std::string& sUrl)
          if (sMetaUrl == sUrl  &&  std::filesystem::exists (sDataPath))
          {
             std::string sHash = jMeta.value ("hash", "");
-            auto pEntry = std::make_unique<ENTRY> (this, sUrl, sHash);
-            pEntry->SetDiskPath (sDataPath);
-            pEntry->SetSizeBytes (jMeta.value ("sizeBytes", static_cast<uint64_t> (0)));
-            pEntry->SetCreatedTime (jMeta.value ("createdAt", ""));
-            pEntry->SetEntryIx (jMeta.value ("entryIx", static_cast<uint32_t> (0)));
+            auto pMeta = std::make_unique<META> (this, sUrl, sHash);
+            pMeta->SetDiskPath (sDataPath);
+            pMeta->SetSizeBytes (jMeta.value ("sizeBytes", static_cast<uint64_t> (0)));
+            pMeta->SetCreatedTime (jMeta.value ("createdAt", ""));
+            pMeta->SetMetaIx (jMeta.value ("nMetaIx", static_cast<uint32_t> (0)));
 
             if (jMeta.contains ("headers"))
             {
                std::unordered_map<std::string, std::string> mapHeaders;
                for (auto& [sKey, sVal] : jMeta["headers"].items ())
                   mapHeaders[sKey] = sVal.get<std::string> ();
-               pEntry->SetHeaders (mapHeaders);
+               pMeta->SetHeaders (mapHeaders);
             }
 
-            pEntry->SetHttpStatus (jMeta.value ("httpStatus", static_cast<long> (0)));
-            pEntry->SetServedFromCache (true);
-            pEntry->Complete (sDataPath, pEntry->GetSizeBytes ());
+            pMeta->SetHttpStatus (jMeta.value ("httpStatus", static_cast<long> (0)));
+            pMeta->SetServedFromCache (true);
+            pMeta->Complete (sDataPath, pMeta->GetSizeBytes ());
 
-            m_mapEntries[sUrl] = std::move (pEntry);
+            m_mapMetas[sUrl] = std::move (pMeta);
             bResult = true;
          }
       }
@@ -904,12 +891,12 @@ void MANAGER::LoadRules ()
       }
       catch (...)
       {
-         m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "CACHE", "Failed to parse rules.json — defaulting to stale");
+         m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Warning, "CACHE", "Failed to parse rules.json -- defaulting to stale");
       }
 
       if (bParsed)
       {
-         m_nNextEntryIx = jDoc.value ("nextEntryIx", static_cast<uint32_t> (1));
+         m_nNextMetaIx = jDoc.value ("nNextMetaIx", static_cast<uint32_t> (1));
 
          if (jDoc.contains ("rules"))
          {
@@ -925,40 +912,40 @@ void MANAGER::LoadRules ()
    }
    else
    {
-      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "CACHE", "No rules.json — creating fresh");
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "CACHE", "No rules.json -- creating fresh");
       SaveRules ();
    }
 }
 
 void MANAGER::SaveRules ()
 {
-   if (m_sCachePath.empty ())
-      return;
-
-   nlohmann::json jDoc;
-   jDoc["nextEntryIx"] = m_nNextEntryIx;
-
-   nlohmann::json jRules = nlohmann::json::array ();
-   for (auto& rule : m_aRules)
+   if (!m_sCachePath.empty ())
    {
-      nlohmann::json jRule;
-      jRule["contentType"] = rule.sContentType;
-      jRule["olderThan"]   = rule.sOlderThan;
-      jRules.push_back (jRule);
-   }
-   jDoc["rules"] = jRules;
+      nlohmann::json jDoc;
+      jDoc["nNextMetaIx"] = m_nNextMetaIx;
 
-   std::string sRulesPath = (std::filesystem::path (m_sCachePath) / "rules.json"     ).string ();
-   std::string sTmpPath   = (std::filesystem::path (m_sCachePath) / "rules.json.temp").string ();
+      nlohmann::json jRules = nlohmann::json::array ();
+      for (auto& rule : m_aRules)
+      {
+         nlohmann::json jRule;
+         jRule["contentType"] = rule.sContentType;
+         jRule["olderThan"]   = rule.sOlderThan;
+         jRules.push_back (jRule);
+      }
+      jDoc["rules"] = jRules;
 
-   std::ofstream file (sTmpPath, std::ios::trunc);
-   if (file.is_open ())
-   {
-      file << jDoc.dump (2);
-      file.close ();
+      std::string sRulesPath = (std::filesystem::path (m_sCachePath) / "rules.json"     ).string ();
+      std::string sTmpPath   = (std::filesystem::path (m_sCachePath) / "rules.json.temp").string ();
 
-      std::error_code ec;
-      std::filesystem::rename (sTmpPath, sRulesPath, ec);
+      std::ofstream file (sTmpPath, std::ios::trunc);
+      if (file.is_open ())
+      {
+         file << jDoc.dump (2);
+         file.close ();
+
+         std::error_code ec;
+         std::filesystem::rename (sTmpPath, sRulesPath, ec);
+      }
    }
 }
 
@@ -977,12 +964,12 @@ void MANAGER::AddRule (const std::string& sContentType, const std::string& sOlde
    SaveRules ();
 }
 
-bool MANAGER::IsEntryStale (ENTRY* pEntry) const
+bool MANAGER::IsMetaStale (META* pMeta) const
 {
    bool bResult = false;
 
-   std::string sContentType = pEntry->GetHeader ("content-type");
-   std::string sCreatedAt   = pEntry->GetCreatedTime ();
+   std::string sContentType = pMeta->GetHeader ("content-type");
+   std::string sCreatedAt   = pMeta->GetCreatedTime ();
 
    for (auto& rule : m_aRules)
    {
@@ -1003,16 +990,16 @@ bool MANAGER::IsEntryStale (ENTRY* pEntry) const
 // Background fetch
 // ---------------------------------------------------------------------------
 
-void MANAGER::FetchEntry (ENTRY* pEntry)
+void MANAGER::FetchMeta (META* pMeta)
 {
    std::string sUrl;
    std::string sHash;
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-      sUrl  = pEntry->GetUrl ();
-      sHash = pEntry->GetHash ();
-      pEntry->SetFetchStartTime (SecondsSinceEpoch ());
+      sUrl  = pMeta->GetUrl ();
+      sHash = pMeta->GetHash ();
+      pMeta->SetFetchStartTime (SecondsSinceEpoch ());
    }
    std::string sDiskKey  = ComputeDiskKey (sUrl);
    std::string sTmpPath  = DiskKeyToPath (sDiskKey, DISKFILE_TEMP);
@@ -1020,7 +1007,7 @@ void MANAGER::FetchEntry (ENTRY* pEntry)
    uint64_t    nSizeBytes = 0;
    bool        bOk        = !m_bShuttingDown.load ();
    bool        bHaveTmp   = false;
-   CURL_FETCH_CONTEXT ctx = {};
+   FETCH_CONTEXT ctx = {};
    ctx.nHttpCode = 0;
 
    // Stage 1: Open temp file
@@ -1135,21 +1122,21 @@ void MANAGER::FetchEntry (ENTRY* pEntry)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-      pEntry->SetHttpStatus (ctx.nHttpCode);
-      pEntry->SetFetchEndTime (SecondsSinceEpoch ());
+      pMeta->SetHttpStatus (ctx.nHttpCode);
+      pMeta->SetFetchEndTime (SecondsSinceEpoch ());
 
       if (bOk)
       {
-         pEntry->SetHeaders (ctx.mapHeaders);
-         pEntry->Complete (sFinalPath, nSizeBytes);
-         NotifyFiles (pEntry->CollectFiles (), STATE_READY);
+         pMeta->SetHeaders (ctx.mapHeaders);
+         pMeta->Complete (sFinalPath, nSizeBytes);
+         NotifyFiles (pMeta->CollectFiles (), STATE_READY);
       }
       else
       {
          if (!ctx.mapHeaders.empty ())
-            pEntry->SetHeaders (ctx.mapHeaders);
-         pEntry->Fail ();
-         NotifyFiles (pEntry->CollectFiles (), STATE_FAILED);
+            pMeta->SetHeaders (ctx.mapHeaders);
+         pMeta->Fail ();
+         NotifyFiles (pMeta->CollectFiles (), STATE_FAILED);
       }
    }
 
@@ -1162,38 +1149,14 @@ void MANAGER::FetchEntry (ENTRY* pEntry)
 }
 
 // ---------------------------------------------------------------------------
-// STORE lookup
-// ---------------------------------------------------------------------------
-
-STORE* MANAGER::FindOrCreateStore (const std::string& sName)
-{
-   STORE* pResult = nullptr;
-
-   auto it = m_mapStores.find (sName);
-   if (it != m_mapStores.end ())
-   {
-      pResult = it->second.get ();
-   }
-   else
-   {
-      auto pStore = std::make_unique<STORE> ();
-      pStore->sName = sName;
-      pResult = pStore.get ();
-      m_mapStores[sName] = std::move (pStore);
-   }
-
-   return pResult;
-}
-
-// ---------------------------------------------------------------------------
-// Notification helpers (called under m_mutex — recursive lock allows re-entry)
+// Notification helpers (called under m_mutex -- recursive lock allows re-entry)
 // ---------------------------------------------------------------------------
 
 void MANAGER::NotifyFiles (const std::vector<FILE*>& apFiles, STATE bState)
 {
    for (auto* pFile : apFiles)
    {
-      pFile->SnapshotEntry ();
+      pFile->SnapshotFinal ();
 
       IFILE* pListener = pFile->GetListener ();
       if (pListener)
@@ -1212,18 +1175,18 @@ void MANAGER::NotifyFiles (const std::vector<FILE*>& apFiles, STATE bState)
 void MANAGER::DispatchNextFromQueue ()
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
-   
+
    SweepCompletedThreads ();
 
    if (!m_aFetchQueue.empty ()  &&  static_cast<int> (m_apFetchSlots.size ()) < kMAX_CONCURRENT_FETCHES)
    {
-      ENTRY* pNext = m_aFetchQueue.front ();
+      META* pNext = m_aFetchQueue.front ();
       m_aFetchQueue.pop ();
 
       FETCH_SLOT* pSlot = new FETCH_SLOT ();
       pSlot->thread = std::thread ([this, pNext, pSlot] ()
       {
-         FetchEntry (pNext);
+         FetchMeta (pNext);
          pSlot->bDone.store (true);
       });
       m_apFetchSlots.push_back (pSlot);

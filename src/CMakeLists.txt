@@ -558,15 +558,16 @@ set (SOM_HEADERS
    som/SpatialIndex.h)
 
 set (CACHE_SOURCES
-   cache/Entry.cpp
+   cache/Meta.cpp
    cache/File.cpp
    cache/Manager.cpp)
 set (CACHE_HEADERS
    cache/Types.h
-   cache/Entry.h
+   cache/Meta.h
    cache/File.h
-   cache/Store.h
    cache/Manager.h)
+
+set (CONTAINER_HEADERS  container/Container.h)
 
 set (STORAGE_SOURCES  storage/Storage.cpp)
 set (STORAGE_HEADERS  storage/Storage.h)
@@ -632,6 +633,7 @@ add_library (Sneeze STATIC
    ${ASTRO_SOURCES}     ${ASTRO_HEADERS}
    ${SOM_SOURCES}       ${SOM_HEADERS}
    ${CACHE_SOURCES}     ${CACHE_HEADERS}
+   ${CONTAINER_HEADERS}
    ${STORAGE_SOURCES}   ${STORAGE_HEADERS}
    ${PERSONA_SOURCES}   ${PERSONA_HEADERS}
    ${RENDERER_SOURCES}  ${RENDERER_HEADERS}
@@ -725,8 +727,9 @@ endif ()
 source_group ("core"     FILES ${CORE_SOURCES} ${CORE_HEADERS})
 source_group ("astro"    FILES ${ASTRO_SOURCES} ${ASTRO_HEADERS})
 source_group ("som"      FILES ${SOM_SOURCES} ${SOM_HEADERS})
-source_group ("cache"    FILES ${CACHE_SOURCES} ${CACHE_HEADERS})
-source_group ("storage"  FILES ${STORAGE_SOURCES} ${STORAGE_HEADERS})
+source_group ("cache"     FILES ${CACHE_SOURCES} ${CACHE_HEADERS})
+source_group ("container" FILES ${CONTAINER_HEADERS})
+source_group ("storage"   FILES ${STORAGE_SOURCES} ${STORAGE_HEADERS})
 source_group ("persona"  FILES ${PERSONA_SOURCES} ${PERSONA_HEADERS})
 source_group ("renderer" FILES ${RENDERER_SOURCES} ${RENDERER_HEADERS})
 source_group ("view"     FILES ${VIEW_SOURCES} ${VIEW_HEADERS})

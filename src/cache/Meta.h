@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef SNEEZE_CACHE_ENTRY_H
-#define SNEEZE_CACHE_ENTRY_H
+#ifndef SNEEZE_CACHE_META_H
+#define SNEEZE_CACHE_META_H
 
 #include "Types.h"
 #include <string>
@@ -29,18 +29,18 @@ class FILE;
 class MANAGER;
 
 // ---------------------------------------------------------------------------
-// ENTRY — internal shared state for a single cached URL.
+// META — internal shared state for a single cached URL.
 //
-// Owned by MANAGER, never exposed to callers directly. One ENTRY per URL.
-// Multiple FILE handles may reference the same ENTRY. The ENTRY owns the
+// Owned by MANAGER, never exposed to callers directly. One META per URL.
+// Multiple FILE handles may reference the same META. The META owns the
 // fetch/validate lifecycle and notifies attached FILE handles when the
 // resource reaches READY or FAILED.
 // ---------------------------------------------------------------------------
 
-class ENTRY
+class META
 {
 public:
-   ENTRY (MANAGER* pManager, const std::string& sUrl, const std::string& sHash);
+   META (MANAGER* pManager, const std::string& sUrl, const std::string& sHash);
 
    const std::string& GetUrl ()  const { return m_sUrl; }
    const std::string& GetHash () const { return m_sHash; }
@@ -70,14 +70,14 @@ public:
    std::string GetCreatedTime ()    const { return m_sCreatedAt; }
    std::string GetLastAccessTime () const { return m_sLastAccessedAt; }
    uint32_t    GetAccessCount ()    const { return m_nAccessCount; }
-   uint32_t    GetEntryIx ()        const { return m_nEntryIx; }
+   uint32_t    GetMetaIx ()        const { return m_nMetaIx; }
 
    void SetDiskPath (const std::string& sPath) { m_sDiskPath = sPath; }
    void SetHash (const std::string& sHash) { m_sHash = sHash; }
    void SetHeaders (const std::unordered_map<std::string, std::string>& mapHeaders);
    void SetSizeBytes (uint64_t nBytes) { m_nSizeBytes = nBytes; }
    void SetCreatedTime (const std::string& sTime) { m_sCreatedAt = sTime; }
-   void SetEntryIx (uint32_t nEntryIx) { m_nEntryIx = nEntryIx; }
+   void SetMetaIx (uint32_t nMetaIx) { m_nMetaIx = nMetaIx; }
    void TouchAccess ();
 
    void AttachFile (FILE* pFile);
@@ -101,6 +101,7 @@ public:
    std::mutex& GetMutex () { return m_mutex; }
 
 private:
+   static std::string NowIso8601 ();
 
    MANAGER*                 m_pManager;
    std::string              m_sUrl;
@@ -114,7 +115,7 @@ private:
    std::string              m_sCreatedAt;
    std::string              m_sLastAccessedAt;
    uint32_t                 m_nAccessCount;
-   uint32_t                 m_nEntryIx;
+   uint32_t                 m_nMetaIx;
 
    long                     m_nHttpStatus;
    double                   m_dFetchQueuedTime;
@@ -129,4 +130,4 @@ private:
 
 }} // namespace SNEEZE::CACHE
 
-#endif // SNEEZE_CACHE_ENTRY_H
+#endif // SNEEZE_CACHE_META_H

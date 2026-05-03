@@ -19,8 +19,10 @@
 #include "core/Sneeze.h"
 #include "cache/Manager.h"
 #include "cache/File.h"
+#include "container/Container.h"
 #include "stb/stb_image.h"
 #include <algorithm>
+#include <memory>
 
 namespace SNEEZE { namespace som {
 
@@ -139,7 +141,17 @@ void NODE::SetMapObject (MAP_OBJECT* pMapObject)
 void NODE::RequestTexture ()
 {
    if (m_pMapObject  &&  !m_pMapObject->m_sTextureUrl.empty ())
-      m_pFile = m_pFabric->Scene ()->Sneeze ()->Cache ()->Request (this, "Solar System", m_pMapObject->m_sTextureUrl);
+   {
+      auto pName = std::make_shared<CONTAINER::NAME> ();
+      pName->sFingerprint   = "5YTB6YjNQWnpBTkJna3Foa2lHOXcwQkFRc0ZBQU9DQVFFQWxrVFR0Z0pTWXRoMDJ";
+      pName->sOrganization  = "Metaversal Corporation";
+      pName->sCommonName    = "Metaversal";
+      pName->sContainerName = "Solar System";
+      pName->sPersonaHash   = "ZklkNVZTY0cxb2ZqUmtTWGpMVHE2bHkyQT09IiwiTUlJRFBUQ0NBaVdnQXdJQkFn";
+      pName->bValidated     = true;
+
+      m_pFile = m_pFabric->Scene ()->Sneeze ()->Cache ()->Request (this, pName, m_pMapObject->m_sTextureUrl);
+   }
 }
 
 // ---------------------------------------------------------------------------

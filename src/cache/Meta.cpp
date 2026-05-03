@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Entry.h"
+#include "Meta.h"
 #include "File.h"
 #include <fstream>
 #include <chrono>
@@ -25,7 +25,7 @@ namespace SNEEZE { namespace CACHE {
 // Helpers
 // ---------------------------------------------------------------------------
 
-static std::string NowIso8601 ()
+std::string META::NowIso8601 ()
 {
    auto tpNow  = std::chrono::system_clock::now ();
    auto tmTime = std::chrono::system_clock::to_time_t (tpNow);
@@ -43,17 +43,17 @@ static std::string NowIso8601 ()
 }
 
 // ---------------------------------------------------------------------------
-// ENTRY
+// META
 // ---------------------------------------------------------------------------
 
-ENTRY::ENTRY (MANAGER* pManager, const std::string& sUrl, const std::string& sHash) :
+META::META (MANAGER* pManager, const std::string& sUrl, const std::string& sHash) :
    m_pManager         (pManager),
    m_sUrl             (sUrl),
    m_sHash            (sHash),
    m_bState           (STATE_IDLE),
    m_nSizeBytes       (0),
    m_nAccessCount     (0),
-   m_nEntryIx         (0),
+   m_nMetaIx          (0),
    m_nHttpStatus      (0),
    m_dFetchQueuedTime (0.0),
    m_dFetchStartTime  (0.0),
@@ -65,12 +65,12 @@ ENTRY::ENTRY (MANAGER* pManager, const std::string& sUrl, const std::string& sHa
    m_sLastAccessedAt = m_sCreatedAt;
 }
 
-STATE ENTRY::GetState () const
+STATE META::GetState () const
 {
    return m_bState.load ();
 }
 
-std::string ENTRY::GetHeader (const std::string& sName) const
+std::string META::GetHeader (const std::string& sName) const
 {
    auto it = m_mapHeaders.find (sName);
    std::string sResult;
@@ -79,23 +79,23 @@ std::string ENTRY::GetHeader (const std::string& sName) const
    return sResult;
 }
 
-void ENTRY::SetHeaders (const std::unordered_map<std::string, std::string>& mapHeaders)
+void META::SetHeaders (const std::unordered_map<std::string, std::string>& mapHeaders)
 {
    m_mapHeaders = mapHeaders;
 }
 
-void ENTRY::TouchAccess ()
+void META::TouchAccess ()
 {
    m_sLastAccessedAt = NowIso8601 ();
    m_nAccessCount++;
 }
 
-void ENTRY::AttachFile (FILE* pFile)
+void META::AttachFile (FILE* pFile)
 {
    m_apFiles.push_back (pFile);
 }
 
-void ENTRY::DetachFile (FILE* pFile)
+void META::DetachFile (FILE* pFile)
 {
    for (auto it = m_apFiles.begin (); it != m_apFiles.end (); ++it)
    {
@@ -111,29 +111,29 @@ void ENTRY::DetachFile (FILE* pFile)
 // State transitions
 // ---------------------------------------------------------------------------
 
-void ENTRY::SetFetching ()
+void META::SetFetching ()
 {
    m_bState.store (STATE_FETCHING);
 }
 
-void ENTRY::SetValidating ()
+void META::SetValidating ()
 {
    m_bState.store (STATE_VALIDATING);
 }
 
-void ENTRY::Complete (const std::string& sDiskPath, uint64_t nSizeBytes)
+void META::Complete (const std::string& sDiskPath, uint64_t nSizeBytes)
 {
    m_sDiskPath  = sDiskPath;
    m_nSizeBytes = nSizeBytes;
    m_bState.store (STATE_READY);
 }
 
-void ENTRY::Fail ()
+void META::Fail ()
 {
    m_bState.store (STATE_FAILED);
 }
 
-void ENTRY::ResetState ()
+void META::ResetState ()
 {
    m_bState.store (STATE_IDLE);
    m_sDiskPath.clear ();
@@ -145,11 +145,11 @@ void ENTRY::ResetState ()
    m_dFetchEndTime    = 0.0;
    m_bServedFromCache = false;
    m_bPendingReset    = false;
-   m_nEntryIx         = 0;
+   m_nMetaIx          = 0;
    m_mapHeaders.clear ();
 }
 
-std::vector<FILE*> ENTRY::CollectFiles () const
+std::vector<FILE*> META::CollectFiles () const
 {
    return m_apFiles;
 }
@@ -158,7 +158,7 @@ std::vector<FILE*> ENTRY::CollectFiles () const
 // Data access
 // ---------------------------------------------------------------------------
 
-std::vector<uint8_t> ENTRY::ReadData () const
+std::vector<uint8_t> META::ReadData () const
 {
    std::vector<uint8_t> aData;
 

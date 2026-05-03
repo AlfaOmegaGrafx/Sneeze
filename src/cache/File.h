@@ -16,37 +16,38 @@
 #define SNEEZE_CACHE_FILE_H
 
 #include "Types.h"
+#include "container/Container.h"
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <memory>
 #include <cstdint>
 
 namespace SNEEZE { namespace CACHE {
 
-class ENTRY;
+class META;
 class MANAGER;
-class STORE;
 
 // ---------------------------------------------------------------------------
 // FILE — per-caller handle to a cached resource.
 //
 // Created by MANAGER::Request(), returned to the caller as a raw pointer.
-// Owns a snapshot of the entry's display-level fields (URL, state, size,
+// Owns a snapshot of the meta's display-level fields (URL, state, size,
 // content-type, timing, etc.) so the inspector can read them after Release.
 //
-// While attached to an ENTRY (between Request and Release), the FILE also
-// provides access to the full metadata and data payload via the ENTRY.
-// After Release, m_pEntry is null and the ENTRY may be evicted from memory.
+// While attached to a META (between Request and Release), the FILE also
+// provides access to the full metadata and data payload via the META.
+// After Release, m_pMeta is null and the META may be evicted from memory.
 //
-// To reattach to the ENTRY (e.g. for a details pane), call Request().
-// This reloads the ENTRY from disk if needed and fails if the content
-// has been replaced (nEntryIx mismatch).
+// To reattach to the META (e.g. for a details pane), call Request().
+// This reloads the META from disk if needed and fails if the content
+// has been replaced (nMetaIx mismatch).
 // ---------------------------------------------------------------------------
 
 class FILE
 {
 public:
-   FILE (MANAGER* pManager, ENTRY* pEntry, STORE* pStore, IFILE* pListener, uint32_t nFileIx);
+   FILE (MANAGER* pManager, META* pMeta, std::shared_ptr<CONTAINER::NAME> pName, IFILE* pListener, uint32_t nFileIx);
    ~FILE ();
 
    // --- Snapshot fields (always available, even after Release) ---
@@ -59,7 +60,7 @@ public:
    bool        IsHashed () const             { return !m_sHash.empty (); }
 
    uint32_t    GetFileIx () const            { return m_nFileIx; }
-   uint32_t    GetEntryIx () const           { return m_nEntryIx; }
+   uint32_t    GetMetaIx () const            { return m_nMetaIx; }
    long        GetHttpStatus () const        { return m_nHttpStatus; }
    double      GetFetchQueuedTime () const   { return m_dFetchQueuedTime; }
    double      GetFetchStartTime () const    { return m_dFetchStartTime; }
@@ -70,7 +71,7 @@ public:
    std::string GetContentType () const       { return m_sContentType; }
    uint64_t    GetSizeBytes () const         { return m_nSizeBytes; }
 
-   // --- ENTRY-dependent (require attached ENTRY, empty/default after Release) ---
+   // --- META-dependent (require attached META, empty/default after Release) ---
 
    std::vector<uint8_t> ReadData () const;
    std::string GetHeader (const std::string& sName) const;
@@ -87,10 +88,10 @@ public:
    void        Clear (bool b = true);
    void        Reset (bool b = true);
 
-   // --- Store ---
+   // --- Container ---
 
-   STORE*      GetStore () const             { return m_pStore; }
-   std::string GetStoreName () const;
+   const CONTAINER::NAME& GetName () const   { return *m_pName; }
+   std::string GetContainerName () const;
 
    // --- Listener ---
 
@@ -98,35 +99,41 @@ public:
 
    // --- Internal (MANAGER use only) ---
 
-   ENTRY*      GetEntry () const             { return m_pEntry; }
-   void        SetEntry (ENTRY* pEntry)      { m_pEntry = pEntry; }
+   META*       GetMeta () const              { return m_pMeta; }
+   void        SetMeta (META* pMeta)         { m_pMeta = pMeta; }
    bool        IsPendingClear () const       { return m_bPendingClear; }
    bool        IsReleased () const           { return m_bReleased; }
-   bool        IsAttached () const           { return m_pEntry != nullptr; }
+   bool        IsAttached () const           { return m_pMeta != nullptr; }
 
    void        SetReleased ()                { m_bReleased = true; }
    bool        SetPendingClear (bool b)      { bool bChanged = (b != m_bPendingClear); m_bPendingClear = b; return bChanged; }
    void        SetEnumeration (bool b)       { m_bEnumeration = b; }
 
-   void        SnapshotEntry ();
+   void        SnapshotInitial ();
+   void        SnapshotProgress ();
+   void        SnapshotFinal ();
 
 private:
    MANAGER*    m_pManager;
-   ENTRY*      m_pEntry;
-   STORE*      m_pStore;
+   META*       m_pMeta;
+   std::shared_ptr<CONTAINER::NAME> m_pName;
    IFILE*      m_pListener;
 
-   // Snapshot fields (owned by FILE, always valid)
+   // Initial (set once at construction — request identity)
    std::string m_sUrl;
-   std::string m_sHash;
    uint32_t    m_nFileIx;
-   uint32_t    m_nEntryIx;
+   uint32_t    m_nMetaIx;
+
+   // Progress (updated during fetch lifecycle)
    STATE       m_bState;
+   double      m_dFetchQueuedTime;
+   double      m_dFetchStartTime;
+
+   // Final (set when fetch resolves)
+   std::string m_sHash;
    std::string m_sContentType;
    uint64_t    m_nSizeBytes;
    long        m_nHttpStatus;
-   double      m_dFetchQueuedTime;
-   double      m_dFetchStartTime;
    double      m_dFetchEndTime;
    bool        m_bServedFromCache;
 

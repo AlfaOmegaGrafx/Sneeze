@@ -27,28 +27,29 @@
 #include <chrono>
 #include <cstdint>
 
+#include "container/Container.h"
+
 namespace SNEEZE { namespace CORE { class SNEEZE; }}
 
 namespace SNEEZE { namespace CACHE {
 
-class ENTRY;
+class META;
 class FILE;
-class STORE;
 
 // ---------------------------------------------------------------------------
-// MANAGER — singleton cache manager.
+// MANAGER -- singleton cache manager.
 //
 // Callers request files via Request(), which returns a FILE* handle. When
 // done, they must return it via Release(). All files are persisted on disk
 // as sidecar pairs: {hash}.data (payload) + {hash}.meta (metadata JSON).
-// The filesystem is the index — no manifest file, no startup scan.
+// The filesystem is the index -- no manifest file, no startup scan.
 //
-// Entries are loaded lazily on first Request(). Only entries with active
-// FILE handles live in m_mapEntries. The .meta is flushed to disk when
+// Metas are loaded lazily on first Request(). Only metas with active
+// FILE handles live in m_mapMetas. The .meta is flushed to disk when
 // the last active handle releases.
 //
 // Staleness rules (persisted in rules.json) control re-fetch policy.
-// A monotonic entry index counter (also in rules.json) tracks content versions.
+// A monotonic meta index counter (also in rules.json) tracks content versions.
 //
 // Background fetches are capped at 16 concurrent threads. Overflow requests
 // queue and are dispatched as threads complete.
@@ -75,10 +76,10 @@ public:
 
    // --- Primary API ---
 
-   FILE* Request (IFILE* pListener, const std::string& sStore, const std::string& sUrl);
-   FILE* Request (IFILE* pListener, const std::string& sStore, const std::string& sUrl,
+   FILE* Request (IFILE* pListener, std::shared_ptr<CONTAINER::NAME> pName, const std::string& sUrl);
+   FILE* Request (IFILE* pListener, std::shared_ptr<CONTAINER::NAME> pName, const std::string& sUrl,
                   const std::string& sHash, uint32_t bFlags = kREQUEST_DEFAULT,
-                  uint32_t nEntryIx = 0);
+                  uint32_t nMetaIx = 0);
    void  Release (FILE* pFile);
    bool  ReopenFile (FILE* pFile);
    void  Clear   (FILE* pFile, bool b = true);
@@ -112,33 +113,38 @@ private:
    std::string ComputeFileHash (const std::string& sFilePath, const std::string& sAlgo) const;
    std::string ComputeDataHash (const uint8_t* pData, size_t nLen, const std::string& sAlgo) const;
 
-   void SaveMeta (ENTRY* pEntry);
+   void SaveMeta (META* pMeta);
    bool LoadMeta (const std::string& sDiskKey, const std::string& sUrl);
 
    void LoadRules ();
    void SaveRules ();
-   bool IsEntryStale (ENTRY* pEntry) const;
+   bool IsMetaStale (META* pMeta) const;
 
-   void FetchEntry (ENTRY* pEntry);
+   void FetchMeta (META* pMeta);
    void SweepCompletedThreads ();
-   void DispatchFetch (ENTRY* pEntry);
+   void DispatchFetch (META* pMeta);
    void DispatchNextFromQueue ();
    void NotifyFiles (const std::vector<FILE*>& apFiles, STATE bState);
    double SecondsSinceEpoch () const;
 
    void DeleteFiles ();
-   void ResetEntry (ENTRY* pEntry);
+   void ResetMeta (META* pMeta);
 
-   STORE* FindOrCreateStore (const std::string& sName);
+   struct FETCH_CONTEXT
+   {
+      std::FILE*   pFile;
+      std::unordered_map<std::string, std::string> mapHeaders;
+      long         nHttpCode;
+   };
+   static size_t FetchWriteCallback (char* pData, size_t nSize, size_t nMembers, void* pUser);
+   static size_t FetchHeaderCallback (char* pData, size_t nSize, size_t nMembers, void* pUser);
 
    CORE::SNEEZE*             m_pSneeze;
    std::string               m_sCachePath;
 
-   using ENTRY_MAP = std::unordered_map<std::string, std::unique_ptr<ENTRY>>;
-   ENTRY_MAP                 m_mapEntries;
+   using META_MAP = std::unordered_map<std::string, std::unique_ptr<META>>;
+   META_MAP                  m_mapMetas;
 
-   using STORE_MAP = std::unordered_map<std::string, std::unique_ptr<STORE>>;
-   STORE_MAP                 m_mapStores;
    mutable std::recursive_mutex m_mutex;
 
    // Fetch thread pool (capped at kMAX_CONCURRENT_FETCHES)
@@ -152,15 +158,15 @@ private:
    };
 
    std::vector<FETCH_SLOT*>  m_apFetchSlots;
-   std::queue<ENTRY*>        m_aFetchQueue;
+   std::queue<META*>         m_aFetchQueue;
 
    std::atomic<bool>         m_bShuttingDown;
    bool                      m_bCacheEnabled;
    bool                      m_bDisplayEnabled;
 
-   // Staleness rules + entry index counter
+   // Staleness rules + meta index counter
    std::vector<RULE>         m_aRules;
-   uint32_t                  m_nNextEntryIx;
+   uint32_t                  m_nNextMetaIx;
 
    // Network inspector
    std::vector<FILE*>        m_apFile;

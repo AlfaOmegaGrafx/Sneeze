@@ -503,3 +503,17 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 - **Decided MSF content-type** — `application/jose+msf` (JOSE encoding, MSF payload, follows RFC 6838 structured syntax convention).
 - **Updated `project.mdc`** — cache module description, MANAGER (Enumerate, SaveManifest in Reset), FILE (enumeration flag, SetEntry, pruning warning), new IENUM entry, Artemis startup purge.
 - **Updated `Cache.md`** — added Enumerate section with usage example and MSF purge use case, updated FILE architecture diagram (m_bEnumeration), updated manifest section (saved on Reset too, non-hashed entries restored), updated eviction deferred item (entries never pruned).
+
+## 2026-05-03 (Saturday) — Afternoon (continued from prior session)
+
+- **Changed `MANAGER::Request()` signature** — now takes `std::shared_ptr<CONTAINER::NAME>` instead of `const std::string&`. Removed `FindOrCreateName()` and `m_mapNames` from MANAGER entirely — callers own the NAME, cache holds a shared reference.
+- **Changed FILE to store `shared_ptr<CONTAINER::NAME>`** — avoids duplicating the ~500-byte NAME struct per FILE. All FILEs from the same container share one NAME in memory via reference counting. `m_pName` prefix retained (smart pointer is still a pointer).
+- **Split `SnapshotMeta()` into three lifecycle methods** — `SnapshotInitial()` (URL, nMetaIx — set once at construction), `SnapshotProgress()` (state, queued/start times — during fetch), `SnapshotFinal()` (all settled fields — when fetch resolves). Eliminates redundant copying of immutable fields on every state transition.
+- **Collapsed 4 `SnapshotFinal()` calls in `Request()` into 1** — replaced inline snapshots and listener notifications in each branch with `bNotifyReady`/`bNotifyFailed` flags resolved at the end. Single `SnapshotFinal()` in the else branch (excludes only the dispatch-fetch and already-fetching paths).
+- **Added `CONTAINER::NAME::DisplayName()`** — returns `sCommonName + "/" + sContainerName` (no spaces around slash). `FILE::GetContainerName()` delegates to it.
+- **Added `ISNEEZE::sSessionPath` and `SessionPath()` method** — `SessionPath()` joins `sAppDataPath / sSessionPath`. Cache and Storage build paths as `SessionPath() / "Cache"` and `SessionPath() / "Storage"`. Backward compatible (empty `sSessionPath` is a no-op).
+- **Updated `Node.cpp::RequestTexture()`** — constructs a `shared_ptr<CONTAINER::NAME>` with testworthy data and passes it to `Request()`.
+- **Updated `CacheTest.cpp`** — static `s_pTestName` shared across all 31 test calls.
+- **Debugged Artemis path issue** — `sSessionPath="/Persistent"` (leading slash) caused `std::filesystem::path` to treat it as root-relative, producing `C:/Persistent` instead of the full path. Root cause: code was added to `AppFrame_SDL.cpp` instead of `AppFrame_Win32.cpp`. Fixed by editing the correct file and removing the leading slash.
+- **Removed redundant null check in FILE constructor** — `SnapshotInitial()` (and formerly `SnapshotMeta()`) already guards with `if (m_pMeta)`.
+- **Updated `Cache.md` and `project.mdc`** — all today's changes: shared_ptr ownership, snapshot phases, DisplayName(), SessionPath(), removed NAME_MAP.
