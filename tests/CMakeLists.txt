@@ -27,6 +27,7 @@ set (TEST_SOURCES
    VoxTest.cpp
    JwsTest.cpp
    NetworkTest.cpp
+   StorageTest.cpp
 )
 
 if (SNEEZE_ENABLE_WASM)

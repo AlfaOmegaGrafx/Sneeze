@@ -498,6 +498,24 @@ void SNEEZE::OnNetworkFileDeleted (NETWORK::FILE* pFile)
       m_pHost->OnNetworkFileDeleted (pFile);
 }
 
+void SNEEZE::OnStorageUnitCreated (STORAGE::ASSET* pAsset)
+{
+   if (m_pHost)
+      m_pHost->OnStorageUnitCreated (pAsset);
+}
+
+void SNEEZE::OnStorageUnitChanged (STORAGE::ASSET* pAsset)
+{
+   if (m_pHost)
+      m_pHost->OnStorageUnitChanged (pAsset);
+}
+
+void SNEEZE::OnStorageUnitDeleted (STORAGE::ASSET* pAsset)
+{
+   if (m_pHost)
+      m_pHost->OnStorageUnitDeleted (pAsset);
+}
+
 // ---------------------------------------------------------------------------
 // Persona
 // ---------------------------------------------------------------------------

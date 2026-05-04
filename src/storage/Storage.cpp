@@ -14,210 +14,16 @@
 
 #include "Storage.h"
 #include "core/Sneeze.h"
-#include <nlohmann/json.hpp>
-#include <fstream>
-#include <filesystem>
 
 
 namespace SNEEZE {
 
 // ===========================================================================
-// STORAGE::CONTAINER
-// ===========================================================================
-
-STORAGE::CONTAINER::CONTAINER (const std::string& sName, const std::string& sDiskPath)
-   : m_sName (sName)
-   , m_sDiskPath (sDiskPath)
-{
-}
-
-std::string STORAGE::CONTAINER::Get (const std::string& sKey) const
-{
-   std::lock_guard<std::mutex> guard (m_mutex);
-   auto it = m_mapData.find (sKey);
-   if (it != m_mapData.end ())
-      return it->second;
-   return "";
-}
-
-void STORAGE::CONTAINER::Set (const std::string& sKey, const std::string& sValue)
-{
-   std::lock_guard<std::mutex> guard (m_mutex);
-   m_mapData[sKey] = sValue;
-   Save ();
-}
-
-void STORAGE::CONTAINER::Remove (const std::string& sKey)
-{
-   std::lock_guard<std::mutex> guard (m_mutex);
-   m_mapData.erase (sKey);
-   Save ();
-}
-
-bool STORAGE::CONTAINER::Has (const std::string& sKey) const
-{
-   std::lock_guard<std::mutex> guard (m_mutex);
-   return m_mapData.find (sKey) != m_mapData.end ();
-}
-
-void STORAGE::CONTAINER::Load ()
-{
-   std::lock_guard<std::mutex> guard (m_mutex);
-   std::ifstream file (m_sDiskPath);
-   if (!file.is_open ())
-      return;
-
-   try
-   {
-      nlohmann::json jDoc = nlohmann::json::parse (file);
-      for (auto it = jDoc.begin (); it != jDoc.end (); ++it)
-      {
-         if (it.value ().is_string ())
-            m_mapData[it.key ()] = it.value ().get<std::string> ();
-         else
-            m_mapData[it.key ()] = it.value ().dump ();
-      }
-   }
-   catch (...) {}
-}
-
-void STORAGE::CONTAINER::Save () const
-{
-   std::filesystem::path dir = std::filesystem::path (m_sDiskPath).parent_path ();
-   std::filesystem::create_directories (dir);
-
-   nlohmann::json jDoc = nlohmann::json::object ();
-   for (auto& pair : m_mapData)
-      jDoc[pair.first] = pair.second;
-
-   std::ofstream file (m_sDiskPath, std::ios::trunc);
-   if (file.is_open ())
-      file << jDoc.dump (2);
-}
-
-// ===========================================================================
-// STORAGE::FINGERPRINT
-// ===========================================================================
-
-STORAGE::FINGERPRINT::FINGERPRINT (const std::string& sFingerprint, const std::string& sBasePath)
-   : m_sFingerprint (sFingerprint)
-   , m_sBasePath (sBasePath)
-{
-}
-
-std::string STORAGE::FINGERPRINT::Common_Get (const std::string& sKey) const
-{
-   std::lock_guard<std::mutex> guard (m_commonMutex);
-   auto it = m_mapCommon.find (sKey);
-   if (it != m_mapCommon.end ())
-      return it->second;
-   return "";
-}
-
-void STORAGE::FINGERPRINT::Common_Set (const std::string& sKey, const std::string& sValue)
-{
-   std::lock_guard<std::mutex> guard (m_commonMutex);
-   m_mapCommon[sKey] = sValue;
-   Save ();
-}
-
-void STORAGE::FINGERPRINT::Common_Remove (const std::string& sKey)
-{
-   std::lock_guard<std::mutex> guard (m_commonMutex);
-   m_mapCommon.erase (sKey);
-   Save ();
-}
-
-bool STORAGE::FINGERPRINT::Common_Has (const std::string& sKey) const
-{
-   std::lock_guard<std::mutex> guard (m_commonMutex);
-   return m_mapCommon.find (sKey) != m_mapCommon.end ();
-}
-
-STORAGE::CONTAINER* STORAGE::FINGERPRINT::GetContainer (const std::string& sName)
-{
-   std::lock_guard<std::mutex> guard (m_containersMutex);
-
-   auto it = m_mapContainers.find (sName);
-   if (it != m_mapContainers.end ())
-      return it->second.get ();
-
-   std::string sDiskPath = m_sBasePath + "/container-" + sName + ".json";
-   auto pContainer = std::make_unique<CONTAINER> (sName, sDiskPath);
-   pContainer->Load ();
-   CONTAINER* pRaw = pContainer.get ();
-   m_mapContainers[sName] = std::move (pContainer);
-   return pRaw;
-}
-
-void STORAGE::FINGERPRINT::Load ()
-{
-   std::lock_guard<std::mutex> guard (m_commonMutex);
-   std::string sCommonPath = m_sBasePath + "/common.json";
-   std::ifstream file (sCommonPath);
-   if (!file.is_open ())
-      return;
-
-   try
-   {
-      nlohmann::json jDoc = nlohmann::json::parse (file);
-      for (auto it = jDoc.begin (); it != jDoc.end (); ++it)
-      {
-         if (it.value ().is_string ())
-            m_mapCommon[it.key ()] = it.value ().get<std::string> ();
-         else
-            m_mapCommon[it.key ()] = it.value ().dump ();
-      }
-   }
-   catch (...) {}
-}
-
-void STORAGE::FINGERPRINT::Save () const
-{
-   std::filesystem::create_directories (m_sBasePath);
-   std::string sCommonPath = m_sBasePath + "/common.json";
-
-   nlohmann::json jDoc = nlohmann::json::object ();
-   for (auto& pair : m_mapCommon)
-      jDoc[pair.first] = pair.second;
-
-   std::ofstream file (sCommonPath, std::ios::trunc);
-   if (file.is_open ())
-      file << jDoc.dump (2);
-}
-
-// ===========================================================================
-// STORAGE::PERSONA_STORE
-// ===========================================================================
-
-STORAGE::PERSONA_STORE::PERSONA_STORE (const std::string& sPersonaHash, const std::string& sBasePath)
-   : m_sPersonaHash (sPersonaHash)
-   , m_sBasePath (sBasePath)
-{
-}
-
-STORAGE::FINGERPRINT* STORAGE::PERSONA_STORE::GetFingerprint (const std::string& sFingerprint)
-{
-   std::lock_guard<std::mutex> guard (m_mutex);
-
-   auto it = m_mapFingerprints.find (sFingerprint);
-   if (it != m_mapFingerprints.end ())
-      return it->second.get ();
-
-   std::string sFpPath = m_sBasePath + "/" + sFingerprint;
-   auto pFingerprint = std::make_unique<FINGERPRINT> (sFingerprint, sFpPath);
-   pFingerprint->Load ();
-   FINGERPRINT* pRaw = pFingerprint.get ();
-   m_mapFingerprints[sFingerprint] = std::move (pFingerprint);
-   return pRaw;
-}
-
-// ===========================================================================
 // STORAGE
 // ===========================================================================
 
-STORAGE::STORAGE (CORE::SNEEZE* pSneeze)
-   : m_pSneeze (pSneeze)
+STORAGE::STORAGE (CORE::SNEEZE* pSneeze) :
+   m_pSneeze (pSneeze)
 {
 }
 
@@ -228,48 +34,239 @@ STORAGE::~STORAGE ()
 
 bool STORAGE::Initialize ()
 {
-   m_sRootPath = GetStorageRootPath ();
-   if (m_sRootPath.empty ())
+   bool bResult = false;
+
+   CORE::ISNEEZE* pHost = m_pSneeze->GetHost ();
+   std::string sSession = pHost->SessionPath ();
+
+   if (!sSession.empty ())
+   {
+      m_sPermanentPath = (std::filesystem::path (sSession) / "Storage" / "Permanent").string ();
+      m_sTemporaryPath = (std::filesystem::path (sSession) / "Storage" / "Temporary").string ();
+
+      std::filesystem::create_directories (m_sPermanentPath);
+      std::filesystem::create_directories (m_sTemporaryPath);
+
+      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "STORAGE",
+         "Initialized (permanent: " + m_sPermanentPath + ", temporary: " + m_sTemporaryPath + ")");
+      bResult = true;
+   }
+   else
    {
       m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Error, "STORAGE",
-         "Failed to determine storage root path");
-      return false;
+         "Failed to determine storage path");
    }
 
-   std::filesystem::create_directories (m_sRootPath);
-   m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "STORAGE",
-      "Initialized (root: " + m_sRootPath + ")");
-   return true;
+   return bResult;
 }
 
 void STORAGE::Shutdown ()
 {
-   std::lock_guard<std::mutex> guard (m_mutex);
-   m_mapPersonas.clear ();
+   std::lock_guard<std::recursive_mutex> guard (m_mutex);
+
+   SaveAllDirty ();
+
+   m_aAssets.clear ();
+   m_mapUnits.clear ();
 }
 
-STORAGE::PERSONA_STORE* STORAGE::GetPersona (const std::string& sPersonaHash)
+// ---------------------------------------------------------------------------
+// Container lifecycle
+// ---------------------------------------------------------------------------
+
+STORAGE::ASSET* STORAGE::Open (std::shared_ptr<CONTAINER::NAME> pName)
 {
-   std::lock_guard<std::mutex> guard (m_mutex);
+   if (!pName)
+      return nullptr;
 
-   auto it = m_mapPersonas.find (sPersonaHash);
-   if (it != m_mapPersonas.end ())
-      return it->second.get ();
+   std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-   std::string sPersonaPath = m_sRootPath + "/" + sPersonaHash;
-   auto pPersona = std::make_unique<PERSONA_STORE> (sPersonaHash, sPersonaPath);
-   PERSONA_STORE* pRaw = pPersona.get ();
-   m_mapPersonas[sPersonaHash] = std::move (pPersona);
+   std::string sFp2  = pName->sFingerprint.substr (0, 2);
+   std::string sFp22 = pName->sFingerprint.substr (2);
+
+   // Build paths for all four units
+   std::string aJsonPaths[SCOPE_COUNT];
+
+   aJsonPaths[ORG_PERMANENT] = ComputeUnitPath (
+      m_sPermanentPath, pName->sPersonaHash, sFp2 + "/" + sFp22, "organization.json");
+   aJsonPaths[ORG_TEMPORARY] = ComputeUnitPath (
+      m_sTemporaryPath, pName->sPersonaHash, sFp2 + "/" + sFp22, "organization.json");
+   aJsonPaths[CONTAINER_PERMANENT] = ComputeUnitPath (
+      m_sPermanentPath, pName->sPersonaHash, sFp2 + "/" + sFp22,
+      "container-" + pName->sContainerName + ".json");
+   aJsonPaths[CONTAINER_TEMPORARY] = ComputeUnitPath (
+      m_sTemporaryPath, pName->sPersonaHash, sFp2 + "/" + sFp22,
+      "container-" + pName->sContainerName + ".json");
+
+   auto pAsset = std::make_unique<ASSET> (this, pName);
+
+   for (int i = 0; i < SCOPE_COUNT; i++)
+   {
+      UNIT* pUnit = FindOrCreateUnit (aJsonPaths[i]);
+      pAsset->SetUnit (static_cast<SCOPE> (i), pUnit);
+   }
+
+   pAsset->Attach ();
+
+   ASSET* pRaw = pAsset.get ();
+   m_aAssets.push_back (std::move (pAsset));
+
+   m_pSneeze->OnStorageUnitCreated (pRaw);
+
    return pRaw;
 }
 
-std::string STORAGE::GetStorageRootPath () const
+void STORAGE::Close (ASSET* pAsset)
 {
-   std::string sResult;
-   std::string sSession = m_pSneeze->GetHost ()->SessionPath ();
-   if (!sSession.empty ())
-      sResult = (std::filesystem::path (sSession) / "Storage").string ();
-   return sResult;
+   if (!pAsset)
+      return;
+
+   std::lock_guard<std::recursive_mutex> guard (m_mutex);
+
+   // Save dirty units and meta before detaching
+   for (int i = 0; i < SCOPE_COUNT; i++)
+   {
+      UNIT* pUnit = pAsset->GetUnit (static_cast<SCOPE> (i));
+      if (pUnit)
+      {
+         if (pUnit->IsDirty ())
+            pUnit->Save ();
+         pUnit->SaveMeta (pAsset->GetName ());
+      }
+   }
+
+   pAsset->Detach ();
+
+   auto it = std::find_if (m_aAssets.begin (), m_aAssets.end (),
+      [pAsset] (const std::unique_ptr<ASSET>& p) { return p.get () == pAsset; });
+
+   if (it != m_aAssets.end ())
+      m_aAssets.erase (it);
+}
+
+// ---------------------------------------------------------------------------
+// Inspector enumeration
+// ---------------------------------------------------------------------------
+
+void STORAGE::Enumerate (IENUM* pEnum)
+{
+   if (!pEnum)
+      return;
+
+   std::lock_guard<std::recursive_mutex> guard (m_mutex);
+
+   // Walk both permanent and temporary paths looking for .meta files
+   std::vector<std::string> aPaths;
+   aPaths.push_back (m_sPermanentPath);
+   if (m_sTemporaryPath != m_sPermanentPath)
+      aPaths.push_back (m_sTemporaryPath);
+
+   for (auto& sRoot : aPaths)
+   {
+      if (!std::filesystem::exists (sRoot))
+         continue;
+
+      for (auto& entry : std::filesystem::recursive_directory_iterator (sRoot))
+      {
+         if (!entry.is_regular_file ()  ||  entry.path ().extension () != ".meta")
+            continue;
+
+         std::string sMetaPath = entry.path ().string ();
+         std::string sJsonPath = sMetaPath.substr (0, sMetaPath.size () - 5);
+
+         ASSET* pFound = nullptr;
+         for (auto& pAsset : m_aAssets)
+         {
+            for (int i = 0; i < SCOPE_COUNT; i++)
+            {
+               if (pAsset->GetUnit (static_cast<SCOPE> (i))  &&
+                   pAsset->GetUnit (static_cast<SCOPE> (i))->GetJsonPath () == sJsonPath)
+               {
+                  pFound = pAsset.get ();
+                  break;
+               }
+            }
+            if (pFound)
+               break;
+         }
+
+         if (pFound)
+         {
+            pEnum->OnAsset (pFound);
+         }
+         else
+         {
+            std::ifstream metaFile (sMetaPath);
+            if (!metaFile.is_open ())
+               continue;
+
+            try
+            {
+               nlohmann::json jMeta = nlohmann::json::parse (metaFile);
+
+               auto pName = std::make_shared<CONTAINER::NAME> ();
+               pName->sFingerprint   = jMeta.value ("fingerprint", "");
+               pName->sOrganization  = jMeta.value ("organization", "");
+               pName->sCommonName    = jMeta.value ("commonName", "");
+               pName->sContainerName = jMeta.value ("containerName", "");
+               pName->sPersonaHash   = jMeta.value ("personaHash", "");
+               pName->bValidated     = jMeta.value ("validated", false);
+
+               SCOPE eScope = static_cast<SCOPE> (jMeta.value ("scope", 0));
+
+               UNIT* pUnit = FindOrCreateUnit (sJsonPath);
+               pUnit->LoadMeta ();
+
+               auto pTempAsset = std::make_unique<ASSET> (this, pName);
+               pTempAsset->SetUnit (eScope, pUnit);
+
+               pEnum->OnAsset (pTempAsset.get ());
+            }
+            catch (...) {}
+         }
+      }
+   }
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+std::string STORAGE::ComputeUnitPath (const std::string& sBasePath, const std::string& sPersonaHash,
+                                      const std::string& sFingerprint, const std::string& sFileName) const
+{
+   return (std::filesystem::path (sBasePath) / sPersonaHash / sFingerprint / sFileName).string ();
+}
+
+STORAGE::UNIT* STORAGE::FindOrCreateUnit (const std::string& sJsonPath)
+{
+   auto it = m_mapUnits.find (sJsonPath);
+   if (it != m_mapUnits.end ())
+      return it->second.get ();
+
+   SCOPE eScope = ORG_PERMANENT;
+   std::string sFilename = std::filesystem::path (sJsonPath).filename ().string ();
+   bool bTemp = (sJsonPath.find (m_sTemporaryPath) == 0  &&  m_sTemporaryPath != m_sPermanentPath);
+
+   if (sFilename == "organization.json")
+      eScope = bTemp ? ORG_TEMPORARY : ORG_PERMANENT;
+   else
+      eScope = bTemp ? CONTAINER_TEMPORARY : CONTAINER_PERMANENT;
+
+   auto pUnit = std::make_unique<UNIT> (this, eScope, sJsonPath);
+   pUnit->LoadMeta ();
+   UNIT* pRaw = pUnit.get ();
+   m_mapUnits[sJsonPath] = std::move (pUnit);
+   return pRaw;
+}
+
+void STORAGE::SaveAllDirty ()
+{
+   for (auto& [sPath, pUnit] : m_mapUnits)
+   {
+      if (pUnit->IsLoaded ()  &&  pUnit->IsDirty ())
+         pUnit->Save ();
+   }
 }
 
 } // namespace SNEEZE

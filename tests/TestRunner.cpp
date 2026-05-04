@@ -35,6 +35,7 @@ extern int RunComputeTests (int nArgc, char** aArgv);
 extern int RunVoxTests     (int nArgc, char** aArgv);
 extern int RunJwsTests     (int nArgc, char** aArgv);
 extern int RunNetworkTests   (int nArgc, char** aArgv);
+extern int RunStorageTests   (int nArgc, char** aArgv);
 
 // ---------------------------------------------------------------------------
 // Suite table
@@ -62,6 +63,7 @@ static const SUITE g_aSuites[] =
    { "--vox",     "Vox",     RunVoxTests     },
    { "--jws",     "Jws",     RunJwsTests     },
    { "--network", "Network", RunNetworkTests },
+   { "--storage", "Storage", RunStorageTests },
 };
 
 static const int g_nSuiteCount = sizeof (g_aSuites) / sizeof (g_aSuites[0]);

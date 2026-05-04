@@ -15,115 +15,203 @@
 #ifndef SNEEZE_STORAGE_STORAGE_H
 #define SNEEZE_STORAGE_STORAGE_H
 
+#include "container/Container.h"
+#include <nlohmann/json.hpp>
 #include <string>
-#include <unordered_map>
 #include <vector>
+#include <unordered_map>
 #include <mutex>
 #include <memory>
+#include <cstdint>
+#include <fstream>
+#include <filesystem>
 
 namespace SNEEZE { namespace CORE { class SNEEZE; }}
 
 namespace SNEEZE {
 
-// ===========================================================================
-// STORAGE — persistent per-persona/per-org/per-container key-value storage.
+// ---------------------------------------------------------------------------
+// STORAGE — persistent per-persona/per-org/per-container JSON document store.
 //
-// Analogous to localStorage in a web browser. Data is stored as JSON files
-// on disk and survives application restarts.
+// Analogous to localStorage/sessionStorage in a web browser. Each container
+// gets four independent JSON document stores (organization permanent/temporary,
+// container permanent/temporary). Data is stored as JSON files on disk.
 //
-// Hierarchy: STORAGE -> PERSONA_STORE -> FINGERPRINT -> CONTAINER
-// On disk:   <SessionPath>/Storage/<persona>/<fingerprint>/container-<name>.json
-// ===========================================================================
+// Consumers:
+//   1. WASM modules — scoped to their own four storage units
+//   2. Inspector — omniscient, browsable, request/release pattern
+//
+// Caching: UNITs are loaded on demand and evicted when no longer referenced.
+// Crash durability: JSONL changelog appended on every mutation.
+// ---------------------------------------------------------------------------
 
 class STORAGE
 {
 public:
 
    // -----------------------------------------------------------------------
-   // CONTAINER — per-container key-value store.
-   //
-   // On disk: <root>/<persona>/<fingerprint>/container-<name>.json
-   // Thread safety: mutex per container, write-on-set.
+   // SCOPE — selects one of the four storage units within an ASSET.
    // -----------------------------------------------------------------------
 
-   class CONTAINER
+   enum SCOPE
    {
-   public:
-      CONTAINER (const std::string& sName, const std::string& sDiskPath);
-
-      const std::string& GetName () const { return m_sName; }
-
-      std::string Get (const std::string& sKey) const;
-      void        Set (const std::string& sKey, const std::string& sValue);
-      void        Remove (const std::string& sKey);
-      bool        Has (const std::string& sKey) const;
-
-      void Load ();
-      void Save () const;
-
-   private:
-      std::string                                m_sName;
-      std::string                                m_sDiskPath;
-      std::unordered_map<std::string, std::string> m_mapData;
-      mutable std::mutex                         m_mutex;
+      ORG_PERMANENT       = 0,
+      ORG_TEMPORARY       = 1,
+      CONTAINER_PERMANENT = 2,
+      CONTAINER_TEMPORARY = 3,
+      SCOPE_COUNT         = 4,
    };
 
    // -----------------------------------------------------------------------
-   // FINGERPRINT — per-organization scope.
-   //
-   // Owns a "common" store (shared across containers of same org) and a map
-   // of named CONTAINERs.
-   // On disk: <root>/<persona>/<fingerprint>/common.json
+   // Forward declarations
    // -----------------------------------------------------------------------
 
-   class FINGERPRINT
+   class UNIT;
+   class ASSET;
+
+   // -----------------------------------------------------------------------
+   // IENUM — enumeration callback interface.
+   //
+   // Implement to receive ASSET pointers during Enumerate().
+   // -----------------------------------------------------------------------
+
+   class IENUM
    {
    public:
-      FINGERPRINT (const std::string& sFingerprint, const std::string& sBasePath);
-
-      const std::string& GetFingerprint () const { return m_sFingerprint; }
-
-      // Common (organization-shared) storage
-      std::string Common_Get (const std::string& sKey) const;
-      void        Common_Set (const std::string& sKey, const std::string& sValue);
-      void        Common_Remove (const std::string& sKey);
-      bool        Common_Has (const std::string& sKey) const;
-
-      // Per-container storage
-      CONTAINER*  GetContainer (const std::string& sName);
-
-      void Load ();
-      void Save () const;
-
-   private:
-      std::string                                          m_sFingerprint;
-      std::string                                          m_sBasePath;
-      std::unordered_map<std::string, std::string>         m_mapCommon;
-      mutable std::mutex                                   m_commonMutex;
-      std::unordered_map<std::string, std::unique_ptr<CONTAINER>> m_mapContainers;
-      std::mutex                                           m_containersMutex;
+      virtual ~IENUM () {}
+      virtual void OnAsset (ASSET* pAsset) = 0;
    };
 
    // -----------------------------------------------------------------------
-   // PERSONA_STORE — per-persona root of the storage hierarchy.
+   // UNIT — one per JSON file on disk. The core data wrapper.
    //
-   // On disk: <root>/<persona>/
+   // Caches an nlohmann::json document in memory, manages a .meta sidecar
+   // file for inspector metadata, and provides the JSONL changelog for crash
+   // durability. Also serves as the interface for flat file sandbox ops.
    // -----------------------------------------------------------------------
 
-   class PERSONA_STORE
+   class UNIT
    {
    public:
-      PERSONA_STORE (const std::string& sPersonaHash, const std::string& sBasePath);
+      UNIT (STORAGE* pStorage, SCOPE eScope, const std::string& sJsonPath);
 
-      const std::string& GetPersonaHash () const { return m_sPersonaHash; }
+      // --- State ---
 
-      FINGERPRINT* GetFingerprint (const std::string& sFingerprint);
+      bool     IsLoaded () const          { return m_bLoaded; }
+      bool     IsDirty () const           { return m_bDirty; }
+      SCOPE    GetScope () const          { return m_eScope; }
+
+      // --- JSON access ---
+
+      nlohmann::json  Get (const std::string& sPath) const;
+      void            Set (const std::string& sPath, const nlohmann::json& jValue);
+      void            Remove (const std::string& sPath);
+      bool            Has (const std::string& sPath) const;
+
+      // --- Bulk ---
+
+      std::string     GetJson () const;
+      void            SetJson (const std::string& sJson);
+
+      // --- Lifecycle ---
+
+      void            Load ();
+      void            Save ();
+      void            Evict ();
+
+      // --- Meta sidecar ---
+
+      const std::string&  GetJsonPath () const        { return m_sJsonPath; }
+      uint64_t            GetSizeBytes () const       { return m_nSizeBytes; }
+      const std::string&  GetCreatedTime () const     { return m_sCreatedAt; }
+      const std::string&  GetLastAccessTime () const  { return m_sLastAccessedAt; }
+      uint32_t            GetAccessCount () const     { return m_nAccessCount; }
+
+      void  TouchAccess ();
+      void  SaveMeta (std::shared_ptr<CONTAINER::NAME> pName);
+      void  LoadMeta ();
 
    private:
-      std::string                                               m_sPersonaHash;
-      std::string                                               m_sBasePath;
-      std::unordered_map<std::string, std::unique_ptr<FINGERPRINT>> m_mapFingerprints;
-      std::mutex                                                m_mutex;
+      void  NavigatePath (const std::string& sPath, nlohmann::json*& pParent, std::string& sFinalKey) const;
+      void  AppendLog (const std::string& sOp, const std::string& sPath, const nlohmann::json& jValue);
+      void  ReplayLog ();
+      void  DeleteLog ();
+
+      static std::string NowIso8601 ();
+
+      STORAGE*             m_pStorage;
+      SCOPE                m_eScope;
+      std::string          m_sJsonPath;
+
+      nlohmann::json       m_jData;
+      bool                 m_bLoaded;
+      bool                 m_bDirty;
+      uint32_t             m_nRefCount;
+
+      // Meta sidecar fields
+      uint64_t             m_nSizeBytes;
+      std::string          m_sCreatedAt;
+      std::string          m_sLastAccessedAt;
+      uint32_t             m_nAccessCount;
+
+      mutable std::recursive_mutex  m_mutex;
+
+      friend class ASSET;
+      friend class STORAGE;
+   };
+
+   // -----------------------------------------------------------------------
+   // ASSET — groups four UNITs for a specific container.
+   //
+   // The handle passed to both WASM host functions and the inspector.
+   // Created when a WASM container is instantiated or when the inspector
+   // enumerates from disk. Destroyed/evicted when last reference releases.
+   // -----------------------------------------------------------------------
+
+   class ASSET
+   {
+   public:
+      ASSET (STORAGE* pStorage, std::shared_ptr<CONTAINER::NAME> pName);
+
+      // --- Identity ---
+
+      std::shared_ptr<CONTAINER::NAME>  GetName () const { return m_pName; }
+      std::string  GetDisplayName () const { return m_pName ? m_pName->DisplayName () : ""; }
+
+      // --- Path-based API ---
+
+      nlohmann::json  Get (SCOPE eScope, const std::string& sPath) const;
+      void            Set (SCOPE eScope, const std::string& sPath, const nlohmann::json& jValue);
+      void            Remove (SCOPE eScope, const std::string& sPath);
+      bool            Has (SCOPE eScope, const std::string& sPath) const;
+
+      // --- Bulk ---
+
+      std::string     GetJson (SCOPE eScope) const;
+      void            SetJson (SCOPE eScope, const std::string& sJson);
+
+      // --- Reference counting (WASM + inspector attachments) ---
+
+      void     Attach ();
+      void     Detach ();
+      uint32_t GetRefCount () const { return m_nRefCount; }
+
+      // --- Clear flag (deferred history removal) ---
+
+      bool     IsPendingClear () const       { return m_bPendingClear; }
+      void     SetPendingClear (bool b)      { m_bPendingClear = b; }
+
+      // --- Internal ---
+
+      UNIT*    GetUnit (SCOPE eScope) const  { return m_apUnits[eScope]; }
+      void     SetUnit (SCOPE eScope, UNIT* pUnit) { m_apUnits[eScope] = pUnit; }
+
+   private:
+      STORAGE*    m_pStorage;
+      std::shared_ptr<CONTAINER::NAME>  m_pName;
+      UNIT*       m_apUnits[SCOPE_COUNT];
+      uint32_t    m_nRefCount;
+      bool        m_bPendingClear;
    };
 
    // -----------------------------------------------------------------------
@@ -136,15 +224,33 @@ public:
    bool Initialize ();
    void Shutdown ();
 
-   PERSONA_STORE* GetPersona (const std::string& sPersonaHash);
+   // --- Container lifecycle ---
+
+   ASSET*  Open (std::shared_ptr<CONTAINER::NAME> pName);
+   void    Close (ASSET* pAsset);
+
+   // --- Inspector ---
+
+   void    Enumerate (IENUM* pEnum);
+
+   // --- Paths ---
+
+   const std::string& GetPermanentPath () const { return m_sPermanentPath; }
+   const std::string& GetTemporaryPath () const { return m_sTemporaryPath; }
 
 private:
-   std::string GetStorageRootPath () const;
+   std::string  ComputeUnitPath (const std::string& sBasePath, const std::string& sPersonaHash,
+                                 const std::string& sFingerprint, const std::string& sFileName) const;
+   UNIT*        FindOrCreateUnit (const std::string& sJsonPath);
+   void         SaveAllDirty ();
 
-   CORE::SNEEZE*                                                m_pSneeze;
-   std::string                                                  m_sRootPath;
-   std::unordered_map<std::string, std::unique_ptr<PERSONA_STORE>> m_mapPersonas;
-   std::mutex                                                   m_mutex;
+   CORE::SNEEZE*   m_pSneeze;
+   std::string     m_sPermanentPath;
+   std::string     m_sTemporaryPath;
+
+   std::unordered_map<std::string, std::unique_ptr<UNIT>>  m_mapUnits;
+   std::vector<std::unique_ptr<ASSET>>                     m_aAssets;
+   std::recursive_mutex                                    m_mutex;
 };
 
 } // namespace SNEEZE

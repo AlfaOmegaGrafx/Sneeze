@@ -517,3 +517,19 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 - **Debugged Artemis path issue** — `sSessionPath="/Persistent"` (leading slash) caused `std::filesystem::path` to treat it as root-relative, producing `C:/Persistent` instead of the full path. Root cause: code was added to `AppFrame_SDL.cpp` instead of `AppFrame_Win32.cpp`. Fixed by editing the correct file and removing the leading slash.
 - **Removed redundant null check in FILE constructor** — `SnapshotInitial()` (and formerly `SnapshotMeta()`) already guards with `if (m_pMeta)`.
 - **Updated `Cache.md` and `project.mdc`** — all today's changes: shared_ptr ownership, snapshot phases, DisplayName(), SessionPath(), removed NAME_MAP.
+
+## 2026-05-04 (Mon) ~3:55 PM – 4:45 PM PDT
+
+**Dean Abramson** — Storage documentation, test suite, bug fixes, and file split.
+
+- **Rewrote `Storage.md`** — comprehensive documentation covering architecture, terminology, session paths, disk layout, usage examples, data model, path navigation table, full caching lifecycle flow, JSONL crash durability details, consumers (WASM + Inspector), notifications, .meta sidecars, thread safety, files. Added "Not Yet Implemented" section documenting: Host-Decides Pattern, quotas, dual session paths, file storage sandbox, WASM host function wiring, fine-grained WASM host functions, periodic dirty flush, OnStorageUnitDeleted never fired.
+- **Created `StorageTest.cpp`** — 42 assertions across 10 test groups (all passing): Initialize/OpenClose, basic Set/Get/Has/Remove, nested path navigation, array index access, persistence across Open/Close, org sharing, scope isolation, JSONL crash recovery, bulk JSON, meta sidecar validation. Registered in `TestRunner.cpp` (`RunStorageTests`, `--storage` flag) and `tests/CMakeLists.txt`.
+- **Fixed bugs discovered during testing:**
+  - Changed UNIT's `std::mutex` to `std::recursive_mutex` (Evict calls Save which also locks)
+  - Fixed NavigatePath to auto-create arrays when encountering `[N]` on non-existent intermediate paths
+  - Split permanent/temporary into separate subdirectories (`Storage/Permanent/` and `Storage/Temporary/`) so all four scopes are properly isolated
+  - Fixed `Load()` ordering — set `m_bLoaded = true` before calling `Save()` on crash recovery (Save guards with `if (!m_bLoaded) return`)
+  - Fixed `Close()` — save dirty units and meta before calling `Detach()` (which was clearing the dirty flag via Evict prematurely)
+- **Split `Storage.cpp` into three files** — `Storage.cpp` (top-level: Initialize, Shutdown, Open, Close, Enumerate), `Unit.cpp` (UNIT class: JSON access, changelog, lifecycle, meta), `Asset.cpp` (ASSET class: path-based API, attach/detach). Mirrors NETWORK's `Network.cpp` / `Asset.cpp` / `File.cpp` structure. Updated `src/CMakeLists.txt`.
+- **Updated `project.mdc`** — storage module description (disk layout, file split, features), STORAGE class entry, Storage test suite documentation, `--storage` flag in test runner list.
+

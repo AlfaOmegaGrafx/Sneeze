@@ -566,7 +566,7 @@ set (NETWORK_HEADERS
 
 set (CONTAINER_HEADERS  container/Container.h)
 
-set (STORAGE_SOURCES  storage/Storage.cpp)
+set (STORAGE_SOURCES  storage/Storage.cpp storage/Unit.cpp storage/Asset.cpp)
 set (STORAGE_HEADERS  storage/Storage.h)
 
 set (PERSONA_SOURCES  persona/Persona.cpp)

@@ -76,6 +76,10 @@ public:
    virtual void OnNetworkFileCreated (NETWORK::FILE* pFile) { (void)pFile; }
    virtual void OnNetworkFileChanged (NETWORK::FILE* pFile) { (void)pFile; }
    virtual void OnNetworkFileDeleted (NETWORK::FILE* pFile) { (void)pFile; }
+
+   virtual void OnStorageUnitCreated (STORAGE::ASSET* pAsset) { (void)pAsset; }
+   virtual void OnStorageUnitChanged (STORAGE::ASSET* pAsset) { (void)pAsset; }
+   virtual void OnStorageUnitDeleted (STORAGE::ASSET* pAsset) { (void)pAsset; }
 };
 
 // ---------------------------------------------------------------------------
@@ -160,6 +164,10 @@ public:
    void OnNetworkFileCreated (NETWORK::FILE* pFile);
    void OnNetworkFileChanged (NETWORK::FILE* pFile);
    void OnNetworkFileDeleted (NETWORK::FILE* pFile);
+
+   void OnStorageUnitCreated (STORAGE::ASSET* pAsset);
+   void OnStorageUnitChanged (STORAGE::ASSET* pAsset);
+   void OnStorageUnitDeleted (STORAGE::ASSET* pAsset);
 
 private:
    void EngineThreadLoop ();
