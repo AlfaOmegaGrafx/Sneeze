@@ -3,14 +3,16 @@ if (WIN32)
 elseif (APPLE)
    # macOS + iOS: Apple's Secure Transport (no OpenSSL dep)
    set (CURL_SSL_ARGS -DCURL_USE_SECTRANSPORT=ON -DCURL_USE_OPENSSL=OFF -DCURL_USE_SCHANNEL=OFF)
-elseif (ANDROID)
-   # Android: curl links against BoringSSL (built by deps/boringssl.cmake).
+else ()
+   # Linux + Android: curl links against BoringSSL (built by deps/boringssl.cmake).
    # BoringSSL answers to the same FindOpenSSL interface as OpenSSL, so
    # CURL_USE_OPENSSL=ON still works -- we just point it at the BoringSSL
    # install tree. The Android NDK toolchain sets
    # CMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY which makes find_package(OpenSSL)
    # ignore OPENSSL_ROOT_DIR, so we also pass the explicit lib and include
-   # paths to short-circuit the search.
+   # paths to short-circuit the search. Using BoringSSL on Linux (instead
+   # of system OpenSSL) keeps the build hermetic per the no-apt-packages
+   # policy and matches what gets shipped to consumers.
    set (BORINGSSL_INSTALL_DIR "${LIBS_DIR}/boringssl/install")
    set (CURL_SSL_ARGS
       -DCURL_USE_OPENSSL=ON
@@ -21,9 +23,6 @@ elseif (ANDROID)
       -DOPENSSL_CRYPTO_LIBRARY=${BORINGSSL_INSTALL_DIR}/lib/libcrypto.a
       -DOPENSSL_SSL_LIBRARY=${BORINGSSL_INSTALL_DIR}/lib/libssl.a
    )
-else ()
-   # Linux
-   set (CURL_SSL_ARGS -DCURL_USE_SCHANNEL=OFF -DCURL_USE_OPENSSL=ON)
 endif ()
 
 set (_repo "${SNEEZE_DEP_REPO}/curl")
