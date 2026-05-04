@@ -24,7 +24,7 @@ namespace SNEEZE {
 // Helpers
 // ---------------------------------------------------------------------------
 
-std::string NETWORK::META::NowIso8601 ()
+std::string NETWORK::ASSET::NowIso8601 ()
 {
    auto tpNow  = std::chrono::system_clock::now ();
    auto tmTime = std::chrono::system_clock::to_time_t (tpNow);
@@ -42,17 +42,17 @@ std::string NETWORK::META::NowIso8601 ()
 }
 
 // ---------------------------------------------------------------------------
-// META
+// ASSET
 // ---------------------------------------------------------------------------
 
-NETWORK::META::META (NETWORK* pNetwork, const std::string& sUrl, const std::string& sHash) :
+NETWORK::ASSET::ASSET (NETWORK* pNetwork, const std::string& sUrl, const std::string& sHash) :
    m_pNetwork         (pNetwork),
    m_sUrl             (sUrl),
    m_sHash            (sHash),
    m_bState           (STATE_IDLE),
    m_nSizeBytes       (0),
    m_nAccessCount     (0),
-   m_nMetaIx          (0),
+   m_nAssetIx          (0),
    m_nHttpStatus      (0),
    m_dFetchQueuedTime (0.0),
    m_dFetchStartTime  (0.0),
@@ -64,12 +64,12 @@ NETWORK::META::META (NETWORK* pNetwork, const std::string& sUrl, const std::stri
    m_sLastAccessedAt = m_sCreatedAt;
 }
 
-NETWORK::STATE NETWORK::META::GetState () const
+NETWORK::STATE NETWORK::ASSET::GetState () const
 {
    return m_bState.load ();
 }
 
-std::string NETWORK::META::GetHeader (const std::string& sName) const
+std::string NETWORK::ASSET::GetHeader (const std::string& sName) const
 {
    auto it = m_mapHeaders.find (sName);
    std::string sResult;
@@ -78,23 +78,23 @@ std::string NETWORK::META::GetHeader (const std::string& sName) const
    return sResult;
 }
 
-void NETWORK::META::SetHeaders (const std::unordered_map<std::string, std::string>& mapHeaders)
+void NETWORK::ASSET::SetHeaders (const std::unordered_map<std::string, std::string>& mapHeaders)
 {
    m_mapHeaders = mapHeaders;
 }
 
-void NETWORK::META::TouchAccess ()
+void NETWORK::ASSET::TouchAccess ()
 {
    m_sLastAccessedAt = NowIso8601 ();
    m_nAccessCount++;
 }
 
-void NETWORK::META::AttachFile (FILE* pFile)
+void NETWORK::ASSET::AttachFile (FILE* pFile)
 {
    m_apFiles.push_back (pFile);
 }
 
-void NETWORK::META::DetachFile (FILE* pFile)
+void NETWORK::ASSET::DetachFile (FILE* pFile)
 {
    for (auto it = m_apFiles.begin (); it != m_apFiles.end (); ++it)
    {
@@ -110,29 +110,29 @@ void NETWORK::META::DetachFile (FILE* pFile)
 // State transitions
 // ---------------------------------------------------------------------------
 
-void NETWORK::META::SetFetching ()
+void NETWORK::ASSET::SetFetching ()
 {
    m_bState.store (STATE_FETCHING);
 }
 
-void NETWORK::META::SetValidating ()
+void NETWORK::ASSET::SetValidating ()
 {
    m_bState.store (STATE_VALIDATING);
 }
 
-void NETWORK::META::Complete (const std::string& sDiskPath, uint64_t nSizeBytes)
+void NETWORK::ASSET::Complete (const std::string& sDiskPath, uint64_t nSizeBytes)
 {
    m_sDiskPath  = sDiskPath;
    m_nSizeBytes = nSizeBytes;
    m_bState.store (STATE_READY);
 }
 
-void NETWORK::META::Fail ()
+void NETWORK::ASSET::Fail ()
 {
    m_bState.store (STATE_FAILED);
 }
 
-void NETWORK::META::ResetState ()
+void NETWORK::ASSET::ResetState ()
 {
    m_bState.store (STATE_IDLE);
    m_sDiskPath.clear ();
@@ -144,11 +144,11 @@ void NETWORK::META::ResetState ()
    m_dFetchEndTime    = 0.0;
    m_bServedFromCache = false;
    m_bPendingReset    = false;
-   m_nMetaIx          = 0;
+   m_nAssetIx          = 0;
    m_mapHeaders.clear ();
 }
 
-std::vector<NETWORK::FILE*> NETWORK::META::CollectFiles () const
+std::vector<NETWORK::FILE*> NETWORK::ASSET::CollectFiles () const
 {
    return m_apFiles;
 }
@@ -157,7 +157,7 @@ std::vector<NETWORK::FILE*> NETWORK::META::CollectFiles () const
 // Data access
 // ---------------------------------------------------------------------------
 
-std::vector<uint8_t> NETWORK::META::ReadData () const
+std::vector<uint8_t> NETWORK::ASSET::ReadData () const
 {
    std::vector<uint8_t> aData;
 

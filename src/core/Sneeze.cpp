@@ -174,7 +174,7 @@ bool SNEEZE::Initialize ()
                   m_pNetwork = new NETWORK (this);
                   m_pNetwork->Initialize ();
 
-                  m_pStorage = new storage::STORAGE_SYSTEM (this);
+                  m_pStorage = new STORAGE (this);
                   m_pStorage->Initialize ();
 
                   m_pPersona = new persona::PERSONA (this);

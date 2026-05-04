@@ -39,8 +39,8 @@ namespace SNEEZE {
 // with a cryptographic hash are additionally integrity-verified.
 //
 // Callers request files via Request(), which returns a FILE* handle. When
-// done, they must return it via Release(). Metas are loaded lazily on first
-// Request(). Only metas with active FILE handles live in m_mapMetas. The
+// done, they must return it via Release(). Assets are loaded lazily on first
+// Request(). Only assets with active FILE handles live in m_mapAssets. The
 // .meta sidecar is flushed to disk when the last active handle releases.
 //
 // Background fetches are capped at 16 concurrent threads. Overflow requests
@@ -93,7 +93,7 @@ public:
    {
    public:
       virtual ~IENUM () {}
-      virtual void OnMeta (FILE* pFile) = 0;
+      virtual void OnAsset (FILE* pFile) = 0;
    };
 
    struct RULE
@@ -103,16 +103,16 @@ public:
    };
 
    // -----------------------------------------------------------------------
-   // META — internal shared state for a single cached URL.
+   // ASSET — internal shared state for a single cached URL.
    //
-   // Owned by NETWORK, never exposed to callers directly. One META per URL.
-   // Multiple FILE handles may reference the same META.
+   // Owned by NETWORK, never exposed to callers directly. One ASSET per URL.
+   // Multiple FILE handles may reference the same ASSET.
    // -----------------------------------------------------------------------
 
-   class META
+   class ASSET
    {
    public:
-      META (NETWORK* pNetwork, const std::string& sUrl, const std::string& sHash);
+      ASSET (NETWORK* pNetwork, const std::string& sUrl, const std::string& sHash);
 
       const std::string& GetUrl ()  const { return m_sUrl; }
       const std::string& GetHash () const { return m_sHash; }
@@ -142,14 +142,14 @@ public:
       std::string GetCreatedTime ()    const { return m_sCreatedAt; }
       std::string GetLastAccessTime () const { return m_sLastAccessedAt; }
       uint32_t    GetAccessCount ()    const { return m_nAccessCount; }
-      uint32_t    GetMetaIx ()        const { return m_nMetaIx; }
+      uint32_t    GetAssetIx ()        const { return m_nAssetIx; }
 
       void SetDiskPath (const std::string& sPath) { m_sDiskPath = sPath; }
       void SetHash (const std::string& sHash) { m_sHash = sHash; }
       void SetHeaders (const std::unordered_map<std::string, std::string>& mapHeaders);
       void SetSizeBytes (uint64_t nBytes) { m_nSizeBytes = nBytes; }
       void SetCreatedTime (const std::string& sTime) { m_sCreatedAt = sTime; }
-      void SetMetaIx (uint32_t nMetaIx) { m_nMetaIx = nMetaIx; }
+      void SetAssetIx (uint32_t nAssetIx) { m_nAssetIx = nAssetIx; }
       void TouchAccess ();
 
       void AttachFile (FILE* pFile);
@@ -187,7 +187,7 @@ public:
       std::string              m_sCreatedAt;
       std::string              m_sLastAccessedAt;
       uint32_t                 m_nAccessCount;
-      uint32_t                 m_nMetaIx;
+      uint32_t                 m_nAssetIx;
 
       long                     m_nHttpStatus;
       double                   m_dFetchQueuedTime;
@@ -204,14 +204,14 @@ public:
    // FILE — per-caller handle to a cached resource.
    //
    // Created by NETWORK::Request(), returned to the caller as a raw pointer.
-   // Owns a snapshot of the meta's display-level fields so the inspector can
+   // Owns a snapshot of the asset's display-level fields so the inspector can
    // read them after Release.
    // -----------------------------------------------------------------------
 
    class FILE
    {
    public:
-      FILE (NETWORK* pNetwork, META* pMeta, std::shared_ptr<CONTAINER::NAME> pName, IFILE* pListener, uint32_t nFileIx);
+      FILE (NETWORK* pNetwork, ASSET* pAsset, std::shared_ptr<CONTAINER::NAME> pName, IFILE* pListener, uint32_t nFileIx);
       ~FILE ();
 
       // --- Snapshot fields (always available, even after Release) ---
@@ -224,7 +224,7 @@ public:
       bool        IsHashed () const             { return !m_sHash.empty (); }
 
       uint32_t    GetFileIx () const            { return m_nFileIx; }
-      uint32_t    GetMetaIx () const            { return m_nMetaIx; }
+      uint32_t    GetAssetIx () const            { return m_nAssetIx; }
       long        GetHttpStatus () const        { return m_nHttpStatus; }
       double      GetFetchQueuedTime () const   { return m_dFetchQueuedTime; }
       double      GetFetchStartTime () const    { return m_dFetchStartTime; }
@@ -235,7 +235,7 @@ public:
       std::string GetContentType () const       { return m_sContentType; }
       uint64_t    GetSizeBytes () const         { return m_nSizeBytes; }
 
-      // --- META-dependent (require attached META, empty/default after Release) ---
+      // --- ASSET-dependent (require attached ASSET, empty/default after Release) ---
 
       std::vector<uint8_t> ReadData () const;
       std::string GetHeader (const std::string& sName) const;
@@ -263,11 +263,11 @@ public:
 
       // --- Internal (NETWORK use only) ---
 
-      META*       GetMeta () const              { return m_pMeta; }
-      void        SetMeta (META* pMeta)         { m_pMeta = pMeta; }
+      ASSET*      GetAsset () const              { return m_pAsset; }
+      void        SetAsset (ASSET* pAsset)       { m_pAsset = pAsset; }
       bool        IsPendingClear () const       { return m_bPendingClear; }
       bool        IsReleased () const           { return m_bReleased; }
-      bool        IsAttached () const           { return m_pMeta != nullptr; }
+      bool        IsAttached () const           { return m_pAsset != nullptr; }
 
       void        SetReleased ()                { m_bReleased = true; }
       bool        SetPendingClear (bool b)      { bool bChanged = (b != m_bPendingClear); m_bPendingClear = b; return bChanged; }
@@ -279,14 +279,14 @@ public:
 
    private:
       NETWORK*    m_pNetwork;
-      META*       m_pMeta;
+      ASSET*      m_pAsset;
       std::shared_ptr<CONTAINER::NAME> m_pName;
       IFILE*      m_pListener;
 
       // Initial (set once at construction — request identity)
       std::string m_sUrl;
       uint32_t    m_nFileIx;
-      uint32_t    m_nMetaIx;
+      uint32_t    m_nAssetIx;
 
       // Progress (updated during fetch lifecycle)
       STATE       m_bState;
@@ -358,22 +358,22 @@ private:
    std::string ComputeFileHash (const std::string& sFilePath, const std::string& sAlgo) const;
    std::string ComputeDataHash (const uint8_t* pData, size_t nLen, const std::string& sAlgo) const;
 
-   void SaveMeta (META* pMeta);
+   void SaveMeta (ASSET* pAsset);
    bool LoadMeta (const std::string& sDiskKey, const std::string& sUrl);
 
    void LoadRules ();
    void SaveRules ();
-   bool IsMetaStale (META* pMeta) const;
+   bool IsAssetStale (ASSET* pAsset) const;
 
-   void FetchMeta (META* pMeta);
+   void FetchAsset (ASSET* pAsset);
    void SweepCompletedThreads ();
-   void DispatchFetch (META* pMeta);
+   void DispatchFetch (ASSET* pAsset);
    void DispatchNextFromQueue ();
    void NotifyFiles (const std::vector<FILE*>& apFiles, STATE bState);
    double SecondsSinceEpoch () const;
 
    void DeleteFiles ();
-   void ResetMeta (META* pMeta);
+   void ResetAsset (ASSET* pAsset);
 
    struct FETCH_CONTEXT
    {
@@ -387,8 +387,8 @@ private:
    CORE::SNEEZE*             m_pSneeze;
    std::string               m_sCachePath;
 
-   using META_MAP = std::unordered_map<std::string, std::unique_ptr<META>>;
-   META_MAP                  m_mapMetas;
+   using ASSET_MAP = std::unordered_map<std::string, std::unique_ptr<ASSET>>;
+   ASSET_MAP                  m_mapAssets;
 
    mutable std::recursive_mutex m_mutex;
 
@@ -403,15 +403,15 @@ private:
    };
 
    std::vector<FETCH_SLOT*>  m_apFetchSlots;
-   std::queue<META*>         m_aFetchQueue;
+   std::queue<ASSET*>        m_aFetchQueue;
 
    std::atomic<bool>         m_bShuttingDown;
    bool                      m_bCacheEnabled;
    bool                      m_bDisplayEnabled;
 
-   // Staleness rules + meta index counter
+   // Staleness rules + asset index counter
    std::vector<RULE>         m_aRules;
-   uint32_t                  m_nNextMetaIx;
+   uint32_t                  m_nNextAssetIx;
 
    // Network inspector
    std::vector<FILE*>        m_apFile;

@@ -23,106 +23,115 @@
 
 namespace SNEEZE { namespace CORE { class SNEEZE; }}
 
-namespace SNEEZE { namespace storage {
+namespace SNEEZE {
 
-// ---------------------------------------------------------------------------
-// CONTAINER — per-container key-value store.
+// ===========================================================================
+// STORAGE — persistent per-persona/per-org/per-container key-value storage.
 //
-// On disk: %APPDATA%/Storage/<persona>/<fingerprint>/container-<name>.json
-// Thread safety: mutex per container, write-on-set.
-// ---------------------------------------------------------------------------
+// Analogous to localStorage in a web browser. Data is stored as JSON files
+// on disk and survives application restarts.
+//
+// Hierarchy: STORAGE -> PERSONA_STORE -> FINGERPRINT -> CONTAINER
+// On disk:   <SessionPath>/Storage/<persona>/<fingerprint>/container-<name>.json
+// ===========================================================================
 
-class CONTAINER
+class STORAGE
 {
 public:
-   CONTAINER (const std::string& sName, const std::string& sDiskPath);
 
-   const std::string& GetName () const { return m_sName; }
+   // -----------------------------------------------------------------------
+   // CONTAINER — per-container key-value store.
+   //
+   // On disk: <root>/<persona>/<fingerprint>/container-<name>.json
+   // Thread safety: mutex per container, write-on-set.
+   // -----------------------------------------------------------------------
 
-   std::string Get (const std::string& sKey) const;
-   void        Set (const std::string& sKey, const std::string& sValue);
-   void        Remove (const std::string& sKey);
-   bool        Has (const std::string& sKey) const;
+   class CONTAINER
+   {
+   public:
+      CONTAINER (const std::string& sName, const std::string& sDiskPath);
 
-   void Load ();
-   void Save () const;
+      const std::string& GetName () const { return m_sName; }
 
-private:
-   std::string                                m_sName;
-   std::string                                m_sDiskPath;
-   std::unordered_map<std::string, std::string> m_mapData;
-   mutable std::mutex                         m_mutex;
-};
+      std::string Get (const std::string& sKey) const;
+      void        Set (const std::string& sKey, const std::string& sValue);
+      void        Remove (const std::string& sKey);
+      bool        Has (const std::string& sKey) const;
 
-// ---------------------------------------------------------------------------
-// FINGERPRINT — per-organization scope.
-//
-// Owns a "common" store (shared across containers of same org) and a map of
-// named CONTAINERs.
-// On disk: %APPDATA%/Storage/<persona>/<fingerprint>/common.json
-// ---------------------------------------------------------------------------
+      void Load ();
+      void Save () const;
 
-class FINGERPRINT
-{
-public:
-   FINGERPRINT (const std::string& sFingerprint, const std::string& sBasePath);
+   private:
+      std::string                                m_sName;
+      std::string                                m_sDiskPath;
+      std::unordered_map<std::string, std::string> m_mapData;
+      mutable std::mutex                         m_mutex;
+   };
 
-   const std::string& GetFingerprint () const { return m_sFingerprint; }
+   // -----------------------------------------------------------------------
+   // FINGERPRINT — per-organization scope.
+   //
+   // Owns a "common" store (shared across containers of same org) and a map
+   // of named CONTAINERs.
+   // On disk: <root>/<persona>/<fingerprint>/common.json
+   // -----------------------------------------------------------------------
 
-   // Common (organization-shared) storage
-   std::string Common_Get (const std::string& sKey) const;
-   void        Common_Set (const std::string& sKey, const std::string& sValue);
-   void        Common_Remove (const std::string& sKey);
-   bool        Common_Has (const std::string& sKey) const;
+   class FINGERPRINT
+   {
+   public:
+      FINGERPRINT (const std::string& sFingerprint, const std::string& sBasePath);
 
-   // Per-container storage
-   CONTAINER*  GetContainer (const std::string& sName);
+      const std::string& GetFingerprint () const { return m_sFingerprint; }
 
-   void Load ();
-   void Save () const;
+      // Common (organization-shared) storage
+      std::string Common_Get (const std::string& sKey) const;
+      void        Common_Set (const std::string& sKey, const std::string& sValue);
+      void        Common_Remove (const std::string& sKey);
+      bool        Common_Has (const std::string& sKey) const;
 
-private:
-   std::string                                          m_sFingerprint;
-   std::string                                          m_sBasePath;
-   std::unordered_map<std::string, std::string>         m_mapCommon;
-   mutable std::mutex                                   m_commonMutex;
-   std::unordered_map<std::string, std::unique_ptr<CONTAINER>> m_mapContainers;
-   std::mutex                                           m_containersMutex;
-};
+      // Per-container storage
+      CONTAINER*  GetContainer (const std::string& sName);
 
-// ---------------------------------------------------------------------------
-// PERSONA_STORE — per-persona root of the storage hierarchy.
-//
-// On disk: %APPDATA%/Storage/<persona>/
-// ---------------------------------------------------------------------------
+      void Load ();
+      void Save () const;
 
-class PERSONA_STORE
-{
-public:
-   PERSONA_STORE (const std::string& sPersonaHash, const std::string& sBasePath);
+   private:
+      std::string                                          m_sFingerprint;
+      std::string                                          m_sBasePath;
+      std::unordered_map<std::string, std::string>         m_mapCommon;
+      mutable std::mutex                                   m_commonMutex;
+      std::unordered_map<std::string, std::unique_ptr<CONTAINER>> m_mapContainers;
+      std::mutex                                           m_containersMutex;
+   };
 
-   const std::string& GetPersonaHash () const { return m_sPersonaHash; }
+   // -----------------------------------------------------------------------
+   // PERSONA_STORE — per-persona root of the storage hierarchy.
+   //
+   // On disk: <root>/<persona>/
+   // -----------------------------------------------------------------------
 
-   FINGERPRINT* GetFingerprint (const std::string& sFingerprint);
+   class PERSONA_STORE
+   {
+   public:
+      PERSONA_STORE (const std::string& sPersonaHash, const std::string& sBasePath);
 
-private:
-   std::string                                               m_sPersonaHash;
-   std::string                                               m_sBasePath;
-   std::unordered_map<std::string, std::unique_ptr<FINGERPRINT>> m_mapFingerprints;
-   std::mutex                                                m_mutex;
-};
+      const std::string& GetPersonaHash () const { return m_sPersonaHash; }
 
-// ---------------------------------------------------------------------------
-// STORAGE_SYSTEM — top-level manager.
-//
-// Root path: %APPDATA%/Storage/
-// ---------------------------------------------------------------------------
+      FINGERPRINT* GetFingerprint (const std::string& sFingerprint);
 
-class STORAGE_SYSTEM
-{
-public:
-   explicit STORAGE_SYSTEM (CORE::SNEEZE* pSneeze);
-   ~STORAGE_SYSTEM ();
+   private:
+      std::string                                               m_sPersonaHash;
+      std::string                                               m_sBasePath;
+      std::unordered_map<std::string, std::unique_ptr<FINGERPRINT>> m_mapFingerprints;
+      std::mutex                                                m_mutex;
+   };
+
+   // -----------------------------------------------------------------------
+   // STORAGE public API
+   // -----------------------------------------------------------------------
+
+   explicit STORAGE (CORE::SNEEZE* pSneeze);
+   ~STORAGE ();
 
    bool Initialize ();
    void Shutdown ();
@@ -138,6 +147,6 @@ private:
    std::mutex                                                   m_mutex;
 };
 
-}} // namespace SNEEZE::storage
+} // namespace SNEEZE
 
 #endif // SNEEZE_STORAGE_STORAGE_H

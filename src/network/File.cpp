@@ -18,13 +18,13 @@ namespace SNEEZE {
 
 const std::unordered_map<std::string, std::string> NETWORK::FILE::s_mapEmpty;
 
-NETWORK::FILE::FILE (NETWORK* pNetwork, META* pMeta, std::shared_ptr<CONTAINER::NAME> pName, IFILE* pListener, uint32_t nFileIx) :
+NETWORK::FILE::FILE (NETWORK* pNetwork, ASSET* pAsset, std::shared_ptr<CONTAINER::NAME> pName, IFILE* pListener, uint32_t nFileIx) :
    m_pNetwork         (pNetwork),
-   m_pMeta            (pMeta),
+   m_pAsset           (pAsset),
    m_pName            (std::move (pName)),
    m_pListener        (pListener),
    m_nFileIx          (nFileIx),
-   m_nMetaIx          (0),
+   m_nAssetIx         (0),
    m_bState           (STATE_IDLE),
    m_nSizeBytes       (0),
    m_nHttpStatus      (0),
@@ -44,41 +44,41 @@ NETWORK::FILE::~FILE ()
 }
 
 // ---------------------------------------------------------------------------
-// Snapshot — copies display fields from the attached META
+// Snapshot — copies display fields from the attached ASSET
 // ---------------------------------------------------------------------------
 
 void NETWORK::FILE::SnapshotInitial ()
 {
-   if (m_pMeta)
+   if (m_pAsset)
    {
-      m_sUrl    = m_pMeta->GetUrl ();
-      m_nMetaIx = m_pMeta->GetMetaIx ();
+      m_sUrl     = m_pAsset->GetUrl ();
+      m_nAssetIx = m_pAsset->GetAssetIx ();
    }
 }
 
 void NETWORK::FILE::SnapshotProgress ()
 {
-   if (m_pMeta)
+   if (m_pAsset)
    {
-      m_bState           = m_pMeta->GetState ();
-      m_dFetchQueuedTime = m_pMeta->GetFetchQueuedTime ();
-      m_dFetchStartTime  = m_pMeta->GetFetchStartTime ();
+      m_bState           = m_pAsset->GetState ();
+      m_dFetchQueuedTime = m_pAsset->GetFetchQueuedTime ();
+      m_dFetchStartTime  = m_pAsset->GetFetchStartTime ();
    }
 }
 
 void NETWORK::FILE::SnapshotFinal ()
 {
-   if (m_pMeta)
+   if (m_pAsset)
    {
-      m_bState           = m_pMeta->GetState ();
-      m_sHash            = m_pMeta->GetHash ();
-      m_sContentType     = m_pMeta->GetHeader ("content-type");
-      m_nSizeBytes       = m_pMeta->GetSizeBytes ();
-      m_nHttpStatus      = m_pMeta->GetHttpStatus ();
-      m_dFetchQueuedTime = m_pMeta->GetFetchQueuedTime ();
-      m_dFetchStartTime  = m_pMeta->GetFetchStartTime ();
-      m_dFetchEndTime    = m_pMeta->GetFetchEndTime ();
-      m_bServedFromCache = m_pMeta->IsServedFromCache ();
+      m_bState           = m_pAsset->GetState ();
+      m_sHash            = m_pAsset->GetHash ();
+      m_sContentType     = m_pAsset->GetHeader ("content-type");
+      m_nSizeBytes       = m_pAsset->GetSizeBytes ();
+      m_nHttpStatus      = m_pAsset->GetHttpStatus ();
+      m_dFetchQueuedTime = m_pAsset->GetFetchQueuedTime ();
+      m_dFetchStartTime  = m_pAsset->GetFetchStartTime ();
+      m_dFetchEndTime    = m_pAsset->GetFetchEndTime ();
+      m_bServedFromCache = m_pAsset->IsServedFromCache ();
    }
 }
 
@@ -109,61 +109,61 @@ void NETWORK::FILE::Reset (bool b)
 }
 
 // ---------------------------------------------------------------------------
-// META-dependent accessors (require attached META)
+// ASSET-dependent accessors (require attached ASSET)
 // ---------------------------------------------------------------------------
 
 std::vector<uint8_t> NETWORK::FILE::ReadData () const
 {
    std::vector<uint8_t> aResult;
-   if (m_pMeta)
-      aResult = m_pMeta->ReadData ();
+   if (m_pAsset)
+      aResult = m_pAsset->ReadData ();
    return aResult;
 }
 
 std::string NETWORK::FILE::GetHeader (const std::string& sName) const
 {
    std::string sResult;
-   if (m_pMeta)
-      sResult = m_pMeta->GetHeader (sName);
+   if (m_pAsset)
+      sResult = m_pAsset->GetHeader (sName);
    return sResult;
 }
 
 std::string NETWORK::FILE::GetDiskPath () const
 {
    std::string sResult;
-   if (m_pMeta)
-      sResult = m_pMeta->GetDiskPath ();
+   if (m_pAsset)
+      sResult = m_pAsset->GetDiskPath ();
    return sResult;
 }
 
 std::string NETWORK::FILE::GetCreatedTime () const
 {
    std::string sResult;
-   if (m_pMeta)
-      sResult = m_pMeta->GetCreatedTime ();
+   if (m_pAsset)
+      sResult = m_pAsset->GetCreatedTime ();
    return sResult;
 }
 
 std::string NETWORK::FILE::GetLastAccessTime () const
 {
    std::string sResult;
-   if (m_pMeta)
-      sResult = m_pMeta->GetLastAccessTime ();
+   if (m_pAsset)
+      sResult = m_pAsset->GetLastAccessTime ();
    return sResult;
 }
 
 uint32_t NETWORK::FILE::GetAccessCount () const
 {
    uint32_t nResult = 0;
-   if (m_pMeta)
-      nResult = m_pMeta->GetAccessCount ();
+   if (m_pAsset)
+      nResult = m_pAsset->GetAccessCount ();
    return nResult;
 }
 
 const std::unordered_map<std::string, std::string>& NETWORK::FILE::GetHeaders () const
 {
    const std::unordered_map<std::string, std::string>& mapResult =
-      m_pMeta ? m_pMeta->GetHeaders () : s_mapEmpty;
+      m_pAsset ? m_pAsset->GetHeaders () : s_mapEmpty;
    return mapResult;
 }
 

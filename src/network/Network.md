@@ -13,42 +13,42 @@ All files are stored on disk, never solely in memory. Fetches stream to a tempor
 
 ```
 NETWORK (singleton)
- ├── META_MAP: URL -> unique_ptr<META>        (only metas with active FILE handles)
+ ├── ASSET_MAP: URL -> unique_ptr<ASSET>        (only assets with active FILE handles)
  ├── Fetch thread pool (capped at 16) + overflow queue
  ├── History list: all FILE* handles ever created
  ├── m_nNextFileIx: monotonic FILE index counter
- ├── m_nNextMetaIx: monotonic META index counter (persisted in rules.json)
+ ├── m_nNextAssetIx: monotonic ASSET index counter (persisted in rules.json)
  ├── rules.json: staleness rules + nNextMetaIx counter
- ├── Sidecar .meta files per META (replaces manifest.json)
+ ├── Sidecar .meta files per ASSET (replaces manifest.json)
  └── Epoch (steady_clock time point)
 
-META (internal shared state, one per URL)
+ASSET (internal shared state, one per URL)
  ├── NETWORK* (parent back-pointer)
  ├── STATE lifecycle (atomic)
- ├── nMetaIx: monotonic content-version index (assigned at creation/reset)
+ ├── nAssetIx: monotonic content-version index (assigned at creation/reset)
  ├── Disk path, headers, metadata
  ├── HTTP status, fetch queued/start/end times, served-from-cache flag
- ├── m_dFetchQueuedTime (when meta entered the fetch queue)
+ ├── m_dFetchQueuedTime (when asset entered the fetch queue)
  ├── m_bPendingReset (deferred destruction flag)
  └── list<FILE*> attached handles
 
 FILE (per-caller handle)
  ├── NETWORK* (parent back-pointer)
- ├── META* (attached while live, null after Release)
+ ├── ASSET* (attached while live, null after Release)
  ├── shared_ptr<CONTAINER::NAME> (identity of requesting container)
  ├── IFILE* listener for notifications
  ├── nFileIx: monotonic file-handle index (uint32_t)
- ├── Snapshot fields (owned copies of META display data):
+ ├── Snapshot fields (owned copies of ASSET display data):
  │   ├── Initial (set once at construction):
- │   │   └── URL, nMetaIx
+ │   │   └── URL, nAssetIx
  │   ├── Progress (updated during fetch):
  │   │   └── state, fetch queued/start times
  │   └── Final (set when fetch resolves):
  │       └── hash, content-type, size, HTTP status, fetch end time, served-from-cache
  ├── m_bPendingClear (deferred history removal flag)
- ├── m_bReleased (detached from META)
+ ├── m_bReleased (detached from ASSET)
  ├── m_bEnumeration (guards Release during Enumerate)
- └── Request() to reattach a released FILE to its META
+ └── Request() to reattach a released FILE to its ASSET
 
 CONTAINER::NAME (identity record, shared via shared_ptr)
  ├── sFingerprint (SHA-256 of cert public key)
@@ -66,11 +66,11 @@ All types are nested inside `SNEEZE::NETWORK`:
 
 | Type            | Role                                              |
 |-----------------|---------------------------------------------------|
-| NETWORK         | Singleton network manager. Owns metas and threads.|
-| NETWORK::META   | Internal shared state per URL. Not exposed.        |
+| NETWORK         | Singleton network manager. Owns assets and threads.|
+| NETWORK::ASSET  | Internal shared state per URL. Not exposed.        |
 | NETWORK::FILE   | Per-caller handle. Returned by Request().          |
 | NETWORK::IFILE  | Observer interface (OnFileReady, OnFileFailed).    |
-| NETWORK::IENUM  | Enumeration callback interface (OnMeta).           |
+| NETWORK::IENUM  | Enumeration callback interface (OnAsset).          |
 | NETWORK::STATE  | Enum: IDLE, FETCHING, VALIDATING, READY, FAILED.  |
 | NETWORK::REQUEST| Flags: REQUEST_CREATE, REQUEST_FETCH.              |
 | NETWORK::DISKFILE| Enum: DISKFILE_DATA, DISKFILE_TEMP, DISKFILE_META.|
@@ -138,7 +138,7 @@ void OnFileReady (SNEEZE::NETWORK::FILE* pFile) override
 
 ### Request flags
 
-The 5-arg `Request()` accepts an optional `bFlags` parameter controlling whether to create and/or fetch the meta. Defaults to `kREQUEST_DEFAULT` (`REQUEST_CREATE | REQUEST_FETCH`).
+The 5-arg `Request()` accepts an optional `bFlags` parameter controlling whether to create and/or fetch the asset. Defaults to `kREQUEST_DEFAULT` (`REQUEST_CREATE | REQUEST_FETCH`).
 
 ```cpp
 // Find only — returns nullptr if the URL isn't already cached
@@ -154,10 +154,10 @@ SNEEZE::NETWORK::FILE* pFile2 = pNetwork->Request (&listener, pName, url, "",
 
 | Flag             | Effect                                            |
 |------------------|---------------------------------------------------|
-| `REQUEST_CREATE` | Create the META if it doesn't already exist.      |
-| `REQUEST_FETCH`  | Initiate a network fetch for IDLE metas.          |
+| `REQUEST_CREATE` | Create the ASSET if it doesn't already exist.     |
+| `REQUEST_FETCH`  | Initiate a network fetch for IDLE assets.         |
 
-Without `CREATE`, a missing meta returns `nullptr`. Without `FETCH`, an IDLE meta is not fetched — a stale-but-READY meta is rejected rather than re-fetched (returns `nullptr`).
+Without `CREATE`, a missing asset returns `nullptr`. Without `FETCH`, an IDLE asset is not fetched — a stale-but-READY asset is rejected rather than re-fetched (returns `nullptr`).
 
 ### Container Identity
 
@@ -171,7 +171,7 @@ std::string sDisplay = pFile->GetContainerName ();  // "Metaversal/Solar System"
 
 ### Cache Bypass
 
-The cache can be globally disabled at runtime via `SetCacheEnabled(false)`. When disabled, every `Request()` that would normally serve data from disk instead triggers a fresh network fetch. Existing metas and disk files are not destroyed (unlike `Reset()`); the flag only affects the cache-hit decision path.
+The cache can be globally disabled at runtime via `SetCacheEnabled(false)`. When disabled, every `Request()` that would normally serve data from disk instead triggers a fresh network fetch. Existing assets and disk files are not destroyed (unlike `Reset()`); the flag only affects the cache-hit decision path.
 
 ```cpp
 pNetwork->SetCacheEnabled (false);   // all subsequent requests bypass the cache
@@ -183,17 +183,17 @@ This is intended for the inspector's "Disable cache" toggle, analogous to the sa
 
 ### Release, Clear, and Reset
 
-**Release** detaches the FILE from its META and snapshots the META's current state into the FILE's local fields. If the FILE has a pending clear flag, it is deleted from the history list. When the META's last FILE handle releases:
-- If the META is READY: the `.meta` sidecar is saved and the META is evicted from `m_mapMetas`.
-- If the META has a pending reset: the META's disk files are destroyed, state is reset, and the META is evicted from `m_mapMetas`.
+**Release** detaches the FILE from its ASSET and snapshots the ASSET's current state into the FILE's local fields. If the FILE has a pending clear flag, it is deleted from the history list. When the ASSET's last FILE handle releases:
+- If the ASSET is READY: the `.meta` sidecar is saved and the ASSET is evicted from `m_mapAssets`.
+- If the ASSET has a pending reset: the ASSET's disk files are destroyed, state is reset, and the ASSET is evicted from `m_mapAssets`.
 
-This means metas don't accumulate in memory indefinitely — only metas with active FILE handles live in the map.
+This means assets don't accumulate in memory indefinitely — only assets with active FILE handles live in the map.
 
-**Clear** is an immediate visibility toggle for the inspector. `Clear(true)` removes the FILE from the history list and fires `OnNetworkFileDeleted` immediately — the inspector row vanishes on the spot. If the FILE is already released, it is also deleted. `Clear(false)` adds the FILE back to the history list and fires `OnNetworkFileCreated`. The META and its cached data are not affected — this is purely inspector housekeeping.
+**Clear** is an immediate visibility toggle for the inspector. `Clear(true)` removes the FILE from the history list and fires `OnNetworkFileDeleted` immediately — the inspector row vanishes on the spot. If the FILE is already released, it is also deleted. `Clear(false)` adds the FILE back to the history list and fires `OnNetworkFileCreated`. The ASSET and its cached data are not affected — this is purely inspector housekeeping.
 
 The clear flag also acts as a deferred destruction flag: when a cleared FILE is eventually released, it is deleted rather than kept in history.
 
-**Reset** marks the META for destruction. When the last attached FILE is released and the count reaches zero, the META's disk files (`.data`, `.meta`, `.temp`) are deleted and the META is erased from `m_mapMetas`. FILE handles in the history that pointed to the destroyed META retain their snapshot data (getters return the snapshotted values).
+**Reset** marks the ASSET for destruction. When the last attached FILE is released and the count reaches zero, the ASSET's disk files (`.data`, `.meta`, `.temp`) are deleted and the ASSET is erased from `m_mapAssets`. FILE handles in the history that pointed to the destroyed ASSET retain their snapshot data (getters return the snapshotted values).
 
 Both `Clear()` and `Reset()` accept a `bool` parameter (default `true`) so the flag can be toggled on/off:
 
@@ -201,7 +201,7 @@ Both `Clear()` and `Reset()` accept a `bool` parameter (default `true`) so the f
 pFile->Clear ();              // immediately remove from inspector
 pFile->Clear (false);         // immediately add back to inspector
 
-pFile->Reset ();              // mark META for destruction
+pFile->Reset ();              // mark ASSET for destruction
 pFile->Release ();            // triggers it (if last holder)
 
 pFile->Reset ();              // mark for reset
@@ -224,22 +224,22 @@ pNetwork->Reset (pFile);       // via NETWORK
 
 ### FILE::Request() — Reopen
 
-A released FILE can be re-attached to its META by calling `Request()`. This is used by the inspector detail pane to drill into a previously-released cached resource.
+A released FILE can be re-attached to its ASSET by calling `Request()`. This is used by the inspector detail pane to drill into a previously-released cached resource.
 
 ```cpp
 bool bOk = pFile->Request (&listener);
 if (!bOk)
 {
-   // META was replaced (nMetaIx mismatch) or no longer exists on disk
+   // ASSET was replaced (nAssetIx mismatch) or no longer exists on disk
 }
 ```
 
 Internally, `Request()` calls `NETWORK::ReopenFile()`:
-1. Looks up the META in `m_mapMetas` by the FILE's snapshotted URL.
-2. If not in memory, loads the META from its `.meta` sidecar on disk.
-3. Validates that the META's `nMetaIx` matches the FILE's snapshotted `nMetaIx`.
+1. Looks up the ASSET in `m_mapAssets` by the FILE's snapshotted URL.
+2. If not in memory, loads the ASSET from its `.meta` sidecar on disk.
+3. Validates that the ASSET's `nAssetIx` matches the FILE's snapshotted `nAssetIx`.
 4. If matched: reattaches the FILE, snapshots, and fires the listener callback.
-5. Returns `false` if the content has been replaced (nMetaIx mismatch) or if no `.meta`/`.data` exists on disk.
+5. Returns `false` if the content has been replaced (nAssetIx mismatch) or if no `.meta`/`.data` exists on disk.
 
 An optional `IFILE*` parameter can replace the listener; passing `nullptr` keeps the existing listener.
 
@@ -257,33 +257,33 @@ This is intended for the inspector's stop/play toggle. Existing FILEs already in
 
 ### Bulk Management
 
-Bulk operations set flags on all matching metas/files, then immediately process any that are already eligible (released FILEs, zero-attach METAs). In-use items are cleaned up automatically when their last holder releases.
+Bulk operations set flags on all matching assets/files, then immediately process any that are already eligible (released FILEs, zero-attach ASSETs). In-use items are cleaned up automatically when their last holder releases.
 
 ```cpp
 // Clear all released FILE records from history
 pNetwork->Clear ();
 
-// Reset all metas (destroy when last holder releases)
+// Reset all assets (destroy when last holder releases)
 pNetwork->Reset ();
 ```
 
 | Method  | Scope     | Effect                                       |
 |---------|-----------|----------------------------------------------|
 | `Clear` | History   | Remove all released FILEs; flag rest          |
-| `Reset` | Metas     | Destroy all idle METAs; flag in-use ones      |
+| `Reset` | Assets    | Destroy all idle ASSETs; flag in-use ones     |
 
 ### Enumerate
 
 `Enumerate(IENUM*)` walks all `.meta` files on disk (via `recursive_directory_iterator`), loading each cached resource's metadata and passing a temporary FILE handle to the callback. The callback can inspect the FILE (URL, content-type, headers, hash, state) and call `Reset()` or `Clear()` on it. `Release()` is guarded — it no-ops on enumeration FILEs to prevent double-detach.
 
-For metas already in `m_mapMetas`, the existing META is used. For metas only on disk, a temporary META is created from the `.meta` sidecar, used for the callback, then discarded.
+For assets already in `m_mapAssets`, the existing ASSET is used. For assets only on disk, a temporary ASSET is created from the `.meta` sidecar, used for the callback, then discarded.
 
-Internally, a single FILE object is allocated before the loop, with `m_bEnumeration` set to true. On each iteration, `SetMeta()` swaps the META pointer, `AttachFile` / `DetachFile` manage the attachment, and the callback fires. The FILE is deleted after the loop completes.
+Internally, a single FILE object is allocated before the loop, with `m_bEnumeration` set to true. On each iteration, `SetAsset()` swaps the ASSET pointer, `AttachFile` / `DetachFile` manage the attachment, and the callback fires. The FILE is deleted after the loop completes.
 
 ```cpp
 struct ENUM_PURGE : SNEEZE::NETWORK::IENUM
 {
-   void OnMeta (SNEEZE::NETWORK::FILE* pFile) override
+   void OnAsset (SNEEZE::NETWORK::FILE* pFile) override
    {
       if (pFile->GetContentType () == "application/jose+msf")
          pFile->Reset ();
@@ -293,11 +293,11 @@ ENUM_PURGE pEnum_Purge;
 pNetwork->Enumerate (&pEnum_Purge);
 ```
 
-**Use case: MSF file freshness.** Artemis calls `Enumerate()` immediately after `SNEEZE::Initialize()` to reset all cached metas with content-type `application/jose+msf`. MSF files are trust anchors (signed service manifests) that should always be re-fetched from the network on startup rather than served from stale cache. The policy decision lives in Artemis, not the engine — Sneeze's `Enumerate` is type-agnostic.
+**Use case: MSF file freshness.** Artemis calls `Enumerate()` immediately after `SNEEZE::Initialize()` to reset all cached assets with content-type `application/jose+msf`. MSF files are trust anchors (signed service manifests) that should always be re-fetched from the network on startup rather than served from stale cache. The policy decision lives in Artemis, not the engine — Sneeze's `Enumerate` is type-agnostic.
 
 ## FILE Data Ownership (Snapshotting)
 
-FILE stores a local snapshot of display-relevant META fields so that inspector data remains valid even after `Release()` detaches the FILE from its META (and the META is potentially evicted from memory).
+FILE stores a local snapshot of display-relevant ASSET fields so that inspector data remains valid even after `Release()` detaches the FILE from its ASSET (and the ASSET is potentially evicted from memory).
 
 Snapshot fields are organized into three lifecycle phases, each with its own method:
 
@@ -305,30 +305,30 @@ Snapshot fields are organized into three lifecycle phases, each with its own met
 
 | Field                | Type       | Source                              |
 |----------------------|------------|-------------------------------------|
-| `m_sUrl`             | `string`   | `META::GetUrl()`                    |
-| `m_nMetaIx`          | `uint32_t` | `META::GetMetaIx()`                |
+| `m_sUrl`             | `string`   | `ASSET::GetUrl()`                   |
+| `m_nAssetIx`         | `uint32_t` | `ASSET::GetAssetIx()`              |
 
 ### SnapshotProgress() — Updated During Fetch
 
 | Field                | Type       | Source                              |
 |----------------------|------------|-------------------------------------|
-| `m_bState`           | `STATE`    | `META::GetState()`                  |
-| `m_dFetchQueuedTime` | `double`   | `META::GetFetchQueuedTime()`        |
-| `m_dFetchStartTime`  | `double`   | `META::GetFetchStartTime()`         |
+| `m_bState`           | `STATE`    | `ASSET::GetState()`                 |
+| `m_dFetchQueuedTime` | `double`   | `ASSET::GetFetchQueuedTime()`       |
+| `m_dFetchStartTime`  | `double`   | `ASSET::GetFetchStartTime()`        |
 
 ### SnapshotFinal() — Set When Fetch Resolves
 
 | Field                | Type       | Source                              |
 |----------------------|------------|-------------------------------------|
-| `m_bState`           | `STATE`    | `META::GetState()`                  |
-| `m_sHash`            | `string`   | `META::GetHash()`                   |
-| `m_sContentType`     | `string`   | `META::GetHeader("content-type")`   |
-| `m_nSizeBytes`       | `uint64_t` | `META::GetSizeBytes()`              |
-| `m_nHttpStatus`      | `long`     | `META::GetHttpStatus()`             |
-| `m_dFetchQueuedTime` | `double`   | `META::GetFetchQueuedTime()`        |
-| `m_dFetchStartTime`  | `double`   | `META::GetFetchStartTime()`         |
-| `m_dFetchEndTime`    | `double`   | `META::GetFetchEndTime()`           |
-| `m_bServedFromCache` | `bool`     | `META::IsServedFromCache()`         |
+| `m_bState`           | `STATE`    | `ASSET::GetState()`                 |
+| `m_sHash`            | `string`   | `ASSET::GetHash()`                  |
+| `m_sContentType`     | `string`   | `ASSET::GetHeader("content-type")`  |
+| `m_nSizeBytes`       | `uint64_t` | `ASSET::GetSizeBytes()`             |
+| `m_nHttpStatus`      | `long`     | `ASSET::GetHttpStatus()`            |
+| `m_dFetchQueuedTime` | `double`   | `ASSET::GetFetchQueuedTime()`       |
+| `m_dFetchStartTime`  | `double`   | `ASSET::GetFetchStartTime()`        |
+| `m_dFetchEndTime`    | `double`   | `ASSET::GetFetchEndTime()`          |
+| `m_bServedFromCache` | `bool`     | `ASSET::IsServedFromCache()`        |
 
 ### When Each Snapshot Method is Called
 
@@ -336,7 +336,7 @@ Snapshot fields are organized into three lifecycle phases, each with its own met
 - **SnapshotProgress()** — when a fetch is dispatched (after `SetFetching()` and `SetFetchQueuedTime()`).
 - **SnapshotFinal()** — when the fetch resolves (READY/FAILED), on Release, on ReopenFile, and during Enumerate. In `Request()`, a single `SnapshotFinal()` covers all resolved-state branches.
 
-Getters on FILE read from these snapshot members, not from the META. META-dependent accessors (`ReadData()`, `GetHeaders()`, `GetDiskPath()`, etc.) still require an attached META and return empty defaults after Release.
+Getters on FILE read from these snapshot members, not from the ASSET. ASSET-dependent accessors (`ReadData()`, `GetHeaders()`, `GetDiskPath()`, etc.) still require an attached ASSET and return empty defaults after Release.
 
 ## Network Inspector Data
 
@@ -348,29 +348,29 @@ All timing values are `double` seconds relative to a per-session epoch (`steady_
 
 | Accessor               | Source         | Description                              |
 |------------------------|----------------|------------------------------------------|
-| `GetFetchQueuedTime()` | `META`/`FILE`  | Seconds since epoch when meta queued     |
-| `GetFetchStartTime()`  | `META`/`FILE`  | Seconds since epoch when fetch began     |
-| `GetFetchEndTime()`    | `META`/`FILE`  | Seconds since epoch when fetch ended     |
-| `GetFetchDuration()`   | `META`/`FILE`  | Derived: end - start                     |
-| `GetQueueDuration()`   | `META`/`FILE`  | Derived: start - queued                  |
+| `GetFetchQueuedTime()` | `ASSET`/`FILE` | Seconds since epoch when asset queued    |
+| `GetFetchStartTime()`  | `ASSET`/`FILE` | Seconds since epoch when fetch began     |
+| `GetFetchEndTime()`    | `ASSET`/`FILE` | Seconds since epoch when fetch ended     |
+| `GetFetchDuration()`   | `ASSET`/`FILE` | Derived: end - start                     |
+| `GetQueueDuration()`   | `ASSET`/`FILE` | Derived: start - queued                  |
 | `GetEpochAge()`        | `NETWORK`      | Current seconds since epoch              |
 
-`m_dFetchQueuedTime` records when the META enters the fetch queue (set in `Request()` before `DispatchFetch()`). `m_dFetchStartTime` records when the HTTP request actually begins (set at the start of `FetchMeta()`). The difference (`GetQueueDuration()`) measures how long the meta waited in the overflow queue before a thread became available.
+`m_dFetchQueuedTime` records when the ASSET enters the fetch queue (set in `Request()` before `DispatchFetch()`). `m_dFetchStartTime` records when the HTTP request actually begins (set at the start of `FetchAsset()`). The difference (`GetQueueDuration()`) measures how long the asset waited in the overflow queue before a thread became available.
 
-### File & Meta Indexes
+### File & Asset Indexes
 
-Each `FILE` handle receives a monotonically increasing `uint32_t` file index (`nFileIx`) at creation. This provides a stable sort key for the inspector's request list, independent of fetch completion order. Each `META` receives a separate monotonically increasing index (`nMetaIx`) at creation or reset, identifying the version of the cached content.
+Each `FILE` handle receives a monotonically increasing `uint32_t` file index (`nFileIx`) at creation. This provides a stable sort key for the inspector's request list, independent of fetch completion order. Each `ASSET` receives a separate monotonically increasing index (`nAssetIx`) at creation or reset, identifying the version of the cached content.
 
-`nMetaIx` is persisted in `.meta` sidecar files and in `rules.json` (as `nNextMetaIx`). `m_nNextFileIx` and `m_nNextMetaIx` are maintained on NETWORK.
+`nAssetIx` is persisted in `.meta` sidecar files and in `rules.json` (as `nNextMetaIx`). `m_nNextFileIx` and `m_nNextAssetIx` are maintained on NETWORK.
 
 ```cpp
 uint32_t nFileIx = pFile->GetFileIx ();
-uint32_t nMetaIx = pFile->GetMetaIx ();
+uint32_t nAssetIx = pFile->GetAssetIx ();
 ```
 
 ### History List
 
-`NETWORK::GetFiles()` returns a `const std::vector<FILE*>&` containing all FILE handles, in creation order. `Release()` detaches the FILE from its META (stops notifications) but does **not** remove it from the list unless the FILE has a pending clear flag. This list is the data backing the inspector's request table.
+`NETWORK::GetFiles()` returns a `const std::vector<FILE*>&` containing all FILE handles, in creation order. `Release()` detaches the FILE from its ASSET (stops notifications) but does **not** remove it from the list unless the FILE has a pending clear flag. This list is the data backing the inspector's request table.
 
 ```cpp
 const auto& aHistory = pNetwork->GetFiles ();
@@ -419,17 +419,17 @@ The NETWORK routes these through `SNEEZE::OnNetworkFileCreated()`, `SNEEZE::OnNe
 | Queue        | `GetQueueDuration()`                                  |
 | Waterfall    | `GetFetchQueuedTime()` / `GetFetchStartTime()` / `GetFetchEndTime()` vs epoch |
 | File Index   | `GetFileIx()`                                         |
-| Meta Index   | `GetMetaIx()`                                         |
+| Asset Index  | `GetAssetIx()`                                        |
 | Initiator    | `GetContainerName()`                                  |
 
 ## Request Deduplication
 
-If multiple callers request the same URL before the first fetch completes, they share a single META. Each caller gets their own FILE handle with their own IFILE listener, and all listeners are notified when the fetch resolves.
+If multiple callers request the same URL before the first fetch completes, they share a single ASSET. Each caller gets their own FILE handle with their own IFILE listener, and all listeners are notified when the fetch resolves.
 
 ```cpp
 NETWORK::FILE* pA = pNetwork->Request (&listenerA, pName, url);
 NETWORK::FILE* pB = pNetwork->Request (&listenerB, pName, url);
-// pA and pB wrap the same META; both listeners fire on completion.
+// pA and pB wrap the same ASSET; both listeners fire on completion.
 
 pA->Release ();
 pB->Release ();
@@ -514,15 +514,15 @@ Written via `SaveMeta()` using nlohmann::json. Atomically written (write to `.te
 
 ### .meta Lifecycle
 
-- **Written** when a META is evicted from memory (last FILE handle calls `Release()` and `GetFileCount()` drops to zero while state is READY), or during `Shutdown()` for all READY metas still in memory.
-- **Loaded** on demand by `LoadMeta()` when `Request()` looks up a URL that isn't in `m_mapMetas` but has a `.meta` on disk. Also loaded during `Enumerate()` for metas not currently in memory.
-- **Deleted** when a META is reset (`ResetMeta()` removes `.data`, `.meta`, and `.temp`).
+- **Written** when an ASSET is evicted from memory (last FILE handle calls `Release()` and `GetFileCount()` drops to zero while state is READY), or during `Shutdown()` for all READY assets still in memory.
+- **Loaded** on demand by `LoadMeta()` when `Request()` looks up a URL that isn't in `m_mapAssets` but has a `.meta` on disk. Also loaded during `Enumerate()` for assets not currently in memory.
+- **Deleted** when an ASSET is reset (`ResetAsset()` removes `.data`, `.meta`, and `.temp`).
 
-Loading uses `file >> jDoc` inside a `try/catch` block. A corrupt `.meta` is logged as a warning and skipped. The URL stored in the `.meta` is validated against the requested URL before the META is constructed.
+Loading uses `file >> jDoc` inside a `try/catch` block. A corrupt `.meta` is logged as a warning and skipped. The URL stored in the `.meta` is validated against the requested URL before the ASSET is constructed.
 
 ### rules.json
 
-`rules.json` lives at `Cache/rules.json` and persists staleness rules and the `nNextMetaIx` counter.
+`rules.json` lives at `Cache/rules.json` and persists staleness rules and the `nNextAssetIx` counter.
 
 ```json
 {
@@ -536,47 +536,47 @@ Loading uses `file >> jDoc` inside a `try/catch` block. A corrupt `.meta` is log
 }
 ```
 
-- **`LoadRules()`** runs at `Initialize()`. Restores `m_nNextMetaIx` and `m_aRules`. If `rules.json` is missing, creates a fresh empty one via `SaveRules()`.
+- **`LoadRules()`** runs at `Initialize()`. Restores `m_nNextAssetIx` and `m_aRules`. If `rules.json` is missing, creates a fresh empty one via `SaveRules()`.
 - **`SaveRules()`** writes atomically (`.temp` then rename). Called at shutdown and after `AddRule()`.
-- **`IsMetaStale()`** checks a READY meta against all rules. A rule matches if its `sContentType` matches (or is empty = wildcard) **and** the meta's `createdAt` is older than `sOlderThan`.
-- On `Request()`, if a meta is READY but stale: if `bFetch` is set, the meta is reset and re-fetched; if `!bFetch`, the request is rejected (returns `nullptr`).
+- **`IsAssetStale()`** checks a READY asset against all rules. A rule matches if its `sContentType` matches (or is empty = wildcard) **and** the asset's `createdAt` is older than `sOlderThan`.
+- On `Request()`, if an asset is READY but stale: if `bFetch` is set, the asset is reset and re-fetched; if `!bFetch`, the request is rejected (returns `nullptr`).
 
-### META Eviction
+### ASSET Eviction
 
-METAs are actively evicted from `m_mapMetas` when their last FILE handle calls `Release()`. In `NETWORK::Release()`, when `pMeta->GetFileCount() == 0`:
+ASSETs are actively evicted from `m_mapAssets` when their last FILE handle calls `Release()`. In `NETWORK::Release()`, when `pAsset->GetFileCount() == 0`:
 
-- If the META has a pending reset flag: `ResetMeta()` deletes disk files and resets state, then the META is erased from the map.
-- If the META is READY: `SaveMeta()` persists the sidecar, then the META is erased from the map.
-- If the META is in any other state: it is erased from the map.
+- If the ASSET has a pending reset flag: `ResetAsset()` deletes disk files and resets state, then the ASSET is erased from the map.
+- If the ASSET is READY: `SaveMeta()` persists the sidecar, then the ASSET is erased from the map.
+- If the ASSET is in any other state: it is erased from the map.
 
-This means only metas with active FILE handles live in memory. Re-requesting a previously evicted URL triggers `LoadMeta()` to reconstruct the META from disk.
+This means only assets with active FILE handles live in memory. Re-requesting a previously evicted URL triggers `LoadMeta()` to reconstruct the ASSET from disk.
 
 ## HTTP Behavior
 
-- Only HTTP 2xx responses create valid cached resources. Non-2xx responses cause the meta to transition to FAILED.
+- Only HTTP 2xx responses create valid cached resources. Non-2xx responses cause the asset to transition to FAILED.
 - Redirects are followed transparently (CURLOPT_FOLLOWLOCATION).
 - Default timeout is 300 seconds (CURLOPT_TIMEOUT).
-- Response headers (Content-Type, ETag, Last-Modified, Content-Length, etc.) are captured and stored on the META and in the `.meta` sidecar.
+- Response headers (Content-Type, ETag, Last-Modified, Content-Length, etc.) are captured and stored on the ASSET and in the `.meta` sidecar.
 
 ## Concurrency Model
 
 ### Current: Capped Thread Pool (16 threads)
 
-Background fetches run on dedicated `std::thread` instances, capped at 16 concurrent threads. When a fetch is requested and all 16 slots are occupied, the META is pushed to `m_aFetchQueue`. When a fetch completes, the thread checks the queue and dispatches the next pending meta.
+Background fetches run on dedicated `std::thread` instances, capped at 16 concurrent threads. When a fetch is requested and all 16 slots are occupied, the ASSET is pushed to `m_aFetchQueue`. When a fetch completes, the thread checks the queue and dispatches the next pending asset.
 
 Each thread slot uses a `FETCH_SLOT` struct with an `std::atomic<bool> bDone` flag. Before dispatching a new fetch, completed slots are swept (joined and freed), making room for new work.
 
-`FetchWriteCallback` and `FetchHeaderCallback` are static methods on NETWORK (not free functions). `GetEvpMd` remains a file-local static in `Network.cpp`. `NowIso8601` is a private static method on META.
+`FetchWriteCallback` and `FetchHeaderCallback` are static methods on NETWORK (not free functions). `GetEvpMd` remains a file-local static in `Network.cpp`. `NowIso8601` is a private static method on ASSET.
 
 ### Race Condition Mitigations
 
 Three specific race conditions were identified and addressed:
 
-1. **`META::m_bState` is `std::atomic<STATE>`** — allows safe reads from any thread without holding the NETWORK lock. State transitions still happen under `m_mutex` for consistency with the rest of the META fields.
+1. **`ASSET::m_bState` is `std::atomic<STATE>`** — allows safe reads from any thread without holding the NETWORK lock. State transitions still happen under `m_mutex` for consistency with the rest of the ASSET fields.
 
 2. **`m_mutex` is a `recursive_mutex`** — IFILE notifications and ISNEEZE callbacks fire under the lock. The recursive mutex allows listeners to safely call back into NETWORK (e.g., calling `Request()` or `Release()` from a callback) without deadlocking.
 
-3. **`.meta` files are written only at eviction/shutdown** — sidecar files are saved when the last FILE handle releases (evicting the META from memory) or during `Shutdown()`. No concurrent fetch activity exists at shutdown (all threads are joined first), and eviction writes happen under `m_mutex`.
+3. **`.meta` files are written only at eviction/shutdown** — sidecar files are saved when the last FILE handle releases (evicting the ASSET from memory) or during `Shutdown()`. No concurrent fetch activity exists at shutdown (all threads are joined first), and eviction writes happen under `m_mutex`.
 
 ### Deferred: Non-Blocking I/O Thread Pool
 
@@ -602,7 +602,7 @@ The current model creates one `std::thread` per active fetch. While capped at 16
 
 **Implementation notes:**
 - The `FETCH_SLOT` / `m_apFetchSlots` / `m_aFetchQueue` infrastructure can be replaced wholesale — the rest of the NETWORK API is unchanged.
-- `FetchMeta()` would be refactored: the curl setup portion would prepare an easy handle and submit it to a worker, and the completion logic would run as a callback when the multi handle reports completion.
+- `FetchAsset()` would be refactored: the curl setup portion would prepare an easy handle and submit it to a worker, and the completion logic would run as a callback when the multi handle reports completion.
 - The `FETCH_CONTEXT` struct (`NETWORK::FETCH_CONTEXT`) and write/header callbacks (static methods on NETWORK) remain unchanged — they're already compatible with both easy and multi modes.
 
 ## Shutdown
@@ -611,9 +611,9 @@ The NETWORK's `Shutdown()` method:
 
 1. Sets the atomic shutdown flag (cancels in-flight fetches at next check)
 2. Joins all fetch threads and drains the fetch queue
-3. Saves `.meta` sidecars for all READY metas still in memory
-4. Saves `rules.json` (persists `m_nNextMetaIx` and staleness rules)
-5. Clears all metas from `m_mapMetas`
+3. Saves `.meta` sidecars for all READY assets still in memory
+4. Saves `rules.json` (persists `m_nNextAssetIx` and staleness rules)
+5. Clears all assets from `m_mapAssets`
 6. Deletes all FILE handles in the history list
 
 In-flight fetches check the shutdown flag after `curl_easy_perform` returns and discard results if shutdown was requested. Pending clear/reset flags are irrelevant during shutdown — everything is torn down unconditionally.
@@ -634,14 +634,14 @@ The `NetworkTest` suite (`SneezeTest --network`) validates:
 |----|-----------------------------|---------------------------------------------------------|
 | 1  | Network initialization      | Cache path creation, rules loading                      |
 | 2  | Unhashed fetch              | Unhashed file fetched, stored, readable, persisted      |
-| 3  | Deduplication               | Same URL shares META, both listeners notified           |
+| 3  | Deduplication               | Same URL shares ASSET, both listeners notified          |
 | 4  | Hash-verified fetch         | SRI hash computed, verified, persistent                 |
 | 5  | Hash mismatch               | Wrong hash causes FAILED state                          |
-| 6  | Reset                       | Metas reset, triggers re-fetch                          |
-| 7  | Reset flag                  | Deferred flag destroys meta and disk file on release    |
+| 6  | Reset                       | Assets reset, triggers re-fetch                         |
+| 7  | Reset flag                  | Deferred flag destroys asset and disk file on release   |
 | 8  | Failed fetch                | Invalid host causes FAILED state                        |
-| 9  | Meta persistence            | Meta survives shutdown/reinit cycle via .meta sidecar   |
-| 10 | HTTP headers                | Response headers captured on META                       |
+| 9  | Asset persistence           | Asset survives shutdown/reinit cycle via .meta sidecar  |
+| 10 | HTTP headers                | Response headers captured on ASSET                      |
 | 11 | FILE handle lifecycle       | Allocation, access, release without crash               |
 | 12 | History and nFileIx         | History accumulates, nFileIx is monotonic, Release keeps|
 | 13 | Notifications               | OnNetworkFileCreated and OnNetworkFileChanged fire       |
@@ -649,11 +649,11 @@ The `NetworkTest` suite (`SneezeTest --network`) validates:
 | 15 | Failed fetch HTTP status    | 404 response records correct HTTP status code           |
 | 16 | Clear flag                  | Clear immediately removes FILE from history             |
 | 17 | Clear flag toggle           | Clear(false) adds FILE back to history                  |
-| 18 | Reset flag toggle           | Reset(true) then Reset(false) preserves meta            |
+| 18 | Reset flag toggle           | Reset(true) then Reset(false) preserves asset           |
 | 19 | Deferred reset              | Reset deferred until last handle releases               |
 | 20 | Clear                       | Released FILEs removed, in-use FILEs survive            |
 | 21 | OnNetworkFileDeleted        | Notification fires immediately on Clear                 |
-| 22 | Staleness rules             | Rules mark metas stale, trigger re-fetch on request     |
+| 22 | Staleness rules             | Rules mark assets stale, trigger re-fetch on request    |
 | 23 | Request with bFetch=false   | No-fetch request returns null for uncached URL          |
 
 ## Deferred Items
@@ -672,17 +672,17 @@ Implementation: iterate `Cache/<2-char>/` subdirectories, collect all `.data` fi
 
 ### Cache Eviction (Disk)
 
-META eviction from memory is implemented — metas are removed from `m_mapMetas` when their last FILE handle releases. However, `.meta` and `.data` files persist on disk indefinitely. The metadata infrastructure is already in place (size, creation time, last access time, access count) to support disk eviction policies:
+ASSET eviction from memory is implemented — assets are removed from `m_mapAssets` when their last FILE handle releases. However, `.meta` and `.data` files persist on disk indefinitely. The metadata infrastructure is already in place (size, creation time, last access time, access count) to support disk eviction policies:
 
-- **LRU**: Evict metas with the oldest `lastAccessedAt`
-- **Size-based**: Evict metas when total cache size exceeds a threshold
-- **TTL**: Evict metas older than a configurable age
+- **LRU**: Evict assets with the oldest `lastAccessedAt`
+- **Size-based**: Evict assets when total cache size exceeds a threshold
+- **TTL**: Evict assets older than a configurable age
 
-The eviction check should run on `Initialize()` and periodically (e.g. after each new fetch completes). Evicted metas should have their `.data` and `.meta` files deleted.
+The eviction check should run on `Initialize()` and periodically (e.g. after each new fetch completes). Evicted assets should have their `.data` and `.meta` files deleted.
 
 ### Retry Policy
 
-No automatic retry on fetch failure. If a fetch fails (network error, timeout, non-2xx status), the meta transitions to FAILED and the caller is notified. The caller must explicitly re-request the URL to retry.
+No automatic retry on fetch failure. If a fetch fails (network error, timeout, non-2xx status), the asset transitions to FAILED and the caller is notified. The caller must explicitly re-request the URL to retry.
 
 A future enhancement could add configurable retry with exponential backoff (e.g. 3 retries, 1s/2s/4s delays) as a NETWORK option.
 

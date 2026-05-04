@@ -19,19 +19,19 @@
 #include <filesystem>
 
 
-namespace SNEEZE { namespace storage {
+namespace SNEEZE {
 
 // ===========================================================================
-// CONTAINER
+// STORAGE::CONTAINER
 // ===========================================================================
 
-CONTAINER::CONTAINER (const std::string& sName, const std::string& sDiskPath)
+STORAGE::CONTAINER::CONTAINER (const std::string& sName, const std::string& sDiskPath)
    : m_sName (sName)
    , m_sDiskPath (sDiskPath)
 {
 }
 
-std::string CONTAINER::Get (const std::string& sKey) const
+std::string STORAGE::CONTAINER::Get (const std::string& sKey) const
 {
    std::lock_guard<std::mutex> guard (m_mutex);
    auto it = m_mapData.find (sKey);
@@ -40,27 +40,27 @@ std::string CONTAINER::Get (const std::string& sKey) const
    return "";
 }
 
-void CONTAINER::Set (const std::string& sKey, const std::string& sValue)
+void STORAGE::CONTAINER::Set (const std::string& sKey, const std::string& sValue)
 {
    std::lock_guard<std::mutex> guard (m_mutex);
    m_mapData[sKey] = sValue;
    Save ();
 }
 
-void CONTAINER::Remove (const std::string& sKey)
+void STORAGE::CONTAINER::Remove (const std::string& sKey)
 {
    std::lock_guard<std::mutex> guard (m_mutex);
    m_mapData.erase (sKey);
    Save ();
 }
 
-bool CONTAINER::Has (const std::string& sKey) const
+bool STORAGE::CONTAINER::Has (const std::string& sKey) const
 {
    std::lock_guard<std::mutex> guard (m_mutex);
    return m_mapData.find (sKey) != m_mapData.end ();
 }
 
-void CONTAINER::Load ()
+void STORAGE::CONTAINER::Load ()
 {
    std::lock_guard<std::mutex> guard (m_mutex);
    std::ifstream file (m_sDiskPath);
@@ -81,7 +81,7 @@ void CONTAINER::Load ()
    catch (...) {}
 }
 
-void CONTAINER::Save () const
+void STORAGE::CONTAINER::Save () const
 {
    std::filesystem::path dir = std::filesystem::path (m_sDiskPath).parent_path ();
    std::filesystem::create_directories (dir);
@@ -96,16 +96,16 @@ void CONTAINER::Save () const
 }
 
 // ===========================================================================
-// FINGERPRINT
+// STORAGE::FINGERPRINT
 // ===========================================================================
 
-FINGERPRINT::FINGERPRINT (const std::string& sFingerprint, const std::string& sBasePath)
+STORAGE::FINGERPRINT::FINGERPRINT (const std::string& sFingerprint, const std::string& sBasePath)
    : m_sFingerprint (sFingerprint)
    , m_sBasePath (sBasePath)
 {
 }
 
-std::string FINGERPRINT::Common_Get (const std::string& sKey) const
+std::string STORAGE::FINGERPRINT::Common_Get (const std::string& sKey) const
 {
    std::lock_guard<std::mutex> guard (m_commonMutex);
    auto it = m_mapCommon.find (sKey);
@@ -114,27 +114,27 @@ std::string FINGERPRINT::Common_Get (const std::string& sKey) const
    return "";
 }
 
-void FINGERPRINT::Common_Set (const std::string& sKey, const std::string& sValue)
+void STORAGE::FINGERPRINT::Common_Set (const std::string& sKey, const std::string& sValue)
 {
    std::lock_guard<std::mutex> guard (m_commonMutex);
    m_mapCommon[sKey] = sValue;
    Save ();
 }
 
-void FINGERPRINT::Common_Remove (const std::string& sKey)
+void STORAGE::FINGERPRINT::Common_Remove (const std::string& sKey)
 {
    std::lock_guard<std::mutex> guard (m_commonMutex);
    m_mapCommon.erase (sKey);
    Save ();
 }
 
-bool FINGERPRINT::Common_Has (const std::string& sKey) const
+bool STORAGE::FINGERPRINT::Common_Has (const std::string& sKey) const
 {
    std::lock_guard<std::mutex> guard (m_commonMutex);
    return m_mapCommon.find (sKey) != m_mapCommon.end ();
 }
 
-CONTAINER* FINGERPRINT::GetContainer (const std::string& sName)
+STORAGE::CONTAINER* STORAGE::FINGERPRINT::GetContainer (const std::string& sName)
 {
    std::lock_guard<std::mutex> guard (m_containersMutex);
 
@@ -150,7 +150,7 @@ CONTAINER* FINGERPRINT::GetContainer (const std::string& sName)
    return pRaw;
 }
 
-void FINGERPRINT::Load ()
+void STORAGE::FINGERPRINT::Load ()
 {
    std::lock_guard<std::mutex> guard (m_commonMutex);
    std::string sCommonPath = m_sBasePath + "/common.json";
@@ -172,7 +172,7 @@ void FINGERPRINT::Load ()
    catch (...) {}
 }
 
-void FINGERPRINT::Save () const
+void STORAGE::FINGERPRINT::Save () const
 {
    std::filesystem::create_directories (m_sBasePath);
    std::string sCommonPath = m_sBasePath + "/common.json";
@@ -187,16 +187,16 @@ void FINGERPRINT::Save () const
 }
 
 // ===========================================================================
-// PERSONA_STORE
+// STORAGE::PERSONA_STORE
 // ===========================================================================
 
-PERSONA_STORE::PERSONA_STORE (const std::string& sPersonaHash, const std::string& sBasePath)
+STORAGE::PERSONA_STORE::PERSONA_STORE (const std::string& sPersonaHash, const std::string& sBasePath)
    : m_sPersonaHash (sPersonaHash)
    , m_sBasePath (sBasePath)
 {
 }
 
-FINGERPRINT* PERSONA_STORE::GetFingerprint (const std::string& sFingerprint)
+STORAGE::FINGERPRINT* STORAGE::PERSONA_STORE::GetFingerprint (const std::string& sFingerprint)
 {
    std::lock_guard<std::mutex> guard (m_mutex);
 
@@ -213,20 +213,20 @@ FINGERPRINT* PERSONA_STORE::GetFingerprint (const std::string& sFingerprint)
 }
 
 // ===========================================================================
-// STORAGE_SYSTEM
+// STORAGE
 // ===========================================================================
 
-STORAGE_SYSTEM::STORAGE_SYSTEM (CORE::SNEEZE* pSneeze)
+STORAGE::STORAGE (CORE::SNEEZE* pSneeze)
    : m_pSneeze (pSneeze)
 {
 }
 
-STORAGE_SYSTEM::~STORAGE_SYSTEM ()
+STORAGE::~STORAGE ()
 {
    Shutdown ();
 }
 
-bool STORAGE_SYSTEM::Initialize ()
+bool STORAGE::Initialize ()
 {
    m_sRootPath = GetStorageRootPath ();
    if (m_sRootPath.empty ())
@@ -242,13 +242,13 @@ bool STORAGE_SYSTEM::Initialize ()
    return true;
 }
 
-void STORAGE_SYSTEM::Shutdown ()
+void STORAGE::Shutdown ()
 {
    std::lock_guard<std::mutex> guard (m_mutex);
    m_mapPersonas.clear ();
 }
 
-PERSONA_STORE* STORAGE_SYSTEM::GetPersona (const std::string& sPersonaHash)
+STORAGE::PERSONA_STORE* STORAGE::GetPersona (const std::string& sPersonaHash)
 {
    std::lock_guard<std::mutex> guard (m_mutex);
 
@@ -263,7 +263,7 @@ PERSONA_STORE* STORAGE_SYSTEM::GetPersona (const std::string& sPersonaHash)
    return pRaw;
 }
 
-std::string STORAGE_SYSTEM::GetStorageRootPath () const
+std::string STORAGE::GetStorageRootPath () const
 {
    std::string sResult;
    std::string sSession = m_pSneeze->GetHost ()->SessionPath ();
@@ -272,4 +272,4 @@ std::string STORAGE_SYSTEM::GetStorageRootPath () const
    return sResult;
 }
 
-}} // namespace SNEEZE::storage
+} // namespace SNEEZE

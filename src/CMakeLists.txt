@@ -558,7 +558,7 @@ set (SOM_HEADERS
    scene/SpatialIndex.h)
 
 set (NETWORK_SOURCES
-   network/Meta.cpp
+   network/Asset.cpp
    network/File.cpp
    network/Network.cpp)
 set (NETWORK_HEADERS

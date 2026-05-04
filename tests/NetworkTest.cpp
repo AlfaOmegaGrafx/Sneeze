@@ -224,7 +224,7 @@ static void TestUnhashedFetch ()
 }
 
 // ---------------------------------------------------------------------------
-// Test 3: Request deduplication (same URL returns shared META)
+// Test 3: Request deduplication (same URL returns shared ASSET)
 // ---------------------------------------------------------------------------
 
 static void TestDeduplication ()
@@ -247,8 +247,8 @@ static void TestDeduplication ()
 
    if (pFileA  &&  pFileB)
    {
-      Check (pFileA->GetMeta () == pFileB->GetMeta (),
-         "Both handles share the same META");
+      Check (pFileA->GetAsset () == pFileB->GetAsset (),
+         "Both handles share the same ASSET");
 
       bool bGotA = listenerA.WaitFor (15000);
       bool bGotB = listenerB.WaitFor (15000);
@@ -546,7 +546,7 @@ static void TestSidecarPersistence ()
          {
             listenerHash.WaitFor (15000);
             Check (listenerHash.Succeeded (), "Persistent entry created");
-            Check (pHash->GetMetaIx () > 0, "Meta index assigned on creation");
+            Check (pHash->GetAssetIx () > 0, "Asset index assigned on creation");
             pHash->Release ();
          }
       }
@@ -578,7 +578,7 @@ static void TestSidecarPersistence ()
          Check (pReload->IsReady (), "Meta survived shutdown (loaded from .meta sidecar)");
          Check (pReload->IsHashed (), "Meta is still hashed");
          Check (pReload->GetHash () == sSri, "Hash matches after reload");
-         Check (pReload->GetMetaIx () > 0, "Meta index preserved across sessions");
+         Check (pReload->GetAssetIx () > 0, "Asset index preserved across sessions");
 
          std::vector<uint8_t> aData = pReload->ReadData ();
          Check (!aData.empty (), "Data is readable after reload");
@@ -648,11 +648,11 @@ static void TestFileHandleLifecycle ()
    SNEEZE::NETWORK::FILE* pFile = pNetwork->Request (
       &listener, s_pTestName, "https://httpbin.org/bytes/8");
 
-   Check (pFile != nullptr, "Handle allocated");
+      Check (pFile != nullptr, "Handle allocated");
 
    if (pFile)
    {
-      Check (pFile->GetMeta () != nullptr, "Handle wraps a valid META");
+      Check (pFile->GetAsset () != nullptr, "Handle wraps a valid ASSET");
       Check (!pFile->GetUrl ().empty (), "URL accessible from handle");
 
       listener.WaitFor (15000);
@@ -943,8 +943,8 @@ static void TestDeferredReset ()
             "Disk file survives while second handle is attached");
       }
 
-      Check (pFileB->GetMeta () != nullptr,
-         "Second handle still has a valid META");
+      Check (pFileB->GetAsset () != nullptr,
+         "Second handle still has a valid ASSET");
 
       pFileB->Release ();
 

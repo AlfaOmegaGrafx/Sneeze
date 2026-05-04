@@ -26,7 +26,7 @@
 namespace SNEEZE { namespace som { class FABRIC; class NODE; class SCENE; }}
 namespace SNEEZE { namespace astro { class ASTRO_SERVICE; }}
 #include "network/Network.h"
-namespace SNEEZE { namespace storage { class STORAGE_SYSTEM; }}
+#include "storage/Storage.h"
 namespace SNEEZE { namespace persona { class PERSONA; }}
 namespace SNEEZE { namespace net { class HTTP_CLIENT; }}
 
@@ -153,7 +153,7 @@ public:
    // --- Subsystems ---
 
    NETWORK*                 Network () const { return m_pNetwork; }
-   storage::STORAGE_SYSTEM* GetStorage () const { return m_pStorage; }
+   STORAGE*         GetStorage () const { return m_pStorage; }
    persona::PERSONA*        GetPersona () const { return m_pPersona; }
    net::HTTP_CLIENT*        GetHttpClient () const;
 
@@ -210,7 +210,7 @@ private:
 
    // Subsystems
    NETWORK*                 m_pNetwork;
-   storage::STORAGE_SYSTEM* m_pStorage;
+   STORAGE*               m_pStorage;
    persona::PERSONA*        m_pPersona;
 };
 
