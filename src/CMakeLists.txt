@@ -682,6 +682,7 @@ target_link_libraries (Sneeze PUBLIC
    ${CURL_LIB}
    ${RMLUI_CORE_LIB}
    ${RMLUI_DEBUGGER_LIB}
+   ${BORINGSSL_SSL_LIB}
    ${BORINGSSL_CRYPTO_LIB}
    vox::vox
 )
