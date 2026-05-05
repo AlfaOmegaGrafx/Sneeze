@@ -14,7 +14,7 @@
 
 #include "storage/Storage.h"
 #include "container/Container.h"
-#include "core/Sneeze.h"
+#include "Sneeze.h"
 
 #include <cstdio>
 #include <cstring>

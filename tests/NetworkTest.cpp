@@ -14,7 +14,7 @@
 
 #include "network/Network.h"
 #include "container/Container.h"
-#include "core/Sneeze.h"
+#include "Sneeze.h"
 
 #include <openssl/sha.h>
 #include <curl/curl.h>

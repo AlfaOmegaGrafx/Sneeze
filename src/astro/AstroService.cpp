@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "AstroService.h"
-#include "core/Sneeze.h"
+#include "Sneeze.h"
 #include "RMCObject.h"
 #include "Orbit.h"
 

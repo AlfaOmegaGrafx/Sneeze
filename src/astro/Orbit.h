@@ -16,7 +16,7 @@
 #define SNEEZE_ASTRO_ORBIT_H
 
 #include "Celestial.h"
-#include "core/Epoch.h"
+#include "Epoch.h"
 #include <string>
 #include <optional>
 

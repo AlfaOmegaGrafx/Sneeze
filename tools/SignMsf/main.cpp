@@ -21,7 +21,7 @@
 // Verify / dump:
 //   SignMsf --verify <file.msf> [--trust <ca.pem>]
 
-#include "../../src/msf/MsfFile.h"
+#include "msf/MsfFile.h"
 
 #include <cstdio>
 #include <cstring>

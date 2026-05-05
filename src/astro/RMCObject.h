@@ -16,7 +16,7 @@
 #define SNEEZE_ASTRO_RMCOBJECT_H
 
 #include "Orbit.h"
-#include "core/Types.h"
+#include "Types.h"
 #include <string>
 #include <vector>
 #include <map>

@@ -405,7 +405,7 @@ endif ()
 # Compile GLSL compute kernels to SPIR-V at build time
 # ---------------------------------------------------------------------------
 
-set (KERNEL_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/compute/kernels")
+set (KERNEL_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/compute/kernels")
 set (KERNEL_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/spv")
 file (MAKE_DIRECTORY "${KERNEL_OUTPUT_DIR}")
 
@@ -501,30 +501,30 @@ endif ()
 # ---------------------------------------------------------------------------
 
 set (CORE_SOURCES
-   core/Epoch.cpp
-   core/Sneeze.cpp
-   core/Worker.cpp
-   core/WorkerCompositor.cpp
-   core/WorkerB.cpp
-   core/WorkerC.cpp
-   core/WorkerD.cpp
-   core/WorkerE.cpp
-   core/WorkerF.cpp
-   core/WorkerG.cpp
-   core/WorkerH.cpp)
+   sneeze/Epoch.cpp
+   sneeze/Sneeze.cpp
+   sneeze/worker/Worker.cpp
+   sneeze/worker/Compositor.cpp
+   sneeze/worker/WorkerB.cpp
+   sneeze/worker/WorkerC.cpp
+   sneeze/worker/WorkerD.cpp
+   sneeze/worker/WorkerE.cpp
+   sneeze/worker/WorkerF.cpp
+   sneeze/worker/WorkerG.cpp
+   sneeze/worker/WorkerH.cpp)
 set (CORE_HEADERS
-   core/Epoch.h
-   core/Types.h
-   core/Sneeze.h
-   core/Worker.h
-   core/WorkerCompositor.h
-   core/WorkerB.h
-   core/WorkerC.h
-   core/WorkerD.h
-   core/WorkerE.h
-   core/WorkerF.h
-   core/WorkerG.h
-   core/WorkerH.h)
+   sneeze/Epoch.h
+   sneeze/Types.h
+   sneeze/Sneeze.h
+   sneeze/worker/Worker.h
+   sneeze/worker/Compositor.h
+   sneeze/worker/WorkerB.h
+   sneeze/worker/WorkerC.h
+   sneeze/worker/WorkerD.h
+   sneeze/worker/WorkerE.h
+   sneeze/worker/WorkerF.h
+   sneeze/worker/WorkerG.h
+   sneeze/worker/WorkerH.h)
 
 set (ASTRO_SOURCES
    astro/BodyData.cpp
@@ -540,83 +540,83 @@ set (ASTRO_HEADERS
    astro/AstroService.h)
 
 set (SOM_SOURCES
-   scene/Node.cpp
-   scene/Fabric.cpp
-   scene/Scene.cpp
-   scene/MapObject.cpp
-   scene/AccessControl.cpp
-   scene/Events.cpp
-   scene/SpatialIndex.cpp)
+   viewport/scene/Node.cpp
+   viewport/scene/Fabric.cpp
+   viewport/scene/Scene.cpp
+   viewport/scene/MapObject.cpp
+   viewport/scene/AccessControl.cpp
+   viewport/scene/Events.cpp
+   viewport/scene/SpatialIndex.cpp)
 set (SOM_HEADERS
-   scene/Types.h
-   scene/Node.h
-   scene/Fabric.h
-   scene/Scene.h
-   scene/MapObject.h
-   scene/AccessControl.h
-   scene/Events.h
-   scene/SpatialIndex.h)
+   viewport/scene/Types.h
+   viewport/scene/Node.h
+   viewport/scene/Fabric.h
+   viewport/scene/Scene.h
+   viewport/scene/MapObject.h
+   viewport/scene/AccessControl.h
+   viewport/scene/Events.h
+   viewport/scene/SpatialIndex.h)
 
 set (NETWORK_SOURCES
-   network/Asset.cpp
-   network/File.cpp
-   network/Network.cpp)
+   sneeze/network/Asset.cpp
+   sneeze/network/File.cpp
+   sneeze/network/Network.cpp)
 set (NETWORK_HEADERS
-   network/Network.h)
+   sneeze/network/Network.h)
 
-set (CONTAINER_HEADERS  container/Container.h)
+set (CONTAINER_HEADERS  viewport/container/Container.h)
 
-set (STORAGE_SOURCES  storage/Storage.cpp storage/Unit.cpp storage/Asset.cpp)
-set (STORAGE_HEADERS  storage/Storage.h)
+set (STORAGE_SOURCES  sneeze/storage/Storage.cpp sneeze/storage/Unit.cpp sneeze/storage/Asset.cpp)
+set (STORAGE_HEADERS  sneeze/storage/Storage.h)
 
 set (PERSONA_SOURCES  persona/Persona.cpp)
 set (PERSONA_HEADERS  persona/Persona.h)
 
-set (RENDERER_SOURCES  renderer/AnariRenderer.cpp  renderer/UVSphere.cpp)
-set (RENDERER_HEADERS  renderer/Renderer.h  renderer/AnariRenderer.h  renderer/UVSphere.h)
+set (RENDERER_SOURCES  viewport/renderer/AnariRenderer.cpp  viewport/renderer/UVSphere.cpp)
+set (RENDERER_HEADERS  viewport/renderer/Renderer.h  viewport/renderer/AnariRenderer.h  viewport/renderer/UVSphere.h)
 
-set (VIEW_SOURCES    view/CameraOrbit.cpp)
-set (VIEW_HEADERS    view/CameraOrbit.h)
+set (VIEW_SOURCES    viewport/view/CameraOrbit.cpp)
+set (VIEW_HEADERS    viewport/view/CameraOrbit.h)
 
 if (SNEEZE_ENABLE_WASM)
    set (WASM_SOURCES
-      wasm/WasmRuntime.cpp
-      wasm/WasmStore.cpp
-      wasm/WasmInstance.cpp
-      wasm/HostFunctions.cpp
-      wasm/ThreadPool.cpp)
+      deps/wasm/WasmRuntime.cpp
+      deps/wasm/WasmStore.cpp
+      deps/wasm/WasmInstance.cpp
+      deps/wasm/HostFunctions.cpp
+      deps/wasm/ThreadPool.cpp)
    set (WASM_HEADERS
-      wasm/WasmRuntime.h
-      wasm/WasmStore.h
-      wasm/WasmInstance.h
-      wasm/HostFunctions.h
-      wasm/ThreadPool.h)
+      deps/wasm/WasmRuntime.h
+      deps/wasm/WasmStore.h
+      deps/wasm/WasmInstance.h
+      deps/wasm/HostFunctions.h
+      deps/wasm/ThreadPool.h)
 endif ()
 
-set (SPIRV_SOURCES   spirv/SpvPipeline.cpp)
-set (SPIRV_HEADERS   spirv/SpvPipeline.h)
+set (SPIRV_SOURCES   deps/spirv/SpvPipeline.cpp)
+set (SPIRV_HEADERS   deps/spirv/SpvPipeline.h)
 
 if (SNEEZE_ENABLE_XR)
-   set (XR_SOURCES      xr/XrRuntime.cpp)
-   set (XR_HEADERS      xr/XrRuntime.h)
+   set (XR_SOURCES      deps/xr/XrRuntime.cpp)
+   set (XR_HEADERS      deps/xr/XrRuntime.h)
 endif ()
 
-set (UI_SOURCES      ui/UiContext.cpp)
-set (UI_HEADERS      ui/UiContext.h)
+set (UI_SOURCES      deps/ui/UiContext.cpp)
+set (UI_HEADERS      deps/ui/UiContext.h)
 
-set (COMPUTE_SOURCES compute/EmbeddedKernels.cpp compute/ComputeDispatch.cpp)
-set (COMPUTE_HEADERS compute/EmbeddedKernels.h compute/ComputeDispatch.h)
+set (COMPUTE_SOURCES deps/compute/EmbeddedKernels.cpp deps/compute/ComputeDispatch.cpp)
+set (COMPUTE_HEADERS deps/compute/EmbeddedKernels.h deps/compute/ComputeDispatch.h)
 
 set (MSF_SOURCES
-   msf/MsfFile.cpp
-   msf/CertChain.cpp)
+   viewport/msf/MsfFile.cpp
+   viewport/msf/CertChain.cpp)
 set (MSF_HEADERS
-   msf/MsfFile.h
-   msf/CertInfo.h
-   msf/CertChain.h)
+   viewport/msf/MsfFile.h
+   viewport/msf/CertInfo.h
+   viewport/msf/CertChain.h)
 
-set (STB_SOURCES  stb/stb_image_impl.cpp)
-set (STB_HEADERS  stb/stb_image.h)
+set (STB_SOURCES  deps/stb/stb_image_impl.cpp)
+set (STB_HEADERS  deps/stb/stb_image.h)
 
 # ---------------------------------------------------------------------------
 # Static library
@@ -645,6 +645,9 @@ add_dependencies (Sneeze CompileKernels)
 
 target_include_directories (Sneeze PUBLIC
    ${CMAKE_CURRENT_SOURCE_DIR}
+   ${CMAKE_CURRENT_SOURCE_DIR}/sneeze
+   ${CMAKE_CURRENT_SOURCE_DIR}/viewport
+   ${CMAKE_CURRENT_SOURCE_DIR}/deps
    ${SPIRV_TOOLS_INCLUDE}
    ${CURL_INCLUDE}
    ${RMLUI_INCLUDE}

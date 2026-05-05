@@ -15,7 +15,7 @@
 #ifndef SNEEZE_ASTRO_CELESTIAL_H
 #define SNEEZE_ASTRO_CELESTIAL_H
 
-#include "core/Types.h"
+#include "Types.h"
 
 namespace astro {
 
