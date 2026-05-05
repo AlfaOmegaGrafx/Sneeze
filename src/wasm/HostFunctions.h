@@ -18,7 +18,7 @@
 #include <wasmtime.h>
 #include <cstdint>
 
-namespace SNEEZE { namespace wasm {
+namespace wasm {
 
 // ---------------------------------------------------------------------------
 // Host functions exposed to WASM modules via Wasmtime linker.
@@ -83,6 +83,6 @@ wasm_trap_t* Storage_Has (void* pEnv, wasmtime_caller_t* pCaller,
    const wasmtime_val_t* pArgs, size_t nArgs,
    wasmtime_val_t* pResults, size_t nResults);
 
-}} // namespace SNEEZE::wasm
+} // namespace wasm
 
 #endif // SNEEZE_WASM_HOSTFUNCTIONS_H

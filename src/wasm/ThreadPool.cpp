@@ -17,9 +17,9 @@
 #include <cstdio>
 #include <algorithm>
 
-namespace SNEEZE { namespace wasm {
+namespace wasm {
 
-THREAD_POOL::THREAD_POOL (CORE::SNEEZE* pSneeze)
+THREAD_POOL::THREAD_POOL (SNEEZE* pSneeze)
    : m_pSneeze (pSneeze)
    , m_bShutdown (false)
 {
@@ -43,7 +43,7 @@ bool THREAD_POOL::Initialize (int nThreads)
    for (int i = 0; i < nThreads; i++)
       m_aThreads.emplace_back (&THREAD_POOL::WorkerLoop, this);
 
-   m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "WASM_THREAD_POOL",
+   m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Info, "WASM_THREAD_POOL",
       "Initialized with " + std::to_string (nThreads) + " workers");
    return true;
 }
@@ -101,4 +101,4 @@ void THREAD_POOL::WorkerLoop ()
    }
 }
 
-}} // namespace SNEEZE::wasm
+} // namespace wasm

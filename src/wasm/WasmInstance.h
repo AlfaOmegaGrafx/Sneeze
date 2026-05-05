@@ -19,9 +19,9 @@
 #include <string>
 #include <cstdint>
 
-namespace SNEEZE { namespace CORE { class SNEEZE; }}
+class SNEEZE;
 
-namespace SNEEZE { namespace wasm {
+namespace wasm {
 
 class WASM_STORE;
 
@@ -53,7 +53,7 @@ enum INSTANCE_STATE
 class WASM_INSTANCE
 {
 public:
-   WASM_INSTANCE (CORE::SNEEZE* pSneeze, WASM_STORE* pStore, const std::string& sUrl, const std::string& sSha256);
+   WASM_INSTANCE (SNEEZE* pSneeze, WASM_STORE* pStore, const std::string& sUrl, const std::string& sSha256);
    ~WASM_INSTANCE ();
 
    // --- Identity ---
@@ -80,7 +80,7 @@ public:
    bool CallShutdown ();
 
 private:
-   CORE::SNEEZE*      m_pSneeze;
+   SNEEZE*      m_pSneeze;
    WASM_STORE*        m_pStore;
    std::string        m_sUrl;
    std::string        m_sSha256;
@@ -91,6 +91,6 @@ private:
    bool               m_bInstantiated;
 };
 
-}} // namespace SNEEZE::wasm
+} // namespace wasm
 
 #endif // SNEEZE_WASM_WASMINSTANCE_H

@@ -16,7 +16,7 @@
 #include "Node.h"
 #include "Fabric.h"
 
-namespace SNEEZE { namespace som {
+namespace som {
 
 // ---------------------------------------------------------------------------
 // CanRead — determines if pRequestingOwner may read this node's data.
@@ -101,4 +101,4 @@ bool CanWriteFabric (const FABRIC* pFabric, const void* pRequestingOwner)
    return pFabric->GetOwner () == pRequestingOwner;
 }
 
-}} // namespace SNEEZE::som
+} // namespace som

@@ -21,7 +21,7 @@ pHost->pNativeWindow = hWnd;
 pHost->nWidth        = 1280;
 pHost->nHeight       = 720;
 
-SNEEZE::CORE::SNEEZE engine (pHost);
+SNEEZE engine (pHost);
 engine.Initialize ();
 
 // Application event loop feeds input

@@ -15,7 +15,7 @@
 #ifndef SNEEZE_VIEW_CAMERAORBIT_H
 #define SNEEZE_VIEW_CAMERAORBIT_H
 
-namespace SNEEZE { namespace view {
+namespace view {
 
 struct CAMERA_ORBIT
 {
@@ -30,6 +30,6 @@ struct CAMERA_ORBIT
 void UpdateCameraOrbit (CAMERA_ORBIT& pOrbit, int nDX, int nDY, float dScrollY,
                         bool bMouseLeft, bool bMouseRight);
 
-}} // namespace SNEEZE::view
+} // namespace view
 
 #endif // SNEEZE_VIEW_CAMERAORBIT_H

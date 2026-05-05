@@ -17,8 +17,6 @@
 
 #include <string>
 
-namespace SNEEZE
-{
 namespace msf
 {
 
@@ -35,6 +33,5 @@ struct CERT_INFO
 };
 
 } // namespace msf
-} // namespace SNEEZE
 
 #endif // SNEEZE_JWS_CERTINFO_H

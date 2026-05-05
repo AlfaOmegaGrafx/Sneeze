@@ -18,7 +18,7 @@
 #include <vector>
 #include <cstdint>
 
-namespace SNEEZE { namespace renderer {
+namespace renderer {
 
 struct UV_SPHERE
 {
@@ -32,6 +32,6 @@ void GenerateUVSphere (UV_SPHERE& sphere, float dRadius,
                        int nStacks, int nSlices,
                        float dCenterX, float dCenterY, float dCenterZ);
 
-}} // namespace SNEEZE::renderer
+} // namespace renderer
 
 #endif // SNEEZE_RENDERER_UVSPHERE_H

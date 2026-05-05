@@ -9,7 +9,7 @@ rendering is possible.
 ```cpp
 #include "xr/XrRuntime.h"
 
-SNEEZE::xr::XR_RUNTIME xr;
+xr::XR_RUNTIME xr;
 xr.Initialize ();
 
 if (xr.HasRuntime ())

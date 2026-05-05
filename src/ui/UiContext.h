@@ -17,10 +17,8 @@
 
 #include <string>
 
-namespace SNEEZE { namespace CORE { class SNEEZE; }}
+class SNEEZE;
 
-namespace SNEEZE
-{
 namespace ui
 {
 
@@ -30,15 +28,14 @@ public:
    UI_CONTEXT ();
    ~UI_CONTEXT ();
 
-   bool Initialize (CORE::SNEEZE* pSneeze);
+   bool Initialize (SNEEZE* pSneeze);
    void Shutdown ();
 
 private:
-   CORE::SNEEZE* m_pSneeze;
+   SNEEZE* m_pSneeze;
    bool bInitialized;
 };
 
 } // namespace ui
-} // namespace SNEEZE
 
 #endif // SNEEZE_UI_CONTEXT_H

@@ -19,10 +19,8 @@
 #include <vector>
 #include <cstdint>
 
-namespace SNEEZE { namespace CORE { class SNEEZE; }}
+class SNEEZE;
 
-namespace SNEEZE
-{
 namespace spirv
 {
 
@@ -32,17 +30,16 @@ public:
    SPV_PIPELINE ();
    ~SPV_PIPELINE ();
 
-   bool Initialize (CORE::SNEEZE* pSneeze);
+   bool Initialize (SNEEZE* pSneeze);
    void Shutdown ();
 
    bool Validate (const std::vector<uint32_t>& aBinary, std::string& sError);
 
 private:
-   CORE::SNEEZE* m_pSneeze;
+   SNEEZE* m_pSneeze;
    bool bInitialized;
 };
 
 } // namespace spirv
-} // namespace SNEEZE
 
 #endif // SNEEZE_SPV_PIPELINE_H

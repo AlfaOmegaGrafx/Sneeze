@@ -15,7 +15,7 @@
 #ifndef SNEEZE_SOM_ACCESSCONTROL_H
 #define SNEEZE_SOM_ACCESSCONTROL_H
 
-namespace SNEEZE { namespace som {
+namespace som {
 
 class NODE;
 class FABRIC;
@@ -37,6 +37,6 @@ bool CanWrite (const NODE* pNode, const void* pRequestingOwner);
 bool CanReadFabric (const FABRIC* pFabric, const void* pRequestingOwner);
 bool CanWriteFabric (const FABRIC* pFabric, const void* pRequestingOwner);
 
-}} // namespace SNEEZE::som
+} // namespace som
 
 #endif // SNEEZE_SOM_ACCESSCONTROL_H

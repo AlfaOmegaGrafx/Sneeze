@@ -17,10 +17,7 @@
 
 #include "core/Types.h"
 
-namespace SNEEZE { namespace astro {
-
-using CORE::QUAT;
-using CORE::VEC3;
+namespace astro {
 
 class CELESTIAL
 {
@@ -59,6 +56,6 @@ public:
    void ConvertFrameYUp ();
 };
 
-}} // namespace SNEEZE::astro
+} // namespace astro
 
 #endif // SNEEZE_ASTRO_CELESTIAL_H

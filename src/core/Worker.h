@@ -15,6 +15,8 @@
 #ifndef SNEEZE_CORE_WORKER_H
 #define SNEEZE_CORE_WORKER_H
 
+#include "core/Sneeze.h"
+
 #include <thread>
 #include <mutex>
 #include <condition_variable>
@@ -22,11 +24,7 @@
 #include <chrono>
 #include <cstdint>
 
-namespace SNEEZE { namespace CORE {
-
-class SNEEZE;
-
-class WORKER
+class SNEEZE::WORKER
 {
 public:
    explicit WORKER (SNEEZE* pSneeze);
@@ -67,7 +65,5 @@ private:
 public:
    void SetWorkerIndex (int nIndex);
 };
-
-}} // namespace SNEEZE::CORE
 
 #endif // SNEEZE_CORE_WORKER_H

@@ -51,7 +51,7 @@ static void Check (bool bCondition, const char* szName)
 // Minimal ISNEEZE for test logging
 // ---------------------------------------------------------------------------
 
-class CACHE_TEST_LISTENER : public SNEEZE::CORE::ISNEEZE
+class CACHE_TEST_LISTENER : public SNEEZE::ISNEEZE
 {
 public:
    int m_nCreatedCount = 0;
@@ -64,9 +64,9 @@ public:
       std::printf ("    [%s] %s\n", sModule.c_str (), sMessage.c_str ());
    }
 
-   void OnNetworkFileCreated (SNEEZE::NETWORK::FILE*) override { m_nCreatedCount++; }
-   void OnNetworkFileChanged (SNEEZE::NETWORK::FILE*) override { m_nChangedCount++; }
-   void OnNetworkFileDeleted (SNEEZE::NETWORK::FILE*) override { m_nDeletedCount++; }
+   void OnNetworkFileCreated (SNEEZE::NOTIFICATION*) override { m_nCreatedCount++; }
+   void OnNetworkFileChanged (SNEEZE::NOTIFICATION*) override { m_nChangedCount++; }
+   void OnNetworkFileDeleted (SNEEZE::NOTIFICATION*) override { m_nDeletedCount++; }
 
    void ResetCounters () { m_nCreatedCount = 0; m_nChangedCount = 0; m_nDeletedCount = 0; }
 };
@@ -137,9 +137,9 @@ static std::string ComputeSha256Hex (const uint8_t* pData, size_t nLen)
 // ---------------------------------------------------------------------------
 
 static CACHE_TEST_LISTENER* s_pTestListener = nullptr;
-static SNEEZE::CORE::SNEEZE* s_pSneeze = nullptr;
+static SNEEZE* s_pSneeze = nullptr;
 
-static auto s_pTestName = std::make_shared<SNEEZE::CONTAINER::NAME> (SNEEZE::CONTAINER::NAME {
+static auto s_pTestName = std::make_shared<som::CONTAINER::NAME> (som::CONTAINER::NAME {
    "TestFingerprint_0123456789abcdef",
    "TestOrg",
    "TestCommon",
@@ -1151,7 +1151,7 @@ int RunNetworkTests (int /*nArgc*/, char** /*aArgv*/)
    auto sCachePath = std::filesystem::path (s_pTestListener->sAppDataPath) / "Cache";
    std::filesystem::remove_all (sCachePath);
 
-   s_pSneeze = new SNEEZE::CORE::SNEEZE (s_pTestListener);
+   s_pSneeze = new SNEEZE (s_pTestListener);
    curl_global_init (CURL_GLOBAL_DEFAULT);
 
    TestManagerInit ();

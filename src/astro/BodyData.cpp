@@ -15,7 +15,7 @@
 #include "BodyData.h"
 #include "RMCObject.h"
 
-namespace SNEEZE { namespace astro {
+namespace astro {
 
 static RMCOBJECT_COLOR MakeColor (uint8_t r, uint8_t g, uint8_t b)
 {
@@ -412,4 +412,4 @@ https://cdn.rp1.com/res/texture/celestial/generic_moon-4.png
    }
 }
 
-}} // namespace SNEEZE::astro
+} // namespace astro

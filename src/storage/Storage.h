@@ -15,6 +15,7 @@
 #ifndef SNEEZE_STORAGE_STORAGE_H
 #define SNEEZE_STORAGE_STORAGE_H
 
+#include "core/Sneeze.h"
 #include "container/Container.h"
 #include <nlohmann/json.hpp>
 #include <string>
@@ -26,12 +27,8 @@
 #include <fstream>
 #include <filesystem>
 
-namespace SNEEZE { namespace CORE { class SNEEZE; }}
-
-namespace SNEEZE {
-
 // ---------------------------------------------------------------------------
-// STORAGE — persistent per-persona/per-org/per-container JSON document store.
+// SNEEZE::STORAGE — persistent per-persona/per-org/per-container JSON document store.
 //
 // Analogous to localStorage/sessionStorage in a web browser. Each container
 // gets four independent JSON document stores (organization permanent/temporary,
@@ -45,7 +42,7 @@ namespace SNEEZE {
 // Crash durability: JSONL changelog appended on every mutation.
 // ---------------------------------------------------------------------------
 
-class STORAGE
+class SNEEZE::STORAGE
 {
 public:
 
@@ -128,7 +125,7 @@ public:
       uint32_t            GetAccessCount () const     { return m_nAccessCount; }
 
       void  TouchAccess ();
-      void  SaveMeta (std::shared_ptr<CONTAINER::NAME> pName);
+      void  SaveMeta (std::shared_ptr<som::CONTAINER::NAME> pName);
       void  LoadMeta ();
 
    private:
@@ -168,14 +165,14 @@ public:
    // enumerates from disk. Destroyed/evicted when last reference releases.
    // -----------------------------------------------------------------------
 
-   class ASSET
+   class ASSET : public SNEEZE::NOTIFICATION
    {
    public:
-      ASSET (STORAGE* pStorage, std::shared_ptr<CONTAINER::NAME> pName);
+      ASSET (STORAGE* pStorage, std::shared_ptr<som::CONTAINER::NAME> pName);
 
       // --- Identity ---
 
-      std::shared_ptr<CONTAINER::NAME>  GetName () const { return m_pName; }
+      std::shared_ptr<som::CONTAINER::NAME>  GetName () const { return m_pName; }
       std::string  GetDisplayName () const { return m_pName ? m_pName->DisplayName () : ""; }
 
       // --- Path-based API ---
@@ -208,7 +205,7 @@ public:
 
    private:
       STORAGE*    m_pStorage;
-      std::shared_ptr<CONTAINER::NAME>  m_pName;
+      std::shared_ptr<som::CONTAINER::NAME>  m_pName;
       UNIT*       m_apUnits[SCOPE_COUNT];
       uint32_t    m_nRefCount;
       bool        m_bPendingClear;
@@ -218,7 +215,7 @@ public:
    // STORAGE public API
    // -----------------------------------------------------------------------
 
-   explicit STORAGE (CORE::SNEEZE* pSneeze);
+   explicit STORAGE (SNEEZE* pSneeze);
    ~STORAGE ();
 
    bool Initialize ();
@@ -226,7 +223,7 @@ public:
 
    // --- Container lifecycle ---
 
-   ASSET*  Open (std::shared_ptr<CONTAINER::NAME> pName);
+   ASSET*  Open (std::shared_ptr<som::CONTAINER::NAME> pName);
    void    Close (ASSET* pAsset);
 
    // --- Inspector ---
@@ -244,7 +241,7 @@ private:
    UNIT*        FindOrCreateUnit (const std::string& sJsonPath);
    void         SaveAllDirty ();
 
-   CORE::SNEEZE*   m_pSneeze;
+   SNEEZE*   m_pSneeze;
    std::string     m_sPermanentPath;
    std::string     m_sTemporaryPath;
 
@@ -252,7 +249,5 @@ private:
    std::vector<std::unique_ptr<ASSET>>                     m_aAssets;
    std::recursive_mutex                                    m_mutex;
 };
-
-} // namespace SNEEZE
 
 #endif // SNEEZE_STORAGE_STORAGE_H

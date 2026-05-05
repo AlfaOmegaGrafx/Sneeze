@@ -16,7 +16,7 @@
 #include "Node.h"
 #include <algorithm>
 
-namespace SNEEZE { namespace som {
+namespace som {
 
 EVENT_SYSTEM::EVENT_SYSTEM ()
    : m_twNextWatchId (1)
@@ -178,4 +178,4 @@ bool EVENT_SYSTEM::MatchesTarget (const WATCH& pWatch, NODE* pNode) const
    return false;
 }
 
-}} // namespace SNEEZE::som
+} // namespace som

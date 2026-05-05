@@ -22,7 +22,7 @@
 #include <algorithm>
 #include <memory>
 
-namespace SNEEZE { namespace som {
+namespace som {
 
 NODE::NODE (FABRIC* pFabric)
    : m_twObjectIx (0)
@@ -169,7 +169,7 @@ void NODE::ReleaseTexture ()
 // OnFileReady — decode the fetched texture data and populate the map object.
 // ---------------------------------------------------------------------------
 
-void NODE::OnFileReady (NETWORK::FILE* pFile)
+void NODE::OnFileReady (SNEEZE::NETWORK::FILE* pFile)
 {
    std::vector<uint8_t> aData;
 
@@ -206,10 +206,10 @@ void NODE::OnFileReady (NETWORK::FILE* pFile)
 // OnFileFailed — release the network file handle.
 // ---------------------------------------------------------------------------
 
-void NODE::OnFileFailed (NETWORK::FILE* pFile)
+void NODE::OnFileFailed (SNEEZE::NETWORK::FILE* pFile)
 {
    pFile->Release ();
    m_pFile = nullptr;
 }
 
-}} // namespace SNEEZE::som
+} // namespace som

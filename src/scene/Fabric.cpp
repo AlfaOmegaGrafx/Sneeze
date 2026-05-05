@@ -16,7 +16,7 @@
 #include "Node.h"
 #include <algorithm>
 
-namespace SNEEZE { namespace som {
+namespace som {
 
 FABRIC::FABRIC (SCENE* pScene)
    : m_pScene (pScene)
@@ -51,4 +51,4 @@ void FABRIC::RemoveChildFabric (FABRIC* pChild)
    }
 }
 
-}} // namespace SNEEZE::som
+} // namespace som

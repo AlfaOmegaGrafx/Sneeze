@@ -14,11 +14,9 @@
 
 #include "Network.h"
 
-namespace SNEEZE {
+const std::unordered_map<std::string, std::string> SNEEZE::NETWORK::FILE::s_mapEmpty;
 
-const std::unordered_map<std::string, std::string> NETWORK::FILE::s_mapEmpty;
-
-NETWORK::FILE::FILE (NETWORK* pNetwork, ASSET* pAsset, std::shared_ptr<CONTAINER::NAME> pName, IFILE* pListener, uint32_t nFileIx) :
+SNEEZE::NETWORK::FILE::FILE (NETWORK* pNetwork, ASSET* pAsset, std::shared_ptr<som::CONTAINER::NAME> pName, IFILE* pListener, uint32_t nFileIx) :
    m_pNetwork         (pNetwork),
    m_pAsset           (pAsset),
    m_pName            (std::move (pName)),
@@ -39,7 +37,7 @@ NETWORK::FILE::FILE (NETWORK* pNetwork, ASSET* pAsset, std::shared_ptr<CONTAINER
    SnapshotInitial ();
 }
 
-NETWORK::FILE::~FILE ()
+SNEEZE::NETWORK::FILE::~FILE ()
 {
 }
 
@@ -47,7 +45,7 @@ NETWORK::FILE::~FILE ()
 // Snapshot — copies display fields from the attached ASSET
 // ---------------------------------------------------------------------------
 
-void NETWORK::FILE::SnapshotInitial ()
+void SNEEZE::NETWORK::FILE::SnapshotInitial ()
 {
    if (m_pAsset)
    {
@@ -56,7 +54,7 @@ void NETWORK::FILE::SnapshotInitial ()
    }
 }
 
-void NETWORK::FILE::SnapshotProgress ()
+void SNEEZE::NETWORK::FILE::SnapshotProgress ()
 {
    if (m_pAsset)
    {
@@ -66,7 +64,7 @@ void NETWORK::FILE::SnapshotProgress ()
    }
 }
 
-void NETWORK::FILE::SnapshotFinal ()
+void SNEEZE::NETWORK::FILE::SnapshotFinal ()
 {
    if (m_pAsset)
    {
@@ -86,24 +84,24 @@ void NETWORK::FILE::SnapshotFinal ()
 // Actions
 // ---------------------------------------------------------------------------
 
-bool NETWORK::FILE::Request (IFILE* pListener)
+bool SNEEZE::NETWORK::FILE::Request (IFILE* pListener)
 {
    m_pListener = pListener;
    return m_pNetwork->ReopenFile (this);
 }
 
-void NETWORK::FILE::Release ()
+void SNEEZE::NETWORK::FILE::Release ()
 {
    if (!m_bEnumeration)
       m_pNetwork->Release (this);
 }
 
-void NETWORK::FILE::Clear (bool b)
+void SNEEZE::NETWORK::FILE::Clear (bool b)
 {
    m_pNetwork->Clear (this, b);
 }
 
-void NETWORK::FILE::Reset (bool b)
+void SNEEZE::NETWORK::FILE::Reset (bool b)
 {
    m_pNetwork->Reset (this, b);
 }
@@ -112,7 +110,7 @@ void NETWORK::FILE::Reset (bool b)
 // ASSET-dependent accessors (require attached ASSET)
 // ---------------------------------------------------------------------------
 
-std::vector<uint8_t> NETWORK::FILE::ReadData () const
+std::vector<uint8_t> SNEEZE::NETWORK::FILE::ReadData () const
 {
    std::vector<uint8_t> aResult;
    if (m_pAsset)
@@ -120,7 +118,7 @@ std::vector<uint8_t> NETWORK::FILE::ReadData () const
    return aResult;
 }
 
-std::string NETWORK::FILE::GetHeader (const std::string& sName) const
+std::string SNEEZE::NETWORK::FILE::GetHeader (const std::string& sName) const
 {
    std::string sResult;
    if (m_pAsset)
@@ -128,7 +126,7 @@ std::string NETWORK::FILE::GetHeader (const std::string& sName) const
    return sResult;
 }
 
-std::string NETWORK::FILE::GetDiskPath () const
+std::string SNEEZE::NETWORK::FILE::GetDiskPath () const
 {
    std::string sResult;
    if (m_pAsset)
@@ -136,7 +134,7 @@ std::string NETWORK::FILE::GetDiskPath () const
    return sResult;
 }
 
-std::string NETWORK::FILE::GetCreatedTime () const
+std::string SNEEZE::NETWORK::FILE::GetCreatedTime () const
 {
    std::string sResult;
    if (m_pAsset)
@@ -144,7 +142,7 @@ std::string NETWORK::FILE::GetCreatedTime () const
    return sResult;
 }
 
-std::string NETWORK::FILE::GetLastAccessTime () const
+std::string SNEEZE::NETWORK::FILE::GetLastAccessTime () const
 {
    std::string sResult;
    if (m_pAsset)
@@ -152,7 +150,7 @@ std::string NETWORK::FILE::GetLastAccessTime () const
    return sResult;
 }
 
-uint32_t NETWORK::FILE::GetAccessCount () const
+uint32_t SNEEZE::NETWORK::FILE::GetAccessCount () const
 {
    uint32_t nResult = 0;
    if (m_pAsset)
@@ -160,16 +158,14 @@ uint32_t NETWORK::FILE::GetAccessCount () const
    return nResult;
 }
 
-const std::unordered_map<std::string, std::string>& NETWORK::FILE::GetHeaders () const
+const std::unordered_map<std::string, std::string>& SNEEZE::NETWORK::FILE::GetHeaders () const
 {
    const std::unordered_map<std::string, std::string>& mapResult =
       m_pAsset ? m_pAsset->GetHeaders () : s_mapEmpty;
    return mapResult;
 }
 
-std::string NETWORK::FILE::GetContainerName () const
+std::string SNEEZE::NETWORK::FILE::GetContainerName () const
 {
    return m_pName->DisplayName ();
 }
-
-} // namespace SNEEZE

@@ -35,8 +35,6 @@
 #include <sstream>
 #include <vector>
 
-namespace SNEEZE
-{
 namespace msf
 {
 
@@ -448,4 +446,3 @@ std::string CERT_CHAIN::PemToDerBase64 (const std::string& sPem)
 }
 
 } // namespace msf
-} // namespace SNEEZE

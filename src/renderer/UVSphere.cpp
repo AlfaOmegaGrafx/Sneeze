@@ -15,7 +15,7 @@
 #include "UVSphere.h"
 #include <cmath>
 
-namespace SNEEZE { namespace renderer {
+namespace renderer {
 
 static constexpr float PI = 3.14159265358979323846f;
 
@@ -77,4 +77,4 @@ void GenerateUVSphere (UV_SPHERE& sphere, float dRadius,
    }
 }
 
-}} // namespace SNEEZE::renderer
+} // namespace renderer

@@ -15,14 +15,14 @@
 #ifndef SNEEZE_SOM_SCENE_H
 #define SNEEZE_SOM_SCENE_H
 
-namespace SNEEZE { namespace CORE { class SNEEZE; }}
+class SNEEZE;
 
-namespace SNEEZE { namespace som {
+namespace som {
 
 // ---------------------------------------------------------------------------
 // SOM::SCENE — root container for the scene object model.
 //
-// Owned by CORE::SNEEZE. Every FABRIC in the scene holds a back-pointer to
+// Owned by SNEEZE. Every FABRIC in the scene holds a back-pointer to
 // the SCENE, giving any NODE a path to engine services:
 //     NODE -> FABRIC -> SCENE -> SNEEZE -> Network(), etc.
 // ---------------------------------------------------------------------------
@@ -30,15 +30,15 @@ namespace SNEEZE { namespace som {
 class SCENE
 {
 public:
-   explicit SCENE (CORE::SNEEZE* pSneeze);
+   explicit SCENE (SNEEZE* pSneeze);
    ~SCENE ();
 
-   CORE::SNEEZE* Sneeze () const { return m_pSneeze; }
+   SNEEZE* Sneeze () const { return m_pSneeze; }
 
 private:
-   CORE::SNEEZE* m_pSneeze;
+   SNEEZE* m_pSneeze;
 };
 
-}} // namespace SNEEZE::som
+} // namespace som
 
 #endif // SNEEZE_SOM_SCENE_H

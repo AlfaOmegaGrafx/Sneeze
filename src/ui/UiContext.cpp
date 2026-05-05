@@ -35,7 +35,7 @@ public:
       tpStart = std::chrono::steady_clock::now ();
    }
 
-   void SetSneeze (SNEEZE::CORE::SNEEZE* pSneeze) { m_pSneeze = pSneeze; }
+   void SetSneeze (SNEEZE* pSneeze) { m_pSneeze = pSneeze; }
 
    double GetElapsedTime () override
    {
@@ -48,17 +48,17 @@ public:
       if (!m_pSneeze)
          return true;
 
-      SNEEZE::CORE::ISNEEZE::eLOGLEVEL eLevel = SNEEZE::CORE::ISNEEZE::kLOGLEVEL_Info;
-      if (nType == Rml::Log::LT_ERROR)   eLevel = SNEEZE::CORE::ISNEEZE::kLOGLEVEL_Error;
-      if (nType == Rml::Log::LT_WARNING) eLevel = SNEEZE::CORE::ISNEEZE::kLOGLEVEL_Warning;
-      if (nType == Rml::Log::LT_DEBUG)   eLevel = SNEEZE::CORE::ISNEEZE::kLOGLEVEL_Trace;
+      SNEEZE::ISNEEZE::eLOGLEVEL eLevel = SNEEZE::ISNEEZE::kLOGLEVEL_Info;
+      if (nType == Rml::Log::LT_ERROR)   eLevel = SNEEZE::ISNEEZE::kLOGLEVEL_Error;
+      if (nType == Rml::Log::LT_WARNING) eLevel = SNEEZE::ISNEEZE::kLOGLEVEL_Warning;
+      if (nType == Rml::Log::LT_DEBUG)   eLevel = SNEEZE::ISNEEZE::kLOGLEVEL_Trace;
 
       m_pSneeze->Log (eLevel, "UI_CONTEXT", sMessage);
       return true;
    }
 
 private:
-   SNEEZE::CORE::SNEEZE* m_pSneeze;
+   SNEEZE* m_pSneeze;
    std::chrono::steady_clock::time_point tpStart;
 };
 
@@ -123,8 +123,6 @@ static STUB_FONT_ENGINE pStubFontEngine;
 
 } // anonymous namespace
 
-namespace SNEEZE
-{
 namespace ui
 {
 
@@ -139,7 +137,7 @@ UI_CONTEXT::~UI_CONTEXT ()
    Shutdown ();
 }
 
-bool UI_CONTEXT::Initialize (CORE::SNEEZE* pSneeze)
+bool UI_CONTEXT::Initialize (SNEEZE* pSneeze)
 {
    m_pSneeze = pSneeze;
    pStubSystem.SetSneeze (pSneeze);
@@ -151,7 +149,7 @@ bool UI_CONTEXT::Initialize (CORE::SNEEZE* pSneeze)
    bool bOk = Rml::Initialise ();
    if (!bOk)
    {
-      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Error, "UI_CONTEXT",
+      m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Error, "UI_CONTEXT",
          "Rml::Initialise failed");
       bInitialized = false;
    }
@@ -159,7 +157,7 @@ bool UI_CONTEXT::Initialize (CORE::SNEEZE* pSneeze)
    {
       bInitialized = true;
       Rml::String sVersion = Rml::GetVersion ();
-      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "UI_CONTEXT",
+      m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Info, "UI_CONTEXT",
          "RmlUi " + std::string (sVersion.c_str ()) + " initialized (stub renderer)");
    }
 
@@ -176,4 +174,3 @@ void UI_CONTEXT::Shutdown ()
 }
 
 } // namespace ui
-} // namespace SNEEZE

@@ -17,9 +17,7 @@
 
 #include "Worker.h"
 
-namespace SNEEZE { namespace CORE {
-
-class WORKER_E : public WORKER
+class WORKER_E : public SNEEZE::WORKER
 {
 public:
    explicit WORKER_E (SNEEZE* pSneeze);
@@ -27,7 +25,5 @@ public:
 protected:
    void Tick () override;
 };
-
-}} // namespace SNEEZE::CORE
 
 #endif // SNEEZE_CORE_WORKER_E_H

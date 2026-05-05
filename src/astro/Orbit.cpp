@@ -15,17 +15,8 @@
 #include "Orbit.h"
 #include <cmath>
 
-namespace SNEEZE { namespace astro {
+namespace astro {
 
-using CORE::AU_M;
-using CORE::GM_SUN_M3S2;
-using CORE::JULIAN_YEAR;
-using CORE::TICKS_PER_S;
-using CORE::TICKS_PER_CY;
-using CORE::PI;
-using CORE::TWO_PI;
-using CORE::DEG_TO_RAD;
-using CORE::EPOCH_J2000;
 
 // ---------------------------------------------------------------------------
 
@@ -320,7 +311,7 @@ ORBIT_POSITION* ORBIT::PositionAtTick (int64_t tmNow, ORBIT_POSITION& out) const
 //  PointOnOrbit - compute a 3D point on the orbital ellipse
 // ---------------------------------------------------------------------------
 
-CORE::VEC3 ORBIT::PointOnOrbit (double dE, int64_t tmElapsed) const
+VEC3 ORBIT::PointOnOrbit (double dE, int64_t tmElapsed) const
 {
    double dRx = dQx, dRy = dQy, dRz = dQz, dRw = dQw;
 
@@ -341,4 +332,4 @@ CORE::VEC3 ORBIT::PointOnOrbit (double dE, int64_t tmElapsed) const
    return CELESTIAL::RotateByQuat (dRx, dRy, dRz, dRw, dLX, 0.0, -dLY);
 }
 
-}} // namespace SNEEZE::astro
+} // namespace astro

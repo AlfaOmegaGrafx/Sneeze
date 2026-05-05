@@ -24,7 +24,7 @@
 #include <optional>
 #include <cstdint>
 
-namespace SNEEZE { namespace astro {
+namespace astro {
 
 enum RMCOBJECT_TYPE
 {
@@ -118,6 +118,6 @@ private:
    static RMCOBJECT*                         s_pRoot;
 };
 
-}} // namespace SNEEZE::astro
+} // namespace astro
 
 #endif // SNEEZE_ASTRO_RMCOBJECT_H

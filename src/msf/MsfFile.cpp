@@ -19,8 +19,6 @@
 
 #include <cstdio>
 
-namespace SNEEZE
-{
 namespace msf
 {
 
@@ -28,7 +26,7 @@ namespace msf
 // Construction / Destruction
 // ---------------------------------------------------------------------------
 
-MSF_FILE::MSF_FILE (CORE::SNEEZE* pSneeze)
+MSF_FILE::MSF_FILE (SNEEZE* pSneeze)
    : m_bSignatureValid (false)
    , m_bChainTrusted (false)
    , m_bParsed (false)
@@ -103,7 +101,7 @@ bool MSF_FILE::Parse (const std::string& sJws)
       }
       catch (const std::exception& ex)
       {
-         m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Error, "MSF_FILE", std::string ("Parse: ") + ex.what ());
+         m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Error, "MSF_FILE", std::string ("Parse: ") + ex.what ());
       }
    }
 
@@ -156,13 +154,13 @@ std::string MSF_FILE::Sign (const std::string& sPrivateKeyPem,
             sResult = pBuilder.sign (jwt::algorithm::es512 ("", sPrivateKeyPem));
          else
          {
-            m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Error, "MSF_FILE", "Sign: unknown algorithm \"" + sAlgorithm + "\"");
+            m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Error, "MSF_FILE", "Sign: unknown algorithm \"" + sAlgorithm + "\"");
          }
       }
    }
    catch (const std::exception& ex)
    {
-      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Error, "MSF_FILE", std::string ("Sign: exception: ") + ex.what ());
+      m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Error, "MSF_FILE", std::string ("Sign: exception: ") + ex.what ());
 
       sResult.clear ();
    }
@@ -501,4 +499,3 @@ std::string MSF_FILE::GetSignatureError () const  { return m_sSignatureError; }
 std::string MSF_FILE::GetChainError () const      { return m_sChainError; }
 
 } // namespace msf
-} // namespace SNEEZE

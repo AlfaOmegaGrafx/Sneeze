@@ -19,7 +19,7 @@
 #include <cmath>
 #include <limits>
 
-namespace SNEEZE { namespace som {
+namespace som {
 
 // ===========================================================================
 // AABB
@@ -276,4 +276,4 @@ void SPATIAL_INDEX::QuerySphereRecursive (int nBvhIndex, double x, double y, dou
    if (pBvh.nRight >= 0) QuerySphereRecursive (pBvh.nRight, x, y, z, dRadius, aResults);
 }
 
-}} // namespace SNEEZE::som
+} // namespace som

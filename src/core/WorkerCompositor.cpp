@@ -32,8 +32,6 @@
 #include <thread>
 #endif
 
-namespace SNEEZE { namespace CORE {
-
 static constexpr float METERS_TO_AU     = 1.0f / 149597870700.0f;
 static constexpr float MIN_SPHERE_RADIUS = 0.005f;
 static constexpr float SUN_RADIUS_SCALE  = 5.0f;
@@ -92,9 +90,9 @@ void WORKER_COMPOSITOR::ThreadLoop ()
 
    bool bNativeSurface = m_pRenderer.IsRenderingToNativeSurface ();
    if (bNativeSurface)
-      m_pSneeze->Log (ISNEEZE::kLOGLEVEL_Info, "COMPOSITOR", "Rendering to native surface (direct-to-window)");
+      m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Info, "COMPOSITOR", "Rendering to native surface (direct-to-window)");
    else
-      m_pSneeze->Log (ISNEEZE::kLOGLEVEL_Info, "COMPOSITOR", "Rendering to CPU framebuffer (readback path)");
+      m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Info, "COMPOSITOR", "Rendering to CPU framebuffer (readback path)");
    m_tpLastFrame = std::chrono::steady_clock::now ();
 
    SignalReady ();
@@ -111,7 +109,7 @@ void WORKER_COMPOSITOR::ThreadLoop ()
 
       // --- Consume input ---
 
-      SNEEZE_INPUT pInput = m_pSneeze->ConsumeInput ();
+      SNEEZE::INPUT pInput = m_pSneeze->ConsumeInput ();
 
       // Time controls
       if (pInput.bKeyPlus)   m_dTimeScale *= 1.05;
@@ -139,7 +137,7 @@ void WORKER_COMPOSITOR::ThreadLoop ()
          std::snprintf (szFps, sizeof (szFps),
             "%d  (frame %.1f ms | input %.1f ms | scene %.1f ms | submit %.1f ms | render %.1f ms | publish %.1f ms | flush %.1f ms)",
             m_nFrameCount, dAvgFrame, dAvgInput, dAvgScene, dAvgSubmit, dAvgRender, dAvgPublish, dAvgFlush);
-         m_pSneeze->Log (ISNEEZE::kLOGLEVEL_Trace, "FPS", std::string (szFps));
+         m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Trace, "FPS", std::string (szFps));
          m_nFrameCount    = 0;
          m_dFpsAccum     -= 1.0;
          m_dAccumInput    = 0.0;
@@ -316,7 +314,7 @@ void WORKER_COMPOSITOR::ThreadLoop ()
             m_pSneeze->WriteFrameBuffer (pPixels,
                m_pRenderer.GetWidth (), m_pRenderer.GetHeight ());
 
-            ISNEEZE* pHost = m_pSneeze->GetHost ();
+            SNEEZE::ISNEEZE* pHost = m_pSneeze->GetHost ();
             if (pHost)
             {
                int nFbW, nFbH;
@@ -350,5 +348,3 @@ void WORKER_COMPOSITOR::ThreadLoop ()
 
    m_pRenderer.Shutdown ();
 }
-
-}} // namespace SNEEZE::CORE

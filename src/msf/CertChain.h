@@ -20,8 +20,6 @@
 
 #include "CertInfo.h"
 
-namespace SNEEZE
-{
 namespace msf
 {
 
@@ -61,6 +59,5 @@ private:
 };
 
 } // namespace msf
-} // namespace SNEEZE
 
 #endif // SNEEZE_JWS_CERTCHAIN_H

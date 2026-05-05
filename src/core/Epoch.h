@@ -18,8 +18,6 @@
 #include <string>
 #include <cstdint>
 
-namespace SNEEZE { namespace CORE {
-
 class EPOCH
 {
 public:
@@ -40,7 +38,5 @@ private:
 };
 
 extern const EPOCH EPOCH_J2000;
-
-}} // namespace SNEEZE::CORE
 
 #endif // SNEEZE_CORE_EPOCH_H

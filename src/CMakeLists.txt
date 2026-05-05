@@ -601,9 +601,6 @@ if (SNEEZE_ENABLE_XR)
    set (XR_HEADERS      xr/XrRuntime.h)
 endif ()
 
-set (NET_SOURCES     net/HttpClient.cpp)
-set (NET_HEADERS     net/HttpClient.h)
-
 set (UI_SOURCES      ui/UiContext.cpp)
 set (UI_HEADERS      ui/UiContext.h)
 
@@ -638,7 +635,6 @@ add_library (Sneeze STATIC
    ${WASM_SOURCES}      ${WASM_HEADERS}
    ${SPIRV_SOURCES}     ${SPIRV_HEADERS}
    ${XR_SOURCES}        ${XR_HEADERS}
-   ${NET_SOURCES}       ${NET_HEADERS}
    ${UI_SOURCES}        ${UI_HEADERS}
    ${COMPUTE_SOURCES}   ${COMPUTE_HEADERS}
    ${MSF_SOURCES}       ${MSF_HEADERS}
@@ -734,7 +730,6 @@ source_group ("view"     FILES ${VIEW_SOURCES} ${VIEW_HEADERS})
 source_group ("wasm"     FILES ${WASM_SOURCES} ${WASM_HEADERS})
 source_group ("spirv"    FILES ${SPIRV_SOURCES} ${SPIRV_HEADERS})
 source_group ("xr"       FILES ${XR_SOURCES} ${XR_HEADERS})
-source_group ("net"      FILES ${NET_SOURCES} ${NET_HEADERS})
 source_group ("ui"       FILES ${UI_SOURCES} ${UI_HEADERS})
 source_group ("compute"  FILES ${COMPUTE_SOURCES} ${COMPUTE_HEADERS})
 source_group ("msf"      FILES ${MSF_SOURCES} ${MSF_HEADERS})

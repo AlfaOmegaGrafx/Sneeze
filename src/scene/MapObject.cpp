@@ -14,11 +14,11 @@
 
 #include "MapObject.h"
 
-namespace SNEEZE { namespace som {
+namespace som {
 
 MAP_OBJECT::MAP_OBJECT (MAP_OBJECT_TYPE bType)
    : m_bType (bType)
 {
 }
 
-}} // namespace SNEEZE::som
+} // namespace som

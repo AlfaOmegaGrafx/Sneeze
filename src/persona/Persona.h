@@ -17,9 +17,9 @@
 
 #include <string>
 
-namespace SNEEZE { namespace CORE { class SNEEZE; }}
+class SNEEZE;
 
-namespace SNEEZE { namespace persona {
+namespace persona {
 
 // ---------------------------------------------------------------------------
 // PERSONA — temporary local identity proxy.
@@ -32,7 +32,7 @@ namespace SNEEZE { namespace persona {
 class PERSONA
 {
 public:
-   explicit PERSONA (CORE::SNEEZE* pSneeze);
+   explicit PERSONA (SNEEZE* pSneeze);
 
    bool IsLoggedIn () const { return m_bLoggedIn; }
 
@@ -45,12 +45,12 @@ public:
 private:
    static std::string ComputeHash (const std::string& sInput);
 
-   CORE::SNEEZE* m_pSneeze;
+   SNEEZE* m_pSneeze;
    bool        m_bLoggedIn;
    std::string m_sName;
    std::string m_sHash;
 };
 
-}} // namespace SNEEZE::persona
+} // namespace persona
 
 #endif // SNEEZE_PERSONA_PERSONA_H

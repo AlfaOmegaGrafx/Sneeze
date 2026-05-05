@@ -14,9 +14,9 @@
 
 #include "Scene.h"
 
-namespace SNEEZE { namespace som {
+namespace som {
 
-SCENE::SCENE (CORE::SNEEZE* pSneeze)
+SCENE::SCENE (SNEEZE* pSneeze)
    : m_pSneeze (pSneeze)
 {
 }
@@ -25,4 +25,4 @@ SCENE::~SCENE ()
 {
 }
 
-}} // namespace SNEEZE::som
+} // namespace som

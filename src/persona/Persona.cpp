@@ -17,9 +17,9 @@
 #include <openssl/sha.h>
 #include <cstring>
 
-namespace SNEEZE { namespace persona {
+namespace persona {
 
-PERSONA::PERSONA (CORE::SNEEZE* pSneeze)
+PERSONA::PERSONA (SNEEZE* pSneeze)
    : m_pSneeze (pSneeze)
    , m_bLoggedIn (false)
 {
@@ -35,13 +35,13 @@ void PERSONA::Login (const std::string& sFirst, const std::string& sSecond)
    m_sHash = ComputeHash (m_sName);
    m_bLoggedIn = true;
 
-   m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "PERSONA",
+   m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Info, "PERSONA",
       "Logged in as \"" + m_sName + "\" (hash: " + m_sHash + ")");
 }
 
 void PERSONA::Logout ()
 {
-   m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "PERSONA",
+   m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Info, "PERSONA",
       "Logged out \"" + m_sName + "\"");
    m_bLoggedIn = false;
    m_sName.clear ();
@@ -62,4 +62,4 @@ std::string PERSONA::ComputeHash (const std::string& sInput)
    return std::string (szHex);
 }
 
-}} // namespace SNEEZE::persona
+} // namespace persona

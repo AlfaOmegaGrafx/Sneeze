@@ -43,7 +43,7 @@ static void Check (bool bCondition, const char* szName)
 // Minimal ISNEEZE for tests
 // ---------------------------------------------------------------------------
 
-class STORAGE_TEST_HOST : public SNEEZE::CORE::ISNEEZE
+class STORAGE_TEST_HOST : public SNEEZE::ISNEEZE
 {
 public:
    int m_nCreatedCount = 0;
@@ -62,18 +62,18 @@ public:
       std::printf ("    [%s] %s\n", sModule.c_str (), sMessage.c_str ());
    }
 
-   void OnStorageUnitCreated (SNEEZE::STORAGE::ASSET*) override { m_nCreatedCount++; }
-   void OnStorageUnitChanged (SNEEZE::STORAGE::ASSET*) override { m_nChangedCount++; }
-   void OnStorageUnitDeleted (SNEEZE::STORAGE::ASSET*) override { m_nDeletedCount++; }
+   void OnStorageUnitCreated (SNEEZE::NOTIFICATION*) override { m_nCreatedCount++; }
+   void OnStorageUnitChanged (SNEEZE::NOTIFICATION*) override { m_nChangedCount++; }
+   void OnStorageUnitDeleted (SNEEZE::NOTIFICATION*) override { m_nDeletedCount++; }
 };
 
 static STORAGE_TEST_HOST*       s_pHost    = nullptr;
-static SNEEZE::CORE::SNEEZE*    s_pSneeze  = nullptr;
+static SNEEZE*    s_pSneeze  = nullptr;
 static SNEEZE::STORAGE*         s_pStorage = nullptr;
 
-static std::shared_ptr<SNEEZE::CONTAINER::NAME> MakeTestName (const std::string& sContainer = "poker")
+static std::shared_ptr<som::CONTAINER::NAME> MakeTestName (const std::string& sContainer = "poker")
 {
-   auto pName = std::make_shared<SNEEZE::CONTAINER::NAME> ();
+   auto pName = std::make_shared<som::CONTAINER::NAME> ();
    pName->sFingerprint   = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
    pName->sOrganization  = "TestOrg";
    pName->sCommonName    = "TestOrg";
@@ -426,7 +426,7 @@ int RunStorageTests (int nArgc, char** aArgv)
    CleanTestDir ();
 
    s_pHost = new STORAGE_TEST_HOST ();
-   s_pSneeze = new SNEEZE::CORE::SNEEZE (s_pHost);
+   s_pSneeze = new SNEEZE (s_pHost);
 
    s_pStorage = new SNEEZE::STORAGE (s_pSneeze);
    bool bInit = s_pStorage->Initialize ();

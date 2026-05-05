@@ -29,8 +29,6 @@ extern "C"
 }
 #endif
 
-namespace SNEEZE
-{
 namespace compute
 {
 
@@ -69,4 +67,3 @@ KERNEL_DATA GetEmbeddedKernel (const char* szName)
 }
 
 } // namespace compute
-} // namespace SNEEZE

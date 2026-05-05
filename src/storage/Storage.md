@@ -13,14 +13,14 @@ STORAGE (singleton)
 
 UNIT (one per JSON file on disk)
  ├── nlohmann::json document (in-memory cache)
- ├── .meta sidecar (CONTAINER::NAME, statistics)
+ ├── .meta sidecar (som::CONTAINER::NAME, statistics)
  ├── .log changelog (JSONL write-ahead log for crash durability)
  ├── Dirty flag + ref count
  ├── Load/Save/Evict lifecycle
  └── mutex
 
 ASSET (groups four UNITs for a specific container)
- ├── shared_ptr<CONTAINER::NAME>
+ ├── shared_ptr<som::CONTAINER::NAME>
  ├── UNIT* m_apUnits[4] indexed by SCOPE
  ├── Ref count (attach/detach)
  ├── Clear flag (deferred history removal)
@@ -68,7 +68,7 @@ Artemis provides two paths to the engine at initialization:
 
 All temporary storage is wiped upon session termination.
 
-Currently, `Initialize()` derives a single path from `ISNEEZE::SessionPath()`.
+Currently, `Initialize()` derives a single path from `SNEEZE::ISNEEZE::SessionPath()`.
 Once Artemis provides dual paths, the permanent and temporary paths will diverge.
 
 ## Disk Layout
@@ -101,7 +101,7 @@ Once Artemis provides dual paths, the permanent and temporary paths will diverge
 #include "storage/Storage.h"
 
 // Open storage for a container (typically called by WASM runtime)
-auto pName = std::make_shared<CONTAINER::NAME> ();
+auto pName = std::make_shared<som::CONTAINER::NAME> ();
 pName->sFingerprint   = "abc123def456abc123def456abc123def456abc123def456abc123def456abcd";
 pName->sOrganization  = "Metaversal";
 pName->sCommonName    = "Metaversal";
@@ -240,21 +240,23 @@ use bulk `GetJson`/`SetJson`.
 - Real-time notifications via `OnStorageUnitCreated/Changed/Deleted`
 - Storage units not held by WASM or inspector don't need to live in memory
 
-## Notifications (ISNEEZE callbacks)
+## Notifications (SNEEZE::ISNEEZE callbacks)
 
 ```cpp
-virtual void OnStorageUnitCreated (STORAGE::ASSET* pAsset);
-virtual void OnStorageUnitChanged (STORAGE::ASSET* pAsset);
-virtual void OnStorageUnitDeleted (STORAGE::ASSET* pAsset);
+virtual void OnStorageUnitCreated (SNEEZE::NOTIFICATION* pNotification);
+virtual void OnStorageUnitChanged (SNEEZE::NOTIFICATION* pNotification);
+virtual void OnStorageUnitDeleted (SNEEZE::NOTIFICATION* pNotification);
 ```
 
-These fire from STORAGE through `CORE::SNEEZE` up to the host (Artemis).
+The host casts `SNEEZE::NOTIFICATION*` to `SNEEZE::STORAGE::ASSET*`.
+
+These fire from STORAGE through `SNEEZE` up to the host (Artemis).
 
 ## Sidecar .meta Files
 
 Each storage unit has a companion `.meta` sidecar — same pattern as NETWORK:
 
-- Contains CONTAINER::NAME fields (fingerprint, organization, commonName,
+- Contains som::CONTAINER::NAME fields (fingerprint, organization, commonName,
   containerName, personaHash, bValidated)
 - Contains scope identifier and statistics (createdAt, lastAccessedAt,
   accessCount, sizeBytes)
@@ -305,7 +307,7 @@ the inspector is open — it just asks "do you want this?" on every creation.
 
 ### Dual Session Paths
 
-Currently `Initialize()` derives a single path from `ISNEEZE::SessionPath()`.
+Currently `Initialize()` derives a single path from `SNEEZE::ISNEEZE::SessionPath()`.
 Artemis needs to provide two separate paths:
 - A permanent path (either `Persistent/` or `Ephemeral/<id>/`)
 - A temporary path (always `Ephemeral/<session_id>/`)

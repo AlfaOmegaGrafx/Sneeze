@@ -14,8 +14,6 @@
 
 #include "WorkerB.h"
 
-namespace SNEEZE { namespace CORE {
-
 WORKER_B::WORKER_B (SNEEZE* pSneeze)
    : WORKER (pSneeze)
 {
@@ -24,5 +22,3 @@ WORKER_B::WORKER_B (SNEEZE* pSneeze)
 void WORKER_B::Tick ()
 {
 }
-
-}} // namespace SNEEZE::CORE

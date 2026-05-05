@@ -70,7 +70,7 @@ static void PrintUsage ()
 // Verify mode
 // ---------------------------------------------------------------------------
 
-static void PrintCertChain (const SNEEZE::msf::MSF_FILE& msf)
+static void PrintCertChain (const msf::MSF_FILE& msf)
 {
    const auto& aCerts = msf.GetCertInfos ();
 
@@ -102,7 +102,7 @@ static int DoVerify (const char* sMsfPath,
    }
    else
    {
-      SNEEZE::msf::MSF_FILE msf;
+      msf::MSF_FILE msf;
 
       for (const char* sTrustPath : aTrustPaths)
       {
@@ -178,7 +178,7 @@ static int DoSign (const char* sPayloadPath, const char* sKeyPath,
       std::cerr << "Error: cannot read key file: " << sKeyPath << "\n";
    else
    {
-      SNEEZE::msf::MSF_FILE msf;
+      msf::MSF_FILE msf;
 
       msf.SetPayload (nlohmann::json::parse (sPayload));
 

@@ -15,6 +15,7 @@
 #ifndef SNEEZE_NETWORK_H
 #define SNEEZE_NETWORK_H
 
+#include "core/Sneeze.h"
 #include "container/Container.h"
 #include <string>
 #include <vector>
@@ -27,12 +28,8 @@
 #include <chrono>
 #include <cstdint>
 
-namespace SNEEZE { namespace CORE { class SNEEZE; }}
-
-namespace SNEEZE {
-
 // ---------------------------------------------------------------------------
-// NETWORK — the network resource system.
+// SNEEZE::NETWORK — the network resource system.
 //
 // Fetches remote resources, caches them on disk, and serves them to callers
 // via handle-based FILE objects. All files persist across restarts. Files
@@ -47,7 +44,7 @@ namespace SNEEZE {
 // queue and are dispatched as threads complete.
 // ---------------------------------------------------------------------------
 
-class NETWORK
+class SNEEZE::NETWORK
 {
 public:
 
@@ -208,10 +205,10 @@ public:
    // read them after Release.
    // -----------------------------------------------------------------------
 
-   class FILE
+   class FILE : public SNEEZE::NOTIFICATION
    {
    public:
-      FILE (NETWORK* pNetwork, ASSET* pAsset, std::shared_ptr<CONTAINER::NAME> pName, IFILE* pListener, uint32_t nFileIx);
+      FILE (NETWORK* pNetwork, ASSET* pAsset, std::shared_ptr<som::CONTAINER::NAME> pName, IFILE* pListener, uint32_t nFileIx);
       ~FILE ();
 
       // --- Snapshot fields (always available, even after Release) ---
@@ -254,7 +251,7 @@ public:
 
       // --- Container ---
 
-      const CONTAINER::NAME& GetName () const   { return *m_pName; }
+      const som::CONTAINER::NAME& GetName () const   { return *m_pName; }
       std::string GetContainerName () const;
 
       // --- Listener ---
@@ -280,7 +277,7 @@ public:
    private:
       NETWORK*    m_pNetwork;
       ASSET*      m_pAsset;
-      std::shared_ptr<CONTAINER::NAME> m_pName;
+      std::shared_ptr<som::CONTAINER::NAME> m_pName;
       IFILE*      m_pListener;
 
       // Initial (set once at construction — request identity)
@@ -313,7 +310,7 @@ public:
    // NETWORK public API
    // -----------------------------------------------------------------------
 
-   explicit NETWORK (CORE::SNEEZE* pSneeze);
+   explicit NETWORK (SNEEZE* pSneeze);
    ~NETWORK ();
 
    bool Initialize ();
@@ -321,8 +318,8 @@ public:
 
    // --- Primary API ---
 
-   FILE* Request (IFILE* pListener, std::shared_ptr<CONTAINER::NAME> pName, const std::string& sUrl);
-   FILE* Request (IFILE* pListener, std::shared_ptr<CONTAINER::NAME> pName, const std::string& sUrl,
+   FILE* Request (IFILE* pListener, std::shared_ptr<som::CONTAINER::NAME> pName, const std::string& sUrl);
+   FILE* Request (IFILE* pListener, std::shared_ptr<som::CONTAINER::NAME> pName, const std::string& sUrl,
                   const std::string& sHash, uint32_t bFlags = kREQUEST_DEFAULT,
                   uint32_t nMetaIx = 0);
    void  Release (FILE* pFile);
@@ -384,7 +381,7 @@ private:
    static size_t FetchWriteCallback (char* pData, size_t nSize, size_t nMembers, void* pUser);
    static size_t FetchHeaderCallback (char* pData, size_t nSize, size_t nMembers, void* pUser);
 
-   CORE::SNEEZE*             m_pSneeze;
+   SNEEZE*             m_pSneeze;
    std::string               m_sCachePath;
 
    using ASSET_MAP = std::unordered_map<std::string, std::unique_ptr<ASSET>>;
@@ -418,7 +415,5 @@ private:
    uint32_t                  m_nNextFileIx;
    std::chrono::steady_clock::time_point m_tpEpoch;
 };
-
-} // namespace SNEEZE
 
 #endif // SNEEZE_NETWORK_H

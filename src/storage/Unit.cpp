@@ -19,13 +19,11 @@
 #include <iomanip>
 
 
-namespace SNEEZE {
-
 // ===========================================================================
 // Helpers
 // ===========================================================================
 
-std::string STORAGE::UNIT::NowIso8601 ()
+std::string SNEEZE::STORAGE::UNIT::NowIso8601 ()
 {
    auto tpNow = std::chrono::system_clock::now ();
    auto tTime = std::chrono::system_clock::to_time_t (tpNow);
@@ -44,7 +42,7 @@ std::string STORAGE::UNIT::NowIso8601 ()
 // STORAGE::UNIT
 // ===========================================================================
 
-STORAGE::UNIT::UNIT (STORAGE* pStorage, SCOPE eScope, const std::string& sJsonPath) :
+SNEEZE::STORAGE::UNIT::UNIT (STORAGE* pStorage, SCOPE eScope, const std::string& sJsonPath) :
    m_pStorage       (pStorage),
    m_eScope         (eScope),
    m_sJsonPath      (sJsonPath),
@@ -63,7 +61,7 @@ STORAGE::UNIT::UNIT (STORAGE* pStorage, SCOPE eScope, const std::string& sJsonPa
 // Sets pParent to the parent object/array and sFinalKey to the last segment.
 // ---------------------------------------------------------------------------
 
-void STORAGE::UNIT::NavigatePath (const std::string& sPath, nlohmann::json*& pParent, std::string& sFinalKey) const
+void SNEEZE::STORAGE::UNIT::NavigatePath (const std::string& sPath, nlohmann::json*& pParent, std::string& sFinalKey) const
 {
    pParent = const_cast<nlohmann::json*> (&m_jData);
    sFinalKey.clear ();
@@ -138,7 +136,7 @@ void STORAGE::UNIT::NavigatePath (const std::string& sPath, nlohmann::json*& pPa
 // JSON access
 // ---------------------------------------------------------------------------
 
-nlohmann::json STORAGE::UNIT::Get (const std::string& sPath) const
+nlohmann::json SNEEZE::STORAGE::UNIT::Get (const std::string& sPath) const
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -163,7 +161,7 @@ nlohmann::json STORAGE::UNIT::Get (const std::string& sPath) const
    return nlohmann::json ();
 }
 
-void STORAGE::UNIT::Set (const std::string& sPath, const nlohmann::json& jValue)
+void SNEEZE::STORAGE::UNIT::Set (const std::string& sPath, const nlohmann::json& jValue)
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -194,7 +192,7 @@ void STORAGE::UNIT::Set (const std::string& sPath, const nlohmann::json& jValue)
    AppendLog ("Set", sPath, jValue);
 }
 
-void STORAGE::UNIT::Remove (const std::string& sPath)
+void SNEEZE::STORAGE::UNIT::Remove (const std::string& sPath)
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -221,7 +219,7 @@ void STORAGE::UNIT::Remove (const std::string& sPath)
    AppendLog ("Remove", sPath, nlohmann::json ());
 }
 
-bool STORAGE::UNIT::Has (const std::string& sPath) const
+bool SNEEZE::STORAGE::UNIT::Has (const std::string& sPath) const
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -241,13 +239,13 @@ bool STORAGE::UNIT::Has (const std::string& sPath) const
    return pParent->is_object ()  &&  pParent->contains (sFinalKey);
 }
 
-std::string STORAGE::UNIT::GetJson () const
+std::string SNEEZE::STORAGE::UNIT::GetJson () const
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
    return m_jData.dump (2);
 }
 
-void STORAGE::UNIT::SetJson (const std::string& sJson)
+void SNEEZE::STORAGE::UNIT::SetJson (const std::string& sJson)
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -267,7 +265,7 @@ void STORAGE::UNIT::SetJson (const std::string& sJson)
 // JSONL Changelog — crash durability
 // ---------------------------------------------------------------------------
 
-void STORAGE::UNIT::AppendLog (const std::string& sOp, const std::string& sPath, const nlohmann::json& jValue)
+void SNEEZE::STORAGE::UNIT::AppendLog (const std::string& sOp, const std::string& sPath, const nlohmann::json& jValue)
 {
    std::string sLogPath = m_sJsonPath + ".log";
 
@@ -283,7 +281,7 @@ void STORAGE::UNIT::AppendLog (const std::string& sOp, const std::string& sPath,
    }
 }
 
-void STORAGE::UNIT::ReplayLog ()
+void SNEEZE::STORAGE::UNIT::ReplayLog ()
 {
    std::string sLogPath = m_sJsonPath + ".log";
 
@@ -359,7 +357,7 @@ void STORAGE::UNIT::ReplayLog ()
    m_bDirty = true;
 }
 
-void STORAGE::UNIT::DeleteLog ()
+void SNEEZE::STORAGE::UNIT::DeleteLog ()
 {
    std::string sLogPath = m_sJsonPath + ".log";
    std::error_code ec;
@@ -370,7 +368,7 @@ void STORAGE::UNIT::DeleteLog ()
 // Lifecycle
 // ---------------------------------------------------------------------------
 
-void STORAGE::UNIT::Load ()
+void SNEEZE::STORAGE::UNIT::Load ()
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -406,7 +404,7 @@ void STORAGE::UNIT::Load ()
       Save ();
 }
 
-void STORAGE::UNIT::Save ()
+void SNEEZE::STORAGE::UNIT::Save ()
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -437,7 +435,7 @@ void STORAGE::UNIT::Save ()
    m_bDirty = false;
 }
 
-void STORAGE::UNIT::Evict ()
+void SNEEZE::STORAGE::UNIT::Evict ()
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -452,13 +450,13 @@ void STORAGE::UNIT::Evict ()
 // Meta sidecar
 // ---------------------------------------------------------------------------
 
-void STORAGE::UNIT::TouchAccess ()
+void SNEEZE::STORAGE::UNIT::TouchAccess ()
 {
    m_sLastAccessedAt = NowIso8601 ();
    m_nAccessCount++;
 }
 
-void STORAGE::UNIT::SaveMeta (std::shared_ptr<CONTAINER::NAME> pName)
+void SNEEZE::STORAGE::UNIT::SaveMeta (std::shared_ptr<som::CONTAINER::NAME> pName)
 {
    std::string sMetaPath = m_sJsonPath + ".meta";
    std::filesystem::create_directories (std::filesystem::path (sMetaPath).parent_path ());
@@ -493,7 +491,7 @@ void STORAGE::UNIT::SaveMeta (std::shared_ptr<CONTAINER::NAME> pName)
    }
 }
 
-void STORAGE::UNIT::LoadMeta ()
+void SNEEZE::STORAGE::UNIT::LoadMeta ()
 {
    std::string sMetaPath = m_sJsonPath + ".meta";
 
@@ -512,4 +510,3 @@ void STORAGE::UNIT::LoadMeta ()
    catch (...) {}
 }
 
-} // namespace SNEEZE

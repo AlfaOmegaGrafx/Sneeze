@@ -19,7 +19,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace SNEEZE { namespace renderer {
+namespace renderer {
 
 struct SPHERE_DATA
 {
@@ -91,6 +91,6 @@ public:
    virtual double GetLastRenderSeconds () const { return 0.0; }
 };
 
-}} // namespace SNEEZE::renderer
+} // namespace renderer
 
 #endif // SNEEZE_RENDERER_RENDERER_H

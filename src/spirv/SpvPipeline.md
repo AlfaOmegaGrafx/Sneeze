@@ -8,7 +8,7 @@ are dispatched to the GPU compute pipeline.
 ```cpp
 #include "spirv/SpvPipeline.h"
 
-SNEEZE::spirv::SPV_PIPELINE pipeline;
+spirv::SPV_PIPELINE pipeline;
 pipeline.Initialize ();
 
 std::vector<uint32_t> aBinary;

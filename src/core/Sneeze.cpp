@@ -38,7 +38,6 @@
 #ifdef SNEEZE_HAS_XR
 #include "xr/XrRuntime.h"
 #endif
-#include "net/HttpClient.h"
 #include "ui/UiContext.h"
 #include <chrono>
 #include <cstdio>
@@ -51,7 +50,6 @@
 #pragma comment (lib, "winmm.lib")
 #endif
 
-namespace SNEEZE { namespace CORE {
 
 // ---------------------------------------------------------------------------
 // Worker configuration table
@@ -59,20 +57,20 @@ namespace SNEEZE { namespace CORE {
 
 struct WORKER_CONFIG
 {
-   int                                    nHertz;
-   std::function<WORKER* (SNEEZE*)>       Create;
+   int                                             nHertz;
+   std::function<SNEEZE::WORKER* (SNEEZE*)>        Create;
 };
 
 static const std::vector<WORKER_CONFIG> aWorkerConfig =
 {
-   {   0, [] (SNEEZE* p) -> WORKER* { return new WORKER_COMPOSITOR (p); } },
-   {   1, [] (SNEEZE* p) -> WORKER* { return new WORKER_B          (p); } },
-   {  30, [] (SNEEZE* p) -> WORKER* { return new WORKER_C          (p); } },
-   {  60, [] (SNEEZE* p) -> WORKER* { return new WORKER_D          (p); } },
-   {  64, [] (SNEEZE* p) -> WORKER* { return new WORKER_E          (p); } },
-   {  90, [] (SNEEZE* p) -> WORKER* { return new WORKER_F          (p); } },
-   { 120, [] (SNEEZE* p) -> WORKER* { return new WORKER_G          (p); } },
-   { 144, [] (SNEEZE* p) -> WORKER* { return new WORKER_H          (p); } },
+   {   0, [] (SNEEZE* p) -> SNEEZE::WORKER* { return new WORKER_COMPOSITOR (p); } },
+   {   1, [] (SNEEZE* p) -> SNEEZE::WORKER* { return new WORKER_B          (p); } },
+   {  30, [] (SNEEZE* p) -> SNEEZE::WORKER* { return new WORKER_C          (p); } },
+   {  60, [] (SNEEZE* p) -> SNEEZE::WORKER* { return new WORKER_D          (p); } },
+   {  64, [] (SNEEZE* p) -> SNEEZE::WORKER* { return new WORKER_E          (p); } },
+   {  90, [] (SNEEZE* p) -> SNEEZE::WORKER* { return new WORKER_F          (p); } },
+   { 120, [] (SNEEZE* p) -> SNEEZE::WORKER* { return new WORKER_G          (p); } },
+   { 144, [] (SNEEZE* p) -> SNEEZE::WORKER* { return new WORKER_H          (p); } },
 };
 
 // ---------------------------------------------------------------------------
@@ -84,7 +82,6 @@ static spirv::SPV_PIPELINE  s_pSpvPipeline;
 #ifdef SNEEZE_HAS_XR
 static xr::XR_RUNTIME       s_pXrRuntime;
 #endif
-static net::HTTP_CLIENT     s_pHttpClient;
 static ui::UI_CONTEXT       s_pUiContext;
 
 // ---------------------------------------------------------------------------
@@ -140,10 +137,8 @@ bool SNEEZE::Initialize ()
          if (s_pXrRuntime.Initialize (this))
          {
 #endif
-            if (s_pHttpClient.Initialize (this))
+            if (s_pUiContext.Initialize (this))
             {
-               if (s_pUiContext.Initialize (this))
-               {
                   // --- Create SOM fabric structure ---
                   //
                   // root fabric -> root fabric root node -> primary attach node
@@ -248,15 +243,10 @@ bool SNEEZE::Initialize ()
                      m_anWorkerSignalCount.clear ();
                   }
 
-                  if (!bResult)
-                     s_pUiContext.Shutdown ();
-               }
-               else Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize UI context");
-
                if (!bResult)
-                  s_pHttpClient.Shutdown ();
+                  s_pUiContext.Shutdown ();
             }
-            else Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize HTTP client");
+            else Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize UI context");
 
 #ifdef SNEEZE_HAS_XR
             if (!bResult)
@@ -352,7 +342,6 @@ void SNEEZE::Shutdown ()
    }
 
    s_pUiContext.Shutdown ();
-   s_pHttpClient.Shutdown ();
 #ifdef SNEEZE_HAS_XR
    s_pXrRuntime.Shutdown ();
 #endif
@@ -385,10 +374,10 @@ void SNEEZE::SetKeyInput (bool bKeySpace, bool bKeyPlus, bool bKeyMinus)
    m_pInput.bKeyMinus = bKeyMinus;
 }
 
-SNEEZE_INPUT SNEEZE::ConsumeInput ()
+SNEEZE::INPUT SNEEZE::ConsumeInput ()
 {
    std::lock_guard<std::mutex> guard (m_inputMutex);
-   SNEEZE_INPUT pCopy = m_pInput;
+   INPUT pCopy = m_pInput;
    m_pInput.nMouseDX = 0;
    m_pInput.nMouseDY = 0;
    m_pInput.dScrollY = 0.0f;
@@ -475,45 +464,40 @@ std::vector<void*>& SNEEZE::GetBodies ()
    return aBodies;
 }
 
-net::HTTP_CLIENT* SNEEZE::GetHttpClient () const
-{
-   return &s_pHttpClient;
-}
-
-void SNEEZE::OnNetworkFileCreated (NETWORK::FILE* pFile)
+void SNEEZE::OnNetworkFileCreated (NOTIFICATION* pNotification)
 {
    if (m_pHost)
-      m_pHost->OnNetworkFileCreated (pFile);
+      m_pHost->OnNetworkFileCreated (pNotification);
 }
 
-void SNEEZE::OnNetworkFileChanged (NETWORK::FILE* pFile)
+void SNEEZE::OnNetworkFileChanged (NOTIFICATION* pNotification)
 {
    if (m_pHost)
-      m_pHost->OnNetworkFileChanged (pFile);
+      m_pHost->OnNetworkFileChanged (pNotification);
 }
 
-void SNEEZE::OnNetworkFileDeleted (NETWORK::FILE* pFile)
+void SNEEZE::OnNetworkFileDeleted (NOTIFICATION* pNotification)
 {
    if (m_pHost)
-      m_pHost->OnNetworkFileDeleted (pFile);
+      m_pHost->OnNetworkFileDeleted (pNotification);
 }
 
-void SNEEZE::OnStorageUnitCreated (STORAGE::ASSET* pAsset)
+void SNEEZE::OnStorageUnitCreated (NOTIFICATION* pNotification)
 {
    if (m_pHost)
-      m_pHost->OnStorageUnitCreated (pAsset);
+      m_pHost->OnStorageUnitCreated (pNotification);
 }
 
-void SNEEZE::OnStorageUnitChanged (STORAGE::ASSET* pAsset)
+void SNEEZE::OnStorageUnitChanged (NOTIFICATION* pNotification)
 {
    if (m_pHost)
-      m_pHost->OnStorageUnitChanged (pAsset);
+      m_pHost->OnStorageUnitChanged (pNotification);
 }
 
-void SNEEZE::OnStorageUnitDeleted (STORAGE::ASSET* pAsset)
+void SNEEZE::OnStorageUnitDeleted (NOTIFICATION* pNotification)
 {
    if (m_pHost)
-      m_pHost->OnStorageUnitDeleted (pAsset);
+      m_pHost->OnStorageUnitDeleted (pNotification);
 }
 
 // ---------------------------------------------------------------------------
@@ -661,5 +645,3 @@ void SNEEZE::EngineThreadLoop ()
    timeEndPeriod (1);
 #endif
 }
-
-}} // namespace SNEEZE::CORE

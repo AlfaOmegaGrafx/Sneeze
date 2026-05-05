@@ -17,7 +17,7 @@
 #include "RMCObject.h"
 #include "Orbit.h"
 
-namespace SNEEZE { namespace astro {
+namespace astro {
 
 // ---------------------------------------------------------------------------
 // CELESTIAL_MAP_OBJECT
@@ -33,7 +33,7 @@ CELESTIAL_MAP_OBJECT::CELESTIAL_MAP_OBJECT () :
 // ASTRO_SERVICE
 // ---------------------------------------------------------------------------
 
-ASTRO_SERVICE::ASTRO_SERVICE (CORE::SNEEZE* pSneeze) :
+ASTRO_SERVICE::ASTRO_SERVICE (SNEEZE* pSneeze) :
    m_pSneeze (pSneeze),
    m_pFabric (nullptr)
 {
@@ -52,13 +52,13 @@ ASTRO_SERVICE::~ASTRO_SERVICE ()
 // The sun gets a standalone node with no orbit.
 // ---------------------------------------------------------------------------
 
-bool ASTRO_SERVICE::Initialize (SNEEZE::som::FABRIC* pPrimaryFabric)
+bool ASTRO_SERVICE::Initialize (som::FABRIC* pPrimaryFabric)
 {
    m_pFabric = pPrimaryFabric;
    if (!m_pFabric  ||  !m_pFabric->GetRootNode ())
       return false;
 
-   SNEEZE::som::NODE* pRoot = m_pFabric->GetRootNode ();
+   som::NODE* pRoot = m_pFabric->GetRootNode ();
 
    // --- Sun node (no orbit, sits at origin) ---
    {
@@ -74,7 +74,7 @@ bool ASTRO_SERVICE::Initialize (SNEEZE::som::FABRIC* pPrimaryFabric)
       pMapObj->m_pOrbit      = nullptr;
       pMapObj->m_sTextureUrl = pSun ? pSun->sTexture : "";
 
-      auto* pNode = new SNEEZE::som::NODE (m_pFabric);
+      auto* pNode = new som::NODE (m_pFabric);
       pNode->SetMapObject (pMapObj);
       pRoot->AddChild (pNode);
 
@@ -120,7 +120,7 @@ bool ASTRO_SERVICE::Initialize (SNEEZE::som::FABRIC* pPrimaryFabric)
       pMapObj->m_pOrbit      = pBody->pOrbit.get ();
       pMapObj->m_sTextureUrl = sTexture;
 
-      auto* pNode = new SNEEZE::som::NODE (m_pFabric);
+      auto* pNode = new som::NODE (m_pFabric);
       pNode->SetMapObject (pMapObj);
       pRoot->AddChild (pNode);
 
@@ -128,7 +128,7 @@ bool ASTRO_SERVICE::Initialize (SNEEZE::som::FABRIC* pPrimaryFabric)
       m_apMapObjects.push_back (pMapObj);
    }
 
-   m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "ASTRO_SERVICE",
+   m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Info, "ASTRO_SERVICE",
       "Populated " + std::to_string (static_cast<int> (m_apNodes.size ())) + " SOM nodes");
 
    return true;
@@ -147,4 +147,4 @@ void ASTRO_SERVICE::Shutdown ()
    m_pFabric = nullptr;
 }
 
-}} // namespace SNEEZE::astro
+} // namespace astro

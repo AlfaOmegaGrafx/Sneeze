@@ -20,9 +20,7 @@
 #include "view/CameraOrbit.h"
 #include <chrono>
 
-namespace SNEEZE { namespace CORE {
-
-class WORKER_COMPOSITOR : public WORKER
+class WORKER_COMPOSITOR : public SNEEZE::WORKER
 {
 public:
    explicit WORKER_COMPOSITOR (SNEEZE* pSneeze);
@@ -51,7 +49,5 @@ private:
    double m_dAccumPublish;
    double m_dAccumFlush;
 };
-
-}} // namespace SNEEZE::CORE
 
 #endif // SNEEZE_CORE_WORKERCOMPOSITOR_H

@@ -17,7 +17,7 @@
 
 #include <string>
 
-namespace SNEEZE {
+namespace som {
 
 // ---------------------------------------------------------------------------
 // CONTAINER — the runtime manifestation of an MSF file.
@@ -58,6 +58,6 @@ public:
    };
 };
 
-} // namespace SNEEZE
+} // namespace som
 
 #endif // SNEEZE_CONTAINER_H

@@ -18,7 +18,7 @@
 #include <atomic>
 #include <cstdint>
 
-namespace SNEEZE { namespace som {
+namespace som {
 
 // ---------------------------------------------------------------------------
 // Map object type identifiers
@@ -85,6 +85,6 @@ private:
    std::atomic<uint32_t> m_nSequence;
 };
 
-}} // namespace SNEEZE::som
+} // namespace som
 
 #endif // SNEEZE_SOM_TYPES_H

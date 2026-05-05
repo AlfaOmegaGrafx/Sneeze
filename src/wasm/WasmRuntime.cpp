@@ -16,7 +16,7 @@
 #include "core/Sneeze.h"
 #include <cstdio>
 
-namespace SNEEZE { namespace wasm {
+namespace wasm {
 
 WASM_RUNTIME::WASM_RUNTIME ()
    : m_pSneeze (nullptr)
@@ -29,19 +29,19 @@ WASM_RUNTIME::~WASM_RUNTIME ()
    Shutdown ();
 }
 
-bool WASM_RUNTIME::Initialize (CORE::SNEEZE* pSneeze)
+bool WASM_RUNTIME::Initialize (SNEEZE* pSneeze)
 {
    m_pSneeze = pSneeze;
 
    m_pEngine = wasm_engine_new ();
    if (!m_pEngine)
    {
-      m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Error, "WASM_RUNTIME",
+      m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Error, "WASM_RUNTIME",
          "Failed to create Wasmtime engine");
       return false;
    }
 
-   m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "WASM_RUNTIME",
+   m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Info, "WASM_RUNTIME",
       "Wasmtime " + std::string (WASMTIME_VERSION) + " initialized");
    return true;
 }
@@ -75,7 +75,7 @@ WASM_STORE* WASM_RUNTIME::FindOrCreateStore (const STORE_IDENTITY& pIdentity)
    WASM_STORE* pRaw = pStore.get ();
    m_mapStores[sKey] = std::move (pStore);
 
-   m_pSneeze->Log (CORE::ISNEEZE::kLOGLEVEL_Info, "WASM_RUNTIME",
+   m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Info, "WASM_RUNTIME",
       "Created store [" + pIdentity.sFingerprint + "|" + pIdentity.sContainer + "]");
 
    return pRaw;
@@ -107,4 +107,4 @@ void WASM_RUNTIME::DestroyAllStores ()
    m_mapStores.clear ();
 }
 
-}} // namespace SNEEZE::wasm
+} // namespace wasm

@@ -20,7 +20,7 @@
 #include <mutex>
 #include <functional>
 
-namespace SNEEZE { namespace som {
+namespace som {
 
 class NODE;
 
@@ -102,6 +102,6 @@ private:
    mutable std::mutex  m_mutex;
 };
 
-}} // namespace SNEEZE::som
+} // namespace som
 
 #endif // SNEEZE_SOM_EVENTS_H

@@ -18,10 +18,8 @@
 #include <openxr/openxr.h>
 #include <string>
 
-namespace SNEEZE { namespace CORE { class SNEEZE; }}
+class SNEEZE;
 
-namespace SNEEZE
-{
 namespace xr
 {
 
@@ -31,20 +29,19 @@ public:
    XR_RUNTIME ();
    ~XR_RUNTIME ();
 
-   bool Initialize (CORE::SNEEZE* pSneeze);
+   bool Initialize (SNEEZE* pSneeze);
    void Shutdown ();
 
    bool        HasRuntime () const;
    std::string GetRuntimeName () const;
 
 private:
-   CORE::SNEEZE* m_pSneeze;
+   SNEEZE* m_pSneeze;
    XrInstance  hInstance;
    bool        bHasRuntime;
    std::string sRuntimeName;
 };
 
 } // namespace xr
-} // namespace SNEEZE
 
 #endif // SNEEZE_XR_RUNTIME_H

@@ -20,9 +20,9 @@
 #include "scene/MapObject.h"
 #include <vector>
 
-namespace SNEEZE { namespace CORE { class SNEEZE; }}
+class SNEEZE;
 
-namespace SNEEZE { namespace astro {
+namespace astro {
 
 class RMCOBJECT;
 class ORBIT;
@@ -33,7 +33,7 @@ class ORBIT;
 // disposable astro proof-of-concept and the SOM.
 // ---------------------------------------------------------------------------
 
-class CELESTIAL_MAP_OBJECT : public SNEEZE::som::MAP_OBJECT_CELESTIAL
+class CELESTIAL_MAP_OBJECT : public som::MAP_OBJECT_CELESTIAL
 {
 public:
    CELESTIAL_MAP_OBJECT ();
@@ -53,19 +53,19 @@ public:
 class ASTRO_SERVICE
 {
 public:
-   explicit ASTRO_SERVICE (CORE::SNEEZE* pSneeze);
+   explicit ASTRO_SERVICE (SNEEZE* pSneeze);
    ~ASTRO_SERVICE ();
 
-   bool Initialize (SNEEZE::som::FABRIC* pPrimaryFabric);
+   bool Initialize (som::FABRIC* pPrimaryFabric);
    void Shutdown ();
 
 private:
-   CORE::SNEEZE*                           m_pSneeze;
-   SNEEZE::som::FABRIC*                    m_pFabric;
-   std::vector<SNEEZE::som::NODE*>         m_apNodes;
+   SNEEZE*                           m_pSneeze;
+   som::FABRIC*                    m_pFabric;
+   std::vector<som::NODE*>         m_apNodes;
    std::vector<CELESTIAL_MAP_OBJECT*>      m_apMapObjects;
 };
 
-}} // namespace SNEEZE::astro
+} // namespace astro
 
 #endif // SNEEZE_ASTRO_ASTROSERVICE_H

@@ -23,7 +23,7 @@
 #include <unordered_map>
 #include <cstdint>
 
-namespace SNEEZE { namespace som {
+namespace som {
 
 class FABRIC;
 class MAP_OBJECT;
@@ -45,7 +45,7 @@ class MAP_OBJECT;
 // requests the texture from the network and decodes it on completion.
 // ---------------------------------------------------------------------------
 
-class NODE : public NETWORK::IFILE
+class NODE : public SNEEZE::NETWORK::IFILE
 {
 public:
    explicit NODE (FABRIC* pFabric);
@@ -93,10 +93,10 @@ public:
 
    SEQLOCK& GetSeqlock () { return m_pSeqlock; }
 
-   // --- NETWORK::IFILE ---
+   // --- SNEEZE::NETWORK::IFILE ---
 
-   void OnFileReady  (NETWORK::FILE* pFile) override;
-   void OnFileFailed (NETWORK::FILE* pFile) override;
+   void OnFileReady  (SNEEZE::NETWORK::FILE* pFile) override;
+   void OnFileFailed (SNEEZE::NETWORK::FILE* pFile) override;
 
 private:
    void RequestTexture ();
@@ -118,9 +118,9 @@ private:
 
    SEQLOCK              m_pSeqlock;
 
-   NETWORK::FILE*         m_pFile;
+   SNEEZE::NETWORK::FILE*         m_pFile;
 };
 
-}} // namespace SNEEZE::som
+} // namespace som
 
 #endif // SNEEZE_SOM_NODE_H

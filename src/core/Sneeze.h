@@ -23,87 +23,85 @@
 #include <filesystem>
 #include <cstdint>
 
-namespace SNEEZE { namespace som { class FABRIC; class NODE; class SCENE; }}
-namespace SNEEZE { namespace astro { class ASTRO_SERVICE; }}
-#include "network/Network.h"
-#include "storage/Storage.h"
-namespace SNEEZE { namespace persona { class PERSONA; }}
-namespace SNEEZE { namespace net { class HTTP_CLIENT; }}
-
-namespace SNEEZE { namespace CORE {
-
-class WORKER;
-
-// ---------------------------------------------------------------------------
-// ISNEEZE — interface between the host application and the engine.
-//
-// The host application creates a concrete subclass (e.g. SNEEZE_HOST),
-// populates the public configuration members, and passes it to the SNEEZE
-// constructor. Sneeze reads configuration from these members during
-// Initialize() and dispatches callbacks through the virtual methods.
-// ---------------------------------------------------------------------------
-
-class SNEEZE;
-class ISNEEZE
-{
-public:
-   enum eLOGLEVEL
-   {
-      kLOGLEVEL_Trace,
-      kLOGLEVEL_Info,
-      kLOGLEVEL_Warning,
-      kLOGLEVEL_Error
-   };
-
-   virtual ~ISNEEZE () = default;
-
-   // --- Configuration (set by host before Initialize) ---
-
-   std::string sAppDataPath;
-   std::string sSessionPath;
-   std::string sRenderer;
-
-   std::string SessionPath () const { return (std::filesystem::path (sAppDataPath) / sSessionPath).string (); }
-   void*       pNativeWindow  = nullptr;
-   int         nWidth         = 0;
-   int         nHeight        = 0;
-
-   // --- Callbacks (host must implement) ---
-
-   virtual void OnFrameReady (const uint32_t* pFB, int nFbW, int nFbH) = 0;
-   virtual void Log (eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage) = 0;
-
-   virtual void OnNetworkFileCreated (NETWORK::FILE* pFile) { (void)pFile; }
-   virtual void OnNetworkFileChanged (NETWORK::FILE* pFile) { (void)pFile; }
-   virtual void OnNetworkFileDeleted (NETWORK::FILE* pFile) { (void)pFile; }
-
-   virtual void OnStorageUnitCreated (STORAGE::ASSET* pAsset) { (void)pAsset; }
-   virtual void OnStorageUnitChanged (STORAGE::ASSET* pAsset) { (void)pAsset; }
-   virtual void OnStorageUnitDeleted (STORAGE::ASSET* pAsset) { (void)pAsset; }
-};
-
-// ---------------------------------------------------------------------------
-// Input state written by the application, consumed by workers
-// ---------------------------------------------------------------------------
-
-struct SNEEZE_INPUT
-{
-   int   nMouseDX    = 0;
-   int   nMouseDY    = 0;
-   float dScrollY    = 0.0f;
-   bool  bMouseLeft  = false;
-   bool  bMouseRight = false;
-
-   bool  bKeySpace   = false;
-   bool  bKeyPlus    = false;
-   bool  bKeyMinus   = false;
-};
+namespace som { class FABRIC; class NODE; class SCENE; }
+namespace astro { class ASTRO_SERVICE; }
+namespace persona { class PERSONA; }
 
 // ---------------------------------------------------------------------------
 
 class SNEEZE
 {
 public:
+
+   // --- Base class for notification targets ---
+
+   class NOTIFICATION { public: virtual ~NOTIFICATION () = default; };
+
+   // --- Nested subsystem forward declarations ---
+
+   class NETWORK;
+   class STORAGE;
+   class WORKER;
+
+   // ------------------------------------------------------------------------
+   // ISNEEZE — interface between the host application and the engine.
+   // ------------------------------------------------------------------------
+
+   class ISNEEZE
+   {
+   public:
+      enum eLOGLEVEL
+      {
+         kLOGLEVEL_Trace,
+         kLOGLEVEL_Info,
+         kLOGLEVEL_Warning,
+         kLOGLEVEL_Error
+      };
+
+      virtual ~ISNEEZE () = default;
+
+      // --- Configuration (set by host before Initialize) ---
+
+      std::string sAppDataPath;
+      std::string sSessionPath;
+      std::string sRenderer;
+
+      std::string SessionPath () const { return (std::filesystem::path (sAppDataPath) / sSessionPath).string (); }
+      void*       pNativeWindow  = nullptr;
+      int         nWidth         = 0;
+      int         nHeight        = 0;
+
+      // --- Callbacks (host must implement) ---
+
+      virtual void OnFrameReady (const uint32_t* pFB, int nFbW, int nFbH) = 0;
+      virtual void Log (eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage) = 0;
+
+      virtual void OnNetworkFileCreated (NOTIFICATION* pNotification) { (void)pNotification; }
+      virtual void OnNetworkFileChanged (NOTIFICATION* pNotification) { (void)pNotification; }
+      virtual void OnNetworkFileDeleted (NOTIFICATION* pNotification) { (void)pNotification; }
+
+      virtual void OnStorageUnitCreated (NOTIFICATION* pNotification) { (void)pNotification; }
+      virtual void OnStorageUnitChanged (NOTIFICATION* pNotification) { (void)pNotification; }
+      virtual void OnStorageUnitDeleted (NOTIFICATION* pNotification) { (void)pNotification; }
+   };
+
+   // ------------------------------------------------------------------------
+
+   struct INPUT
+   {
+      int   nMouseDX    = 0;
+      int   nMouseDY    = 0;
+      float dScrollY    = 0.0f;
+      bool  bMouseLeft  = false;
+      bool  bMouseRight = false;
+
+      bool  bKeySpace   = false;
+      bool  bKeyPlus    = false;
+      bool  bKeyMinus   = false;
+   };
+
+   // ------------------------------------------------------------------------
+
    explicit SNEEZE (ISNEEZE* pHost);
    ~SNEEZE ();
 
@@ -138,7 +136,7 @@ public:
    // --- Shared state accessed by workers ---
 
    void                     Log (ISNEEZE::eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage);
-   SNEEZE_INPUT             ConsumeInput ();
+   INPUT                    ConsumeInput ();
    void                     WriteFrameBuffer (const uint32_t* pPixels, int nWidth, int nHeight);
    std::vector<void*>&      GetBodies ();
 
@@ -157,17 +155,16 @@ public:
    // --- Subsystems ---
 
    NETWORK*                 Network () const { return m_pNetwork; }
-   STORAGE*         GetStorage () const { return m_pStorage; }
+   STORAGE*                 GetStorage () const { return m_pStorage; }
    persona::PERSONA*        GetPersona () const { return m_pPersona; }
-   net::HTTP_CLIENT*        GetHttpClient () const;
 
-   void OnNetworkFileCreated (NETWORK::FILE* pFile);
-   void OnNetworkFileChanged (NETWORK::FILE* pFile);
-   void OnNetworkFileDeleted (NETWORK::FILE* pFile);
+   void OnNetworkFileCreated (NOTIFICATION* pNotification);
+   void OnNetworkFileChanged (NOTIFICATION* pNotification);
+   void OnNetworkFileDeleted (NOTIFICATION* pNotification);
 
-   void OnStorageUnitCreated (STORAGE::ASSET* pAsset);
-   void OnStorageUnitChanged (STORAGE::ASSET* pAsset);
-   void OnStorageUnitDeleted (STORAGE::ASSET* pAsset);
+   void OnStorageUnitCreated (NOTIFICATION* pNotification);
+   void OnStorageUnitChanged (NOTIFICATION* pNotification);
+   void OnStorageUnitDeleted (NOTIFICATION* pNotification);
 
 private:
    void EngineThreadLoop ();
@@ -189,7 +186,7 @@ private:
 
    // Input
    std::mutex               m_inputMutex;
-   SNEEZE_INPUT             m_pInput;
+   INPUT                    m_pInput;
 
    // Framebuffer
    std::mutex               m_fbMutex;
@@ -218,10 +215,8 @@ private:
 
    // Subsystems
    NETWORK*                 m_pNetwork;
-   STORAGE*               m_pStorage;
+   STORAGE*                 m_pStorage;
    persona::PERSONA*        m_pPersona;
 };
-
-}} // namespace SNEEZE::CORE
 
 #endif // SNEEZE_CORE_SNEEZE_H

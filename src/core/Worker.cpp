@@ -15,9 +15,7 @@
 #include "Worker.h"
 #include <cstdio>
 
-namespace SNEEZE { namespace CORE {
-
-WORKER::WORKER (SNEEZE* pSneeze)
+SNEEZE::WORKER::WORKER (SNEEZE* pSneeze)
    : m_pSneeze (pSneeze)
    , m_pThread (nullptr)
    , m_bShutdown (false)
@@ -28,19 +26,19 @@ WORKER::WORKER (SNEEZE* pSneeze)
 {
 }
 
-void WORKER::SetWorkerIndex (int nIndex)
+void SNEEZE::WORKER::SetWorkerIndex (int nIndex)
 {
    m_nWorkerIndex = nIndex;
 }
 
-WORKER::~WORKER ()
+SNEEZE::WORKER::~WORKER ()
 {
    Shutdown ();
 }
 
-bool WORKER::Initialize ()
+bool SNEEZE::WORKER::Initialize ()
 {
-   m_pThread = new std::thread (&WORKER::ThreadLoop, this);
+   m_pThread = new std::thread (&SNEEZE::WORKER::ThreadLoop, this);
 
    std::unique_lock<std::mutex> lock (m_mutex);
    m_condVar.wait (lock, [this] { return m_bReady; });
@@ -48,7 +46,7 @@ bool WORKER::Initialize ()
    return true;
 }
 
-void WORKER::Shutdown ()
+void SNEEZE::WORKER::Shutdown ()
 {
    if (m_pThread)
    {
@@ -64,22 +62,22 @@ void WORKER::Shutdown ()
    }
 }
 
-void WORKER::Signal ()
+void SNEEZE::WORKER::Signal ()
 {
    CtlBreak_Thread ();
 }
 
-void WORKER::ThreadLoop ()
+void SNEEZE::WORKER::ThreadLoop ()
 {
    m_tpOrigin = std::chrono::steady_clock::now ();
 
    SignalReady ();
 
    std::unique_lock<std::mutex> mlock (m_mutex);
-   m_condVar.wait (mlock, std::bind (&WORKER::Control, this));
+   m_condVar.wait (mlock, std::bind (&SNEEZE::WORKER::Control, this));
 }
 
-void WORKER::SignalReady ()
+void SNEEZE::WORKER::SignalReady ()
 {
    {
       std::lock_guard<std::mutex> guard (m_mutex);
@@ -88,12 +86,12 @@ void WORKER::SignalReady ()
    m_condVar.notify_all ();
 }
 
-bool WORKER::IsShutdown () const
+bool SNEEZE::WORKER::IsShutdown () const
 {
    return m_bShutdown;
 }
 
-bool WORKER::Control ()
+bool SNEEZE::WORKER::Control ()
 {
    if (m_bShutdown == false)
    {
@@ -116,10 +114,8 @@ bool WORKER::Control ()
    return m_bShutdown;
 }
 
-void WORKER::CtlBreak_Thread ()
+void SNEEZE::WORKER::CtlBreak_Thread ()
 {
    std::lock_guard<std::mutex> guard (m_mutex);
    m_condVar.notify_all ();
 }
-
-}} // namespace SNEEZE::CORE

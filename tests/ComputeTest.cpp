@@ -42,7 +42,7 @@ static void TestEmbeddedKernelRetrieval ()
 {
    std::printf ("\n--- Embedded kernel retrieval ---\n");
 
-   auto pKernel = SNEEZE::compute::GetEmbeddedKernel ("TEST_PROXIMITY");
+   auto pKernel = compute::GetEmbeddedKernel ("TEST_PROXIMITY");
    Check (pKernel.pBytes != nullptr, "Kernel pointer is non-null");
    Check (pKernel.nSize > 0, "Kernel size is non-zero");
 
@@ -63,7 +63,7 @@ static void TestUnknownKernel ()
 {
    std::printf ("\n--- Unknown kernel lookup ---\n");
 
-   auto pKernel = SNEEZE::compute::GetEmbeddedKernel ("DOES_NOT_EXIST");
+   auto pKernel = compute::GetEmbeddedKernel ("DOES_NOT_EXIST");
    Check (pKernel.pBytes == nullptr, "Unknown kernel returns null pointer");
    Check (pKernel.nSize == 0, "Unknown kernel returns zero size");
 }
@@ -72,8 +72,8 @@ static void TestMultipleRetrievals ()
 {
    std::printf ("\n--- Multiple retrievals return same data ---\n");
 
-   auto pKernel1 = SNEEZE::compute::GetEmbeddedKernel ("TEST_PROXIMITY");
-   auto pKernel2 = SNEEZE::compute::GetEmbeddedKernel ("TEST_PROXIMITY");
+   auto pKernel1 = compute::GetEmbeddedKernel ("TEST_PROXIMITY");
+   auto pKernel2 = compute::GetEmbeddedKernel ("TEST_PROXIMITY");
    Check (pKernel1.pBytes == pKernel2.pBytes, "Same pointer on repeated retrieval");
    Check (pKernel1.nSize == pKernel2.nSize, "Same size on repeated retrieval");
 }
@@ -82,7 +82,7 @@ static void TestSpvStructure ()
 {
    std::printf ("\n--- SPIR-V structure validation ---\n");
 
-   auto pKernel = SNEEZE::compute::GetEmbeddedKernel ("TEST_PROXIMITY");
+   auto pKernel = compute::GetEmbeddedKernel ("TEST_PROXIMITY");
    if (!pKernel.pBytes  ||  pKernel.nSize < 20)
    {
       Check (false, "Kernel too small for SPIR-V header");
@@ -109,7 +109,7 @@ static void TestDispatchConstruction ()
 {
    std::printf ("\n--- Compute dispatch construction ---\n");
 
-   SNEEZE::compute::COMPUTE_DISPATCH pDispatch;
+   compute::COMPUTE_DISPATCH pDispatch;
 
    // With Vox wired in, native compute availability is a property of
    // the host machine (GPU drivers present). We can't assert either way
@@ -124,7 +124,7 @@ static void TestProximityDispatch ()
 {
    std::printf ("\n--- Proximity kernel dispatch (CPU fallback) ---\n");
 
-   SNEEZE::compute::COMPUTE_DISPATCH pDispatch (nullptr);
+   compute::COMPUTE_DISPATCH pDispatch (nullptr);
 
    float aPositions[] = {
       3.0f, 0.0f, 0.0f, 1.0f,
@@ -135,7 +135,7 @@ static void TestProximityDispatch ()
 
    float aDistances[4] = { -1.0f, -1.0f, -1.0f, -1.0f };
 
-   SNEEZE::compute::BUFFER_BINDING aBindings[2];
+   compute::BUFFER_BINDING aBindings[2];
    aBindings[0] = { 0, aPositions, sizeof (aPositions), true };
    aBindings[1] = { 1, aDistances, sizeof (aDistances), false };
 
@@ -164,7 +164,7 @@ static void TestNonOriginQuery ()
 {
    std::printf ("\n--- Proximity dispatch with non-origin query point ---\n");
 
-   SNEEZE::compute::COMPUTE_DISPATCH pDispatch (nullptr);
+   compute::COMPUTE_DISPATCH pDispatch (nullptr);
 
    float aPositions[] = {
       10.0f, 0.0f, 0.0f, 1.0f,
@@ -173,7 +173,7 @@ static void TestNonOriginQuery ()
 
    float aDistances[2] = { -1.0f, -1.0f };
 
-   SNEEZE::compute::BUFFER_BINDING aBindings[2];
+   compute::BUFFER_BINDING aBindings[2];
    aBindings[0] = { 0, aPositions, sizeof (aPositions), true };
    aBindings[1] = { 1, aDistances, sizeof (aDistances), false };
 
@@ -195,7 +195,7 @@ static void TestUnknownKernelDispatch ()
 {
    std::printf ("\n--- Unknown kernel dispatch ---\n");
 
-   SNEEZE::compute::COMPUTE_DISPATCH pDispatch (nullptr);
+   compute::COMPUTE_DISPATCH pDispatch (nullptr);
 
    bool bResult = pDispatch.Dispatch ("NONEXISTENT_KERNEL", 1, 1, 1, nullptr, 0, nullptr, 0);
    Check (!bResult, "Dispatch of unknown kernel returns false");

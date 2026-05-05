@@ -22,7 +22,7 @@
 #include <mutex>
 #include <atomic>
 
-namespace SNEEZE { namespace som {
+namespace som {
 
 // ---------------------------------------------------------------------------
 // MAP_OBJECT — base class for all 3D objects referenced by SOM::NODEs.
@@ -98,6 +98,6 @@ public:
    MAP_OBJECT_PHYSICAL () : MAP_OBJECT (MAP_OBJECT_TYPE_PHYSICAL) {}
 };
 
-}} // namespace SNEEZE::som
+} // namespace som
 
 #endif // SNEEZE_SOM_MAPOBJECT_H

@@ -18,8 +18,6 @@
 #include <cstdint>
 #include <cstddef>
 
-namespace SNEEZE
-{
 namespace compute
 {
 
@@ -32,6 +30,5 @@ struct KERNEL_DATA
 KERNEL_DATA GetEmbeddedKernel (const char* szName);
 
 } // namespace compute
-} // namespace SNEEZE
 
 #endif // SNEEZE_COMPUTE_EMBEDDED_KERNELS_H

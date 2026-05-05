@@ -16,13 +16,11 @@
 #include "core/Sneeze.h"
 
 
-namespace SNEEZE {
-
 // ===========================================================================
 // STORAGE::ASSET
 // ===========================================================================
 
-STORAGE::ASSET::ASSET (STORAGE* pStorage, std::shared_ptr<CONTAINER::NAME> pName) :
+SNEEZE::STORAGE::ASSET::ASSET (STORAGE* pStorage, std::shared_ptr<som::CONTAINER::NAME> pName) :
    m_pStorage      (pStorage),
    m_pName         (std::move (pName)),
    m_nRefCount     (0),
@@ -32,14 +30,14 @@ STORAGE::ASSET::ASSET (STORAGE* pStorage, std::shared_ptr<CONTAINER::NAME> pName
       m_apUnits[i] = nullptr;
 }
 
-nlohmann::json STORAGE::ASSET::Get (SCOPE eScope, const std::string& sPath) const
+nlohmann::json SNEEZE::STORAGE::ASSET::Get (SCOPE eScope, const std::string& sPath) const
 {
    if (m_apUnits[eScope])
       return m_apUnits[eScope]->Get (sPath);
    return nlohmann::json ();
 }
 
-void STORAGE::ASSET::Set (SCOPE eScope, const std::string& sPath, const nlohmann::json& jValue)
+void SNEEZE::STORAGE::ASSET::Set (SCOPE eScope, const std::string& sPath, const nlohmann::json& jValue)
 {
    if (m_apUnits[eScope])
    {
@@ -51,7 +49,7 @@ void STORAGE::ASSET::Set (SCOPE eScope, const std::string& sPath, const nlohmann
    }
 }
 
-void STORAGE::ASSET::Remove (SCOPE eScope, const std::string& sPath)
+void SNEEZE::STORAGE::ASSET::Remove (SCOPE eScope, const std::string& sPath)
 {
    if (m_apUnits[eScope])
    {
@@ -63,21 +61,21 @@ void STORAGE::ASSET::Remove (SCOPE eScope, const std::string& sPath)
    }
 }
 
-bool STORAGE::ASSET::Has (SCOPE eScope, const std::string& sPath) const
+bool SNEEZE::STORAGE::ASSET::Has (SCOPE eScope, const std::string& sPath) const
 {
    if (m_apUnits[eScope])
       return m_apUnits[eScope]->Has (sPath);
    return false;
 }
 
-std::string STORAGE::ASSET::GetJson (SCOPE eScope) const
+std::string SNEEZE::STORAGE::ASSET::GetJson (SCOPE eScope) const
 {
    if (m_apUnits[eScope])
       return m_apUnits[eScope]->GetJson ();
    return "{}";
 }
 
-void STORAGE::ASSET::SetJson (SCOPE eScope, const std::string& sJson)
+void SNEEZE::STORAGE::ASSET::SetJson (SCOPE eScope, const std::string& sJson)
 {
    if (m_apUnits[eScope])
    {
@@ -89,7 +87,7 @@ void STORAGE::ASSET::SetJson (SCOPE eScope, const std::string& sJson)
    }
 }
 
-void STORAGE::ASSET::Attach ()
+void SNEEZE::STORAGE::ASSET::Attach ()
 {
    m_nRefCount++;
 
@@ -106,7 +104,7 @@ void STORAGE::ASSET::Attach ()
    }
 }
 
-void STORAGE::ASSET::Detach ()
+void SNEEZE::STORAGE::ASSET::Detach ()
 {
    if (m_nRefCount == 0)
       return;
@@ -127,4 +125,3 @@ void STORAGE::ASSET::Detach ()
    }
 }
 
-} // namespace SNEEZE

@@ -20,7 +20,7 @@
 #include <string>
 #include <optional>
 
-namespace SNEEZE { namespace astro {
+namespace astro {
 
 struct ORBIT_PROPS
 {
@@ -51,7 +51,7 @@ struct ORBIT_PROPS
 
    std::optional<double> dPeriodDays;
 
-   const CORE::EPOCH*    pEpoch = nullptr;
+   const EPOCH*    pEpoch = nullptr;
 };
 
 struct ORBIT_POSITION
@@ -101,7 +101,7 @@ public:
    std::optional<double> dPeriodDays;
 
    // Epoch
-   const CORE::EPOCH*    pEpoch;
+   const EPOCH*    pEpoch;
 
    // Derived raw values
    std::optional<double> dSemiMinorAU;
@@ -128,9 +128,9 @@ public:
    void ConvertToOutput ();
 
    ORBIT_POSITION* PositionAtTick (int64_t tmNow, ORBIT_POSITION& out) const;
-   CORE::VEC3      PointOnOrbit (double dE, int64_t tmElapsed) const;
+   VEC3      PointOnOrbit (double dE, int64_t tmElapsed) const;
 };
 
-}} // namespace SNEEZE::astro
+} // namespace astro
 
 #endif // SNEEZE_ASTRO_ORBIT_H
