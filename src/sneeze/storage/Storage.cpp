@@ -72,7 +72,7 @@ void SNEEZE::STORAGE::Shutdown ()
 // Container lifecycle
 // ---------------------------------------------------------------------------
 
-SNEEZE::STORAGE::ASSET* SNEEZE::STORAGE::Open (std::shared_ptr<som::CONTAINER::NAME> pName)
+SNEEZE::STORAGE::ASSET* SNEEZE::STORAGE::Open (std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName)
 {
    if (!pName)
       return nullptr;
@@ -202,7 +202,7 @@ void SNEEZE::STORAGE::Enumerate (IENUM* pEnum)
             {
                nlohmann::json jMeta = nlohmann::json::parse (metaFile);
 
-               auto pName = std::make_shared<som::CONTAINER::NAME> ();
+               auto pName = std::make_shared<SNEEZE::VIEWPORT::CONTAINER::NAME> ();
                pName->sFingerprint   = jMeta.value ("fingerprint", "");
                pName->sOrganization  = jMeta.value ("organization", "");
                pName->sCommonName    = jMeta.value ("commonName", "");

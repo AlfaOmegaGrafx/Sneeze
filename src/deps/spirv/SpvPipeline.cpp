@@ -17,7 +17,7 @@
 
 #include <spirv-tools/libspirv.hpp>
 
-namespace spirv
+namespace DEP
 {
 
 SPV_PIPELINE::SPV_PIPELINE ()
@@ -64,4 +64,4 @@ bool SPV_PIPELINE::Validate (const std::vector<uint32_t>& aBinary, std::string& 
    return bValid;
 }
 
-} // namespace spirv
+} // namespace DEP

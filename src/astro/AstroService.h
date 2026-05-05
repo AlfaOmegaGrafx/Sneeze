@@ -33,7 +33,7 @@ class ORBIT;
 // disposable astro proof-of-concept and the SOM.
 // ---------------------------------------------------------------------------
 
-class CELESTIAL_MAP_OBJECT : public som::MAP_OBJECT_CELESTIAL
+class CELESTIAL_MAP_OBJECT : public MAP_OBJECT_CELESTIAL
 {
 public:
    CELESTIAL_MAP_OBJECT ();
@@ -56,13 +56,13 @@ public:
    explicit ASTRO_SERVICE (SNEEZE* pSneeze);
    ~ASTRO_SERVICE ();
 
-   bool Initialize (som::FABRIC* pPrimaryFabric);
+   bool Initialize (SNEEZE::VIEWPORT::SCENE::FABRIC* pPrimaryFabric);
    void Shutdown ();
 
 private:
-   SNEEZE*                           m_pSneeze;
-   som::FABRIC*                    m_pFabric;
-   std::vector<som::NODE*>         m_apNodes;
+   SNEEZE*                                          m_pSneeze;
+   SNEEZE::VIEWPORT::SCENE::FABRIC*                 m_pFabric;
+   std::vector<SNEEZE::VIEWPORT::SCENE::FABRIC::NODE*> m_apNodes;
    std::vector<CELESTIAL_MAP_OBJECT*>      m_apMapObjects;
 };
 

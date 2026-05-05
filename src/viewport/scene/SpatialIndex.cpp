@@ -19,7 +19,7 @@
 #include <cmath>
 #include <limits>
 
-namespace som {
+using NODE = SNEEZE::VIEWPORT::SCENE::FABRIC::NODE;
 
 // ===========================================================================
 // AABB
@@ -113,7 +113,7 @@ void SPATIAL_INDEX::Clear ()
 }
 
 // ---------------------------------------------------------------------------
-// Build — constructs the BVH from a flat list of nodes with map objects.
+// Build -- constructs the BVH from a flat list of nodes with map objects.
 // ---------------------------------------------------------------------------
 
 void SPATIAL_INDEX::Build (const std::vector<NODE*>& apNodes)
@@ -211,7 +211,7 @@ AABB SPATIAL_INDEX::ComputeBounds (const std::vector<int>& aIndices, int nStart,
 }
 
 // ---------------------------------------------------------------------------
-// QueryFrustum — returns all leaf nodes whose bounds intersect the frustum.
+// QueryFrustum -- returns all leaf nodes whose bounds intersect the frustum.
 // ---------------------------------------------------------------------------
 
 void SPATIAL_INDEX::QueryFrustum (const FRUSTUM& pFrustum, std::vector<NODE*>& aResults) const
@@ -239,7 +239,7 @@ void SPATIAL_INDEX::QueryFrustumRecursive (int nBvhIndex, const FRUSTUM& pFrustu
 }
 
 // ---------------------------------------------------------------------------
-// QuerySphere — returns all leaf nodes whose bounds intersect a sphere.
+// QuerySphere -- returns all leaf nodes whose bounds intersect a sphere.
 // ---------------------------------------------------------------------------
 
 void SPATIAL_INDEX::QuerySphere (double x, double y, double z, double dRadius, std::vector<NODE*>& aResults) const
@@ -275,5 +275,3 @@ void SPATIAL_INDEX::QuerySphereRecursive (int nBvhIndex, double x, double y, dou
    if (pBvh.nLeft >= 0)  QuerySphereRecursive (pBvh.nLeft, x, y, z, dRadius, aResults);
    if (pBvh.nRight >= 0) QuerySphereRecursive (pBvh.nRight, x, y, z, dRadius, aResults);
 }
-
-} // namespace som

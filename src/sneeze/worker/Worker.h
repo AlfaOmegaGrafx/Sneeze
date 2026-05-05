@@ -16,6 +16,9 @@
 #define SNEEZE_CORE_WORKER_H
 
 #include "Sneeze.h"
+#include "renderer/AnariRenderer.h"
+#include "view/CameraOrbit.h"
+#include "renderer/Renderer.h"
 
 #include <thread>
 #include <mutex>
@@ -27,6 +30,15 @@
 class SNEEZE::WORKER
 {
 public:
+   class COMPOSITOR;
+   class B;
+   class C;
+   class D;
+   class E;
+   class F;
+   class G;
+   class H;
+
    explicit WORKER (SNEEZE* pSneeze);
    virtual ~WORKER ();
 
@@ -64,6 +76,100 @@ private:
 
 public:
    void SetWorkerIndex (int nIndex);
+};
+
+// ---------------------------------------------------------------------------
+// COMPOSITOR -- drives the render loop (frame timing, camera, scene submit)
+// ---------------------------------------------------------------------------
+
+class SNEEZE::WORKER::COMPOSITOR : public SNEEZE::WORKER
+{
+public:
+   explicit COMPOSITOR (SNEEZE* pSneeze);
+
+protected:
+   void Tick () override;
+   void ThreadLoop () override;
+
+private:
+   SNEEZE::VIEWPORT::RENDERER::ANARI  m_pRenderer;
+   SNEEZE::VIEWPORT::VIEW     m_pCameraOrbit;
+
+   int64_t m_tmNow;
+   double  m_dTimeScale;
+   bool    m_bPaused;
+   bool    m_bSpaceWasDown;
+
+   std::chrono::steady_clock::time_point m_tpLastFrame;
+
+   int    m_nFrameCount;
+   double m_dFpsAccum;
+   double m_dAccumInput;
+   double m_dAccumScene;
+   double m_dAccumSubmit;
+   double m_dAccumRender;
+   double m_dAccumPublish;
+   double m_dAccumFlush;
+};
+
+// ---------------------------------------------------------------------------
+// Placeholder workers (B-H)
+// ---------------------------------------------------------------------------
+
+class SNEEZE::WORKER::B : public SNEEZE::WORKER
+{
+public:
+   explicit B (SNEEZE* pSneeze);
+protected:
+   void Tick () override;
+};
+
+class SNEEZE::WORKER::C : public SNEEZE::WORKER
+{
+public:
+   explicit C (SNEEZE* pSneeze);
+protected:
+   void Tick () override;
+};
+
+class SNEEZE::WORKER::D : public SNEEZE::WORKER
+{
+public:
+   explicit D (SNEEZE* pSneeze);
+protected:
+   void Tick () override;
+};
+
+class SNEEZE::WORKER::E : public SNEEZE::WORKER
+{
+public:
+   explicit E (SNEEZE* pSneeze);
+protected:
+   void Tick () override;
+};
+
+class SNEEZE::WORKER::F : public SNEEZE::WORKER
+{
+public:
+   explicit F (SNEEZE* pSneeze);
+protected:
+   void Tick () override;
+};
+
+class SNEEZE::WORKER::G : public SNEEZE::WORKER
+{
+public:
+   explicit G (SNEEZE* pSneeze);
+protected:
+   void Tick () override;
+};
+
+class SNEEZE::WORKER::H : public SNEEZE::WORKER
+{
+public:
+   explicit H (SNEEZE* pSneeze);
+protected:
+   void Tick () override;
 };
 
 #endif // SNEEZE_CORE_WORKER_H

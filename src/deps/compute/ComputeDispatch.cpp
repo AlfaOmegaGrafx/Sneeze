@@ -21,7 +21,7 @@
 #include <cstring>
 #include <vector>
 
-namespace compute
+namespace DEP
 {
 
 // ---------------------------------------------------------------------------
@@ -221,4 +221,4 @@ bool COMPUTE_DISPATCH::DispatchVox (
    return true;
 }
 
-} // namespace compute
+} // namespace DEP

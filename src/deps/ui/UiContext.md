@@ -10,7 +10,7 @@ engine-rendered UI within the viewport.
 ```cpp
 #include "ui/UiContext.h"
 
-ui::UI_CONTEXT ui;
+DEP::UI_CONTEXT ui;
 ui.Initialize ();
 // ... engine runs ...
 ui.Shutdown ();

@@ -25,7 +25,7 @@
 // consumers that don't need Vox directly don't pull in the backend.
 namespace vox { class DEVICE; }
 
-namespace compute
+namespace DEP
 {
 
 struct BUFFER_BINDING
@@ -92,6 +92,6 @@ private:
    std::unordered_map<std::string, CpuKernelFn> m_aCpuKernels;
 };
 
-} // namespace compute
+} // namespace DEP
 
 #endif // SNEEZE_COMPUTE_COMPUTE_DISPATCH_H

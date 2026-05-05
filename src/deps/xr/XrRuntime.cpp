@@ -17,7 +17,7 @@
 #include <cstdlib>
 #include <cstring>
 
-namespace xr
+namespace DEP
 {
 
 XR_RUNTIME::XR_RUNTIME ()
@@ -108,4 +108,4 @@ std::string XR_RUNTIME::GetRuntimeName () const
    return sRuntimeName;
 }
 
-} // namespace xr
+} // namespace DEP

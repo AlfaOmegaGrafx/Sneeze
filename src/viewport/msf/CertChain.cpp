@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "CertChain.h"
+#include "Msf.h"
 
 #include <openssl/bio.h>
 #include <openssl/evp.h>
@@ -35,10 +35,10 @@
 #include <sstream>
 #include <vector>
 
-namespace msf
-{
+using CHAIN   = SNEEZE::VIEWPORT::MSF::CHAIN;
+using MSF_CERT = SNEEZE::VIEWPORT::MSF::CERT;
 
-struct CERT_CHAIN::IMPL
+struct CHAIN::IMPL
 {
    X509_STORE* pStore;
    X509*       pLeaf;
@@ -54,12 +54,12 @@ struct CERT_CHAIN::IMPL
    }
 };
 
-CERT_CHAIN::CERT_CHAIN ()
+CHAIN::CHAIN ()
    : m_pImpl (new IMPL)
 {
 }
 
-CERT_CHAIN::~CERT_CHAIN ()
+CHAIN::~CHAIN ()
 {
    delete m_pImpl;
 }
@@ -68,7 +68,7 @@ CERT_CHAIN::~CERT_CHAIN ()
 // LoadTrustStore
 // ---------------------------------------------------------------------------
 
-void CERT_CHAIN::LoadTrustStore ()
+void CHAIN::LoadTrustStore ()
 {
    if (m_pImpl->pStore)
       return;
@@ -179,9 +179,9 @@ static std::string SerialToHex (X509* pCert)
    return sResult;
 }
 
-static CERT_INFO ExtractCertInfo (X509* pCert, bool bIsCA)
+static MSF_CERT ExtractCertInfo (X509* pCert, bool bIsCA)
 {
-   CERT_INFO info;
+   MSF_CERT info;
 
    info.sSubject   = X509NameOneLine (X509_get_subject_name (pCert));
    info.sIssuer    = X509NameOneLine (X509_get_issuer_name (pCert));
@@ -218,7 +218,7 @@ static CERT_INFO ExtractCertInfo (X509* pCert, bool bIsCA)
 // Validate
 // ---------------------------------------------------------------------------
 
-bool CERT_CHAIN::Validate (const std::vector<std::string>& aX5cEntries, std::string& sError)
+bool CHAIN::Validate (const std::vector<std::string>& aX5cEntries, std::string& sError)
 {
    m_aCertInfos.clear ();
 
@@ -316,7 +316,7 @@ static std::string ComputeSpkiFingerprint (X509* pCert)
 // GetLeafFingerprint
 // ---------------------------------------------------------------------------
 
-std::string CERT_CHAIN::GetLeafFingerprint () const
+std::string CHAIN::GetLeafFingerprint () const
 {
    return ComputeSpkiFingerprint (m_pImpl->pLeaf);
 }
@@ -325,7 +325,7 @@ std::string CERT_CHAIN::GetLeafFingerprint () const
 // AddTrustedCert
 // ---------------------------------------------------------------------------
 
-const std::vector<CERT_INFO>& CERT_CHAIN::GetCertInfos () const
+const std::vector<MSF_CERT>& CHAIN::GetCertInfos () const
 {
    return m_aCertInfos;
 }
@@ -334,7 +334,7 @@ const std::vector<CERT_INFO>& CERT_CHAIN::GetCertInfos () const
 // AddTrustedCert
 // ---------------------------------------------------------------------------
 
-void CERT_CHAIN::AddTrustedCert (const std::string& sPem)
+void CHAIN::AddTrustedCert (const std::string& sPem)
 {
    LoadTrustStore ();
 
@@ -353,9 +353,9 @@ void CERT_CHAIN::AddTrustedCert (const std::string& sPem)
 // Static cert utilities
 // ---------------------------------------------------------------------------
 
-CERT_INFO CERT_CHAIN::DecodeInfoDerBase64 (const std::string& sB64, bool bIsCA)
+MSF_CERT CHAIN::DecodeInfoDerBase64 (const std::string& sB64, bool bIsCA)
 {
-   CERT_INFO info;
+   MSF_CERT info;
    X509* pCert = DecodeDerBase64 (sB64);
    if (pCert)
    {
@@ -365,9 +365,9 @@ CERT_INFO CERT_CHAIN::DecodeInfoDerBase64 (const std::string& sB64, bool bIsCA)
    return info;
 }
 
-CERT_INFO CERT_CHAIN::DecodeInfoPem (const std::string& sPem, bool bIsCA)
+MSF_CERT CHAIN::DecodeInfoPem (const std::string& sPem, bool bIsCA)
 {
-   CERT_INFO info;
+   MSF_CERT info;
    BIO* pBio = BIO_new_mem_buf (sPem.data (), (int) sPem.size ());
    X509* pCert = PEM_read_bio_X509 (pBio, nullptr, nullptr, nullptr);
    BIO_free (pBio);
@@ -380,7 +380,7 @@ CERT_INFO CERT_CHAIN::DecodeInfoPem (const std::string& sPem, bool bIsCA)
    return info;
 }
 
-std::string CERT_CHAIN::ComputeFingerprint (const std::string& sB64Der)
+std::string CHAIN::ComputeFingerprint (const std::string& sB64Der)
 {
    std::string sResult;
    X509* pCert = DecodeDerBase64 (sB64Der);
@@ -392,7 +392,7 @@ std::string CERT_CHAIN::ComputeFingerprint (const std::string& sB64Der)
    return sResult;
 }
 
-std::string CERT_CHAIN::ExtractPublicKeyPem (const std::string& sB64Der)
+std::string CHAIN::ExtractPublicKeyPem (const std::string& sB64Der)
 {
    std::string sResult;
    X509* pCert = DecodeDerBase64 (sB64Der);
@@ -417,7 +417,7 @@ std::string CERT_CHAIN::ExtractPublicKeyPem (const std::string& sB64Der)
    return sResult;
 }
 
-std::string CERT_CHAIN::PemToDerBase64 (const std::string& sPem)
+std::string CHAIN::PemToDerBase64 (const std::string& sPem)
 {
    std::string sResult;
 
@@ -445,4 +445,3 @@ std::string CERT_CHAIN::PemToDerBase64 (const std::string& sPem)
    return sResult;
 }
 
-} // namespace msf

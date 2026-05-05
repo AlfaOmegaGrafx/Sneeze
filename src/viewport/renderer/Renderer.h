@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef SNEEZE_RENDERER_RENDERER_H
-#define SNEEZE_RENDERER_RENDERER_H
+#ifndef SNEEZE_VIEWPORT_RENDERER_H
+#define SNEEZE_VIEWPORT_RENDERER_H
 
+#include "viewport/Viewport.h"
 #include "Types.h"
 #include <cstdint>
 #include <vector>
-
-namespace renderer {
 
 struct SPHERE_DATA
 {
@@ -56,21 +55,14 @@ struct CAMERA_DATA
    float dFar;
 };
 
-class RENDERER
+class SNEEZE::VIEWPORT::RENDERER
 {
 public:
+   class ANARI;
+
    virtual ~RENDERER () = default;
 
-   // Optional. Must be called before Initialize(). If the underlying renderer
-   // implementation advertises support (see IsRenderingToNativeSurface() after
-   // Initialize), it will render directly to this platform handle instead of a
-   // CPU-readable framebuffer. Type: HWND (Win32), ANativeWindow* (Android),
-   // CAMetalLayer*/UIView* (iOS), NSView*/NSWindow* (macOS).
    virtual void SetNativeWindow (void* pHandle) { (void) pHandle; }
-
-   // True after Initialize() if the renderer is presenting to the native
-   // window directly. In that case GetFrameBuffer() returns nullptr and the
-   // app must skip any CPU-side blit.
    virtual bool IsRenderingToNativeSurface () const { return false; }
 
    virtual bool Initialize (int nWidth, int nHeight) = 0;
@@ -91,6 +83,4 @@ public:
    virtual double GetLastRenderSeconds () const { return 0.0; }
 };
 
-} // namespace renderer
-
-#endif // SNEEZE_RENDERER_RENDERER_H
+#endif // SNEEZE_VIEWPORT_RENDERER_H

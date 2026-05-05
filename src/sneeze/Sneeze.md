@@ -98,12 +98,12 @@ its own thread and is woken by the engine thread at a configured frequency.
 
 | Worker               | Class                 | Frequency | Purpose                          |
 |----------------------|-----------------------|-----------|----------------------------------|
-| Compositor           | `WORKER_COMPOSITOR`   | 60 Hz     | Scene traversal, rendering       |
+| Compositor           | `WORKER::COMPOSITOR`   | 60 Hz     | Scene traversal, rendering       |
 | B through H          | `WORKER_B` .. `H`     | Varies    | Reserved for future use          |
 
 Workers override `Tick()` to perform their per-frame work.
 
-### WORKER_COMPOSITOR
+### WORKER::COMPOSITOR
 
 The compositor traverses the primary fabric's SOM tree, computes orbital
 positions for celestial bodies, submits geometry to the ANARI renderer, and

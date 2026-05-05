@@ -17,7 +17,7 @@
 #include "Sneeze.h"
 #include <cstdio>
 
-namespace wasm {
+namespace DEP {
 
 WASM_STORE::WASM_STORE (SNEEZE* pSneeze, wasm_engine_t* pEngine, const STORE_IDENTITY& pIdentity)
    : m_pSneeze (pSneeze)
@@ -83,4 +83,4 @@ void WASM_STORE::AddInstance (WASM_INSTANCE* pInstance)
    m_apInstances.push_back (pInstance);
 }
 
-} // namespace wasm
+} // namespace DEP

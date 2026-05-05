@@ -24,7 +24,7 @@
 
 class SNEEZE;
 
-namespace wasm {
+namespace DEP {
 
 // ---------------------------------------------------------------------------
 // WASM_RUNTIME — top-level manager of the Wasmtime engine and all stores.
@@ -58,6 +58,6 @@ private:
    mutable std::mutex m_storesMutex;
 };
 
-} // namespace wasm
+} // namespace DEP
 
 #endif // SNEEZE_WASM_RUNTIME_H

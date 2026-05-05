@@ -239,12 +239,12 @@ void SNEEZE::NETWORK::DispatchFetch (ASSET* pAsset)
 // Request / Release
 // ---------------------------------------------------------------------------
 
-SNEEZE::NETWORK::FILE* SNEEZE::NETWORK::Request (IFILE* pListener, std::shared_ptr<som::CONTAINER::NAME> pName, const std::string& sUrl)
+SNEEZE::NETWORK::FILE* SNEEZE::NETWORK::Request (IFILE* pListener, std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName, const std::string& sUrl)
 {
    return Request (pListener, pName, sUrl, std::string (), kREQUEST_DEFAULT);
 }
 
-SNEEZE::NETWORK::FILE* SNEEZE::NETWORK::Request (IFILE* pListener, std::shared_ptr<som::CONTAINER::NAME> pName, const std::string& sUrl, const std::string& sHash, uint32_t bFlags, uint32_t nAssetIx)
+SNEEZE::NETWORK::FILE* SNEEZE::NETWORK::Request (IFILE* pListener, std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName, const std::string& sUrl, const std::string& sHash, uint32_t bFlags, uint32_t nAssetIx)
 {
    bool bCreate = (bFlags & REQUEST_CREATE) != 0;
    bool bFetch  = (bFlags & REQUEST_FETCH)  != 0;

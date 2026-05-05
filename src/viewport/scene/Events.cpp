@@ -16,7 +16,7 @@
 #include "Node.h"
 #include <algorithm>
 
-namespace som {
+using NODE = SNEEZE::VIEWPORT::SCENE::FABRIC::NODE;
 
 EVENT_SYSTEM::EVENT_SYSTEM ()
    : m_twNextWatchId (1)
@@ -28,7 +28,7 @@ EVENT_SYSTEM::~EVENT_SYSTEM ()
 }
 
 // ---------------------------------------------------------------------------
-// Watch_Node — register a watcher on a specific node (non-recursive).
+// Watch_Node -- register a watcher on a specific node (non-recursive).
 // ---------------------------------------------------------------------------
 
 uint32_t EVENT_SYSTEM::Watch_Node (NODE* pNode, uint32_t nEventMask, void* pOwner, EVENT_CALLBACK pfnCallback)
@@ -48,7 +48,7 @@ uint32_t EVENT_SYSTEM::Watch_Node (NODE* pNode, uint32_t nEventMask, void* pOwne
 }
 
 // ---------------------------------------------------------------------------
-// Watch_Tree — register a watcher on a node and all its descendants.
+// Watch_Tree -- register a watcher on a node and all its descendants.
 // ---------------------------------------------------------------------------
 
 uint32_t EVENT_SYSTEM::Watch_Tree (NODE* pNode, uint32_t nEventMask, void* pOwner, EVENT_CALLBACK pfnCallback)
@@ -89,7 +89,7 @@ void EVENT_SYSTEM::UnwatchAll (void* pOwner)
 }
 
 // ---------------------------------------------------------------------------
-// Fire_* — dispatch events to matching watchers.
+// Fire_* -- dispatch events to matching watchers.
 // ---------------------------------------------------------------------------
 
 void EVENT_SYSTEM::Fire_NodeAdded (NODE* pParent, NODE* pChild)
@@ -150,7 +150,7 @@ void EVENT_SYSTEM::Fire_NodeModified (NODE* pNode)
 }
 
 // ---------------------------------------------------------------------------
-// MatchesTarget — checks if a watch applies to the given node.
+// MatchesTarget -- checks if a watch applies to the given node.
 //
 // Non-recursive: exact match on the target node.
 // Recursive: target node or any ancestor of pNode matches the watch target.
@@ -177,5 +177,3 @@ bool EVENT_SYSTEM::MatchesTarget (const WATCH& pWatch, NODE* pNode) const
 
    return false;
 }
-
-} // namespace som

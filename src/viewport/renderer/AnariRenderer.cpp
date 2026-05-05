@@ -14,16 +14,15 @@
 
 #include "AnariRenderer.h"
 #include "UVSphere.h"
-#include "Sneeze.h"
 #include <anari/anari.h>
 
-/* ANARI_RENDERER enum conflicts with our class name,
- * we rename to _ANARI_RENDERER to avoid the conflict. */
-#define _ANARI_RENDERER ANARI_DATA_TYPE_DEFINE(514)
+#define ANARI_RENDERER_TYPE ANARI_DATA_TYPE_DEFINE(514)
 #undef ANARI_RENDERER
 
 #include <cstring>
 #include <chrono>
+
+using RENDERER = SNEEZE::VIEWPORT::RENDERER;
 
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
@@ -39,8 +38,6 @@
 #define ANARI_LOGE(fmt, ...) __android_log_print (ANDROID_LOG_ERROR, "Sneeze.Anari", fmt, ##__VA_ARGS__)
 #define ANARI_LOGI(fmt, ...) __android_log_print (ANDROID_LOG_INFO,  "Sneeze.Anari", fmt, ##__VA_ARGS__)
 #endif
-
-namespace renderer {
 
 #if defined(SNEEZE_ANARI_OVERRIDE_LIBDIR)
 // ANARI's anchor-based lib-path detection uses dlsym(RTLD_DEFAULT, "_anari_anchor")
@@ -71,7 +68,7 @@ static std::string GetLocalLibDir ()
 
 // ---------------------------------------------------------------------------
 
-ANARI_RENDERER::ANARI_RENDERER (SNEEZE* pSneeze, const std::string& sLibrary)
+RENDERER::ANARI::ANARI (SNEEZE* pSneeze, const std::string& sLibrary)
    : m_pSneeze (pSneeze)
    , m_sLibrary (sLibrary)
    , m_pLibrary (nullptr)
@@ -92,17 +89,17 @@ ANARI_RENDERER::ANARI_RENDERER (SNEEZE* pSneeze, const std::string& sLibrary)
 {
 }
 
-ANARI_RENDERER::~ANARI_RENDERER ()
+RENDERER::ANARI::~ANARI ()
 {
    Shutdown ();
 }
 
-void ANARI_RENDERER::SetNativeWindow (void* pHandle)
+void RENDERER::ANARI::SetNativeWindow (void* pHandle)
 {
    m_pNativeWindow = pHandle;
 }
 
-bool ANARI_RENDERER::IsRenderingToNativeSurface () const
+bool RENDERER::ANARI::IsRenderingToNativeSurface () const
 {
    return m_bNativeSurface;
 }
@@ -125,7 +122,7 @@ bool HasExtension (const char* const* pList, const char* sName)
 
 } // namespace
 
-bool ANARI_RENDERER::Initialize (int nWidth, int nHeight)
+bool RENDERER::ANARI::Initialize (int nWidth, int nHeight)
 {
    m_nWidth  = nWidth;
    m_nHeight = nHeight;
@@ -254,7 +251,7 @@ bool ANARI_RENDERER::Initialize (int nWidth, int nHeight)
       anariSetParameter (m_pDevice, m_pFrame, "size", ANARI_UINT32_VEC2, aSize);
       ANARIDataType nColorType = ANARI_UFIXED8_RGBA_SRGB;
       anariSetParameter (m_pDevice, m_pFrame, "channel.color", ANARI_DATA_TYPE, &nColorType);
-      anariSetParameter (m_pDevice, m_pFrame, "renderer", _ANARI_RENDERER, &m_pRenderer);
+      anariSetParameter (m_pDevice, m_pFrame, "renderer", ANARI_RENDERER_TYPE, &m_pRenderer);
       anariSetParameter (m_pDevice, m_pFrame, "camera", ANARI_CAMERA, &m_pCamera);
       anariSetParameter (m_pDevice, m_pFrame, "world", ANARI_WORLD, &m_pWorld);
       if (m_pNativeSurface)
@@ -270,7 +267,7 @@ bool ANARI_RENDERER::Initialize (int nWidth, int nHeight)
    return bOk;
 }
 
-void ANARI_RENDERER::Resize (int nWidth, int nHeight)
+void RENDERER::ANARI::Resize (int nWidth, int nHeight)
 {
    if (!m_pDevice || !m_pFrame)
       return;
@@ -294,7 +291,7 @@ void ANARI_RENDERER::Resize (int nWidth, int nHeight)
    anariSetParameter (m_pDevice, m_pFrame, "size", ANARI_UINT32_VEC2, aSize);
    ANARIDataType nColorType = ANARI_UFIXED8_RGBA_SRGB;
    anariSetParameter (m_pDevice, m_pFrame, "channel.color", ANARI_DATA_TYPE, &nColorType);
-   anariSetParameter (m_pDevice, m_pFrame, "renderer", _ANARI_RENDERER, &m_pRenderer);
+   anariSetParameter (m_pDevice, m_pFrame, "renderer", ANARI_RENDERER_TYPE, &m_pRenderer);
    anariSetParameter (m_pDevice, m_pFrame, "camera", ANARI_CAMERA, &m_pCamera);
    anariSetParameter (m_pDevice, m_pFrame, "world", ANARI_WORLD, &m_pWorld);
    if (m_pNativeSurface)
@@ -305,7 +302,7 @@ void ANARI_RENDERER::Resize (int nWidth, int nHeight)
    anariCommitParameters (m_pDevice, m_pFrame);
 }
 
-void ANARI_RENDERER::Shutdown ()
+void RENDERER::ANARI::Shutdown ()
 {
    if (m_pDevice)
    {
@@ -347,7 +344,7 @@ void ANARI_RENDERER::Shutdown ()
 
 // ---------------------------------------------------------------------------
 
-void ANARI_RENDERER::SetCamera (const CAMERA_DATA& pCamera)
+void RENDERER::ANARI::SetCamera (const CAMERA_DATA& pCamera)
 {
    float pos[3] = { pCamera.dPosX, pCamera.dPosY, pCamera.dPosZ };
    float dir[3] = { pCamera.dDirX, pCamera.dDirY, pCamera.dDirZ };
@@ -363,23 +360,23 @@ void ANARI_RENDERER::SetCamera (const CAMERA_DATA& pCamera)
    anariCommitParameters (m_pDevice, m_pCamera);
 }
 
-void ANARI_RENDERER::BeginFrame ()
+void RENDERER::ANARI::BeginFrame ()
 {
    m_aSpheres.clear ();
    m_aCurves.clear ();
 }
 
-void ANARI_RENDERER::SubmitSpheres (const std::vector<SPHERE_DATA>& aSpheres)
+void RENDERER::ANARI::SubmitSpheres (const std::vector<SPHERE_DATA>& aSpheres)
 {
    m_aSpheres.insert (m_aSpheres.end (), aSpheres.begin (), aSpheres.end ());
 }
 
-void ANARI_RENDERER::SubmitCurves (const std::vector<CURVE_DATA>& aCurves)
+void RENDERER::ANARI::SubmitCurves (const std::vector<CURVE_DATA>& aCurves)
 {
    m_aCurves.insert (m_aCurves.end (), aCurves.begin (), aCurves.end ());
 }
 
-void ANARI_RENDERER::EndFrame ()
+void RENDERER::ANARI::EndFrame ()
 {
    auto tpSubmitStart = std::chrono::steady_clock::now ();
 
@@ -411,19 +408,19 @@ void ANARI_RENDERER::EndFrame ()
    }
 }
 
-const uint32_t* ANARI_RENDERER::GetFrameBuffer () const
+const uint32_t* RENDERER::ANARI::GetFrameBuffer () const
 {
    // No CPU-readable framebuffer in native-surface mode.
    if (m_bNativeSurface) return nullptr;
    return m_aPixels.data ();
 }
 
-int ANARI_RENDERER::GetWidth () const
+int RENDERER::ANARI::GetWidth () const
 {
    return m_nWidth;
 }
 
-int ANARI_RENDERER::GetHeight () const
+int RENDERER::ANARI::GetHeight () const
 {
    return m_nHeight;
 }
@@ -432,7 +429,7 @@ int ANARI_RENDERER::GetHeight () const
 //  RebuildWorld - recreate ANARI scene objects from submitted data
 // ---------------------------------------------------------------------------
 
-void ANARI_RENDERER::RebuildWorld (const std::vector<SPHERE_DATA>& aSpheres,
+void RENDERER::ANARI::RebuildWorld (const std::vector<SPHERE_DATA>& aSpheres,
                                     const std::vector<CURVE_DATA>& aCurves)
 {
    // --- Generate unit sphere mesh once ---
@@ -662,4 +659,3 @@ void ANARI_RENDERER::RebuildWorld (const std::vector<SPHERE_DATA>& aSpheres,
       anariRelease (m_pDevice, inst);
 }
 
-} // namespace renderer

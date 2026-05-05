@@ -20,7 +20,7 @@
 // STORAGE::ASSET
 // ===========================================================================
 
-SNEEZE::STORAGE::ASSET::ASSET (STORAGE* pStorage, std::shared_ptr<som::CONTAINER::NAME> pName) :
+SNEEZE::STORAGE::ASSET::ASSET (STORAGE* pStorage, std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName) :
    m_pStorage      (pStorage),
    m_pName         (std::move (pName)),
    m_nRefCount     (0),

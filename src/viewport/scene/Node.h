@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef SNEEZE_SOM_NODE_H
-#define SNEEZE_SOM_NODE_H
+#ifndef SNEEZE_VIEWPORT_NODE_H
+#define SNEEZE_VIEWPORT_NODE_H
 
 #include "Types.h"
+#include "scene/Fabric.h"
 #include "network/Network.h"
 #include <atomic>
 #include <mutex>
@@ -23,29 +24,17 @@
 #include <unordered_map>
 #include <cstdint>
 
-namespace som {
-
-class FABRIC;
 class MAP_OBJECT;
 
 // ---------------------------------------------------------------------------
-// SOM::NODE — purely structural element in the scene object model.
+// SNEEZE::VIEWPORT::SCENE::FABRIC::NODE — structural element in the scene.
 //
-// Each node participates in a tree owned by a single FABRIC. Children are
-// stored in a vector for O(1) random access and cache-friendly iteration.
-// Structural modifications (AddChild/RemoveChild) are mutex-protected.
-// The node itself holds no 3D properties — those belong to the referenced
-// MAP_OBJECT.
-//
-// A node may serve as an attachment point for a child FABRIC (downward
-// traversal). The attached fabric's root node is the logical subtree beneath
-// this node.
-//
-// When a MAP_OBJECT with a non-empty texture URL is assigned, the node
-// requests the texture from the network and decodes it on completion.
+// Each node participates in a tree owned by a single FABRIC. When a
+// MAP_OBJECT with a non-empty texture URL is assigned, the node requests the
+// texture from the network and decodes it on completion.
 // ---------------------------------------------------------------------------
 
-class NODE : public SNEEZE::NETWORK::IFILE
+class SNEEZE::VIEWPORT::SCENE::FABRIC::NODE : public SNEEZE::NETWORK::IFILE
 {
 public:
    explicit NODE (FABRIC* pFabric);
@@ -121,6 +110,4 @@ private:
    SNEEZE::NETWORK::FILE*         m_pFile;
 };
 
-} // namespace som
-
-#endif // SNEEZE_SOM_NODE_H
+#endif // SNEEZE_VIEWPORT_NODE_H

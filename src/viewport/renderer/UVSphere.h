@@ -18,8 +18,6 @@
 #include <vector>
 #include <cstdint>
 
-namespace renderer {
-
 struct UV_SPHERE
 {
    std::vector<float>    aPositions;
@@ -31,7 +29,5 @@ struct UV_SPHERE
 void GenerateUVSphere (UV_SPHERE& sphere, float dRadius,
                        int nStacks, int nSlices,
                        float dCenterX, float dCenterY, float dCenterZ);
-
-} // namespace renderer
 
 #endif // SNEEZE_RENDERER_UVSPHERE_H

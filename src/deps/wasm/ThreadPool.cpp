@@ -17,7 +17,7 @@
 #include <cstdio>
 #include <algorithm>
 
-namespace wasm {
+namespace DEP {
 
 THREAD_POOL::THREAD_POOL (SNEEZE* pSneeze)
    : m_pSneeze (pSneeze)
@@ -101,4 +101,4 @@ void THREAD_POOL::WorkerLoop ()
    }
 }
 
-} // namespace wasm
+} // namespace DEP

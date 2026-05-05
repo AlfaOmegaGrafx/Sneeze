@@ -12,18 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef SNEEZE_CORE_WORKER_C_H
-#define SNEEZE_CORE_WORKER_C_H
+#ifndef SNEEZE_VIEWPORT_H
+#define SNEEZE_VIEWPORT_H
 
-#include "Worker.h"
+#include "Sneeze.h"
 
-class WORKER_C : public SNEEZE::WORKER
+class SNEEZE::VIEWPORT
 {
 public:
-   explicit WORKER_C (SNEEZE* pSneeze);
+   class SCENE;
+   class CONTAINER;
+   class MSF;
+   class RENDERER;
+   class VIEW;
 
-protected:
-   void Tick () override;
+   explicit VIEWPORT (SNEEZE* pSneeze);
+   ~VIEWPORT ();
+
+   SNEEZE* Sneeze () const { return m_pSneeze; }
+   SCENE*  GetScene () const { return m_pScene; }
+   void    SetScene (SCENE* p) { m_pScene = p; }
+
+private:
+   SNEEZE* m_pSneeze;
+   SCENE*  m_pScene;
 };
 
-#endif // SNEEZE_CORE_WORKER_C_H
+#endif // SNEEZE_VIEWPORT_H

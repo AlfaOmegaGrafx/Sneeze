@@ -15,28 +15,23 @@
 #ifndef SNEEZE_SOM_ACCESSCONTROL_H
 #define SNEEZE_SOM_ACCESSCONTROL_H
 
-namespace som {
-
-class NODE;
-class FABRIC;
+#include "scene/Fabric.h"
 
 // ---------------------------------------------------------------------------
 // Access control enforcement for WASM host function calls.
 //
 // Browser internals (compositor, animator) bypass these checks entirely.
-// Only WASM modules are subject to access control — they must prove they
+// Only WASM modules are subject to access control -- they must prove they
 // own the fabric or that the node/fabric isn't private to another owner.
 //
 // pRequestingOwner is the opaque owner pointer of the calling store
-// (WASM_STORE*). A null owner means browser-internal — always granted.
+// (WASM_STORE*). A null owner means browser-internal -- always granted.
 // ---------------------------------------------------------------------------
 
-bool CanRead (const NODE* pNode, const void* pRequestingOwner);
-bool CanWrite (const NODE* pNode, const void* pRequestingOwner);
+bool CanRead (const SNEEZE::VIEWPORT::SCENE::FABRIC::NODE* pNode, const void* pRequestingOwner);
+bool CanWrite (const SNEEZE::VIEWPORT::SCENE::FABRIC::NODE* pNode, const void* pRequestingOwner);
 
-bool CanReadFabric (const FABRIC* pFabric, const void* pRequestingOwner);
-bool CanWriteFabric (const FABRIC* pFabric, const void* pRequestingOwner);
-
-} // namespace som
+bool CanReadFabric (const SNEEZE::VIEWPORT::SCENE::FABRIC* pFabric, const void* pRequestingOwner);
+bool CanWriteFabric (const SNEEZE::VIEWPORT::SCENE::FABRIC* pFabric, const void* pRequestingOwner);
 
 #endif // SNEEZE_SOM_ACCESSCONTROL_H

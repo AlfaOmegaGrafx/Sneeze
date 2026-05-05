@@ -14,11 +14,7 @@
 
 #include "MapObject.h"
 
-namespace som {
-
 MAP_OBJECT::MAP_OBJECT (MAP_OBJECT_TYPE bType)
    : m_bType (bType)
 {
 }
-
-} // namespace som

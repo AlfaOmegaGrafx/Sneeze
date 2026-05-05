@@ -20,7 +20,7 @@
 
 class SNEEZE;
 
-namespace xr
+namespace DEP
 {
 
 class XR_RUNTIME
@@ -42,6 +42,6 @@ private:
    std::string sRuntimeName;
 };
 
-} // namespace xr
+} // namespace DEP
 
 #endif // SNEEZE_XR_RUNTIME_H

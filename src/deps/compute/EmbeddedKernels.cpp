@@ -29,7 +29,7 @@ extern "C"
 }
 #endif
 
-namespace compute
+namespace DEP
 {
 
 KERNEL_DATA GetEmbeddedKernel (const char* szName)
@@ -66,4 +66,4 @@ KERNEL_DATA GetEmbeddedKernel (const char* szName)
    return pResult;
 }
 
-} // namespace compute
+} // namespace DEP

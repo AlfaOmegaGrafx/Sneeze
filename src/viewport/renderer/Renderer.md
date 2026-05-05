@@ -57,7 +57,7 @@ should skip CPU-side blitting.
 | `dFovY`            | `float` | Vertical FOV (degrees)   |
 | `dAspect`          | `float` | Width / height           |
 
-## ANARI_RENDERER
+## RENDERER::ANARI
 
 The concrete ANARI backend. Loads an ANARI library by name (e.g. `"anari"`),
 creates a device, and manages the frame/world/camera lifecycle.
@@ -65,7 +65,7 @@ creates a device, and manages the frame/world/camera lifecycle.
 ```cpp
 #include "renderer/AnariRenderer.h"
 
-renderer::ANARI_RENDERER renderer ("anari");
+SNEEZE::VIEWPORT::RENDERER::ANARI renderer ("anari");
 renderer.SetNativeWindow (hWnd);
 renderer.Initialize (1280, 720);
 

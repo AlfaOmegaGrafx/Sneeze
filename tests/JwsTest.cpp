@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "msf/MsfFile.h"
+#include "msf/Msf.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -66,7 +66,7 @@ static std::string SignPayload (const std::string& sPayload,
                                 const std::vector<std::string>& aCertChain,
                                 const std::string& sAlgorithm = "RS256")
 {
-   msf::MSF_FILE msf;
+   SNEEZE::VIEWPORT::MSF msf;
    msf.SetPayload (nlohmann::json::parse (sPayload));
    for (const auto& sCert : aCertChain)
       msf.AddCert (sCert);
@@ -123,7 +123,7 @@ int RunJwsTests (int nArgc, char** aArgv)
    ASSERT (!sJws.empty (), "JWS signed successfully");
    ASSERT (sJws.find ('.') != std::string::npos, "JWS contains dot separators");
 
-   msf::MSF_FILE verifier;
+   SNEEZE::VIEWPORT::MSF verifier;
    verifier.AddTrustedCert (sCaCert);
    verifier.Parse (sJws);
    verifier.VerifySignature ();
@@ -163,7 +163,7 @@ int RunJwsTests (int nArgc, char** aArgv)
    std::string sMssJws = SignPayload (sMssPayload, sProviderKey, aCertChain, "RS256");
    ASSERT (!sMssJws.empty (), "MSS JWS signed successfully");
 
-   msf::MSF_FILE svc;
+   SNEEZE::VIEWPORT::MSF svc;
    svc.AddTrustedCert (sCaCert);
    svc.Parse (sMssJws);
    svc.VerifySignature ();
@@ -201,7 +201,7 @@ int RunJwsTests (int nArgc, char** aArgv)
       sTampered[nMid] = (sTampered[nMid] == 'A') ? 'B' : 'A';
    }
 
-   msf::MSF_FILE tamperedVerifier;
+   SNEEZE::VIEWPORT::MSF tamperedVerifier;
    tamperedVerifier.AddTrustedCert (sCaCert);
    tamperedVerifier.Parse (sTampered);
    tamperedVerifier.VerifySignature ();
@@ -221,7 +221,7 @@ int RunJwsTests (int nArgc, char** aArgv)
    std::string sExpiredJws = SignPayload (sPayload, sExpiredKey, aExpiredChain, "RS256");
    ASSERT (!sExpiredJws.empty (), "Expired JWS signed successfully");
 
-   msf::MSF_FILE expiredVerifier;
+   SNEEZE::VIEWPORT::MSF expiredVerifier;
    expiredVerifier.AddTrustedCert (sCaCert);
    expiredVerifier.Parse (sExpiredJws);
    expiredVerifier.VerifyChain ();
@@ -234,7 +234,7 @@ int RunJwsTests (int nArgc, char** aArgv)
 
    BeginGroup ("Untrusted Chain Rejected");
 
-   msf::MSF_FILE untrustedVerifier;
+   SNEEZE::VIEWPORT::MSF untrustedVerifier;
    untrustedVerifier.Parse (sJws);
    untrustedVerifier.VerifyChain ();
    ASSERT (!untrustedVerifier.IsChainTrusted (), "Untrusted chain rejected");
@@ -246,7 +246,7 @@ int RunJwsTests (int nArgc, char** aArgv)
 
    BeginGroup ("Fingerprint Stability");
 
-   msf::MSF_FILE verifier2;
+   SNEEZE::VIEWPORT::MSF verifier2;
    verifier2.AddTrustedCert (sCaCert);
    verifier2.Parse (sJws);
    verifier2.VerifySignature ();
@@ -260,7 +260,7 @@ int RunJwsTests (int nArgc, char** aArgv)
 
    BeginGroup ("Malformed JWS Rejected");
 
-   msf::MSF_FILE malformedVerifier;
+   SNEEZE::VIEWPORT::MSF malformedVerifier;
 
    bool bEmpty = malformedVerifier.Parse ("");
    ASSERT (!bEmpty, "Empty string rejected");
@@ -277,7 +277,7 @@ int RunJwsTests (int nArgc, char** aArgv)
 
    BeginGroup ("Parse Populates Data Without Verification");
 
-   msf::MSF_FILE parseOnly;
+   SNEEZE::VIEWPORT::MSF parseOnly;
    bool bParsed = parseOnly.Parse (sMssJws);
    ASSERT (bParsed, "Parse succeeded without verification");
    ASSERT (parseOnly.GetNamespace () == "com.pokerstars.poker", "Namespace available without verify");
@@ -290,7 +290,7 @@ int RunJwsTests (int nArgc, char** aArgv)
 
    BeginGroup ("Composition Round-Trip");
 
-   msf::MSF_FILE composer;
+   SNEEZE::VIEWPORT::MSF composer;
    composer.SetNamespace ("com.test.composed");
    composer.SetOrganization ("Test Org");
    composer.AddService ({"my-svc", "grpc", "grpc://example.com:443", {"mod.wasm"}});
@@ -301,7 +301,7 @@ int RunJwsTests (int nArgc, char** aArgv)
    std::string sComposedJws = composer.Sign (sProviderKey, "RS256");
    ASSERT (!sComposedJws.empty (), "Composed MSF signed successfully");
 
-   msf::MSF_FILE reader;
+   SNEEZE::VIEWPORT::MSF reader;
    reader.AddTrustedCert (sCaCert);
    reader.Parse (sComposedJws);
    reader.VerifySignature ();

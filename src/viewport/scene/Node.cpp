@@ -22,7 +22,8 @@
 #include <algorithm>
 #include <memory>
 
-namespace som {
+using NODE      = SNEEZE::VIEWPORT::SCENE::FABRIC::NODE;
+using CONTAINER = SNEEZE::VIEWPORT::CONTAINER;
 
 NODE::NODE (FABRIC* pFabric)
    : m_twObjectIx (0)
@@ -42,7 +43,7 @@ NODE::~NODE ()
 }
 
 // ---------------------------------------------------------------------------
-// Parent () — returns the logical parent, crossing fabric boundaries.
+// Parent () -- returns the logical parent, crossing fabric boundaries.
 //
 // If this node is the root of its fabric (parent is null within the fabric),
 // we traverse upward: fabric -> attaching node in the parent fabric.
@@ -87,7 +88,7 @@ NODE* NODE::FindChild (uint32_t twObjectIx) const
 }
 
 // ---------------------------------------------------------------------------
-// AddChild — appends to the child vector and inserts into the lookup map.
+// AddChild -- appends to the child vector and inserts into the lookup map.
 // ---------------------------------------------------------------------------
 
 void NODE::AddChild (NODE* pChild)
@@ -99,7 +100,7 @@ void NODE::AddChild (NODE* pChild)
 }
 
 // ---------------------------------------------------------------------------
-// RemoveChild — removes from both the vector (swap-and-pop) and the map.
+// RemoveChild -- removes from both the vector (swap-and-pop) and the map.
 // ---------------------------------------------------------------------------
 
 void NODE::RemoveChild (NODE* pChild)
@@ -120,7 +121,7 @@ void NODE::RemoveChild (NODE* pChild)
 }
 
 // ---------------------------------------------------------------------------
-// SetMapObject — assigns the map object and initiates a texture fetch if the
+// SetMapObject -- assigns the map object and initiates a texture fetch if the
 // object has a texture URL and the node can reach the network.
 // ---------------------------------------------------------------------------
 
@@ -132,7 +133,7 @@ void NODE::SetMapObject (MAP_OBJECT* pMapObject)
 }
 
 // ---------------------------------------------------------------------------
-// RequestTexture — if the map object has a texture URL, request it from the
+// RequestTexture -- if the map object has a texture URL, request it from the
 // network via NODE -> FABRIC -> SCENE -> SNEEZE -> Network().
 // ---------------------------------------------------------------------------
 
@@ -153,7 +154,7 @@ void NODE::RequestTexture ()
 }
 
 // ---------------------------------------------------------------------------
-// ReleaseTexture — release any outstanding network file handle.
+// ReleaseTexture -- release any outstanding network file handle.
 // ---------------------------------------------------------------------------
 
 void NODE::ReleaseTexture ()
@@ -166,7 +167,7 @@ void NODE::ReleaseTexture ()
 }
 
 // ---------------------------------------------------------------------------
-// OnFileReady — decode the fetched texture data and populate the map object.
+// OnFileReady -- decode the fetched texture data and populate the map object.
 // ---------------------------------------------------------------------------
 
 void NODE::OnFileReady (SNEEZE::NETWORK::FILE* pFile)
@@ -203,7 +204,7 @@ void NODE::OnFileReady (SNEEZE::NETWORK::FILE* pFile)
 }
 
 // ---------------------------------------------------------------------------
-// OnFileFailed — release the network file handle.
+// OnFileFailed -- release the network file handle.
 // ---------------------------------------------------------------------------
 
 void NODE::OnFileFailed (SNEEZE::NETWORK::FILE* pFile)
@@ -211,5 +212,3 @@ void NODE::OnFileFailed (SNEEZE::NETWORK::FILE* pFile)
    pFile->Release ();
    m_pFile = nullptr;
 }
-
-} // namespace som

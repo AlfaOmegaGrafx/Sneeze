@@ -12,19 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef SNEEZE_SOM_FABRIC_H
-#define SNEEZE_SOM_FABRIC_H
+#ifndef SNEEZE_VIEWPORT_FABRIC_H
+#define SNEEZE_VIEWPORT_FABRIC_H
 
+#include "scene/Scene.h"
 #include <vector>
 #include <string>
 
-namespace som {
-
-class NODE;
-class SCENE;
-
 // ---------------------------------------------------------------------------
-// SOM::FABRIC — represents a spatial fabric's branch in the scene graph.
+// SNEEZE::VIEWPORT::SCENE::FABRIC — a spatial fabric's branch in the scene graph.
 //
 // Each fabric owns a tree of NODEs rooted at m_pRootNode. Fabrics form their
 // own hierarchy (parent/child) mirroring the attachment relationships in the
@@ -32,9 +28,11 @@ class SCENE;
 // serves as the attachment point for this fabric.
 // ---------------------------------------------------------------------------
 
-class FABRIC
+class SNEEZE::VIEWPORT::SCENE::FABRIC
 {
 public:
+   class NODE;
+
    explicit FABRIC (SCENE* pScene);
    ~FABRIC ();
 
@@ -89,6 +87,4 @@ private:
    std::string           m_sUrl;
 };
 
-} // namespace som
-
-#endif // SNEEZE_SOM_FABRIC_H
+#endif // SNEEZE_VIEWPORT_FABRIC_H

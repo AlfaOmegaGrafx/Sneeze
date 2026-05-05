@@ -25,7 +25,7 @@
 
 class SNEEZE;
 
-namespace wasm {
+namespace DEP {
 
 // ---------------------------------------------------------------------------
 // THREAD_POOL — fixed-size pool for dispatching WASM store work items.
@@ -60,6 +60,6 @@ private:
    std::atomic<bool>                   m_bShutdown;
 };
 
-} // namespace wasm
+} // namespace DEP
 
 #endif // SNEEZE_WASM_THREADPOOL_H

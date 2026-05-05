@@ -35,7 +35,7 @@ ASSET (internal shared state, one per URL)
 FILE (per-caller handle)
  ├── NETWORK* (parent back-pointer)
  ├── ASSET* (attached while live, null after Release)
- ├── shared_ptr<som::CONTAINER::NAME> (identity of requesting container)
+ ├── shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> (identity of requesting container)
  ├── IFILE* listener for notifications
  ├── nFileIx: monotonic file-handle index (uint32_t)
  ├── Snapshot fields (owned copies of ASSET display data):
@@ -50,7 +50,7 @@ FILE (per-caller handle)
  ├── m_bEnumeration (guards Release during Enumerate)
  └── Request() to reattach a released FILE to its ASSET
 
-som::CONTAINER::NAME (identity record, shared via shared_ptr)
+SNEEZE::VIEWPORT::CONTAINER::NAME (identity record, shared via shared_ptr)
  ├── sFingerprint (SHA-256 of cert public key)
  ├── sOrganization
  ├── sCommonName
@@ -75,7 +75,7 @@ Types in `SNEEZE::NETWORK` and related namespaces:
 | NETWORK::REQUEST| Flags: REQUEST_CREATE, REQUEST_FETCH.              |
 | NETWORK::DISKFILE| Enum: DISKFILE_DATA, DISKFILE_TEMP, DISKFILE_META.|
 | NETWORK::RULE   | Staleness rule (content-type + olderThan).         |
-| som::CONTAINER::NAME | Identity record for a container.              |
+| SNEEZE::VIEWPORT::CONTAINER::NAME | Identity record for a container.              |
 
 ## Usage
 
@@ -102,7 +102,7 @@ public:
 
 // Request a file (no hash, default flags)
 MY_LISTENER listener;
-auto pName = std::make_shared<som::CONTAINER::NAME> ();
+auto pName = std::make_shared<SNEEZE::VIEWPORT::CONTAINER::NAME> ();
 pName->sCommonName    = "Metaversal";
 pName->sContainerName = "Solar System";
 pName->bValidated     = true;
@@ -161,11 +161,11 @@ Without `CREATE`, a missing asset returns `nullptr`. Without `FETCH`, an IDLE as
 
 ### Container Identity
 
-Every `Request()` call includes a `std::shared_ptr<som::CONTAINER::NAME>` identifying which container originated the request. The caller creates the shared_ptr (typically one per container, reused across all requests from that container). FILE stores a copy of the shared_ptr, so all FILEs from the same container share a single NAME object in memory. CONTAINER::NAME holds: `sFingerprint` (SHA-256 of cert public key), `sOrganization`, `sCommonName`, `sContainerName`, `sPersonaHash`, and `bValidated`. The display name is `sCommonName + "/" + sContainerName` via `DisplayName()`. For unauthenticated certs, `sOrganization` and `sCommonName` are set to `fingerprint[0..15]`.
+Every `Request()` call includes a `std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME>` identifying which container originated the request. The caller creates the shared_ptr (typically one per container, reused across all requests from that container). FILE stores a copy of the shared_ptr, so all FILEs from the same container share a single NAME object in memory. CONTAINER::NAME holds: `sFingerprint` (SHA-256 of cert public key), `sOrganization`, `sCommonName`, `sContainerName`, `sPersonaHash`, and `bValidated`. The display name is `sCommonName + "/" + sContainerName` via `DisplayName()`. For unauthenticated certs, `sOrganization` and `sCommonName` are set to `fingerprint[0..15]`.
 
 ```cpp
 // FILE exposes the container identity
-const som::CONTAINER::NAME& name = pFile->GetName ();
+const SNEEZE::VIEWPORT::CONTAINER::NAME& name = pFile->GetName ();
 std::string sDisplay = pFile->GetContainerName ();  // "Metaversal/Solar System"
 ```
 

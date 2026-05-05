@@ -125,7 +125,7 @@ public:
       uint32_t            GetAccessCount () const     { return m_nAccessCount; }
 
       void  TouchAccess ();
-      void  SaveMeta (std::shared_ptr<som::CONTAINER::NAME> pName);
+      void  SaveMeta (std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName);
       void  LoadMeta ();
 
    private:
@@ -168,11 +168,11 @@ public:
    class ASSET : public SNEEZE::NOTIFICATION
    {
    public:
-      ASSET (STORAGE* pStorage, std::shared_ptr<som::CONTAINER::NAME> pName);
+      ASSET (STORAGE* pStorage, std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName);
 
       // --- Identity ---
 
-      std::shared_ptr<som::CONTAINER::NAME>  GetName () const { return m_pName; }
+      std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME>  GetName () const { return m_pName; }
       std::string  GetDisplayName () const { return m_pName ? m_pName->DisplayName () : ""; }
 
       // --- Path-based API ---
@@ -205,7 +205,7 @@ public:
 
    private:
       STORAGE*    m_pStorage;
-      std::shared_ptr<som::CONTAINER::NAME>  m_pName;
+      std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME>  m_pName;
       UNIT*       m_apUnits[SCOPE_COUNT];
       uint32_t    m_nRefCount;
       bool        m_bPendingClear;
@@ -223,7 +223,7 @@ public:
 
    // --- Container lifecycle ---
 
-   ASSET*  Open (std::shared_ptr<som::CONTAINER::NAME> pName);
+   ASSET*  Open (std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName);
    void    Close (ASSET* pAsset);
 
    // --- Inspector ---

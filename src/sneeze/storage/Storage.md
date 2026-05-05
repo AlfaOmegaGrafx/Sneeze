@@ -13,14 +13,14 @@ STORAGE (singleton)
 
 UNIT (one per JSON file on disk)
  ├── nlohmann::json document (in-memory cache)
- ├── .meta sidecar (som::CONTAINER::NAME, statistics)
+ ├── .meta sidecar (SNEEZE::VIEWPORT::CONTAINER::NAME, statistics)
  ├── .log changelog (JSONL write-ahead log for crash durability)
  ├── Dirty flag + ref count
  ├── Load/Save/Evict lifecycle
  └── mutex
 
 ASSET (groups four UNITs for a specific container)
- ├── shared_ptr<som::CONTAINER::NAME>
+ ├── shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME>
  ├── UNIT* m_apUnits[4] indexed by SCOPE
  ├── Ref count (attach/detach)
  ├── Clear flag (deferred history removal)
@@ -101,7 +101,7 @@ Once Artemis provides dual paths, the permanent and temporary paths will diverge
 #include "storage/Storage.h"
 
 // Open storage for a container (typically called by WASM runtime)
-auto pName = std::make_shared<som::CONTAINER::NAME> ();
+auto pName = std::make_shared<SNEEZE::VIEWPORT::CONTAINER::NAME> ();
 pName->sFingerprint   = "abc123def456abc123def456abc123def456abc123def456abc123def456abcd";
 pName->sOrganization  = "Metaversal";
 pName->sCommonName    = "Metaversal";
@@ -256,7 +256,7 @@ These fire from STORAGE through `SNEEZE` up to the host (Artemis).
 
 Each storage unit has a companion `.meta` sidecar — same pattern as NETWORK:
 
-- Contains som::CONTAINER::NAME fields (fingerprint, organization, commonName,
+- Contains SNEEZE::VIEWPORT::CONTAINER::NAME fields (fingerprint, organization, commonName,
   containerName, personaHash, bValidated)
 - Contains scope identifier and statistics (createdAt, lastAccessedAt,
   accessCount, sizeBytes)

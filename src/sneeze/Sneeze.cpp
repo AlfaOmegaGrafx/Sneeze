@@ -15,14 +15,6 @@
 #include "Sneeze.h"
 #include "Types.h"
 #include "worker/Worker.h"
-#include "worker/Compositor.h"
-#include "worker/WorkerB.h"
-#include "worker/WorkerC.h"
-#include "worker/WorkerD.h"
-#include "worker/WorkerE.h"
-#include "worker/WorkerF.h"
-#include "worker/WorkerG.h"
-#include "worker/WorkerH.h"
 #include "astro/BodyData.h"
 #include "astro/RMCObject.h"
 #include "astro/AstroService.h"
@@ -63,26 +55,26 @@ struct WORKER_CONFIG
 
 static const std::vector<WORKER_CONFIG> aWorkerConfig =
 {
-   {   0, [] (SNEEZE* p) -> SNEEZE::WORKER* { return new WORKER_COMPOSITOR (p); } },
-   {   1, [] (SNEEZE* p) -> SNEEZE::WORKER* { return new WORKER_B          (p); } },
-   {  30, [] (SNEEZE* p) -> SNEEZE::WORKER* { return new WORKER_C          (p); } },
-   {  60, [] (SNEEZE* p) -> SNEEZE::WORKER* { return new WORKER_D          (p); } },
-   {  64, [] (SNEEZE* p) -> SNEEZE::WORKER* { return new WORKER_E          (p); } },
-   {  90, [] (SNEEZE* p) -> SNEEZE::WORKER* { return new WORKER_F          (p); } },
-   { 120, [] (SNEEZE* p) -> SNEEZE::WORKER* { return new WORKER_G          (p); } },
-   { 144, [] (SNEEZE* p) -> SNEEZE::WORKER* { return new WORKER_H          (p); } },
+   {   0, [] (SNEEZE* p) -> SNEEZE::WORKER* { return new SNEEZE::WORKER::COMPOSITOR (p); } },
+   {   1, [] (SNEEZE* p) -> SNEEZE::WORKER* { return new SNEEZE::WORKER::B          (p); } },
+   {  30, [] (SNEEZE* p) -> SNEEZE::WORKER* { return new SNEEZE::WORKER::C          (p); } },
+   {  60, [] (SNEEZE* p) -> SNEEZE::WORKER* { return new SNEEZE::WORKER::D          (p); } },
+   {  64, [] (SNEEZE* p) -> SNEEZE::WORKER* { return new SNEEZE::WORKER::E          (p); } },
+   {  90, [] (SNEEZE* p) -> SNEEZE::WORKER* { return new SNEEZE::WORKER::F          (p); } },
+   { 120, [] (SNEEZE* p) -> SNEEZE::WORKER* { return new SNEEZE::WORKER::G          (p); } },
+   { 144, [] (SNEEZE* p) -> SNEEZE::WORKER* { return new SNEEZE::WORKER::H          (p); } },
 };
 
 // ---------------------------------------------------------------------------
 // Engine modules (file-scope, initialized/shutdown by SNEEZE)
 // ---------------------------------------------------------------------------
 
-static wasm::WASM_RUNTIME   s_pWasmRuntime;
-static spirv::SPV_PIPELINE  s_pSpvPipeline;
+static DEP::WASM_RUNTIME   s_pWasmRuntime;
+static DEP::SPV_PIPELINE  s_pSpvPipeline;
 #ifdef SNEEZE_HAS_XR
-static xr::XR_RUNTIME       s_pXrRuntime;
+static DEP::XR_RUNTIME       s_pXrRuntime;
 #endif
-static ui::UI_CONTEXT       s_pUiContext;
+static DEP::UI_CONTEXT       s_pUiContext;
 
 // ---------------------------------------------------------------------------
 
@@ -98,12 +90,7 @@ SNEEZE::SNEEZE (ISNEEZE* pHost) :
    m_bResizePending         (false),
    m_nResizeWidth           (0),
    m_nResizeHeight          (0),
-   m_pRootFabric            (nullptr),
-   m_pRootFabricRootNode    (nullptr),
-   m_pPrimaryAttachNode     (nullptr),
-   m_pPrimaryFabric         (nullptr),
-   m_pPrimaryFabricRootNode (nullptr),
-   m_pScene                 (nullptr),
+   m_pViewport              (nullptr),
    m_pAstroService          (nullptr),
    m_pNetwork                 (nullptr),
    m_pStorage               (nullptr),
@@ -139,28 +126,34 @@ bool SNEEZE::Initialize ()
 #endif
             if (s_pUiContext.Initialize (this))
             {
-                  // --- Create SOM fabric structure ---
+                  // --- Create viewport and SOM structure ---
                   //
-                  // root fabric -> root fabric root node -> primary attach node
-                  //    -> primary fabric -> primary fabric root node (solar system)
+                  // viewport -> scene
+                  //   scene -> root fabric -> root node -> primary attach node
+                  //                        -> primary fabric -> primary root node
 
-                  m_pScene = new som::SCENE (this);
+                  m_pViewport = new VIEWPORT (this);
 
-                  m_pRootFabric         = new som::FABRIC (m_pScene);
-                  m_pRootFabricRootNode = new som::NODE (m_pRootFabric);
-                  m_pRootFabric->SetRootNode (m_pRootFabricRootNode);
+                  auto* pScene = new VIEWPORT::SCENE (this);
+                  m_pViewport->SetScene (pScene);
 
-                  m_pPrimaryAttachNode = new som::NODE (m_pRootFabric);
-                  m_pPrimaryAttachNode->SetPrimary (true);
-                  m_pRootFabricRootNode->AddChild (m_pPrimaryAttachNode);
+                  auto* pRootFabric = new VIEWPORT::SCENE::FABRIC (pScene);
+                  auto* pRootNode   = new VIEWPORT::SCENE::FABRIC::NODE (pRootFabric);
+                  pRootFabric->SetRootNode (pRootNode);
+                  pScene->SetRootFabric (pRootFabric);
 
-                  m_pPrimaryFabric         = new som::FABRIC (m_pScene);
-                  m_pPrimaryFabricRootNode = new som::NODE (m_pPrimaryFabric);
-                  m_pPrimaryFabric->SetRootNode (m_pPrimaryFabricRootNode);
-                  m_pPrimaryFabric->SetParent (m_pRootFabric);
-                  m_pPrimaryFabric->SetAttachingNode (m_pPrimaryAttachNode);
-                  m_pPrimaryAttachNode->SetAttachedFabric (m_pPrimaryFabric);
-                  m_pRootFabric->AddChildFabric (m_pPrimaryFabric);
+                  auto* pPrimaryAttach = new VIEWPORT::SCENE::FABRIC::NODE (pRootFabric);
+                  pPrimaryAttach->SetPrimary (true);
+                  pRootNode->AddChild (pPrimaryAttach);
+
+                  auto* pPrimaryFabric = new VIEWPORT::SCENE::FABRIC (pScene);
+                  auto* pPrimaryRoot   = new VIEWPORT::SCENE::FABRIC::NODE (pPrimaryFabric);
+                  pPrimaryFabric->SetRootNode (pPrimaryRoot);
+                  pPrimaryFabric->SetParent (pRootFabric);
+                  pPrimaryFabric->SetAttachingNode (pPrimaryAttach);
+                  pPrimaryAttach->SetAttachedFabric (pPrimaryFabric);
+                  pRootFabric->AddChildFabric (pPrimaryFabric);
+                  pScene->SetPrimaryFabric (pPrimaryFabric);
 
                   Log (ISNEEZE::kLOGLEVEL_Info, "SNEEZE", "SOM initialized (root fabric + primary fabric)");
 
@@ -188,7 +181,7 @@ bool SNEEZE::Initialize ()
                      "Created " + std::to_string (aBodies.size ()) + " bodies");
 
                   m_pAstroService = new astro::ASTRO_SERVICE (this);
-                  m_pAstroService->Initialize (m_pPrimaryFabric);
+                  m_pAstroService->Initialize (pPrimaryFabric);
 
                   // --- Create and initialize workers ---
 
@@ -314,23 +307,37 @@ void SNEEZE::Shutdown ()
       m_pAstroService = nullptr;
    }
 
-   delete m_pPrimaryFabricRootNode;
-   m_pPrimaryFabricRootNode = nullptr;
+   if (m_pViewport)
+   {
+      auto* pScene = m_pViewport->GetScene ();
+      if (pScene)
+      {
+         auto* pPrimaryFabric = pScene->GetPrimaryFabric ();
+         if (pPrimaryFabric)
+         {
+            delete pPrimaryFabric->GetRootNode ();
+            delete pPrimaryFabric;
+         }
 
-   delete m_pPrimaryFabric;
-   m_pPrimaryFabric = nullptr;
+         auto* pRootFabric = pScene->GetRootFabric ();
+         if (pRootFabric)
+         {
+            auto* pRootNode = pRootFabric->GetRootNode ();
+            if (pRootNode)
+            {
+               for (auto* pChild : pRootNode->Children ())
+                  delete pChild;
+               delete pRootNode;
+            }
+            delete pRootFabric;
+         }
 
-   delete m_pPrimaryAttachNode;
-   m_pPrimaryAttachNode = nullptr;
+         delete pScene;
+      }
 
-   delete m_pRootFabricRootNode;
-   m_pRootFabricRootNode = nullptr;
-
-   delete m_pRootFabric;
-   m_pRootFabric = nullptr;
-
-   delete m_pScene;
-   m_pScene = nullptr;
+      delete m_pViewport;
+      m_pViewport = nullptr;
+   }
 
    // --- Destroy network (after SOM) ---
 

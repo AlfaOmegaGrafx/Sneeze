@@ -208,7 +208,7 @@ public:
    class FILE : public SNEEZE::NOTIFICATION
    {
    public:
-      FILE (NETWORK* pNetwork, ASSET* pAsset, std::shared_ptr<som::CONTAINER::NAME> pName, IFILE* pListener, uint32_t nFileIx);
+      FILE (NETWORK* pNetwork, ASSET* pAsset, std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName, IFILE* pListener, uint32_t nFileIx);
       ~FILE ();
 
       // --- Snapshot fields (always available, even after Release) ---
@@ -251,7 +251,7 @@ public:
 
       // --- Container ---
 
-      const som::CONTAINER::NAME& GetName () const   { return *m_pName; }
+      const SNEEZE::VIEWPORT::CONTAINER::NAME& GetName () const   { return *m_pName; }
       std::string GetContainerName () const;
 
       // --- Listener ---
@@ -277,7 +277,7 @@ public:
    private:
       NETWORK*    m_pNetwork;
       ASSET*      m_pAsset;
-      std::shared_ptr<som::CONTAINER::NAME> m_pName;
+      std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> m_pName;
       IFILE*      m_pListener;
 
       // Initial (set once at construction — request identity)
@@ -318,8 +318,8 @@ public:
 
    // --- Primary API ---
 
-   FILE* Request (IFILE* pListener, std::shared_ptr<som::CONTAINER::NAME> pName, const std::string& sUrl);
-   FILE* Request (IFILE* pListener, std::shared_ptr<som::CONTAINER::NAME> pName, const std::string& sUrl,
+   FILE* Request (IFILE* pListener, std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName, const std::string& sUrl);
+   FILE* Request (IFILE* pListener, std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName, const std::string& sUrl,
                   const std::string& sHash, uint32_t bFlags = kREQUEST_DEFAULT,
                   uint32_t nMetaIx = 0);
    void  Release (FILE* pFile);

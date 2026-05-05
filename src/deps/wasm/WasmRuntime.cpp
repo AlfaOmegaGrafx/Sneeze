@@ -16,7 +16,7 @@
 #include "Sneeze.h"
 #include <cstdio>
 
-namespace wasm {
+namespace DEP {
 
 WASM_RUNTIME::WASM_RUNTIME ()
    : m_pSneeze (nullptr)
@@ -107,4 +107,4 @@ void WASM_RUNTIME::DestroyAllStores ()
    m_mapStores.clear ();
 }
 
-} // namespace wasm
+} // namespace DEP

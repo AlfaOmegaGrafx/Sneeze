@@ -12,18 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef SNEEZE_CORE_WORKER_E_H
-#define SNEEZE_CORE_WORKER_E_H
+#include "viewport/Viewport.h"
 
-#include "Worker.h"
+using VIEWPORT = SNEEZE::VIEWPORT;
 
-class WORKER_E : public SNEEZE::WORKER
+VIEWPORT::VIEWPORT (SNEEZE* pSneeze)
+   : m_pSneeze (pSneeze),
+     m_pScene  (nullptr)
 {
-public:
-   explicit WORKER_E (SNEEZE* pSneeze);
+}
 
-protected:
-   void Tick () override;
-};
-
-#endif // SNEEZE_CORE_WORKER_E_H
+VIEWPORT::~VIEWPORT ()
+{
+}

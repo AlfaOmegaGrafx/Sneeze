@@ -23,7 +23,7 @@
 
 class SNEEZE;
 
-namespace wasm {
+namespace DEP {
 
 class WASM_INSTANCE;
 
@@ -87,6 +87,6 @@ private:
    mutable std::mutex           m_mutex;
 };
 
-} // namespace wasm
+} // namespace DEP
 
 #endif // SNEEZE_WASM_WASMSTORE_H

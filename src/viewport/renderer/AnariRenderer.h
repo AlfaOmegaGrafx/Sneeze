@@ -23,7 +23,7 @@
 
 class SNEEZE;
 
-// Forward declarations for ANARI types used in ANARI_RENDERER class body
+// Forward declarations for ANARI types used in RENDERER::ANARI class body
 // to avoid transitively including in every unit that uses AnariRenderer.h
 namespace anari { namespace api {
 struct Library;
@@ -36,13 +36,11 @@ struct Renderer;
 struct World;
 }} // namespace api::anari
 
-namespace renderer {
-
-class ANARI_RENDERER : public RENDERER
+class SNEEZE::VIEWPORT::RENDERER::ANARI : public SNEEZE::VIEWPORT::RENDERER
 {
 public:
-   explicit ANARI_RENDERER (SNEEZE* pSneeze, const std::string& sLibrary);
-   ~ANARI_RENDERER () override;
+   explicit ANARI (SNEEZE* pSneeze, const std::string& sLibrary);
+   ~ANARI () override;
 
    void SetNativeWindow (void* pHandle) override;
    bool IsRenderingToNativeSurface () const override;
@@ -97,7 +95,5 @@ private:
    double m_dLastSubmitSeconds;
    double m_dLastRenderSeconds;
 };
-
-} // namespace renderer
 
 #endif // SNEEZE_RENDERER_ANARIRENDERER_H

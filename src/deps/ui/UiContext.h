@@ -19,7 +19,7 @@
 
 class SNEEZE;
 
-namespace ui
+namespace DEP
 {
 
 class UI_CONTEXT
@@ -36,6 +36,6 @@ private:
    bool bInitialized;
 };
 
-} // namespace ui
+} // namespace DEP
 
 #endif // SNEEZE_UI_CONTEXT_H

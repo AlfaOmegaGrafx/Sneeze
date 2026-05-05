@@ -12,17 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Scene.h"
+#include "scene/Scene.h"
 
-namespace som {
+using SCENE = SNEEZE::VIEWPORT::SCENE;
 
 SCENE::SCENE (SNEEZE* pSneeze)
-   : m_pSneeze (pSneeze)
+   : m_pSneeze       (pSneeze),
+     m_pRootFabric   (nullptr),
+     m_pPrimaryFabric (nullptr)
 {
 }
 
 SCENE::~SCENE ()
 {
 }
-
-} // namespace som

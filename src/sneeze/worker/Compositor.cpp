@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Compositor.h"
+#include "Worker.h"
 #include "Sneeze.h"
 #include "Types.h"
 #include "astro/Epoch.h"
@@ -24,6 +24,8 @@
 #include "scene/MapObject.h"
 #include <cmath>
 #include <cstdio>
+
+using WORKER = SNEEZE::WORKER;
 
 #ifdef _WIN32
 #include <dwmapi.h>
@@ -47,7 +49,7 @@ static void ColorFromU32 (uint32_t nColor, float& r, float& g, float& b)
 
 // ---------------------------------------------------------------------------
 
-WORKER_COMPOSITOR::WORKER_COMPOSITOR (SNEEZE* pSneeze)
+WORKER::COMPOSITOR::COMPOSITOR (SNEEZE* pSneeze)
    : WORKER (pSneeze)
    , m_pRenderer (pSneeze, pSneeze->GetHost ()->sRenderer)
    , m_tmNow (0)
@@ -76,11 +78,11 @@ WORKER_COMPOSITOR::WORKER_COMPOSITOR (SNEEZE* pSneeze)
    m_tmNow = static_cast<int64_t> (dElapsedSec * TICKS_PER_S);
 }
 
-void WORKER_COMPOSITOR::Tick ()
+void WORKER::COMPOSITOR::Tick ()
 {
 }
 
-void WORKER_COMPOSITOR::ThreadLoop ()
+void WORKER::COMPOSITOR::ThreadLoop ()
 {
    void* pNativeWindow = m_pSneeze->GetHost ()->pNativeWindow;
    if (pNativeWindow)
@@ -155,7 +157,7 @@ void WORKER_COMPOSITOR::ThreadLoop ()
       }
 
       // Camera
-      view::UpdateCameraOrbit (m_pCameraOrbit,
+      m_pCameraOrbit.Update (
          pInput.nMouseDX, pInput.nMouseDY, pInput.dScrollY,
          pInput.bMouseLeft, pInput.bMouseRight);
 
@@ -163,7 +165,7 @@ void WORKER_COMPOSITOR::ThreadLoop ()
       float dCamY = m_pCameraOrbit.dTargetY + m_pCameraOrbit.dDistance * std::sin (m_pCameraOrbit.dPhi);
       float dCamZ = m_pCameraOrbit.dTargetZ + m_pCameraOrbit.dDistance * std::cos (m_pCameraOrbit.dPhi) * std::sin (m_pCameraOrbit.dTheta);
 
-      renderer::CAMERA_DATA pCamera;
+      CAMERA_DATA pCamera;
       pCamera.dPosX = dCamX;
       pCamera.dPosY = dCamY;
       pCamera.dPosZ = dCamZ;
@@ -191,20 +193,20 @@ void WORKER_COMPOSITOR::ThreadLoop ()
       auto tpSceneStart = std::chrono::steady_clock::now ();
       m_dAccumInput += std::chrono::duration<double> (tpSceneStart - tpLoopStart).count ();
 
-      std::vector<renderer::SPHERE_DATA> aSpheres;
-      std::vector<renderer::CURVE_DATA>  aCurves;
+      std::vector<SPHERE_DATA> aSpheres;
+      std::vector<CURVE_DATA>  aCurves;
 
-      som::FABRIC* pPrimaryFabric = m_pSneeze->GetPrimaryFabric ();
-      som::NODE* pSomRoot = pPrimaryFabric ? pPrimaryFabric->GetRootNode () : nullptr;
+      SNEEZE::VIEWPORT::SCENE::FABRIC* pPrimaryFabric = m_pSneeze->GetViewport ()->GetScene ()->GetPrimaryFabric ();
+      SNEEZE::VIEWPORT::SCENE::FABRIC::NODE* pSomRoot = pPrimaryFabric ? pPrimaryFabric->GetRootNode () : nullptr;
 
       if (pSomRoot)
       {
          astro::ORBIT_POSITION pos;
 
-         for (som::NODE* pNode : pSomRoot->Children ())
+         for (SNEEZE::VIEWPORT::SCENE::FABRIC::NODE* pNode : pSomRoot->Children ())
          {
-            som::MAP_OBJECT* pObj = pNode->GetMapObject ();
-            if (!pObj  ||  pObj->GetType () != som::MAP_OBJECT_TYPE_CELESTIAL)
+            MAP_OBJECT* pObj = pNode->GetMapObject ();
+            if (!pObj  ||  pObj->GetType () != MAP_OBJECT_TYPE_CELESTIAL)
                continue;
 
             auto* pCelestial = static_cast<astro::CELESTIAL_MAP_OBJECT*> (pObj);
@@ -229,7 +231,7 @@ void WORKER_COMPOSITOR::ThreadLoop ()
             if (dRadius < MIN_SPHERE_RADIUS) dRadius = MIN_SPHERE_RADIUS;
             if (!pCelestial->m_pOrbit) dRadius *= SUN_RADIUS_SCALE;
 
-            renderer::SPHERE_DATA sphere;
+            SPHERE_DATA sphere;
             sphere.x         = dBodyX;
             sphere.y         = dBodyY;
             sphere.z         = dBodyZ;
@@ -252,7 +254,7 @@ void WORKER_COMPOSITOR::ThreadLoop ()
 
             if (pCelestial->m_pOrbit)
             {
-               renderer::CURVE_DATA curve;
+               CURVE_DATA curve;
                ColorFromU32 (pCelestial->m_nColor, curve.r, curve.g, curve.b);
                curve.r *= 0.4f;
                curve.g *= 0.4f;
@@ -260,7 +262,7 @@ void WORKER_COMPOSITOR::ThreadLoop ()
 
                int nTrailPoints = static_cast<int> (TRAIL_SEGMENTS * TRAIL_FRACTION);
 
-               renderer::CURVE_POINT cpHead;
+               CURVE_POINT cpHead;
                cpHead.x       = dBodyX;
                cpHead.y       = dBodyY;
                cpHead.z       = dBodyZ;
@@ -276,7 +278,7 @@ void WORKER_COMPOSITOR::ThreadLoop ()
                      double dE = dE_planet - (static_cast<double> (i) / TRAIL_SEGMENTS) * TWO_PI;
                      VEC3 vPt = pCelestial->m_pOrbit->PointOnOrbit (dE, m_tmNow);
 
-                     renderer::CURVE_POINT cp;
+                     CURVE_POINT cp;
                      cp.x       = static_cast<float> (vPt.x * METERS_TO_AU);
                      cp.y       = static_cast<float> (vPt.y * METERS_TO_AU);
                      cp.z       = static_cast<float> (vPt.z * METERS_TO_AU);

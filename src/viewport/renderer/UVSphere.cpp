@@ -15,8 +15,6 @@
 #include "UVSphere.h"
 #include <cmath>
 
-namespace renderer {
-
 static constexpr float PI = 3.14159265358979323846f;
 
 void GenerateUVSphere (UV_SPHERE& sphere, float dRadius,
@@ -77,4 +75,3 @@ void GenerateUVSphere (UV_SPHERE& sphere, float dRadius,
    }
 }
 
-} // namespace renderer

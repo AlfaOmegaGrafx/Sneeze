@@ -18,7 +18,7 @@
 #include <wasmtime.h>
 #include <cstdint>
 
-namespace wasm {
+namespace DEP {
 
 // ---------------------------------------------------------------------------
 // Host functions exposed to WASM modules via Wasmtime linker.
@@ -83,6 +83,6 @@ wasm_trap_t* Storage_Has (void* pEnv, wasmtime_caller_t* pCaller,
    const wasmtime_val_t* pArgs, size_t nArgs,
    wasmtime_val_t* pResults, size_t nResults);
 
-} // namespace wasm
+} // namespace DEP
 
 #endif // SNEEZE_WASM_HOSTFUNCTIONS_H

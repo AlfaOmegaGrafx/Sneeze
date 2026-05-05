@@ -11,13 +11,13 @@ the kernel has no SPIR-V binary), it falls back to a registered CPU kernel.
 ```cpp
 #include "compute/ComputeDispatch.h"
 
-compute::COMPUTE_DISPATCH dispatch;
+DEP::COMPUTE_DISPATCH dispatch;
 
 // Register a CPU fallback kernel
 dispatch.RegisterCpuKernel ("test_proximity", MyProximityKernel);
 
 // Dispatch — GPU if available, CPU otherwise
-compute::BUFFER_BINDING bindings[] = {
+DEP::BUFFER_BINDING bindings[] = {
    { 0, pPositions, nPosSize, true },
    { 1, pResults,   nResSize, false },
 };
@@ -55,7 +55,7 @@ compiled at build time and embedded into the Sneeze library as Windows
 resources (or platform equivalent).
 
 ```cpp
-compute::KERNEL_DATA k = compute::GetEmbeddedKernel ("test_proximity");
+DEP::KERNEL_DATA k = DEP::GetEmbeddedKernel ("test_proximity");
 // k.pBytes, k.nSize
 ```
 

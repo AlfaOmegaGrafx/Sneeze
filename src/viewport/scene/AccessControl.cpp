@@ -16,10 +16,11 @@
 #include "Node.h"
 #include "Fabric.h"
 
-namespace som {
+using NODE   = SNEEZE::VIEWPORT::SCENE::FABRIC::NODE;
+using FABRIC = SNEEZE::VIEWPORT::SCENE::FABRIC;
 
 // ---------------------------------------------------------------------------
-// CanRead — determines if pRequestingOwner may read this node's data.
+// CanRead -- determines if pRequestingOwner may read this node's data.
 //
 // Rules:
 //   1. Null owner = browser internal, always allowed.
@@ -50,7 +51,7 @@ bool CanRead (const NODE* pNode, const void* pRequestingOwner)
 }
 
 // ---------------------------------------------------------------------------
-// CanWrite — determines if pRequestingOwner may modify this node.
+// CanWrite -- determines if pRequestingOwner may modify this node.
 //
 // Rules:
 //   1. Null owner = browser internal, always allowed.
@@ -100,5 +101,3 @@ bool CanWriteFabric (const FABRIC* pFabric, const void* pRequestingOwner)
 
    return pFabric->GetOwner () == pRequestingOwner;
 }
-
-} // namespace som

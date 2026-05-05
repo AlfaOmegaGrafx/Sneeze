@@ -15,14 +15,11 @@
 #ifndef SNEEZE_SOM_EVENTS_H
 #define SNEEZE_SOM_EVENTS_H
 
+#include "scene/Fabric.h"
 #include <cstdint>
 #include <vector>
 #include <mutex>
 #include <functional>
-
-namespace som {
-
-class NODE;
 
 // ---------------------------------------------------------------------------
 // Event types that watchers can subscribe to
@@ -43,8 +40,8 @@ enum EVENT_TYPE
 struct EVENT_DATA
 {
    EVENT_TYPE  bType;
-   NODE*       pNode;
-   NODE*       pParent;
+   SNEEZE::VIEWPORT::SCENE::FABRIC::NODE*  pNode;
+   SNEEZE::VIEWPORT::SCENE::FABRIC::NODE*  pParent;
    uint32_t    twObjectIx;
 };
 
@@ -61,7 +58,7 @@ using EVENT_CALLBACK = std::function<void (const EVENT_DATA& pEvent)>;
 struct WATCH
 {
    uint32_t       twWatchId;
-   NODE*          pTarget;
+   SNEEZE::VIEWPORT::SCENE::FABRIC::NODE*  pTarget;
    bool           bRecursive;
    uint32_t       nEventMask;
    void*          pOwner;
@@ -83,25 +80,23 @@ public:
 
    // --- Watch management ---
 
-   uint32_t Watch_Node (NODE* pNode, uint32_t nEventMask, void* pOwner, EVENT_CALLBACK pfnCallback);
-   uint32_t Watch_Tree (NODE* pNode, uint32_t nEventMask, void* pOwner, EVENT_CALLBACK pfnCallback);
+   uint32_t Watch_Node (SNEEZE::VIEWPORT::SCENE::FABRIC::NODE* pNode, uint32_t nEventMask, void* pOwner, EVENT_CALLBACK pfnCallback);
+   uint32_t Watch_Tree (SNEEZE::VIEWPORT::SCENE::FABRIC::NODE* pNode, uint32_t nEventMask, void* pOwner, EVENT_CALLBACK pfnCallback);
    void     Unwatch (uint32_t twWatchId);
    void     UnwatchAll (void* pOwner);
 
    // --- Event dispatch (called by SOM mutators) ---
 
-   void Fire_NodeAdded (NODE* pParent, NODE* pChild);
-   void Fire_NodeRemoved (NODE* pParent, NODE* pChild);
-   void Fire_NodeModified (NODE* pNode);
+   void Fire_NodeAdded (SNEEZE::VIEWPORT::SCENE::FABRIC::NODE* pParent, SNEEZE::VIEWPORT::SCENE::FABRIC::NODE* pChild);
+   void Fire_NodeRemoved (SNEEZE::VIEWPORT::SCENE::FABRIC::NODE* pParent, SNEEZE::VIEWPORT::SCENE::FABRIC::NODE* pChild);
+   void Fire_NodeModified (SNEEZE::VIEWPORT::SCENE::FABRIC::NODE* pNode);
 
 private:
-   bool MatchesTarget (const WATCH& pWatch, NODE* pNode) const;
+   bool MatchesTarget (const WATCH& pWatch, SNEEZE::VIEWPORT::SCENE::FABRIC::NODE* pNode) const;
 
    std::vector<WATCH>  m_aWatches;
    uint32_t            m_twNextWatchId;
    mutable std::mutex  m_mutex;
 };
-
-} // namespace som
 
 #endif // SNEEZE_SOM_EVENTS_H

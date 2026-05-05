@@ -16,30 +16,26 @@
 #include <cmath>
 #include <algorithm>
 
-namespace view {
-
 static constexpr float MOUSE_SENSITIVITY = 0.005f;
 static constexpr float SCROLL_FACTOR     = 1.1f;
 static constexpr float MIN_DISTANCE      = 0.1f;
 static constexpr float MAX_DISTANCE      = 1e14f;
 static constexpr float PI_F              = 3.14159265358979f;
 
-void UpdateCameraOrbit (CAMERA_ORBIT& pOrbit, int nDX, int nDY, float dScrollY,
-                        bool bMouseLeft, bool bMouseRight)
+void SNEEZE::VIEWPORT::VIEW::Update (int nDX, int nDY, float dScrollY,
+                                     bool bMouseLeft, bool bMouseRight)
 {
    if (bMouseLeft)
    {
-      pOrbit.dTheta += nDX * MOUSE_SENSITIVITY;
-      pOrbit.dPhi   += nDY * MOUSE_SENSITIVITY;
-      pOrbit.dPhi = std::max (-PI_F * 0.49f, std::min (PI_F * 0.49f, pOrbit.dPhi));
+      dTheta += nDX * MOUSE_SENSITIVITY;
+      dPhi   += nDY * MOUSE_SENSITIVITY;
+      dPhi = std::max (-PI_F * 0.49f, std::min (PI_F * 0.49f, dPhi));
    }
 
    if (dScrollY != 0.0f)
    {
       float dFactor = (dScrollY > 0.0f) ? (1.0f / SCROLL_FACTOR) : SCROLL_FACTOR;
-      pOrbit.dDistance *= dFactor;
-      pOrbit.dDistance = std::max (MIN_DISTANCE, std::min (MAX_DISTANCE, pOrbit.dDistance));
+      dDistance *= dFactor;
+      dDistance = std::max (MIN_DISTANCE, std::min (MAX_DISTANCE, dDistance));
    }
 }
-
-} // namespace view

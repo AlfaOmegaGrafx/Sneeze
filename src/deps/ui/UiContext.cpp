@@ -123,7 +123,7 @@ static STUB_FONT_ENGINE pStubFontEngine;
 
 } // anonymous namespace
 
-namespace ui
+namespace DEP
 {
 
 UI_CONTEXT::UI_CONTEXT ()
@@ -173,4 +173,4 @@ void UI_CONTEXT::Shutdown ()
    }
 }
 
-} // namespace ui
+} // namespace DEP

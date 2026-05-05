@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "WorkerG.h"
+#include "Worker.h"
 
-WORKER_G::WORKER_G (SNEEZE* pSneeze)
+using WORKER = SNEEZE::WORKER;
+
+WORKER::G::G (SNEEZE* pSneeze)
    : WORKER (pSneeze)
 {
 }
 
-void WORKER_G::Tick ()
+void WORKER::G::Tick ()
 {
 }

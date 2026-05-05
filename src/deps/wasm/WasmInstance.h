@@ -21,7 +21,7 @@
 
 class SNEEZE;
 
-namespace wasm {
+namespace DEP {
 
 class WASM_STORE;
 
@@ -91,6 +91,6 @@ private:
    bool               m_bInstantiated;
 };
 
-} // namespace wasm
+} // namespace DEP
 
 #endif // SNEEZE_WASM_WASMINSTANCE_H

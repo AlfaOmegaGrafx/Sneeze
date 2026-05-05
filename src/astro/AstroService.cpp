@@ -52,13 +52,13 @@ ASTRO_SERVICE::~ASTRO_SERVICE ()
 // The sun gets a standalone node with no orbit.
 // ---------------------------------------------------------------------------
 
-bool ASTRO_SERVICE::Initialize (som::FABRIC* pPrimaryFabric)
+bool ASTRO_SERVICE::Initialize (SNEEZE::VIEWPORT::SCENE::FABRIC* pPrimaryFabric)
 {
    m_pFabric = pPrimaryFabric;
    if (!m_pFabric  ||  !m_pFabric->GetRootNode ())
       return false;
 
-   som::NODE* pRoot = m_pFabric->GetRootNode ();
+   SNEEZE::VIEWPORT::SCENE::FABRIC::NODE* pRoot = m_pFabric->GetRootNode ();
 
    // --- Sun node (no orbit, sits at origin) ---
    {
@@ -74,7 +74,7 @@ bool ASTRO_SERVICE::Initialize (som::FABRIC* pPrimaryFabric)
       pMapObj->m_pOrbit      = nullptr;
       pMapObj->m_sTextureUrl = pSun ? pSun->sTexture : "";
 
-      auto* pNode = new som::NODE (m_pFabric);
+      auto* pNode = new SNEEZE::VIEWPORT::SCENE::FABRIC::NODE (m_pFabric);
       pNode->SetMapObject (pMapObj);
       pRoot->AddChild (pNode);
 
@@ -120,7 +120,7 @@ bool ASTRO_SERVICE::Initialize (som::FABRIC* pPrimaryFabric)
       pMapObj->m_pOrbit      = pBody->pOrbit.get ();
       pMapObj->m_sTextureUrl = sTexture;
 
-      auto* pNode = new som::NODE (m_pFabric);
+      auto* pNode = new SNEEZE::VIEWPORT::SCENE::FABRIC::NODE (m_pFabric);
       pNode->SetMapObject (pMapObj);
       pRoot->AddChild (pNode);
 

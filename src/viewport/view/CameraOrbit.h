@@ -12,24 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef SNEEZE_VIEW_CAMERAORBIT_H
-#define SNEEZE_VIEW_CAMERAORBIT_H
+#ifndef SNEEZE_VIEWPORT_VIEW_H
+#define SNEEZE_VIEWPORT_VIEW_H
 
-namespace view {
+#include "viewport/Viewport.h"
 
-struct CAMERA_ORBIT
+class SNEEZE::VIEWPORT::VIEW
 {
+public:
    float dTheta;
    float dPhi;
    float dDistance;
    float dTargetX;
    float dTargetY;
    float dTargetZ;
+
+   void Update (int nDX, int nDY, float dScrollY, bool bMouseLeft, bool bMouseRight);
 };
 
-void UpdateCameraOrbit (CAMERA_ORBIT& pOrbit, int nDX, int nDY, float dScrollY,
-                        bool bMouseLeft, bool bMouseRight);
-
-} // namespace view
-
-#endif // SNEEZE_VIEW_CAMERAORBIT_H
+#endif // SNEEZE_VIEWPORT_VIEW_H

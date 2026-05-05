@@ -21,7 +21,7 @@
 
 class SNEEZE;
 
-namespace spirv
+namespace DEP
 {
 
 class SPV_PIPELINE
@@ -40,6 +40,6 @@ private:
    bool bInitialized;
 };
 
-} // namespace spirv
+} // namespace DEP
 
 #endif // SNEEZE_SPV_PIPELINE_H

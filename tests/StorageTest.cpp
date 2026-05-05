@@ -71,9 +71,9 @@ static STORAGE_TEST_HOST*       s_pHost    = nullptr;
 static SNEEZE*    s_pSneeze  = nullptr;
 static SNEEZE::STORAGE*         s_pStorage = nullptr;
 
-static std::shared_ptr<som::CONTAINER::NAME> MakeTestName (const std::string& sContainer = "poker")
+static std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> MakeTestName (const std::string& sContainer = "poker")
 {
-   auto pName = std::make_shared<som::CONTAINER::NAME> ();
+   auto pName = std::make_shared<SNEEZE::VIEWPORT::CONTAINER::NAME> ();
    pName->sFingerprint   = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
    pName->sOrganization  = "TestOrg";
    pName->sCommonName    = "TestOrg";

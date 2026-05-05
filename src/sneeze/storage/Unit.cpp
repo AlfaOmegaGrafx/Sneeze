@@ -456,7 +456,7 @@ void SNEEZE::STORAGE::UNIT::TouchAccess ()
    m_nAccessCount++;
 }
 
-void SNEEZE::STORAGE::UNIT::SaveMeta (std::shared_ptr<som::CONTAINER::NAME> pName)
+void SNEEZE::STORAGE::UNIT::SaveMeta (std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName)
 {
    std::string sMetaPath = m_sJsonPath + ".meta";
    std::filesystem::create_directories (std::filesystem::path (sMetaPath).parent_path ());

@@ -17,7 +17,7 @@
 #include "Sneeze.h"
 #include <cstdio>
 
-namespace wasm {
+namespace DEP {
 
 WASM_INSTANCE::WASM_INSTANCE (SNEEZE* pSneeze, WASM_STORE* pStore, const std::string& sUrl, const std::string& sSha256)
    : m_pSneeze (pSneeze)
@@ -131,4 +131,4 @@ bool WASM_INSTANCE::CallShutdown ()
    return true;
 }
 
-} // namespace wasm
+} // namespace DEP

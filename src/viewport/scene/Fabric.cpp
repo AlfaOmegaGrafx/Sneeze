@@ -16,7 +16,7 @@
 #include "Node.h"
 #include <algorithm>
 
-namespace som {
+using FABRIC = SNEEZE::VIEWPORT::SCENE::FABRIC;
 
 FABRIC::FABRIC (SCENE* pScene)
    : m_pScene (pScene)
@@ -50,5 +50,3 @@ void FABRIC::RemoveChildFabric (FABRIC* pChild)
       m_apChildren.erase (it);
    }
 }
-
-} // namespace som

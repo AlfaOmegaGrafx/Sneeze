@@ -514,15 +514,7 @@ set (CORE_SOURCES
 set (CORE_HEADERS
    sneeze/Types.h
    sneeze/Sneeze.h
-   sneeze/worker/Worker.h
-   sneeze/worker/Compositor.h
-   sneeze/worker/WorkerB.h
-   sneeze/worker/WorkerC.h
-   sneeze/worker/WorkerD.h
-   sneeze/worker/WorkerE.h
-   sneeze/worker/WorkerF.h
-   sneeze/worker/WorkerG.h
-   sneeze/worker/WorkerH.h)
+   sneeze/worker/Worker.h)
 
 set (ASTRO_SOURCES
    astro/BodyData.cpp
@@ -540,6 +532,7 @@ set (ASTRO_HEADERS
    astro/AstroService.h)
 
 set (SOM_SOURCES
+   viewport/Viewport.cpp
    viewport/scene/Node.cpp
    viewport/scene/Fabric.cpp
    viewport/scene/Scene.cpp
@@ -548,6 +541,7 @@ set (SOM_SOURCES
    viewport/scene/Events.cpp
    viewport/scene/SpatialIndex.cpp)
 set (SOM_HEADERS
+   viewport/Viewport.h
    viewport/scene/Types.h
    viewport/scene/Node.h
    viewport/scene/Fabric.h
@@ -611,9 +605,7 @@ set (MSF_SOURCES
    viewport/msf/MsfFile.cpp
    viewport/msf/CertChain.cpp)
 set (MSF_HEADERS
-   viewport/msf/MsfFile.h
-   viewport/msf/CertInfo.h
-   viewport/msf/CertChain.h)
+   viewport/msf/Msf.h)
 
 set (STB_SOURCES  deps/stb/stb_image_impl.cpp)
 set (STB_HEADERS  deps/stb/stb_image.h)

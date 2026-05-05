@@ -18,7 +18,7 @@
 #include <cstdint>
 #include <cstddef>
 
-namespace compute
+namespace DEP
 {
 
 struct KERNEL_DATA
@@ -29,6 +29,6 @@ struct KERNEL_DATA
 
 KERNEL_DATA GetEmbeddedKernel (const char* szName);
 
-} // namespace compute
+} // namespace DEP
 
 #endif // SNEEZE_COMPUTE_EMBEDDED_KERNELS_H

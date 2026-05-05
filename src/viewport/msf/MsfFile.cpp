@@ -12,21 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "MsfFile.h"
-#include "Sneeze.h"
+#include "Msf.h"
 
 #include <jwt-cpp/traits/nlohmann-json/defaults.h>
 
 #include <cstdio>
 
-namespace msf
-{
+using MSF     = SNEEZE::VIEWPORT::MSF;
+using SERVICE = MSF::SERVICE;
+using MODULE  = MSF::MODULE;
 
 // ---------------------------------------------------------------------------
 // Construction / Destruction
 // ---------------------------------------------------------------------------
 
-MSF_FILE::MSF_FILE (SNEEZE* pSneeze)
+MSF::MSF (SNEEZE* pSneeze)
    : m_bSignatureValid (false)
    , m_bChainTrusted (false)
    , m_bParsed (false)
@@ -34,7 +34,7 @@ MSF_FILE::MSF_FILE (SNEEZE* pSneeze)
 {
 }
 
-MSF_FILE::~MSF_FILE ()
+MSF::~MSF ()
 {
 }
 
@@ -42,7 +42,7 @@ MSF_FILE::~MSF_FILE ()
 // Parse
 // ---------------------------------------------------------------------------
 
-bool MSF_FILE::Parse (const std::string& sJws)
+bool MSF::Parse (const std::string& sJws)
 {
    bool bResult = false;
 
@@ -76,10 +76,10 @@ bool MSF_FILE::Parse (const std::string& sJws)
             for (size_t i = 0; i < m_aX5cEntries.size (); ++i)
             {
                m_aCertInfos.push_back (
-                  CERT_CHAIN::DecodeInfoDerBase64 (m_aX5cEntries[i], i > 0));
+                  CHAIN::DecodeInfoDerBase64 (m_aX5cEntries[i], i > 0));
 
                if (i == 0)
-                  m_sFingerprint = CERT_CHAIN::ComputeFingerprint (m_aX5cEntries[0]);
+                  m_sFingerprint = CHAIN::ComputeFingerprint (m_aX5cEntries[0]);
             }
          }
 
@@ -101,7 +101,7 @@ bool MSF_FILE::Parse (const std::string& sJws)
       }
       catch (const std::exception& ex)
       {
-         m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Error, "MSF_FILE", std::string ("Parse: ") + ex.what ());
+         m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Error, "MSF", std::string ("Parse: ") + ex.what ());
       }
    }
 
@@ -112,8 +112,8 @@ bool MSF_FILE::Parse (const std::string& sJws)
 // Sign
 // ---------------------------------------------------------------------------
 
-std::string MSF_FILE::Sign (const std::string& sPrivateKeyPem,
-                            const std::string& sAlgorithm)
+std::string MSF::Sign (const std::string& sPrivateKeyPem,
+                                         const std::string& sAlgorithm)
 {
    std::string sResult;
 
@@ -124,7 +124,7 @@ std::string MSF_FILE::Sign (const std::string& sPrivateKeyPem,
 
       for (size_t i = 0; i < m_aCertsPem.size ()  &&  bCertsOk; ++i)
       {
-         std::string sB64 = CERT_CHAIN::PemToDerBase64 (m_aCertsPem[i]);
+         std::string sB64 = CHAIN::PemToDerBase64 (m_aCertsPem[i]);
          if (sB64.empty ())
             bCertsOk = false;
          else
@@ -154,13 +154,13 @@ std::string MSF_FILE::Sign (const std::string& sPrivateKeyPem,
             sResult = pBuilder.sign (jwt::algorithm::es512 ("", sPrivateKeyPem));
          else
          {
-            m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Error, "MSF_FILE", "Sign: unknown algorithm \"" + sAlgorithm + "\"");
+            m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Error, "MSF", "Sign: unknown algorithm \"" + sAlgorithm + "\"");
          }
       }
    }
    catch (const std::exception& ex)
    {
-      m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Error, "MSF_FILE", std::string ("Sign: exception: ") + ex.what ());
+      m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Error, "MSF", std::string ("Sign: exception: ") + ex.what ());
 
       sResult.clear ();
    }
@@ -172,7 +172,7 @@ std::string MSF_FILE::Sign (const std::string& sPrivateKeyPem,
 // VerifySignature
 // ---------------------------------------------------------------------------
 
-bool MSF_FILE::VerifySignature ()
+bool MSF::VerifySignature ()
 {
    bool bResult = false;
    m_bSignatureValid = false;
@@ -192,7 +192,7 @@ bool MSF_FILE::VerifySignature ()
       {
          auto decoded = jwt::decode (m_sRawJws);
 
-         std::string sPubKeyPem = CERT_CHAIN::ExtractPublicKeyPem (m_aX5cEntries[0]);
+         std::string sPubKeyPem = CHAIN::ExtractPublicKeyPem (m_aX5cEntries[0]);
          if (sPubKeyPem.empty ())
             throw std::runtime_error ("failed to extract public key from leaf certificate");
 
@@ -228,7 +228,7 @@ bool MSF_FILE::VerifySignature ()
 // VerifyChain
 // ---------------------------------------------------------------------------
 
-bool MSF_FILE::VerifyChain ()
+bool MSF::VerifyChain ()
 {
    bool bResult = false;
    m_bChainTrusted = false;
@@ -263,7 +263,7 @@ bool MSF_FILE::VerifyChain ()
 // Trust store
 // ---------------------------------------------------------------------------
 
-void MSF_FILE::AddTrustedCert (const std::string& sPem)
+void MSF::AddTrustedCert (const std::string& sPem)
 {
    m_certChain.AddTrustedCert (sPem);
 }
@@ -272,14 +272,14 @@ void MSF_FILE::AddTrustedCert (const std::string& sPem)
 // Certificate chain management
 // ---------------------------------------------------------------------------
 
-void MSF_FILE::AddCert (const std::string& sPem)
+void MSF::AddCert (const std::string& sPem)
 {
    bool bIsCA = !m_aCertsPem.empty ();
    m_aCertsPem.push_back (sPem);
-   m_aCertInfos.push_back (CERT_CHAIN::DecodeInfoPem (sPem, bIsCA));
+   m_aCertInfos.push_back (CHAIN::DecodeInfoPem (sPem, bIsCA));
 }
 
-bool MSF_FILE::RemoveCert (int nIndex)
+bool MSF::RemoveCert (int nIndex)
 {
    bool bResult = false;
 
@@ -294,12 +294,12 @@ bool MSF_FILE::RemoveCert (int nIndex)
    return bResult;
 }
 
-const std::vector<CERT_INFO>& MSF_FILE::GetCertInfos () const
+const std::vector<MSF::CERT>& MSF::GetCertInfos () const
 {
    return m_aCertInfos;
 }
 
-int MSF_FILE::GetCertCount () const
+int MSF::GetCertCount () const
 {
    return (int) m_aCertInfos.size ();
 }
@@ -308,12 +308,12 @@ int MSF_FILE::GetCertCount () const
 // Payload (bulk)
 // ---------------------------------------------------------------------------
 
-void MSF_FILE::SetPayload (const nlohmann::json& payload)
+void MSF::SetPayload (const nlohmann::json& payload)
 {
    m_payload = payload;
 }
 
-nlohmann::json MSF_FILE::GetPayload () const
+nlohmann::json MSF::GetPayload () const
 {
    return m_payload;
 }
@@ -322,14 +322,14 @@ nlohmann::json MSF_FILE::GetPayload () const
 // Payload (typed fields)
 // ---------------------------------------------------------------------------
 
-void MSF_FILE::SetNamespace (const std::string& sNamespace)
+void MSF::SetNamespace (const std::string& sNamespace)
 {
    if (!m_payload.is_object ())
       m_payload = nlohmann::json::object ();
    m_payload["namespace"] = sNamespace;
 }
 
-std::string MSF_FILE::GetNamespace () const
+std::string MSF::GetNamespace () const
 {
    std::string sResult;
    if (m_payload.is_object ()  &&  m_payload.contains ("namespace"))
@@ -337,14 +337,14 @@ std::string MSF_FILE::GetNamespace () const
    return sResult;
 }
 
-void MSF_FILE::SetOrganization (const std::string& sOrganization)
+void MSF::SetOrganization (const std::string& sOrganization)
 {
    if (!m_payload.is_object ())
       m_payload = nlohmann::json::object ();
    m_payload["organization"] = sOrganization;
 }
 
-std::string MSF_FILE::GetOrganization () const
+std::string MSF::GetOrganization () const
 {
    std::string sResult;
    if (m_payload.is_object ()  &&  m_payload.contains ("organization"))
@@ -352,14 +352,14 @@ std::string MSF_FILE::GetOrganization () const
    return sResult;
 }
 
-void MSF_FILE::SetSuccessor (const std::string& sSuccessor)
+void MSF::SetSuccessor (const std::string& sSuccessor)
 {
    if (!m_payload.is_object ())
       m_payload = nlohmann::json::object ();
    m_payload["successor"] = sSuccessor;
 }
 
-std::string MSF_FILE::GetSuccessor () const
+std::string MSF::GetSuccessor () const
 {
    std::string sResult;
    if (m_payload.is_object ()  &&  m_payload.contains ("successor"))
@@ -371,7 +371,7 @@ std::string MSF_FILE::GetSuccessor () const
 // Services
 // ---------------------------------------------------------------------------
 
-void MSF_FILE::AddService (const MSF_SERVICE& service)
+void MSF::AddService (const SERVICE& service)
 {
    if (!m_payload.is_object ())
       m_payload = nlohmann::json::object ();
@@ -388,7 +388,7 @@ void MSF_FILE::AddService (const MSF_SERVICE& service)
    m_payload["services"].push_back (svc);
 }
 
-bool MSF_FILE::RemoveService (const std::string& sName)
+bool MSF::RemoveService (const std::string& sName)
 {
    bool bResult = false;
 
@@ -410,16 +410,16 @@ bool MSF_FILE::RemoveService (const std::string& sName)
    return bResult;
 }
 
-std::vector<MSF_SERVICE> MSF_FILE::GetServices () const
+std::vector<SERVICE> MSF::GetServices () const
 {
-   std::vector<MSF_SERVICE> aResult;
+   std::vector<SERVICE> aResult;
 
    if (m_payload.is_object ()  &&  m_payload.contains ("services")
        &&  m_payload["services"].is_array ())
    {
       for (const auto& svc : m_payload["services"])
       {
-         MSF_SERVICE entry;
+         SERVICE entry;
          if (svc.contains ("name"))     entry.sName     = svc["name"].get<std::string> ();
          if (svc.contains ("type"))     entry.sType     = svc["type"].get<std::string> ();
          if (svc.contains ("endpoint")) entry.sEndpoint = svc["endpoint"].get<std::string> ();
@@ -439,9 +439,9 @@ std::vector<MSF_SERVICE> MSF_FILE::GetServices () const
 // Modules
 // ---------------------------------------------------------------------------
 
-void MSF_FILE::AddModule (const std::string& sName,
-                          const std::string& sUrl,
-                          const std::string& sSha256)
+void MSF::AddModule (const std::string& sName,
+                                       const std::string& sUrl,
+                                       const std::string& sSha256)
 {
    if (!m_payload.is_object ())
       m_payload = nlohmann::json::object ();
@@ -454,7 +454,7 @@ void MSF_FILE::AddModule (const std::string& sName,
    m_payload["modules"][sName] = mod;
 }
 
-bool MSF_FILE::RemoveModule (const std::string& sName)
+bool MSF::RemoveModule (const std::string& sName)
 {
    bool bResult = false;
 
@@ -468,16 +468,16 @@ bool MSF_FILE::RemoveModule (const std::string& sName)
    return bResult;
 }
 
-std::map<std::string, MSF_MODULE> MSF_FILE::GetModules () const
+std::map<std::string, MODULE> MSF::GetModules () const
 {
-   std::map<std::string, MSF_MODULE> aResult;
+   std::map<std::string, MODULE> aResult;
 
    if (m_payload.is_object ()  &&  m_payload.contains ("modules")
        &&  m_payload["modules"].is_object ())
    {
       for (auto it = m_payload["modules"].begin (); it != m_payload["modules"].end (); ++it)
       {
-         MSF_MODULE mod;
+         MODULE mod;
          if (it.value ().contains ("url"))    mod.sUrl    = it.value ()["url"].get<std::string> ();
          if (it.value ().contains ("sha256")) mod.sSha256 = it.value ()["sha256"].get<std::string> ();
          aResult[it.key ()] = mod;
@@ -491,11 +491,9 @@ std::map<std::string, MSF_MODULE> MSF_FILE::GetModules () const
 // Status
 // ---------------------------------------------------------------------------
 
-std::string MSF_FILE::GetAlgorithm () const      { return m_sAlgorithm; }
-std::string MSF_FILE::GetFingerprint () const     { return m_sFingerprint; }
-bool        MSF_FILE::IsSignatureValid () const   { return m_bSignatureValid; }
-bool        MSF_FILE::IsChainTrusted () const     { return m_bChainTrusted; }
-std::string MSF_FILE::GetSignatureError () const  { return m_sSignatureError; }
-std::string MSF_FILE::GetChainError () const      { return m_sChainError; }
-
-} // namespace msf
+std::string MSF::GetAlgorithm () const      { return m_sAlgorithm; }
+std::string MSF::GetFingerprint () const     { return m_sFingerprint; }
+bool        MSF::IsSignatureValid () const   { return m_bSignatureValid; }
+bool        MSF::IsChainTrusted () const     { return m_bChainTrusted; }
+std::string MSF::GetSignatureError () const  { return m_sSignatureError; }
+std::string MSF::GetChainError () const      { return m_sChainError; }

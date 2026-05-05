@@ -23,7 +23,6 @@
 #include <filesystem>
 #include <cstdint>
 
-namespace som { class FABRIC; class NODE; class SCENE; }
 namespace astro { class ASTRO_SERVICE; }
 namespace persona { class PERSONA; }
 
@@ -42,6 +41,7 @@ public:
    class NETWORK;
    class STORAGE;
    class WORKER;
+   class VIEWPORT;
 
    // ------------------------------------------------------------------------
    // ISNEEZE — interface between the host application and the engine.
@@ -140,10 +140,9 @@ public:
    void                     WriteFrameBuffer (const uint32_t* pPixels, int nWidth, int nHeight);
    std::vector<void*>&      GetBodies ();
 
-   // --- SOM ---
+   // --- Viewport ---
 
-   som::FABRIC*     GetRootFabric () const    { return m_pRootFabric; }
-   som::FABRIC*     GetPrimaryFabric () const { return m_pPrimaryFabric; }
+   VIEWPORT*                GetViewport () const { return m_pViewport; }
 
    // --- Persona ---
 
@@ -204,13 +203,8 @@ private:
    int                      m_nResizeWidth;
    int                      m_nResizeHeight;
 
-   // SOM
-   som::FABRIC*           m_pRootFabric;
-   som::NODE*             m_pRootFabricRootNode;
-   som::NODE*             m_pPrimaryAttachNode;
-   som::FABRIC*           m_pPrimaryFabric;
-   som::NODE*             m_pPrimaryFabricRootNode;
-   som::SCENE*            m_pScene;
+   // Viewport
+   VIEWPORT*              m_pViewport;
    astro::ASTRO_SERVICE*  m_pAstroService;
 
    // Subsystems

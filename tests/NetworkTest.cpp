@@ -139,7 +139,7 @@ static std::string ComputeSha256Hex (const uint8_t* pData, size_t nLen)
 static CACHE_TEST_LISTENER* s_pTestListener = nullptr;
 static SNEEZE* s_pSneeze = nullptr;
 
-static auto s_pTestName = std::make_shared<som::CONTAINER::NAME> (som::CONTAINER::NAME {
+static auto s_pTestName = std::make_shared<SNEEZE::VIEWPORT::CONTAINER::NAME> (SNEEZE::VIEWPORT::CONTAINER::NAME {
    "TestFingerprint_0123456789abcdef",
    "TestOrg",
    "TestCommon",

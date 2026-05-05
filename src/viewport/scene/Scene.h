@@ -12,33 +12,39 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef SNEEZE_SOM_SCENE_H
-#define SNEEZE_SOM_SCENE_H
+#ifndef SNEEZE_VIEWPORT_SCENE_H
+#define SNEEZE_VIEWPORT_SCENE_H
 
-class SNEEZE;
-
-namespace som {
+#include "viewport/Viewport.h"
 
 // ---------------------------------------------------------------------------
-// SOM::SCENE — root container for the scene object model.
+// SNEEZE::VIEWPORT::SCENE — root container for the scene object model.
 //
 // Owned by SNEEZE. Every FABRIC in the scene holds a back-pointer to
 // the SCENE, giving any NODE a path to engine services:
 //     NODE -> FABRIC -> SCENE -> SNEEZE -> Network(), etc.
 // ---------------------------------------------------------------------------
 
-class SCENE
+class SNEEZE::VIEWPORT::SCENE
 {
 public:
+   class FABRIC;
+
    explicit SCENE (SNEEZE* pSneeze);
    ~SCENE ();
 
    SNEEZE* Sneeze () const { return m_pSneeze; }
 
+   FABRIC* GetRootFabric () const    { return m_pRootFabric; }
+   void    SetRootFabric (FABRIC* p) { m_pRootFabric = p; }
+
+   FABRIC* GetPrimaryFabric () const    { return m_pPrimaryFabric; }
+   void    SetPrimaryFabric (FABRIC* p) { m_pPrimaryFabric = p; }
+
 private:
    SNEEZE* m_pSneeze;
+   FABRIC* m_pRootFabric;
+   FABRIC* m_pPrimaryFabric;
 };
 
-} // namespace som
-
-#endif // SNEEZE_SOM_SCENE_H
+#endif // SNEEZE_VIEWPORT_SCENE_H
