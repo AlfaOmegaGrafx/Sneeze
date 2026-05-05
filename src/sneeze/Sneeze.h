@@ -58,31 +58,32 @@ public:
          kLOGLEVEL_Error
       };
 
-      virtual ~ISNEEZE () = default;
-
       // --- Configuration (set by host before Initialize) ---
 
       std::string sAppDataPath;
       std::string sSessionPath;
       std::string sRenderer;
 
-      std::string SessionPath () const { return (std::filesystem::path (sAppDataPath) / sSessionPath).string (); }
-      void*       pNativeWindow  = nullptr;
-      int         nWidth         = 0;
-      int         nHeight        = 0;
+      void* pNativeWindow = nullptr;
+      int   nWidth  = 0;
+      int   nHeight = 0;
 
-      // --- Callbacks (host must implement) ---
+   public:
+      virtual ~ISNEEZE () = default;
 
       virtual void OnFrameReady (const uint32_t* pFB, int nFbW, int nFbH) = 0;
+
       virtual void Log (eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage) = 0;
 
-      virtual void OnNetworkFileCreated (NOTIFICATION* pNotification) { (void)pNotification; }
-      virtual void OnNetworkFileChanged (NOTIFICATION* pNotification) { (void)pNotification; }
-      virtual void OnNetworkFileDeleted (NOTIFICATION* pNotification) { (void)pNotification; }
+      virtual void OnNetworkFileCreated (NOTIFICATION* pNotification) {}
+      virtual void OnNetworkFileChanged (NOTIFICATION* pNotification) {}
+      virtual void OnNetworkFileDeleted (NOTIFICATION* pNotification) {}
 
-      virtual void OnStorageUnitCreated (NOTIFICATION* pNotification) { (void)pNotification; }
-      virtual void OnStorageUnitChanged (NOTIFICATION* pNotification) { (void)pNotification; }
-      virtual void OnStorageUnitDeleted (NOTIFICATION* pNotification) { (void)pNotification; }
+      virtual void OnStorageUnitCreated (NOTIFICATION* pNotification) {}
+      virtual void OnStorageUnitChanged (NOTIFICATION* pNotification) {}
+      virtual void OnStorageUnitDeleted (NOTIFICATION* pNotification) {}
+
+      std::string SessionPath () const { return (std::filesystem::path (sAppDataPath) / sSessionPath).string (); }
    };
 
    // ------------------------------------------------------------------------
