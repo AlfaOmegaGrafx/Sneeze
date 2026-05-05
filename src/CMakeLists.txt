@@ -501,7 +501,6 @@ endif ()
 # ---------------------------------------------------------------------------
 
 set (CORE_SOURCES
-   sneeze/Epoch.cpp
    sneeze/Sneeze.cpp
    sneeze/worker/Worker.cpp
    sneeze/worker/Compositor.cpp
@@ -513,7 +512,6 @@ set (CORE_SOURCES
    sneeze/worker/WorkerG.cpp
    sneeze/worker/WorkerH.cpp)
 set (CORE_HEADERS
-   sneeze/Epoch.h
    sneeze/Types.h
    sneeze/Sneeze.h
    sneeze/worker/Worker.h
@@ -529,12 +527,14 @@ set (CORE_HEADERS
 set (ASTRO_SOURCES
    astro/BodyData.cpp
    astro/Celestial.cpp
+   astro/Epoch.cpp
    astro/Orbit.cpp
    astro/RMCObject.cpp
    astro/AstroService.cpp)
 set (ASTRO_HEADERS
    astro/BodyData.h
    astro/Celestial.h
+   astro/Epoch.h
    astro/Orbit.h
    astro/RMCObject.h
    astro/AstroService.h)

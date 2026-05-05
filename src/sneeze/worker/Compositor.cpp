@@ -15,7 +15,7 @@
 #include "Compositor.h"
 #include "Sneeze.h"
 #include "Types.h"
-#include "Epoch.h"
+#include "astro/Epoch.h"
 #include "astro/AstroService.h"
 #include "astro/RMCObject.h"
 #include "astro/Orbit.h"
