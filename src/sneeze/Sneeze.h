@@ -75,7 +75,7 @@ public:
    };
 
    // ------------------------------------------------------------------------
-   // IVIEWPORT — per-viewport interface between the host and a viewport.
+   // IVIEWPORT -- per-viewport interface between the host and a viewport.
    // Each viewport gets its own IVIEWPORT instance from the application.
    // ------------------------------------------------------------------------
 
