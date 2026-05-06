@@ -79,6 +79,7 @@ SNEEZE::SNEEZE (ISNEEZE* pHost) :
    m_pThread_Engine (nullptr),
    m_bShutdown (false),
    m_bReady (false),
+   m_bEngineInitOk (false),
    m_pNetwork (nullptr),
    m_pStorage (nullptr),
    m_pPersona (nullptr)
@@ -116,52 +117,24 @@ bool SNEEZE::Initialize ()
 
                   m_pPersona = new persona::PERSONA (this);
 
-                  // --- Create and initialize workers ---
+                  // --- Start engine thread (creates workers internally) ---
 
-                  bResult = true;
-                  for (const auto& config : aWorkerConfig)
+                  m_pThread_Engine = new std::thread (&SNEEZE::EngineThreadLoop, this);
                   {
-                     if (!bResult)
-                        break;
-
-                     WORKER* pWorker = config.Create (this);
-
-                     pWorker->SetWorkerIndex (static_cast<int> (m_apWorker.size ()));
-
-                     if (pWorker->Initialize ())
-                     {
-                        m_apWorker.push_back (pWorker);
-                        m_anWorkerHertz.push_back (config.nHertz);
-                        m_anWorkerLastTick.push_back (0);
-                        m_anWorkerSignalCount.push_back (0);
-                     }
-                     else
-                     {
-                        Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Worker failed to initialize");
-                        delete pWorker;
-                        bResult = false;
-                     }
-                  }
-
-                  // --- Start engine thread ---
-
-                  if (bResult)
-                  {
-                     m_pThread_Engine = new std::thread (&SNEEZE::EngineThreadLoop, this);
-
                      std::unique_lock<std::mutex> lock (m_mutex);
                      m_condVar.wait (lock, [this] { return m_bReady; });
-
-                     Log (ISNEEZE::kLOGLEVEL_Info, "SNEEZE", "Initialized (1 engine thread + " + std::to_string (m_apWorker.size ()) + " workers)");
                   }
+
+                  bResult = m_bEngineInitOk;
+
+                  if (bResult)
+                     Log (ISNEEZE::kLOGLEVEL_Info, "SNEEZE", "Initialized (1 engine thread + " + std::to_string (m_apWorker.size ()) + " workers)");
 
                   if (!bResult)
                   {
-                     for (int nIz = static_cast<int> (m_apWorker.size ()) - 1; nIz >= 0; nIz--)
-                     {
-                        m_apWorker[nIz]->Shutdown ();
-                        delete m_apWorker[nIz];
-                     }
+                     m_pThread_Engine->join ();
+                     delete m_pThread_Engine;
+                     m_pThread_Engine = nullptr;
                      m_apWorker.clear ();
                      m_anWorkerHertz.clear ();
                      m_anWorkerLastTick.clear ();
@@ -207,7 +180,17 @@ bool SNEEZE::Initialize ()
 
 void SNEEZE::Shutdown ()
 {
-   // --- Stop engine thread ---
+   // --- Close all viewports (while workers are still running) ---
+
+   for (int nIz = static_cast<int> (m_apViewport.size ()) - 1; nIz >= 0; nIz--)
+   {
+      m_apViewport[nIz]->RequestRendererShutdown ();
+      m_apViewport[nIz]->Shutdown ();
+      delete m_apViewport[nIz];
+   }
+   m_apViewport.clear ();
+
+   // --- Stop engine thread (shuts down workers internally) ---
 
    if (m_pThread_Engine)
    {
@@ -222,26 +205,10 @@ void SNEEZE::Shutdown ()
       m_pThread_Engine = nullptr;
    }
 
-   // --- Shutdown workers ---
-
-   for (int nIz = static_cast<int> (m_apWorker.size ()) - 1; nIz >= 0; nIz--)
-   {
-      m_apWorker[nIz]->Shutdown ();
-      delete m_apWorker[nIz];
-   }
    m_apWorker.clear ();
    m_anWorkerHertz.clear ();
    m_anWorkerLastTick.clear ();
    m_anWorkerSignalCount.clear ();
-
-   // --- Close all viewports ---
-
-   for (int nIz = static_cast<int> (m_apViewport.size ()) - 1; nIz >= 0; nIz--)
-   {
-      m_apViewport[nIz]->Shutdown ();
-      delete m_apViewport[nIz];
-   }
-   m_apViewport.clear ();
 
    // --- Destroy shared subsystems ---
 
@@ -397,57 +364,111 @@ void SNEEZE::EngineThreadLoop ()
    timeBeginPeriod (1);
 #endif
 
+   // --- Create and initialize worker threads ---
+
+   bool bOk = true;
+   for (const auto& config : aWorkerConfig)
+   {
+      if (!bOk)
+         break;
+
+      WORKER* pWorker = config.Create (this);
+      pWorker->SetWorkerIndex (static_cast<int> (m_apWorker.size ()));
+
+      if (pWorker->Initialize ())
+      {
+         m_apWorker.push_back (pWorker);
+         m_anWorkerHertz.push_back (config.nHertz);
+         m_anWorkerLastTick.push_back (0);
+         m_anWorkerSignalCount.push_back (0);
+      }
+      else
+      {
+         Log (ISNEEZE::kLOGLEVEL_Error, "ENGINE", "Worker failed to initialize");
+         delete pWorker;
+         bOk = false;
+      }
+   }
+
+   if (!bOk)
+   {
+      for (int nIz = static_cast<int> (m_apWorker.size ()) - 1; nIz >= 0; nIz--)
+      {
+         m_apWorker[nIz]->Shutdown ();
+         delete m_apWorker[nIz];
+      }
+      m_apWorker.clear ();
+      m_anWorkerHertz.clear ();
+      m_anWorkerLastTick.clear ();
+      m_anWorkerSignalCount.clear ();
+   }
+
+   m_bEngineInitOk = bOk;
+
    {
       std::lock_guard<std::mutex> guard (m_mutex);
       m_bReady = true;
    }
    m_condVar.notify_all ();
 
-   auto tpOrigin       = std::chrono::steady_clock::now ();
-   int64_t nLastReport = 0;
+   // --- Metronome loop ---
 
-   while (true)
+   if (bOk)
    {
-      std::this_thread::sleep_for (std::chrono::milliseconds (1));
+      auto tpOrigin       = std::chrono::steady_clock::now ();
+      int64_t nLastReport = 0;
 
+      while (true)
       {
-         std::lock_guard<std::mutex> guard (m_mutex);
-         if (m_bShutdown)
-            break;
-      }
+         std::this_thread::sleep_for (std::chrono::milliseconds (1));
 
-      auto tpNow = std::chrono::steady_clock::now ();
-      double dElapsed = std::chrono::duration<double> (tpNow - tpOrigin).count ();
-
-      for (int nIz = 0; nIz < static_cast<int> (m_apWorker.size ()); nIz++)
-      {
-         int nHz = m_anWorkerHertz[nIz];
-         if (nHz <= 0)
-            continue;
-
-         int64_t nCurrentTick = static_cast<int64_t> (dElapsed * nHz);
-         if (nCurrentTick > m_anWorkerLastTick[nIz])
          {
-            m_anWorkerLastTick[nIz] = nCurrentTick;
-            m_anWorkerSignalCount[nIz]++;
-            m_apWorker[nIz]->Signal ();
+            std::lock_guard<std::mutex> guard (m_mutex);
+            if (m_bShutdown)
+               break;
          }
-      }
 
-      int64_t nCurrentSecond = static_cast<int64_t> (dElapsed);
-      if (nCurrentSecond > nLastReport)
-      {
-         std::string sMetronome;
+         auto tpNow = std::chrono::steady_clock::now ();
+         double dElapsed = std::chrono::duration<double> (tpNow - tpOrigin).count ();
+
          for (int nIz = 0; nIz < static_cast<int> (m_apWorker.size ()); nIz++)
          {
             int nHz = m_anWorkerHertz[nIz];
             if (nHz <= 0)
                continue;
-            sMetronome += "  [" + std::to_string (nIz) + "] " + std::to_string (m_anWorkerSignalCount[nIz]) + "/" + std::to_string (nHz) + " Hz";
-            m_anWorkerSignalCount[nIz] = 0;
+
+            int64_t nCurrentTick = static_cast<int64_t> (dElapsed * nHz);
+            if (nCurrentTick > m_anWorkerLastTick[nIz])
+            {
+               m_anWorkerLastTick[nIz] = nCurrentTick;
+               m_anWorkerSignalCount[nIz]++;
+               m_apWorker[nIz]->Signal ();
+            }
          }
-      // Log (ISNEEZE::kLOGLEVEL_Trace, "METRONOME", sMetronome);
-         nLastReport = nCurrentSecond;
+
+         int64_t nCurrentSecond = static_cast<int64_t> (dElapsed);
+         if (nCurrentSecond > nLastReport)
+         {
+            std::string sMetronome;
+            for (int nIz = 0; nIz < static_cast<int> (m_apWorker.size ()); nIz++)
+            {
+               int nHz = m_anWorkerHertz[nIz];
+               if (nHz <= 0)
+                  continue;
+               sMetronome += "  [" + std::to_string (nIz) + "] " + std::to_string (m_anWorkerSignalCount[nIz]) + "/" + std::to_string (nHz) + " Hz";
+               m_anWorkerSignalCount[nIz] = 0;
+            }
+         // Log (ISNEEZE::kLOGLEVEL_Trace, "METRONOME", sMetronome);
+            nLastReport = nCurrentSecond;
+         }
+      }
+
+      // --- Shutdown worker threads (reverse order) ---
+
+      for (int nIz = static_cast<int> (m_apWorker.size ()) - 1; nIz >= 0; nIz--)
+      {
+         m_apWorker[nIz]->Shutdown ();
+         delete m_apWorker[nIz];
       }
    }
 

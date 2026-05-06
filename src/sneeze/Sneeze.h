@@ -122,6 +122,7 @@ private:
    std::condition_variable  m_condVar;
    bool                     m_bShutdown;
    bool                     m_bReady;
+   bool                     m_bEngineInitOk;
 
    // Workers
    std::vector<WORKER*>     m_apWorker;

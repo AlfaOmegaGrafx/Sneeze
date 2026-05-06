@@ -208,8 +208,6 @@ void WORKER::COMPOSITOR::ThreadLoop ()
       m_dAccumFlush += std::chrono::duration<double> (tpFlushEnd - tpFlushStart).count ();
    }
 
-   for (SNEEZE::VIEWPORT* pViewport : m_pSneeze->Viewports ())
-      pViewport->ShutdownRenderer ();
 }
 
 void WORKER::COMPOSITOR::RenderViewport (SNEEZE::VIEWPORT* pViewport,
