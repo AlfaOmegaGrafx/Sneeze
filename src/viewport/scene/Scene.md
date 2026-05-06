@@ -29,21 +29,21 @@ container/store.
 
 ```cpp
 SNEEZE::VIEWPORT::SCENE::FABRIC fabric;
-fabric.SetUrl ("https://example.com/world.msf");
-fabric.SetOwner (pMyStore);
-fabric.SetRootNode (pRootNode);
-fabric.SetAttachingNode (pParentLeafNode);   // node in parent fabric
+fabric.Url_Set ("https://example.com/world.msf");
+fabric.Owner_Set (pMyStore);
+fabric.Node_Set_Root (pRootNode);
+fabric.Node_Set_Attaching (pParentLeafNode);   // node in parent fabric
 fabric.SetPrivate (false);
 ```
 
-| Member              | Description                                          |
-|---------------------|------------------------------------------------------|
-| Parent / Children   | Fabric hierarchy (mirrors SOM attachment structure)   |
-| RootNode            | The single root node of this fabric's subtree         |
-| AttachingNode       | The node in the parent fabric where this hangs        |
-| Owner               | Opaque pointer to the owning WASM_STORE               |
-| Private             | If true, non-owning containers cannot read into it    |
-| Url                 | Source MSF URL for this fabric                        |
+| Accessor              | Description                                          |
+|-----------------------|------------------------------------------------------|
+| Fabric_Parent / Fabric_Children | Fabric hierarchy (mirrors SOM attachment structure) |
+| Node_Root             | The single root node of this fabric's subtree         |
+| Node_Attaching        | The node in the parent fabric where this hangs        |
+| Owner                 | Opaque pointer to the owning WASM_STORE               |
+| IsPrivate / SetPrivate| If true, non-owning containers cannot read into it    |
+| Url                   | Source MSF URL for this fabric                        |
 
 ## NODE
 
@@ -57,18 +57,17 @@ Both are protected by a single `std::mutex`.
 
 ```cpp
 SNEEZE::VIEWPORT::SCENE::FABRIC::NODE node;
-node.SetObjectIx (42);
-node.SetFabric (&fabric);
-node.SetMapObject (&myMapObject);
-node.SetAttachedFabric (&childFabric);   // if this is an attachment point
+node.ObjectIx_Set (42);
+node.MapObject_Set (&myMapObject);
+node.Fabric_Set_Attached (&childFabric);   // if this is an attachment point
 
-parentNode.AddChild (&node);
+parentNode.Node_Add (&node);
 
 // Iteration (compositor)
-for (auto* pChild : parentNode.Children ()) { ... }
+for (auto* pChild : parentNode.Node_Children ()) { ... }
 
 // Keyed lookup (WASM host function)
-NODE* pFound = parentNode.FindChild (42);
+NODE* pFound = parentNode.Node_Find (42);
 
 // Cross-fabric upward traversal
 NODE* pParent = node.Parent ();   // crosses fabric boundaries via attaching node
@@ -182,7 +181,7 @@ splits along the longest axis.
 
 - **Incremental BVH update** — currently the entire BVH is rebuilt from
   scratch. An incremental insert/remove would avoid the rebuild cost.
-- **Event dispatch from mutators** — `NODE::AddChild` / `RemoveChild` do
+- **Event dispatch from mutators** -- `NODE::Node_Add` / `Node_Remove` do
   not yet call `EVENT_SYSTEM::Fire_*()`. This wiring needs to be connected
   when the event system is exercised.
 - **Animator integration** — the SEQLOCK on each node is designed for a

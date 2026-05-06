@@ -16,10 +16,12 @@
 
 const std::unordered_map<std::string, std::string> SNEEZE::NETWORK::FILE::s_mapEmpty;
 
-SNEEZE::NETWORK::FILE::FILE (NETWORK* pNetwork, ASSET* pAsset, std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName, IFILE* pListener, uint32_t nFileIx) :
+SNEEZE::NETWORK::FILE::FILE (NETWORK* pNetwork, ASSET* pAsset, std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName,
+   SNEEZE::VIEWPORT* pViewport, IFILE* pListener, uint32_t nFileIx) :
    m_pNetwork         (pNetwork),
    m_pAsset           (pAsset),
    m_pName            (std::move (pName)),
+   m_pViewport        (pViewport),
    m_pListener        (pListener),
    m_nFileIx          (nFileIx),
    m_nAssetIx         (0),

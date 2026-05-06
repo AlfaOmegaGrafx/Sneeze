@@ -47,6 +47,7 @@ using RENDERER = SNEEZE::VIEWPORT::RENDERER;
 // pass it to anariLoadLibrary via the "name,path/" comma syntax.
 static std::string GetLocalLibDir ()
 {
+   std::string sDir;
    Dl_info info;
    if (dladdr ((const void*) &GetLocalLibDir, &info) && info.dli_fname)
    {
@@ -54,15 +55,14 @@ static std::string GetLocalLibDir ()
       auto nSlash = sPath.rfind ('/');
       if (nSlash != std::string::npos)
       {
-         std::string sDir = sPath.substr (0, nSlash + 1);
+         sDir = sPath.substr (0, nSlash + 1);
 #if defined(__APPLE__) && TARGET_OS_IPHONE
          // iOS: dylibs are bundled in <App>.app/Frameworks/
          sDir += "Frameworks/";
 #endif
-         return sDir;
       }
    }
-   return std::string ();
+   return sDir;
 }
 #endif
 
@@ -112,12 +112,16 @@ namespace {
 // anariGetDeviceExtensions().
 bool HasExtension (const char* const* pList, const char* sName)
 {
-   if (!pList || !sName) return false;
-   for (const char* const* p = pList; *p; ++p)
+   bool bFound = false;
+   if (pList && sName)
    {
-      if (std::strcmp (*p, sName) == 0) return true;
+      for (const char* const* p = pList; *p; ++p)
+      {
+         if (std::strcmp (*p, sName) == 0)
+            bFound = true;
+      }
    }
-   return false;
+   return bFound;
 }
 
 } // namespace
@@ -269,37 +273,37 @@ bool RENDERER::ANARI::Initialize (int nWidth, int nHeight)
 
 void RENDERER::ANARI::Resize (int nWidth, int nHeight)
 {
-   if (!m_pDevice || !m_pFrame)
-      return;
-
-   m_nWidth  = nWidth;
-   m_nHeight = nHeight;
-   m_aPixels.resize (nWidth * nHeight, 0);
-
-   if (m_pNativeSurface)
+   if (m_pDevice && m_pFrame)
    {
-      ANARIObject ns = reinterpret_cast<ANARIObject> (m_pNativeSurface);
-      ++m_nResizeGeneration;
-      anariSetParameter (m_pDevice, ns, "generation", ANARI_UINT64, &m_nResizeGeneration);
-      anariCommitParameters (m_pDevice, ns);
-   }
+      m_nWidth  = nWidth;
+      m_nHeight = nHeight;
+      m_aPixels.resize (nWidth * nHeight, 0);
 
-   anariRelease (m_pDevice, m_pFrame);
+      if (m_pNativeSurface)
+      {
+         ANARIObject ns = reinterpret_cast<ANARIObject> (m_pNativeSurface);
+         ++m_nResizeGeneration;
+         anariSetParameter (m_pDevice, ns, "generation", ANARI_UINT64, &m_nResizeGeneration);
+         anariCommitParameters (m_pDevice, ns);
+      }
 
-   m_pFrame = anariNewFrame (m_pDevice);
-   uint32_t aSize[2] = { static_cast<uint32_t> (nWidth), static_cast<uint32_t> (nHeight) };
-   anariSetParameter (m_pDevice, m_pFrame, "size", ANARI_UINT32_VEC2, aSize);
-   ANARIDataType nColorType = ANARI_UFIXED8_RGBA_SRGB;
-   anariSetParameter (m_pDevice, m_pFrame, "channel.color", ANARI_DATA_TYPE, &nColorType);
-   anariSetParameter (m_pDevice, m_pFrame, "renderer", ANARI_RENDERER_TYPE, &m_pRenderer);
-   anariSetParameter (m_pDevice, m_pFrame, "camera", ANARI_CAMERA, &m_pCamera);
-   anariSetParameter (m_pDevice, m_pFrame, "world", ANARI_WORLD, &m_pWorld);
-   if (m_pNativeSurface)
-   {
-      ANARIObject ns = reinterpret_cast<ANARIObject> (m_pNativeSurface);
-      anariSetParameter (m_pDevice, m_pFrame, "nativeSurface", ANARI_OBJECT, &ns);
+      anariRelease (m_pDevice, m_pFrame);
+
+      m_pFrame = anariNewFrame (m_pDevice);
+      uint32_t aSize[2] = { static_cast<uint32_t> (nWidth), static_cast<uint32_t> (nHeight) };
+      anariSetParameter (m_pDevice, m_pFrame, "size", ANARI_UINT32_VEC2, aSize);
+      ANARIDataType nColorType = ANARI_UFIXED8_RGBA_SRGB;
+      anariSetParameter (m_pDevice, m_pFrame, "channel.color", ANARI_DATA_TYPE, &nColorType);
+      anariSetParameter (m_pDevice, m_pFrame, "renderer", ANARI_RENDERER_TYPE, &m_pRenderer);
+      anariSetParameter (m_pDevice, m_pFrame, "camera", ANARI_CAMERA, &m_pCamera);
+      anariSetParameter (m_pDevice, m_pFrame, "world", ANARI_WORLD, &m_pWorld);
+      if (m_pNativeSurface)
+      {
+         ANARIObject ns = reinterpret_cast<ANARIObject> (m_pNativeSurface);
+         anariSetParameter (m_pDevice, m_pFrame, "nativeSurface", ANARI_OBJECT, &ns);
+      }
+      anariCommitParameters (m_pDevice, m_pFrame);
    }
-   anariCommitParameters (m_pDevice, m_pFrame);
 }
 
 void RENDERER::ANARI::Shutdown ()
@@ -395,24 +399,26 @@ void RENDERER::ANARI::EndFrame ()
    m_dLastRenderSeconds = std::chrono::duration<double> (tpRenderEnd - tpRenderStart).count ();
 
    // Native-surface mode: Halogen presented directly to the window; no readback.
-   if (m_bNativeSurface) return;
-
-   uint32_t nW = 0, nH = 0;
-   ANARIDataType nType = ANARI_UNKNOWN;
-   const void* pData = anariMapFrame (m_pDevice, m_pFrame, "channel.color", &nW, &nH, &nType);
-
-   if (pData)
+   if (!m_bNativeSurface)
    {
-      std::memcpy (m_aPixels.data (), pData, nW * nH * sizeof (uint32_t));
-      anariUnmapFrame (m_pDevice, m_pFrame, "channel.color");
+      uint32_t nW = 0, nH = 0;
+      ANARIDataType nType = ANARI_UNKNOWN;
+      const void* pData = anariMapFrame (m_pDevice, m_pFrame, "channel.color", &nW, &nH, &nType);
+
+      if (pData)
+      {
+         std::memcpy (m_aPixels.data (), pData, nW * nH * sizeof (uint32_t));
+         anariUnmapFrame (m_pDevice, m_pFrame, "channel.color");
+      }
    }
 }
 
 const uint32_t* RENDERER::ANARI::GetFrameBuffer () const
 {
-   // No CPU-readable framebuffer in native-surface mode.
-   if (m_bNativeSurface) return nullptr;
-   return m_aPixels.data ();
+   const uint32_t* pPixels = nullptr;
+   if (!m_bNativeSurface)
+      pPixels = m_aPixels.data ();
+   return pPixels;
 }
 
 int RENDERER::ANARI::GetWidth () const

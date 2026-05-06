@@ -15,6 +15,7 @@
 #include "network/Network.h"
 #include "container/Container.h"
 #include "Sneeze.h"
+#include "viewport/Viewport.h"
 
 #include <openssl/sha.h>
 #include <curl/curl.h>
@@ -54,15 +55,20 @@ static void Check (bool bCondition, const char* szName)
 class CACHE_TEST_LISTENER : public SNEEZE::ISNEEZE
 {
 public:
+   void Log (eLOGLEVEL, const std::string& sModule, const std::string& sMessage) override
+   {
+      std::printf ("    [%s] %s\n", sModule.c_str (), sMessage.c_str ());
+   }
+};
+
+class CACHE_TEST_VIEWPORT_HOST : public SNEEZE::IVIEWPORT
+{
+public:
    int m_nCreatedCount = 0;
    int m_nChangedCount = 0;
    int m_nDeletedCount = 0;
 
    void OnFrameReady (const uint32_t*, int, int) override {}
-   void Log (eLOGLEVEL, const std::string& sModule, const std::string& sMessage) override
-   {
-      std::printf ("    [%s] %s\n", sModule.c_str (), sMessage.c_str ());
-   }
 
    void OnNetworkFileCreated (SNEEZE::NOTIFICATION*) override { m_nCreatedCount++; }
    void OnNetworkFileChanged (SNEEZE::NOTIFICATION*) override { m_nChangedCount++; }
@@ -136,7 +142,8 @@ static std::string ComputeSha256Hex (const uint8_t* pData, size_t nLen)
 // Shared test state
 // ---------------------------------------------------------------------------
 
-static CACHE_TEST_LISTENER* s_pTestListener = nullptr;
+static CACHE_TEST_LISTENER*       s_pTestListener = nullptr;
+static CACHE_TEST_VIEWPORT_HOST*  s_pVPHost       = nullptr;
 static SNEEZE* s_pSneeze = nullptr;
 
 static auto s_pTestName = std::make_shared<SNEEZE::VIEWPORT::CONTAINER::NAME> (SNEEZE::VIEWPORT::CONTAINER::NAME {
@@ -179,7 +186,7 @@ static void TestUnhashedFetch ()
    {
       TEST_FILE_LISTENER listener;
       SNEEZE::NETWORK::FILE* pFile = pNetwork->Request (
-         &listener, s_pTestName, "https://httpbin.org/bytes/128");
+         &listener, nullptr, s_pTestName, "https://httpbin.org/bytes/128");
 
       Check (pFile != nullptr, "Request returned a handle");
 
@@ -238,9 +245,9 @@ static void TestDeduplication ()
    TEST_FILE_LISTENER listenerB;
 
    SNEEZE::NETWORK::FILE* pFileA = pNetwork->Request (
-      &listenerA, s_pTestName, "https://httpbin.org/bytes/64");
+      &listenerA, nullptr, s_pTestName, "https://httpbin.org/bytes/64");
    SNEEZE::NETWORK::FILE* pFileB = pNetwork->Request (
-      &listenerB, s_pTestName, "https://httpbin.org/bytes/64");
+      &listenerB, nullptr, s_pTestName, "https://httpbin.org/bytes/64");
 
    Check (pFileA != nullptr, "First handle is valid");
    Check (pFileB != nullptr, "Second handle is valid");
@@ -285,7 +292,7 @@ static void TestHashVerifiedFetch ()
 
    TEST_FILE_LISTENER listenerPreFetch;
    SNEEZE::NETWORK::FILE* pPreFile = pNetwork->Request (
-      &listenerPreFetch, s_pTestName, "https://httpbin.org/base64/SGVsbG9Xb3JsZA==");
+      &listenerPreFetch, nullptr, s_pTestName, "https://httpbin.org/base64/SGVsbG9Xb3JsZA==");
 
    if (pPreFile)
    {
@@ -309,7 +316,7 @@ static void TestHashVerifiedFetch ()
 
          TEST_FILE_LISTENER listenerVerified;
          SNEEZE::NETWORK::FILE* pVerFile = pNetwork->Request (
-            &listenerVerified, s_pTestName, "https://httpbin.org/base64/SGVsbG9Xb3JsZA==", sSri);
+            &listenerVerified, nullptr, s_pTestName, "https://httpbin.org/base64/SGVsbG9Xb3JsZA==", sSri);
 
          if (pVerFile)
          {
@@ -358,7 +365,7 @@ static void TestHashMismatch ()
    std::string sBadHash = "sha256-0000000000000000000000000000000000000000000000000000000000000000";
 
    SNEEZE::NETWORK::FILE* pFile = pNetwork->Request (
-      &listener, s_pTestName, "https://httpbin.org/base64/SGVsbG9Xb3JsZA==", sBadHash);
+      &listener, nullptr, s_pTestName, "https://httpbin.org/base64/SGVsbG9Xb3JsZA==", sBadHash);
 
    if (pFile)
    {
@@ -394,7 +401,7 @@ static void TestReset ()
 
    TEST_FILE_LISTENER listenerSession;
    SNEEZE::NETWORK::FILE* pSession = pNetwork->Request (
-      &listenerSession, s_pTestName, "https://httpbin.org/bytes/32");
+      &listenerSession, nullptr, s_pTestName, "https://httpbin.org/bytes/32");
 
    if (pSession)
    {
@@ -408,7 +415,7 @@ static void TestReset ()
 
          TEST_FILE_LISTENER listenerAfter;
          SNEEZE::NETWORK::FILE* pAfter = pNetwork->Request (
-            &listenerAfter, s_pTestName, "https://httpbin.org/bytes/32");
+            &listenerAfter, nullptr, s_pTestName, "https://httpbin.org/bytes/32");
 
          if (pAfter)
          {
@@ -448,7 +455,7 @@ static void TestResetFlag ()
 
    TEST_FILE_LISTENER listener;
    SNEEZE::NETWORK::FILE* pFile = pNetwork->Request (
-      &listener, s_pTestName, "https://httpbin.org/bytes/16");
+      &listener, nullptr, s_pTestName, "https://httpbin.org/bytes/16");
 
    if (pFile)
    {
@@ -490,7 +497,7 @@ static void TestFailedFetch ()
 
    TEST_FILE_LISTENER listener;
    SNEEZE::NETWORK::FILE* pFile = pNetwork->Request (
-      &listener, s_pTestName, "https://this-domain-does-not-exist-999.invalid/file.bin");
+      &listener, nullptr, s_pTestName, "https://this-domain-does-not-exist-999.invalid/file.bin");
 
    if (pFile)
    {
@@ -530,7 +537,7 @@ static void TestSidecarPersistence ()
       pNetwork->Initialize ();
 
       TEST_FILE_LISTENER listenerPre;
-      SNEEZE::NETWORK::FILE* pPre = pNetwork->Request (&listenerPre, s_pTestName, sUrl);
+      SNEEZE::NETWORK::FILE* pPre = pNetwork->Request (&listenerPre, nullptr, s_pTestName, sUrl);
       if (pPre  &&  listenerPre.WaitFor (15000)  &&  listenerPre.Succeeded ())
       {
          std::vector<uint8_t> aData = pPre->ReadData ();
@@ -541,7 +548,7 @@ static void TestSidecarPersistence ()
          pPre = nullptr;
 
          TEST_FILE_LISTENER listenerHash;
-         SNEEZE::NETWORK::FILE* pHash = pNetwork->Request (&listenerHash, s_pTestName, sUrl, sSri);
+         SNEEZE::NETWORK::FILE* pHash = pNetwork->Request (&listenerHash, nullptr, s_pTestName, sUrl, sSri);
          if (pHash)
          {
             listenerHash.WaitFor (15000);
@@ -571,7 +578,7 @@ static void TestSidecarPersistence ()
       pNetwork2->Initialize ();
 
       TEST_FILE_LISTENER listenerReload;
-      SNEEZE::NETWORK::FILE* pReload = pNetwork2->Request (&listenerReload, s_pTestName, sUrl, sSri);
+      SNEEZE::NETWORK::FILE* pReload = pNetwork2->Request (&listenerReload, nullptr, s_pTestName, sUrl, sSri);
 
       if (pReload)
       {
@@ -605,7 +612,7 @@ static void TestHttpHeaders ()
 
    TEST_FILE_LISTENER listener;
    SNEEZE::NETWORK::FILE* pFile = pNetwork->Request (
-      &listener, s_pTestName, "https://httpbin.org/response-headers?Content-Type=application/json");
+      &listener, nullptr, s_pTestName, "https://httpbin.org/response-headers?Content-Type=application/json");
 
    if (pFile)
    {
@@ -646,7 +653,7 @@ static void TestFileHandleLifecycle ()
 
    TEST_FILE_LISTENER listener;
    SNEEZE::NETWORK::FILE* pFile = pNetwork->Request (
-      &listener, s_pTestName, "https://httpbin.org/bytes/8");
+      &listener, nullptr, s_pTestName, "https://httpbin.org/bytes/8");
 
       Check (pFile != nullptr, "Handle allocated");
 
@@ -680,9 +687,9 @@ static void TestHistoryAndFileIx ()
    TEST_FILE_LISTENER listenerB;
 
    SNEEZE::NETWORK::FILE* pFileA = pNetwork->Request (
-      &listenerA, s_pTestName, "https://httpbin.org/bytes/16");
+      &listenerA, nullptr, s_pTestName, "https://httpbin.org/bytes/16");
    SNEEZE::NETWORK::FILE* pFileB = pNetwork->Request (
-      &listenerB, s_pTestName, "https://httpbin.org/bytes/32");
+      &listenerB, nullptr, s_pTestName, "https://httpbin.org/bytes/32");
 
    Check (pFileA != nullptr  &&  pFileB != nullptr, "Both handles allocated");
 
@@ -715,23 +722,23 @@ static void TestNotifications ()
 {
    std::printf ("\n[Test 13] Notification callbacks\n");
 
-   s_pTestListener->ResetCounters ();
+   s_pVPHost->ResetCounters ();
 
    SNEEZE::NETWORK* pNetwork = new SNEEZE::NETWORK (s_pSneeze);
    pNetwork->Initialize ();
 
    TEST_FILE_LISTENER listener;
    SNEEZE::NETWORK::FILE* pFile = pNetwork->Request (
-      &listener, s_pTestName, "https://httpbin.org/bytes/8?test=notifications");
+      &listener, nullptr, s_pTestName, "https://httpbin.org/bytes/8?test=notifications");
 
-   Check (s_pTestListener->m_nCreatedCount > 0, "OnNetworkFileCreated fired");
+   Check (s_pVPHost->m_nCreatedCount > 0, "OnNetworkFileCreated fired");
 
    if (pFile)
    {
       bool bGot = listener.WaitFor (15000);
       if (bGot)
       {
-         Check (s_pTestListener->m_nChangedCount > 0, "OnNetworkFileChanged fired");
+         Check (s_pVPHost->m_nChangedCount > 0, "OnNetworkFileChanged fired");
       }
       else
       {
@@ -762,7 +769,7 @@ static void TestServedFromCache ()
 
    // First fetch — should NOT be served from cache
    TEST_FILE_LISTENER listenerFirst;
-   SNEEZE::NETWORK::FILE* pFirst = pNetwork->Request (&listenerFirst, s_pTestName, sUrl);
+   SNEEZE::NETWORK::FILE* pFirst = pNetwork->Request (&listenerFirst, nullptr, s_pTestName, sUrl);
 
    if (pFirst)
    {
@@ -773,7 +780,7 @@ static void TestServedFromCache ()
 
          // Second request for the same URL — should be served from cache
          TEST_FILE_LISTENER listenerSecond;
-         SNEEZE::NETWORK::FILE* pSecond = pNetwork->Request (&listenerSecond, s_pTestName, sUrl);
+         SNEEZE::NETWORK::FILE* pSecond = pNetwork->Request (&listenerSecond, nullptr, s_pTestName, sUrl);
 
          if (pSecond)
          {
@@ -809,7 +816,7 @@ static void TestFailedFetchHttpStatus ()
 
    TEST_FILE_LISTENER listener;
    SNEEZE::NETWORK::FILE* pFile = pNetwork->Request (
-      &listener, s_pTestName, "https://httpbin.org/status/404");
+      &listener, nullptr, s_pTestName, "https://httpbin.org/status/404");
 
    if (pFile)
    {
@@ -846,7 +853,7 @@ static void TestClearFlag ()
 
    TEST_FILE_LISTENER listener;
    SNEEZE::NETWORK::FILE* pFile = pNetwork->Request (
-      &listener, s_pTestName, "https://httpbin.org/bytes/8");
+      &listener, nullptr, s_pTestName, "https://httpbin.org/bytes/8");
 
    if (pFile)
    {
@@ -879,7 +886,7 @@ static void TestResetFlagToggle ()
 
    TEST_FILE_LISTENER listener;
    SNEEZE::NETWORK::FILE* pFile = pNetwork->Request (
-      &listener, s_pTestName, "https://httpbin.org/bytes/8");
+      &listener, nullptr, s_pTestName, "https://httpbin.org/bytes/8");
 
    if (pFile)
    {
@@ -922,9 +929,9 @@ static void TestDeferredReset ()
    TEST_FILE_LISTENER listenerB;
 
    SNEEZE::NETWORK::FILE* pFileA = pNetwork->Request (
-      &listenerA, s_pTestName, "https://httpbin.org/bytes/16");
+      &listenerA, nullptr, s_pTestName, "https://httpbin.org/bytes/16");
    SNEEZE::NETWORK::FILE* pFileB = pNetwork->Request (
-      &listenerB, s_pTestName, "https://httpbin.org/bytes/16");
+      &listenerB, nullptr, s_pTestName, "https://httpbin.org/bytes/16");
 
    if (pFileA  &&  pFileB)
    {
@@ -982,9 +989,9 @@ static void TestClear ()
    TEST_FILE_LISTENER listenerB;
 
    SNEEZE::NETWORK::FILE* pFileA = pNetwork->Request (
-      &listenerA, s_pTestName, "https://httpbin.org/bytes/8");
+      &listenerA, nullptr, s_pTestName, "https://httpbin.org/bytes/8");
    SNEEZE::NETWORK::FILE* pFileB = pNetwork->Request (
-      &listenerB, s_pTestName, "https://httpbin.org/bytes/16");
+      &listenerB, nullptr, s_pTestName, "https://httpbin.org/bytes/16");
 
    if (pFileA  &&  pFileB)
    {
@@ -1026,25 +1033,25 @@ static void TestDeletedNotification ()
 {
    std::printf ("\n[Test 21] OnNetworkFileDeleted notification\n");
 
-   s_pTestListener->ResetCounters ();
+   s_pVPHost->ResetCounters ();
 
    SNEEZE::NETWORK* pNetwork = new SNEEZE::NETWORK (s_pSneeze);
    pNetwork->Initialize ();
 
    TEST_FILE_LISTENER listener;
    SNEEZE::NETWORK::FILE* pFile = pNetwork->Request (
-      &listener, s_pTestName, "https://httpbin.org/bytes/8");
+      &listener, nullptr, s_pTestName, "https://httpbin.org/bytes/8");
 
    if (pFile)
    {
       listener.WaitFor (15000);
 
-      Check (s_pTestListener->m_nDeletedCount == 0,
+      Check (s_pVPHost->m_nDeletedCount == 0,
          "No deleted notifications before clear");
 
       pFile->Clear ();
 
-      Check (s_pTestListener->m_nDeletedCount == 1,
+      Check (s_pVPHost->m_nDeletedCount == 1,
          "OnNetworkFileDeleted fired immediately on clear");
 
       pFile->Release ();
@@ -1070,7 +1077,7 @@ static void TestStalenessRules ()
       pNetwork->Initialize ();
 
       TEST_FILE_LISTENER listener;
-      SNEEZE::NETWORK::FILE* pFile = pNetwork->Request (&listener, s_pTestName, sUrl);
+      SNEEZE::NETWORK::FILE* pFile = pNetwork->Request (&listener, nullptr, s_pTestName, sUrl);
 
       if (pFile)
       {
@@ -1101,7 +1108,7 @@ static void TestStalenessRules ()
       pNetwork2->AddRule ("", "9999-12-31T23:59:59Z");
 
       TEST_FILE_LISTENER listener2;
-      SNEEZE::NETWORK::FILE* pFile2 = pNetwork2->Request (&listener2, s_pTestName, sUrl);
+      SNEEZE::NETWORK::FILE* pFile2 = pNetwork2->Request (&listener2, nullptr, s_pTestName, sUrl);
 
       if (pFile2)
       {
@@ -1128,7 +1135,7 @@ static void TestNoFetchRequest ()
    pNetwork->Initialize ();
 
    SNEEZE::NETWORK::FILE* pFile = pNetwork->Request (
-      nullptr, s_pTestName, "https://this-url-does-not-exist-in-cache.invalid/none",
+      nullptr, nullptr, s_pTestName, "https://this-url-does-not-exist-in-cache.invalid/none",
       std::string (), SNEEZE::NETWORK::REQUEST_CREATE);
 
    Check (pFile == nullptr, "bFetch=false returns null for uncached URL");
@@ -1152,6 +1159,10 @@ int RunNetworkTests (int /*nArgc*/, char** /*aArgv*/)
    std::filesystem::remove_all (sCachePath);
 
    s_pSneeze = new SNEEZE (s_pTestListener);
+
+   s_pVPHost = new CACHE_TEST_VIEWPORT_HOST ();
+   s_pSneeze->OpenViewport (s_pVPHost);
+
    curl_global_init (CURL_GLOBAL_DEFAULT);
 
    TestManagerInit ();

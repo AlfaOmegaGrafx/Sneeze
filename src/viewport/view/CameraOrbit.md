@@ -1,26 +1,25 @@
 # View — Camera Controls
 
-The `view` module provides camera control primitives used by the compositor
-to transform user input into camera movement.
+The camera orbit functionality is now part of `VIEWPORT::VIEW`, a struct
+declared inside `Viewport.h`. The `view/` module directory is retained for
+documentation and future camera modes.
 
-## CAMERA_ORBIT
+## VIEWPORT::VIEW
 
-An orbiting camera that rotates around a target point. Used by the
-compositor to navigate the solar system view.
+An orbiting camera that rotates around a target point. Each VIEWPORT owns
+one VIEW instance, updated by the compositor from that viewport's input.
 
 ```cpp
-#include "view/CameraOrbit.h"
+SNEEZE::VIEWPORT::VIEW& view = pViewport->View ();
+view.dTheta    = 0.0f;      // azimuthal angle (radians)
+view.dPhi      = 0.3f;      // polar angle (radians)
+view.dDistance  = 10.0f;     // distance from target
+view.dTargetX  = 0.0f;      // look-at point
+view.dTargetY  = 0.0f;
+view.dTargetZ  = 0.0f;
 
-view::CAMERA_ORBIT camera;
-camera.dTheta    = 0.0f;      // azimuthal angle (radians)
-camera.dPhi      = 0.3f;      // polar angle (radians)
-camera.dDistance  = 10.0f;     // distance from target
-camera.dTargetX  = 0.0f;      // look-at point
-camera.dTargetY  = 0.0f;
-camera.dTargetZ  = 0.0f;
-
-// Each frame, feed mouse input
-view::UpdateCameraOrbit (camera, nDX, nDY, dScrollY, bMouseLeft, bMouseRight);
+// Each frame, the compositor feeds input deltas
+view.Update (nDX, nDY, dScrollY, bMouseLeft, bMouseRight);
 ```
 
 ### Controls
@@ -39,9 +38,9 @@ The compositor converts this into `CAMERA_DATA` for the renderer.
 
 ## Unimplemented / Future Work
 
-- **First-person camera** — a walk/fly camera for terrestrial navigation
+- **First-person camera** -- a walk/fly camera for terrestrial navigation
   (when the user is "on the surface" of a planet or inside a building).
-- **Camera transitions** — smooth animated transitions between camera
+- **Camera transitions** -- smooth animated transitions between camera
   modes or between targets (e.g., clicking a planet to fly to it).
-- **Camera constraints** — clamping phi to prevent flipping, minimum
+- **Camera constraints** -- clamping phi to prevent flipping, minimum
   zoom distance, collision with geometry.

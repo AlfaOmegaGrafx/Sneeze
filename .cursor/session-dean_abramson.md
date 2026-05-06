@@ -533,3 +533,13 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 - **Split `Storage.cpp` into three files** — `Storage.cpp` (top-level: Initialize, Shutdown, Open, Close, Enumerate), `Unit.cpp` (UNIT class: JSON access, changelog, lifecycle, meta), `Asset.cpp` (ASSET class: path-based API, attach/detach). Mirrors NETWORK's `Network.cpp` / `Asset.cpp` / `File.cpp` structure. Updated `src/CMakeLists.txt`.
 - **Updated `project.mdc`** — storage module description (disk layout, file split, features), STORAGE class entry, Storage test suite documentation, `--storage` flag in test runner list.
 
+## 2026-05-05 (Mon) ~6:00 PM – 11:00 PM PDT
+
+**Dean Abramson** — Multi-viewport architecture refactoring, coding standards cleanup, documentation update.
+
+- **Multi-viewport architecture** — Split `ISNEEZE` into engine-level (`ISNEEZE`) and per-viewport (`IVIEWPORT`) interfaces. Moved renderer ownership from COMPOSITOR to VIEWPORT. Refactored COMPOSITOR to iterate all viewports per frame. Added `OpenViewport`/`CloseViewport`/`Viewport()`/`Viewports()` API. Input, framebuffer, scene, renderer all per-viewport now.
+- **Coding standards cleanup** — Systematic pass on Viewport.h/cpp, Sneeze.h/cpp, Scene.h/cpp, Fabric.h/cpp, Node.h/cpp. Established `Type_Verb_Qualifier` naming convention. Moved all inline implementations to .cpp files. Eliminated early returns. Fixed initializer list style, Allman braces, no split lines.
+- **Bug fixes** — JWS crash (null m_pSneeze in catch blocks), double input consumption in compositor, Win32 SPIR-V resource embedding for static lib consumers, missing `<filesystem>` include.
+- **Documentation update** — Comprehensive rewrite of `project.mdc` Key Classes section, module table, coding conventions, architecture notes. Updated `Scene.md`, `Sneeze.md`, `CameraOrbit.md`, `Storage.md` for new API names.
+- **Artemis compatibility** — Identified all breaking API changes and prepared migration guide for Artemis project. Patching in progress (separate session).
+

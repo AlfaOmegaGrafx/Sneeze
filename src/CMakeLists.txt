@@ -542,7 +542,6 @@ set (SOM_SOURCES
    viewport/scene/SpatialIndex.cpp)
 set (SOM_HEADERS
    viewport/Viewport.h
-   viewport/scene/Types.h
    viewport/scene/Node.h
    viewport/scene/Fabric.h
    viewport/scene/Scene.h
@@ -568,9 +567,6 @@ set (PERSONA_HEADERS  persona/Persona.h)
 
 set (RENDERER_SOURCES  viewport/renderer/AnariRenderer.cpp  viewport/renderer/UVSphere.cpp)
 set (RENDERER_HEADERS  viewport/renderer/Renderer.h  viewport/renderer/AnariRenderer.h  viewport/renderer/UVSphere.h)
-
-set (VIEW_SOURCES    viewport/view/CameraOrbit.cpp)
-set (VIEW_HEADERS    viewport/view/CameraOrbit.h)
 
 if (SNEEZE_ENABLE_WASM)
    set (WASM_SOURCES
@@ -623,7 +619,6 @@ add_library (Sneeze STATIC
    ${STORAGE_SOURCES}   ${STORAGE_HEADERS}
    ${PERSONA_SOURCES}   ${PERSONA_HEADERS}
    ${RENDERER_SOURCES}  ${RENDERER_HEADERS}
-   ${VIEW_SOURCES}      ${VIEW_HEADERS}
    ${WASM_SOURCES}      ${WASM_HEADERS}
    ${SPIRV_SOURCES}     ${SPIRV_HEADERS}
    ${XR_SOURCES}        ${XR_HEADERS}
@@ -634,6 +629,13 @@ add_library (Sneeze STATIC
    ${KERNEL_EMBED_FILES}
 )
 add_dependencies (Sneeze CompileKernels)
+
+# On Windows, .res objects inside static libraries don't get pulled into the
+# final executable by the linker. Expose the .rc as an INTERFACE source so
+# executables linking Sneeze automatically compile and link the resource.
+if (WIN32)
+   target_sources (Sneeze INTERFACE ${KERNEL_EMBED_FILES})
+endif ()
 
 target_include_directories (Sneeze PUBLIC
    ${CMAKE_CURRENT_SOURCE_DIR}
@@ -721,7 +723,6 @@ source_group ("container" FILES ${CONTAINER_HEADERS})
 source_group ("storage"   FILES ${STORAGE_SOURCES} ${STORAGE_HEADERS})
 source_group ("persona"  FILES ${PERSONA_SOURCES} ${PERSONA_HEADERS})
 source_group ("renderer" FILES ${RENDERER_SOURCES} ${RENDERER_HEADERS})
-source_group ("view"     FILES ${VIEW_SOURCES} ${VIEW_HEADERS})
 source_group ("wasm"     FILES ${WASM_SOURCES} ${WASM_HEADERS})
 source_group ("spirv"    FILES ${SPIRV_SOURCES} ${SPIRV_HEADERS})
 source_group ("xr"       FILES ${XR_SOURCES} ${XR_HEADERS})

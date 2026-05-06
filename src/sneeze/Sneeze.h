@@ -44,7 +44,8 @@ public:
    class VIEWPORT;
 
    // ------------------------------------------------------------------------
-   // ISNEEZE — interface between the host application and the engine.
+   // ISNEEZE -- interface between the host application and the engine.
+   // Engine-level only: logging, data paths, renderer selection.
    // ------------------------------------------------------------------------
 
    class ISNEEZE
@@ -66,7 +67,25 @@ public:
       std::string sSessionPath;
       std::string sRenderer;
 
-      std::string SessionPath () const { return (std::filesystem::path (sAppDataPath) / sSessionPath).string (); }
+      std::string SessionPath () const;
+
+      // --- Callbacks (host must implement) ---
+
+      virtual void Log (eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage) = 0;
+   };
+
+   // ------------------------------------------------------------------------
+   // IVIEWPORT — per-viewport interface between the host and a viewport.
+   // Each viewport gets its own IVIEWPORT instance from the application.
+   // ------------------------------------------------------------------------
+
+   class IVIEWPORT
+   {
+   public:
+      virtual ~IVIEWPORT () = default;
+
+      // --- Configuration (set by host before OpenViewport) ---
+
       void*       pNativeWindow  = nullptr;
       int         nWidth         = 0;
       int         nHeight        = 0;
@@ -74,7 +93,8 @@ public:
       // --- Callbacks (host must implement) ---
 
       virtual void OnFrameReady (const uint32_t* pFB, int nFbW, int nFbH) = 0;
-      virtual void Log (eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage) = 0;
+
+      // --- Inspector callbacks (optional) ---
 
       virtual void OnNetworkFileCreated (NOTIFICATION* pNotification) { (void)pNotification; }
       virtual void OnNetworkFileChanged (NOTIFICATION* pNotification) { (void)pNotification; }
@@ -87,75 +107,42 @@ public:
 
    // ------------------------------------------------------------------------
 
-   struct INPUT
-   {
-      int   nMouseDX    = 0;
-      int   nMouseDY    = 0;
-      float dScrollY    = 0.0f;
-      bool  bMouseLeft  = false;
-      bool  bMouseRight = false;
-
-      bool  bKeySpace   = false;
-      bool  bKeyPlus    = false;
-      bool  bKeyMinus   = false;
-   };
-
-   // ------------------------------------------------------------------------
-
    explicit SNEEZE (ISNEEZE* pHost);
    ~SNEEZE ();
 
-   ISNEEZE* GetHost () const { return m_pHost; }
+   ISNEEZE* Host () const;
 
    bool Initialize ();
    void Shutdown ();
 
-   // --- Input (called by application from its event loop) ---
+   // --- Viewport management ---
 
-   void SetMouseInput (int nDX, int nDY, float dScrollY,
-                       bool bMouseLeft, bool bMouseRight);
-   void SetKeyInput (bool bKeySpace, bool bKeyPlus, bool bKeyMinus);
-
-   // --- Framebuffer (called by application to present) ---
-
-   const uint32_t* LockFrameBuffer (int& nWidth, int& nHeight);
-   void            UnlockFrameBuffer ();
-
-   // --- Dimensions ---
-
-   int  GetWidth () const  { return m_nWidth; }
-   int  GetHeight () const { return m_nHeight; }
-   void Resize (int nWidth, int nHeight);
-   bool ConsumePendingResize (int& nWidth, int& nHeight);
+   VIEWPORT* OpenViewport (IVIEWPORT* pHost, const std::string& sUrl = "");
+   void      CloseViewport (VIEWPORT* pViewport);
+   VIEWPORT* Viewport () const;
+   const std::vector<VIEWPORT*>& Viewports () const;
 
    SNEEZE (const SNEEZE&) = delete;
    SNEEZE& operator= (const SNEEZE&) = delete;
    SNEEZE (SNEEZE&&) = delete;
    SNEEZE& operator= (SNEEZE&&) = delete;
 
-   // --- Shared state accessed by workers ---
+   // --- Shared services ---
 
    void                     Log (ISNEEZE::eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage);
-   INPUT                    ConsumeInput ();
-   void                     WriteFrameBuffer (const uint32_t* pPixels, int nWidth, int nHeight);
-   std::vector<void*>&      GetBodies ();
-
-   // --- Viewport ---
-
-   VIEWPORT*                GetViewport () const { return m_pViewport; }
+   std::vector<void*>&      Bodies ();
 
    // --- Persona ---
 
    void Login (const std::string& sFirst, const std::string& sSecond);
    void Logout ();
    void ChangePersona (const std::string& sFirst, const std::string& sSecond);
-   void ChangePrimaryFabric (const std::string& sUrl);
 
    // --- Subsystems ---
 
-   NETWORK*                 Network () const { return m_pNetwork; }
-   STORAGE*                 GetStorage () const { return m_pStorage; }
-   persona::PERSONA*        GetPersona () const { return m_pPersona; }
+   NETWORK*                 Network () const;
+   STORAGE*                 Storage () const;
+   persona::PERSONA*        Persona () const;
 
    void OnNetworkFileCreated (NOTIFICATION* pNotification);
    void OnNetworkFileChanged (NOTIFICATION* pNotification);
@@ -171,41 +158,20 @@ private:
    ISNEEZE*                 m_pHost;
 
    // Engine thread
-   std::thread*             m_pEngineThread;
+   std::thread*             m_pThread_Engine;
    std::mutex               m_mutex;
    std::condition_variable  m_condVar;
    bool                     m_bShutdown;
    bool                     m_bReady;
 
    // Workers
-   std::vector<WORKER*>     m_apWorkers;
+   std::vector<WORKER*>     m_apWorker;
    std::vector<int>         m_anWorkerHertz;
    std::vector<int64_t>     m_anWorkerLastTick;
    std::vector<int>         m_anWorkerSignalCount;
 
-   // Input
-   std::mutex               m_inputMutex;
-   INPUT                    m_pInput;
-
-   // Framebuffer
-   std::mutex               m_fbMutex;
-   std::vector<uint32_t>    m_aFrameBuffer;
-   int                      m_nFbWidth;
-   int                      m_nFbHeight;
-
-   // Renderer configuration
-   int                      m_nWidth;
-   int                      m_nHeight;
-
-   // Resize request
-   std::mutex               m_resizeMutex;
-   bool                     m_bResizePending;
-   int                      m_nResizeWidth;
-   int                      m_nResizeHeight;
-
-   // Viewport
-   VIEWPORT*              m_pViewport;
-   astro::ASTRO_SERVICE*  m_pAstroService;
+   // Viewports
+   std::vector<VIEWPORT*>   m_apViewport;
 
    // Subsystems
    NETWORK*                 m_pNetwork;

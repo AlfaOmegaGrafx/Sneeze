@@ -70,31 +70,31 @@ CHAIN::~CHAIN ()
 
 void CHAIN::LoadTrustStore ()
 {
-   if (m_pImpl->pStore)
-      return;
-
-   m_pImpl->pStore = X509_STORE_new ();
+   if (!m_pImpl->pStore)
+   {
+      m_pImpl->pStore = X509_STORE_new ();
 
 #ifdef _WIN32
-   HCERTSTORE hSysStore = CertOpenSystemStoreA (0, "ROOT");
-   if (hSysStore)
-   {
-      PCCERT_CONTEXT pCtx = nullptr;
-      while ((pCtx = CertEnumCertificatesInStore (hSysStore, pCtx)) != nullptr)
+      HCERTSTORE hSysStore = CertOpenSystemStoreA (0, "ROOT");
+      if (hSysStore)
       {
-         const unsigned char* pDer = pCtx->pbCertEncoded;
-         X509* pCert = d2i_X509 (nullptr, &pDer, (long) pCtx->cbCertEncoded);
-         if (pCert)
+         PCCERT_CONTEXT pCtx = nullptr;
+         while ((pCtx = CertEnumCertificatesInStore (hSysStore, pCtx)) != nullptr)
          {
-            X509_STORE_add_cert (m_pImpl->pStore, pCert);
-            X509_free (pCert);
+            const unsigned char* pDer = pCtx->pbCertEncoded;
+            X509* pCert = d2i_X509 (nullptr, &pDer, (long) pCtx->cbCertEncoded);
+            if (pCert)
+            {
+               X509_STORE_add_cert (m_pImpl->pStore, pCert);
+               X509_free (pCert);
+            }
          }
+         CertCloseStore (hSysStore, 0);
       }
-      CertCloseStore (hSysStore, 0);
-   }
 #else
-   X509_STORE_set_default_paths (m_pImpl->pStore);
+      X509_STORE_set_default_paths (m_pImpl->pStore);
 #endif
+   }
 }
 
 // ---------------------------------------------------------------------------

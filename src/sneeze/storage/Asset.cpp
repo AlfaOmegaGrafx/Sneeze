@@ -20,9 +20,11 @@
 // STORAGE::ASSET
 // ===========================================================================
 
-SNEEZE::STORAGE::ASSET::ASSET (STORAGE* pStorage, std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName) :
+SNEEZE::STORAGE::ASSET::ASSET (STORAGE* pStorage, std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName,
+   SNEEZE::VIEWPORT* pViewport) :
    m_pStorage      (pStorage),
    m_pName         (std::move (pName)),
+   m_pViewport     (pViewport),
    m_nRefCount     (0),
    m_bPendingClear (false)
 {
@@ -32,9 +34,10 @@ SNEEZE::STORAGE::ASSET::ASSET (STORAGE* pStorage, std::shared_ptr<SNEEZE::VIEWPO
 
 nlohmann::json SNEEZE::STORAGE::ASSET::Get (SCOPE eScope, const std::string& sPath) const
 {
+   nlohmann::json jResult;
    if (m_apUnits[eScope])
-      return m_apUnits[eScope]->Get (sPath);
-   return nlohmann::json ();
+      jResult = m_apUnits[eScope]->Get (sPath);
+   return jResult;
 }
 
 void SNEEZE::STORAGE::ASSET::Set (SCOPE eScope, const std::string& sPath, const nlohmann::json& jValue)
@@ -63,16 +66,18 @@ void SNEEZE::STORAGE::ASSET::Remove (SCOPE eScope, const std::string& sPath)
 
 bool SNEEZE::STORAGE::ASSET::Has (SCOPE eScope, const std::string& sPath) const
 {
+   bool bHas = false;
    if (m_apUnits[eScope])
-      return m_apUnits[eScope]->Has (sPath);
-   return false;
+      bHas = m_apUnits[eScope]->Has (sPath);
+   return bHas;
 }
 
 std::string SNEEZE::STORAGE::ASSET::GetJson (SCOPE eScope) const
 {
+   std::string sJson = "{}";
    if (m_apUnits[eScope])
-      return m_apUnits[eScope]->GetJson ();
-   return "{}";
+      sJson = m_apUnits[eScope]->GetJson ();
+   return sJson;
 }
 
 void SNEEZE::STORAGE::ASSET::SetJson (SCOPE eScope, const std::string& sJson)
@@ -106,20 +111,20 @@ void SNEEZE::STORAGE::ASSET::Attach ()
 
 void SNEEZE::STORAGE::ASSET::Detach ()
 {
-   if (m_nRefCount == 0)
-      return;
-
-   m_nRefCount--;
-
-   if (m_nRefCount == 0)
+   if (m_nRefCount > 0)
    {
-      for (int i = 0; i < SCOPE_COUNT; i++)
+      m_nRefCount--;
+
+      if (m_nRefCount == 0)
       {
-         if (m_apUnits[i])
+         for (int i = 0; i < SCOPE_COUNT; i++)
          {
-            m_apUnits[i]->m_nRefCount--;
-            if (m_apUnits[i]->m_nRefCount == 0)
-               m_apUnits[i]->Evict ();
+            if (m_apUnits[i])
+            {
+               m_apUnits[i]->m_nRefCount--;
+               if (m_apUnits[i]->m_nRefCount == 0)
+                  m_apUnits[i]->Evict ();
+            }
          }
       }
    }

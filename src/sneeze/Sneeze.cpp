@@ -15,18 +15,14 @@
 #include "Sneeze.h"
 #include "Types.h"
 #include "worker/Worker.h"
-#include "astro/BodyData.h"
 #include "astro/RMCObject.h"
-#include "astro/AstroService.h"
-#include "scene/Fabric.h"
-#include "scene/Scene.h"
-#include "scene/Node.h"
-#include "scene/MapObject.h"
 #include "network/Network.h"
 #include "storage/Storage.h"
 #include "persona/Persona.h"
+#include "viewport/Viewport.h"
 #include "wasm/WasmRuntime.h"
 #include "spirv/SpvPipeline.h"
+#include <filesystem>
 #ifdef SNEEZE_HAS_XR
 #include "xr/XrRuntime.h"
 #endif
@@ -79,22 +75,13 @@ static DEP::UI_CONTEXT       s_pUiContext;
 // ---------------------------------------------------------------------------
 
 SNEEZE::SNEEZE (ISNEEZE* pHost) :
-   m_pHost                  (pHost),
-   m_pEngineThread          (nullptr),
-   m_bShutdown              (false),
-   m_bReady                 (false),
-   m_nFbWidth               (0),
-   m_nFbHeight              (0),
-   m_nWidth                 (0),
-   m_nHeight                (0),
-   m_bResizePending         (false),
-   m_nResizeWidth           (0),
-   m_nResizeHeight          (0),
-   m_pViewport              (nullptr),
-   m_pAstroService          (nullptr),
-   m_pNetwork                 (nullptr),
-   m_pStorage               (nullptr),
-   m_pPersona               (nullptr)
+   m_pHost (pHost),
+   m_pThread_Engine (nullptr),
+   m_bShutdown (false),
+   m_bReady (false),
+   m_pNetwork (nullptr),
+   m_pStorage (nullptr),
+   m_pPersona (nullptr)
 {
 }
 
@@ -107,16 +94,9 @@ bool SNEEZE::Initialize ()
 {
    bool bResult = false;
 
-   if (!m_pHost  ||  m_pHost->sAppDataPath.empty ()  ||  !m_pHost->pNativeWindow)
-   {
-      Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Host configuration incomplete (sAppDataPath and pNativeWindow required)");
-      return false;
-   }
-
-   m_nWidth  = m_pHost->nWidth;
-   m_nHeight = m_pHost->nHeight;
-
-   if (s_pWasmRuntime.Initialize (this))
+   if (!m_pHost  ||  m_pHost->sAppDataPath.empty ())
+      Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Host configuration incomplete (sAppDataPath required)");
+   else if (s_pWasmRuntime.Initialize (this))
    {
       if (s_pSpvPipeline.Initialize (this))
       {
@@ -126,38 +106,7 @@ bool SNEEZE::Initialize ()
 #endif
             if (s_pUiContext.Initialize (this))
             {
-                  // --- Create viewport and SOM structure ---
-                  //
-                  // viewport -> scene
-                  //   scene -> root fabric -> root node -> primary attach node
-                  //                        -> primary fabric -> primary root node
-
-                  m_pViewport = new VIEWPORT (this);
-
-                  auto* pScene = new VIEWPORT::SCENE (this);
-                  m_pViewport->SetScene (pScene);
-
-                  auto* pRootFabric = new VIEWPORT::SCENE::FABRIC (pScene);
-                  auto* pRootNode   = new VIEWPORT::SCENE::FABRIC::NODE (pRootFabric);
-                  pRootFabric->SetRootNode (pRootNode);
-                  pScene->SetRootFabric (pRootFabric);
-
-                  auto* pPrimaryAttach = new VIEWPORT::SCENE::FABRIC::NODE (pRootFabric);
-                  pPrimaryAttach->SetPrimary (true);
-                  pRootNode->AddChild (pPrimaryAttach);
-
-                  auto* pPrimaryFabric = new VIEWPORT::SCENE::FABRIC (pScene);
-                  auto* pPrimaryRoot   = new VIEWPORT::SCENE::FABRIC::NODE (pPrimaryFabric);
-                  pPrimaryFabric->SetRootNode (pPrimaryRoot);
-                  pPrimaryFabric->SetParent (pRootFabric);
-                  pPrimaryFabric->SetAttachingNode (pPrimaryAttach);
-                  pPrimaryAttach->SetAttachedFabric (pPrimaryFabric);
-                  pRootFabric->AddChildFabric (pPrimaryFabric);
-                  pScene->SetPrimaryFabric (pPrimaryFabric);
-
-                  Log (ISNEEZE::kLOGLEVEL_Info, "SNEEZE", "SOM initialized (root fabric + primary fabric)");
-
-                  // --- Initialize subsystems (network, storage, persona) ---
+                  // --- Initialize shared subsystems ---
 
                   m_pNetwork = new NETWORK (this);
                   m_pNetwork->Initialize ();
@@ -166,22 +115,6 @@ bool SNEEZE::Initialize ()
                   m_pStorage->Initialize ();
 
                   m_pPersona = new persona::PERSONA (this);
-
-                  // --- Create solar system and populate SOM ---
-
-                  astro::CreateSolarSystem ();
-                  auto& aBodies = astro::RMCOBJECT::All ();
-
-                  for (auto* pBody : aBodies)
-                     pBody->ComputeRaw ();
-                  for (auto* pBody : aBodies)
-                     pBody->ConvertToOutput ();
-
-                  Log (ISNEEZE::kLOGLEVEL_Info, "SNEEZE",
-                     "Created " + std::to_string (aBodies.size ()) + " bodies");
-
-                  m_pAstroService = new astro::ASTRO_SERVICE (this);
-                  m_pAstroService->Initialize (pPrimaryFabric);
 
                   // --- Create and initialize workers ---
 
@@ -193,11 +126,11 @@ bool SNEEZE::Initialize ()
 
                      WORKER* pWorker = config.Create (this);
 
-                     pWorker->SetWorkerIndex (static_cast<int> (m_apWorkers.size ()));
+                     pWorker->SetWorkerIndex (static_cast<int> (m_apWorker.size ()));
 
                      if (pWorker->Initialize ())
                      {
-                        m_apWorkers.push_back (pWorker);
+                        m_apWorker.push_back (pWorker);
                         m_anWorkerHertz.push_back (config.nHertz);
                         m_anWorkerLastTick.push_back (0);
                         m_anWorkerSignalCount.push_back (0);
@@ -214,23 +147,22 @@ bool SNEEZE::Initialize ()
 
                   if (bResult)
                   {
-                     m_pEngineThread = new std::thread (&SNEEZE::EngineThreadLoop, this);
+                     m_pThread_Engine = new std::thread (&SNEEZE::EngineThreadLoop, this);
 
                      std::unique_lock<std::mutex> lock (m_mutex);
                      m_condVar.wait (lock, [this] { return m_bReady; });
 
-                     Log (ISNEEZE::kLOGLEVEL_Info, "SNEEZE",
-                        "Initialized (1 engine thread + " + std::to_string (m_apWorkers.size ()) + " workers)");
+                     Log (ISNEEZE::kLOGLEVEL_Info, "SNEEZE", "Initialized (1 engine thread + " + std::to_string (m_apWorker.size ()) + " workers)");
                   }
 
                   if (!bResult)
                   {
-                     for (int nIz = static_cast<int> (m_apWorkers.size ()) - 1; nIz >= 0; nIz--)
+                     for (int nIz = static_cast<int> (m_apWorker.size ()) - 1; nIz >= 0; nIz--)
                      {
-                        m_apWorkers[nIz]->Shutdown ();
-                        delete m_apWorkers[nIz];
+                        m_apWorker[nIz]->Shutdown ();
+                        delete m_apWorker[nIz];
                      }
-                     m_apWorkers.clear ();
+                     m_apWorker.clear ();
                      m_anWorkerHertz.clear ();
                      m_anWorkerLastTick.clear ();
                      m_anWorkerSignalCount.clear ();
@@ -239,31 +171,45 @@ bool SNEEZE::Initialize ()
                if (!bResult)
                   s_pUiContext.Shutdown ();
             }
-            else Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize UI context");
+            else
+            {
+               Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize UI context");
+            }
 
 #ifdef SNEEZE_HAS_XR
             if (!bResult)
                s_pXrRuntime.Shutdown ();
          }
-         else Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize XR runtime");
+         else
+         {
+            Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize XR runtime");
+         }
 #endif
 
          if (!bResult)
             s_pSpvPipeline.Shutdown ();
       }
-      else Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize SPIR-V pipeline");
+      else
+      {
+         Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize SPIR-V pipeline");
+      }
 
       if (!bResult)
          s_pWasmRuntime.Shutdown ();
    }
-   else Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize WASM runtime");
+   else
+   {
+      Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize WASM runtime");
+   }
 
    return bResult;
 }
 
 void SNEEZE::Shutdown ()
 {
-   if (m_pEngineThread)
+   // --- Stop engine thread ---
+
+   if (m_pThread_Engine)
    {
       {
          std::lock_guard<std::mutex> guard (m_mutex);
@@ -271,22 +217,33 @@ void SNEEZE::Shutdown ()
       }
       m_condVar.notify_all ();
 
-      m_pEngineThread->join ();
-      delete m_pEngineThread;
-      m_pEngineThread = nullptr;
+      m_pThread_Engine->join ();
+      delete m_pThread_Engine;
+      m_pThread_Engine = nullptr;
    }
 
-   for (int nIz = static_cast<int> (m_apWorkers.size ()) - 1; nIz >= 0; nIz--)
+   // --- Shutdown workers ---
+
+   for (int nIz = static_cast<int> (m_apWorker.size ()) - 1; nIz >= 0; nIz--)
    {
-      m_apWorkers[nIz]->Shutdown ();
-      delete m_apWorkers[nIz];
+      m_apWorker[nIz]->Shutdown ();
+      delete m_apWorker[nIz];
    }
-   m_apWorkers.clear ();
+   m_apWorker.clear ();
    m_anWorkerHertz.clear ();
    m_anWorkerLastTick.clear ();
    m_anWorkerSignalCount.clear ();
 
-   // --- Destroy subsystems ---
+   // --- Close all viewports ---
+
+   for (int nIz = static_cast<int> (m_apViewport.size ()) - 1; nIz >= 0; nIz--)
+   {
+      m_apViewport[nIz]->Shutdown ();
+      delete m_apViewport[nIz];
+   }
+   m_apViewport.clear ();
+
+   // --- Destroy shared subsystems ---
 
    delete m_pPersona;
    m_pPersona = nullptr;
@@ -298,55 +255,14 @@ void SNEEZE::Shutdown ()
       m_pStorage = nullptr;
    }
 
-   // --- Destroy SOM (before network, because node destructors release network files) ---
-
-   if (m_pAstroService)
-   {
-      m_pAstroService->Shutdown ();
-      delete m_pAstroService;
-      m_pAstroService = nullptr;
-   }
-
-   if (m_pViewport)
-   {
-      auto* pScene = m_pViewport->GetScene ();
-      if (pScene)
-      {
-         auto* pPrimaryFabric = pScene->GetPrimaryFabric ();
-         if (pPrimaryFabric)
-         {
-            delete pPrimaryFabric->GetRootNode ();
-            delete pPrimaryFabric;
-         }
-
-         auto* pRootFabric = pScene->GetRootFabric ();
-         if (pRootFabric)
-         {
-            auto* pRootNode = pRootFabric->GetRootNode ();
-            if (pRootNode)
-            {
-               for (auto* pChild : pRootNode->Children ())
-                  delete pChild;
-               delete pRootNode;
-            }
-            delete pRootFabric;
-         }
-
-         delete pScene;
-      }
-
-      delete m_pViewport;
-      m_pViewport = nullptr;
-   }
-
-   // --- Destroy network (after SOM) ---
-
    if (m_pNetwork)
    {
       m_pNetwork->Shutdown ();
       delete m_pNetwork;
       m_pNetwork = nullptr;
    }
+
+   // --- Shutdown deps ---
 
    s_pUiContext.Shutdown ();
 #ifdef SNEEZE_HAS_XR
@@ -359,90 +275,57 @@ void SNEEZE::Shutdown ()
 }
 
 // ---------------------------------------------------------------------------
-// Input
+// Viewport management
 // ---------------------------------------------------------------------------
 
-void SNEEZE::SetMouseInput (int nDX, int nDY, float dScrollY,
-                            bool bMouseLeft, bool bMouseRight)
+SNEEZE::VIEWPORT* SNEEZE::OpenViewport (IVIEWPORT* pHost, const std::string& sUrl)
 {
-   std::lock_guard<std::mutex> guard (m_inputMutex);
-   m_pInput.nMouseDX   += nDX;
-   m_pInput.nMouseDY   += nDY;
-   m_pInput.dScrollY   += dScrollY;
-   m_pInput.bMouseLeft  = bMouseLeft;
-   m_pInput.bMouseRight = bMouseRight;
+   VIEWPORT* pViewport = new VIEWPORT (this, pHost);
+
+   if (!pViewport->Initialize (sUrl))
+   {
+      delete pViewport;
+      pViewport = nullptr;
+   }
+   else
+   {
+      m_apViewport.push_back (pViewport);
+   }
+
+   return pViewport;
 }
 
-void SNEEZE::SetKeyInput (bool bKeySpace, bool bKeyPlus, bool bKeyMinus)
+void SNEEZE::CloseViewport (VIEWPORT* pViewport)
 {
-   std::lock_guard<std::mutex> guard (m_inputMutex);
-   m_pInput.bKeySpace = bKeySpace;
-   m_pInput.bKeyPlus  = bKeyPlus;
-   m_pInput.bKeyMinus = bKeyMinus;
+   if (pViewport)
+   {
+      for (auto it = m_apViewport.begin (); it != m_apViewport.end (); ++it)
+      {
+         if (*it == pViewport)
+         {
+            pViewport->Shutdown ();
+            delete pViewport;
+            m_apViewport.erase (it);
+            break;
+         }
+      }
+   }
 }
 
-SNEEZE::INPUT SNEEZE::ConsumeInput ()
+SNEEZE::VIEWPORT* SNEEZE::Viewport () const
 {
-   std::lock_guard<std::mutex> guard (m_inputMutex);
-   INPUT pCopy = m_pInput;
-   m_pInput.nMouseDX = 0;
-   m_pInput.nMouseDY = 0;
-   m_pInput.dScrollY = 0.0f;
-   return pCopy;
+   return m_apViewport.empty () ? nullptr : m_apViewport[0];
 }
 
-// ---------------------------------------------------------------------------
-// Framebuffer
-// ---------------------------------------------------------------------------
+const std::vector<SNEEZE::VIEWPORT*>& SNEEZE::Viewports () const { return m_apViewport; }
+SNEEZE::ISNEEZE*  SNEEZE::Host () const       { return m_pHost; }
+SNEEZE::NETWORK*  SNEEZE::Network () const    { return m_pNetwork; }
+SNEEZE::STORAGE*  SNEEZE::Storage () const    { return m_pStorage; }
+persona::PERSONA* SNEEZE::Persona () const    { return m_pPersona; }
 
-void SNEEZE::WriteFrameBuffer (const uint32_t* pPixels, int nWidth, int nHeight)
+std::string SNEEZE::ISNEEZE::SessionPath () const
 {
-   std::lock_guard<std::mutex> guard (m_fbMutex);
-   int nSize = nWidth * nHeight;
-   m_aFrameBuffer.resize (nSize);
-   std::memcpy (m_aFrameBuffer.data (), pPixels, nSize * sizeof (uint32_t));
-   m_nFbWidth  = nWidth;
-   m_nFbHeight = nHeight;
-}
-
-const uint32_t* SNEEZE::LockFrameBuffer (int& nWidth, int& nHeight)
-{
-   m_fbMutex.lock ();
-   nWidth  = m_nFbWidth;
-   nHeight = m_nFbHeight;
-   const uint32_t* pResult = m_aFrameBuffer.empty () ? nullptr : m_aFrameBuffer.data ();
-   return pResult;
-}
-
-void SNEEZE::UnlockFrameBuffer ()
-{
-   m_fbMutex.unlock ();
-}
-
-// ---------------------------------------------------------------------------
-// Resize
-// ---------------------------------------------------------------------------
-
-void SNEEZE::Resize (int nWidth, int nHeight)
-{
-   std::lock_guard<std::mutex> guard (m_resizeMutex);
-   m_bResizePending = true;
-   m_nResizeWidth   = nWidth;
-   m_nResizeHeight  = nHeight;
-}
-
-bool SNEEZE::ConsumePendingResize (int& nWidth, int& nHeight)
-{
-   std::lock_guard<std::mutex> guard (m_resizeMutex);
-   if (!m_bResizePending)
-      return false;
-
-   nWidth  = m_nResizeWidth;
-   nHeight = m_nResizeHeight;
-   m_nWidth  = nWidth;
-   m_nHeight = nHeight;
-   m_bResizePending = false;
-   return true;
+   return (std::filesystem::path (sAppDataPath) / sSessionPath).string ();
 }
 
 // ---------------------------------------------------------------------------
@@ -459,10 +342,8 @@ void SNEEZE::Log (ISNEEZE::eLOGLEVEL Level, const std::string& sModule, const st
 // Bodies (accessed by compositor)
 // ---------------------------------------------------------------------------
 
-std::vector<void*>& SNEEZE::GetBodies ()
+std::vector<void*>& SNEEZE::Bodies ()
 {
-   // RMCOBJECT::All() returns the static registry; we expose it via void*
-   // to avoid pulling astro headers into Sneeze.h. The compositor casts back.
    static std::vector<void*> aBodies;
    aBodies.clear ();
    auto& aAll = astro::RMCOBJECT::All ();
@@ -473,38 +354,92 @@ std::vector<void*>& SNEEZE::GetBodies ()
 
 void SNEEZE::OnNetworkFileCreated (NOTIFICATION* pNotification)
 {
-   if (m_pHost)
-      m_pHost->OnNetworkFileCreated (pNotification);
+   NETWORK::FILE* pFile     = dynamic_cast<NETWORK::FILE*> (pNotification);
+   VIEWPORT*      pViewport = pFile ? pFile->Viewport () : nullptr;
+
+   if (pViewport  &&  pViewport->Host ())
+      pViewport->Host ()->OnNetworkFileCreated (pNotification);
+   else
+   {
+      for (VIEWPORT* pLoop : m_apViewport)
+         if (pLoop->Host ())
+            pLoop->Host ()->OnNetworkFileCreated (pNotification);
+   }
 }
 
 void SNEEZE::OnNetworkFileChanged (NOTIFICATION* pNotification)
 {
-   if (m_pHost)
-      m_pHost->OnNetworkFileChanged (pNotification);
+   NETWORK::FILE* pFile     = dynamic_cast<NETWORK::FILE*> (pNotification);
+   VIEWPORT*      pViewport = pFile ? pFile->Viewport () : nullptr;
+
+   if (pViewport  &&  pViewport->Host ())
+      pViewport->Host ()->OnNetworkFileChanged (pNotification);
+   else
+   {
+      for (VIEWPORT* pLoop : m_apViewport)
+         if (pLoop->Host ())
+            pLoop->Host ()->OnNetworkFileChanged (pNotification);
+   }
 }
 
 void SNEEZE::OnNetworkFileDeleted (NOTIFICATION* pNotification)
 {
-   if (m_pHost)
-      m_pHost->OnNetworkFileDeleted (pNotification);
+   NETWORK::FILE* pFile     = dynamic_cast<NETWORK::FILE*> (pNotification);
+   VIEWPORT*      pViewport = pFile ? pFile->Viewport () : nullptr;
+
+   if (pViewport  &&  pViewport->Host ())
+      pViewport->Host ()->OnNetworkFileDeleted (pNotification);
+   else
+   {
+      for (VIEWPORT* pLoop : m_apViewport)
+         if (pLoop->Host ())
+            pLoop->Host ()->OnNetworkFileDeleted (pNotification);
+   }
 }
 
 void SNEEZE::OnStorageUnitCreated (NOTIFICATION* pNotification)
 {
-   if (m_pHost)
-      m_pHost->OnStorageUnitCreated (pNotification);
+   STORAGE::ASSET* pAsset    = dynamic_cast<STORAGE::ASSET*> (pNotification);
+   VIEWPORT*       pViewport = pAsset ? pAsset->Viewport () : nullptr;
+
+   if (pViewport  &&  pViewport->Host ())
+      pViewport->Host ()->OnStorageUnitCreated (pNotification);
+   else
+   {
+      for (VIEWPORT* pLoop : m_apViewport)
+         if (pLoop->Host ())
+            pLoop->Host ()->OnStorageUnitCreated (pNotification);
+   }
 }
 
 void SNEEZE::OnStorageUnitChanged (NOTIFICATION* pNotification)
 {
-   if (m_pHost)
-      m_pHost->OnStorageUnitChanged (pNotification);
+   STORAGE::ASSET* pAsset    = dynamic_cast<STORAGE::ASSET*> (pNotification);
+   VIEWPORT*       pViewport = pAsset ? pAsset->Viewport () : nullptr;
+
+   if (pViewport  &&  pViewport->Host ())
+      pViewport->Host ()->OnStorageUnitChanged (pNotification);
+   else
+   {
+      for (VIEWPORT* pLoop : m_apViewport)
+         if (pLoop->Host ())
+            pLoop->Host ()->OnStorageUnitChanged (pNotification);
+   }
 }
 
 void SNEEZE::OnStorageUnitDeleted (NOTIFICATION* pNotification)
 {
-   if (m_pHost)
-      m_pHost->OnStorageUnitDeleted (pNotification);
+   STORAGE::ASSET* pAsset    = dynamic_cast<STORAGE::ASSET*> (pNotification);
+   VIEWPORT*       pViewport = pAsset ? pAsset->Viewport () : nullptr;
+
+   if (pViewport  &&  pViewport->Host ())
+      pViewport->Host ()->OnStorageUnitDeleted (pNotification);
+   else
+   {
+      for (VIEWPORT* pLoop : m_apViewport)
+         if (pLoop->Host ())
+            pLoop->Host ()->OnStorageUnitDeleted (pNotification);
+   }
 }
 
 // ---------------------------------------------------------------------------
@@ -519,22 +454,11 @@ void SNEEZE::Login (const std::string& sFirst, const std::string& sSecond)
 
 void SNEEZE::Logout ()
 {
-   // --- Phase 1: Signal ---
-   // Notify all active stores that a teardown is imminent.
    Log (ISNEEZE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 1 (signal)");
-
-   // --- Phase 2: Communicate ---
-   // Give instances time to communicate with their services.
-   // (In the future, this would await async acknowledgements.)
    Log (ISNEEZE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 2 (communicate)");
-
-   // --- Phase 3: Shutdown ---
-   // Call Shutdown on all active instances, destroy all stores.
    Log (ISNEEZE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 3 (shutdown)");
    s_pWasmRuntime.DestroyAllStores ();
 
-   // --- Phase 4: Destroy ---
-   // Clear session network files.
    if (m_pNetwork)
       m_pNetwork->Clear ();
 
@@ -548,40 +472,6 @@ void SNEEZE::ChangePersona (const std::string& sFirst, const std::string& sSecon
 {
    Logout ();
    Login (sFirst, sSecond);
-}
-
-void SNEEZE::ChangePrimaryFabric (const std::string& sUrl)
-{
-   // Same phased teardown as Logout, but we stay logged in and switch fabric.
-   Log (ISNEEZE::kLOGLEVEL_Info, "SNEEZE", "ChangePrimaryFabric -> " + sUrl);
-
-   // --- Phase 1: Signal ---
-   Log (ISNEEZE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 1 (signal)");
-
-   // --- Phase 2: Communicate ---
-   Log (ISNEEZE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 2 (communicate)");
-
-   // --- Phase 3: Shutdown ---
-   Log (ISNEEZE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 3 (shutdown)");
-   s_pWasmRuntime.DestroyAllStores ();
-
-   // --- Phase 4: Destroy and rebuild ---
-   if (m_pNetwork)
-      m_pNetwork->Clear ();
-
-   // Tear down existing primary fabric content
-   if (m_pAstroService)
-   {
-      m_pAstroService->Shutdown ();
-      delete m_pAstroService;
-      m_pAstroService = nullptr;
-   }
-
-   // The primary fabric root node's children are now gone (AstroService owned them).
-   // In the future, this is where we'd fetch the new MSF at sUrl,
-   // create the new primary fabric content, and repopulate the SOM.
-
-   Log (ISNEEZE::kLOGLEVEL_Info, "SNEEZE", "Primary fabric cleared, ready for new content from [" + sUrl + "]");
 }
 
 // ---------------------------------------------------------------------------
@@ -616,7 +506,7 @@ void SNEEZE::EngineThreadLoop ()
       auto tpNow = std::chrono::steady_clock::now ();
       double dElapsed = std::chrono::duration<double> (tpNow - tpOrigin).count ();
 
-      for (int nIz = 0; nIz < static_cast<int> (m_apWorkers.size ()); nIz++)
+      for (int nIz = 0; nIz < static_cast<int> (m_apWorker.size ()); nIz++)
       {
          int nHz = m_anWorkerHertz[nIz];
          if (nHz <= 0)
@@ -627,7 +517,7 @@ void SNEEZE::EngineThreadLoop ()
          {
             m_anWorkerLastTick[nIz] = nCurrentTick;
             m_anWorkerSignalCount[nIz]++;
-            m_apWorkers[nIz]->Signal ();
+            m_apWorker[nIz]->Signal ();
          }
       }
 
@@ -635,7 +525,7 @@ void SNEEZE::EngineThreadLoop ()
       if (nCurrentSecond > nLastReport)
       {
          std::string sMetronome;
-         for (int nIz = 0; nIz < static_cast<int> (m_apWorkers.size ()); nIz++)
+         for (int nIz = 0; nIz < static_cast<int> (m_apWorker.size ()); nIz++)
          {
             int nHz = m_anWorkerHertz[nIz];
             if (nHz <= 0)

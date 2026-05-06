@@ -20,9 +20,9 @@
 #include <string>
 
 // ---------------------------------------------------------------------------
-// SNEEZE::VIEWPORT::SCENE::FABRIC — a spatial fabric's branch in the scene graph.
+// SNEEZE::VIEWPORT::SCENE::FABRIC -- a spatial fabric's branch in the scene graph.
 //
-// Each fabric owns a tree of NODEs rooted at m_pRootNode. Fabrics form their
+// Each fabric owns a tree of NODEs rooted at m_pNode_Root. Fabrics form their
 // own hierarchy (parent/child) mirroring the attachment relationships in the
 // SOM tree. The attaching node is the NODE in the parent fabric's tree that
 // serves as the attachment point for this fabric.
@@ -36,50 +36,50 @@ public:
    explicit FABRIC (SCENE* pScene);
    ~FABRIC ();
 
-   // --- Scene (owner — immutable after construction) ---
+   // --- Scene (owner -- immutable after construction) ---
 
-   SCENE*  Scene () const { return m_pScene; }
+   SCENE*  Scene () const;
 
    // --- Fabric hierarchy ---
 
-   FABRIC* GetParent () const { return m_pParent; }
-   void    SetParent (FABRIC* pParent) { m_pParent = pParent; }
+   FABRIC* Fabric_Parent () const;
+   void    Fabric_Set_Parent (FABRIC* pParent);
 
-   void    AddChildFabric (FABRIC* pChild);
-   void    RemoveChildFabric (FABRIC* pChild);
-   const std::vector<FABRIC*>& GetChildren () const { return m_apChildren; }
+   void    Fabric_Add (FABRIC* pChild);
+   void    Fabric_Remove (FABRIC* pChild);
+   const std::vector<FABRIC*>& Fabric_Children () const;
 
    // --- Root node (the single root of this fabric's node tree) ---
 
-   NODE*   GetRootNode () const { return m_pRootNode; }
-   void    SetRootNode (NODE* pNode) { m_pRootNode = pNode; }
+   NODE*   Node_Root () const;
+   void    Node_Set_Root (NODE* pNode);
 
    // --- Attaching node (the node in the parent fabric where this hangs) ---
 
-   NODE*   GetAttachingNode () const { return m_pAttachingNode; }
-   void    SetAttachingNode (NODE* pNode) { m_pAttachingNode = pNode; }
+   NODE*   Node_Attaching () const;
+   void    Node_Set_Attaching (NODE* pNode);
 
    // --- Owning store (opaque for now; will be WASM::STORE*) ---
 
-   void*   GetOwner () const { return m_pOwner; }
-   void    SetOwner (void* pOwner) { m_pOwner = pOwner; }
+   void*   Owner () const;
+   void    Owner_Set (void* pOwner);
 
    // --- Flags ---
 
-   bool    IsPrivate () const { return m_bPrivate; }
-   void    SetPrivate (bool bPrivate) { m_bPrivate = bPrivate; }
+   bool    IsPrivate () const;
+   void    SetPrivate (bool bPrivate);
 
    // --- Identity ---
 
-   const std::string& GetUrl () const { return m_sUrl; }
-   void  SetUrl (const std::string& sUrl) { m_sUrl = sUrl; }
+   const std::string& Url () const;
+   void  Url_Set (const std::string& sUrl);
 
 private:
-   FABRIC*               m_pParent;
-   std::vector<FABRIC*>  m_apChildren;
+   FABRIC*               m_pFabric_Parent;
+   std::vector<FABRIC*>  m_apFabric;
 
-   NODE*                 m_pRootNode;
-   NODE*                 m_pAttachingNode;
+   NODE*                 m_pNode_Root;
+   NODE*                 m_pNode_Attaching;
    SCENE*                m_pScene;
    void*                 m_pOwner;
 

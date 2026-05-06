@@ -34,7 +34,7 @@ bool SNEEZE::STORAGE::Initialize ()
 {
    bool bResult = false;
 
-   ISNEEZE* pHost = m_pSneeze->GetHost ();
+   ISNEEZE* pHost = m_pSneeze->Host ();
    std::string sSession = pHost->SessionPath ();
 
    if (!sSession.empty ())
@@ -72,74 +72,71 @@ void SNEEZE::STORAGE::Shutdown ()
 // Container lifecycle
 // ---------------------------------------------------------------------------
 
-SNEEZE::STORAGE::ASSET* SNEEZE::STORAGE::Open (std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName)
+SNEEZE::STORAGE::ASSET* SNEEZE::STORAGE::Open (std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName,
+   SNEEZE::VIEWPORT* pViewport)
 {
-   if (!pName)
-      return nullptr;
+   ASSET* pRaw = nullptr;
 
-   std::lock_guard<std::recursive_mutex> guard (m_mutex);
-
-   std::string sFp2  = pName->sFingerprint.substr (0, 2);
-   std::string sFp22 = pName->sFingerprint.substr (2);
-
-   // Build paths for all four units
-   std::string aJsonPaths[SCOPE_COUNT];
-
-   aJsonPaths[ORG_PERMANENT] = ComputeUnitPath (
-      m_sPermanentPath, pName->sPersonaHash, sFp2 + "/" + sFp22, "organization.json");
-   aJsonPaths[ORG_TEMPORARY] = ComputeUnitPath (
-      m_sTemporaryPath, pName->sPersonaHash, sFp2 + "/" + sFp22, "organization.json");
-   aJsonPaths[CONTAINER_PERMANENT] = ComputeUnitPath (
-      m_sPermanentPath, pName->sPersonaHash, sFp2 + "/" + sFp22,
-      "container-" + pName->sContainerName + ".json");
-   aJsonPaths[CONTAINER_TEMPORARY] = ComputeUnitPath (
-      m_sTemporaryPath, pName->sPersonaHash, sFp2 + "/" + sFp22,
-      "container-" + pName->sContainerName + ".json");
-
-   auto pAsset = std::make_unique<ASSET> (this, pName);
-
-   for (int i = 0; i < SCOPE_COUNT; i++)
+   if (pName)
    {
-      UNIT* pUnit = FindOrCreateUnit (aJsonPaths[i]);
-      pAsset->SetUnit (static_cast<SCOPE> (i), pUnit);
+      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+
+      std::string sFp2  = pName->sFingerprint.substr (0, 2);
+      std::string sFp22 = pName->sFingerprint.substr (2);
+
+      // Build paths for all four units
+      std::string aJsonPaths[SCOPE_COUNT];
+
+      aJsonPaths[ORG_PERMANENT      ] = ComputeUnitPath (m_sPermanentPath, pName->sPersonaHash, sFp2 + "/" + sFp22, "organization.json");
+      aJsonPaths[ORG_TEMPORARY      ] = ComputeUnitPath (m_sTemporaryPath, pName->sPersonaHash, sFp2 + "/" + sFp22, "organization.json");
+      aJsonPaths[CONTAINER_PERMANENT] = ComputeUnitPath (m_sPermanentPath, pName->sPersonaHash, sFp2 + "/" + sFp22, "container-" + pName->sContainerName + ".json");
+      aJsonPaths[CONTAINER_TEMPORARY] = ComputeUnitPath (m_sTemporaryPath, pName->sPersonaHash, sFp2 + "/" + sFp22, "container-" + pName->sContainerName + ".json");
+
+      auto pAsset = std::make_unique<ASSET> (this, pName, pViewport);
+
+      for (int i = 0; i < SCOPE_COUNT; i++)
+      {
+         UNIT* pUnit = FindOrCreateUnit (aJsonPaths[i]);
+         pAsset->SetUnit (static_cast<SCOPE> (i), pUnit);
+      }
+
+      pAsset->Attach ();
+
+      pRaw = pAsset.get ();
+      m_aAssets.push_back (std::move (pAsset));
+
+      m_pSneeze->OnStorageUnitCreated (pRaw);
    }
-
-   pAsset->Attach ();
-
-   ASSET* pRaw = pAsset.get ();
-   m_aAssets.push_back (std::move (pAsset));
-
-   m_pSneeze->OnStorageUnitCreated (pRaw);
 
    return pRaw;
 }
 
 void SNEEZE::STORAGE::Close (ASSET* pAsset)
 {
-   if (!pAsset)
-      return;
-
-   std::lock_guard<std::recursive_mutex> guard (m_mutex);
-
-   // Save dirty units and meta before detaching
-   for (int i = 0; i < SCOPE_COUNT; i++)
+   if (pAsset)
    {
-      UNIT* pUnit = pAsset->GetUnit (static_cast<SCOPE> (i));
-      if (pUnit)
+      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+
+      // Save dirty units and meta before detaching
+      for (int i = 0; i < SCOPE_COUNT; i++)
       {
-         if (pUnit->IsDirty ())
-            pUnit->Save ();
-         pUnit->SaveMeta (pAsset->GetName ());
+         UNIT* pUnit = pAsset->GetUnit (static_cast<SCOPE> (i));
+         if (pUnit)
+         {
+            if (pUnit->IsDirty ())
+               pUnit->Save ();
+            pUnit->SaveMeta (pAsset->GetName ());
+         }
       }
+
+      pAsset->Detach ();
+
+      auto it = std::find_if (m_aAssets.begin (), m_aAssets.end (),
+         [pAsset] (const std::unique_ptr<ASSET>& p) { return p.get () == pAsset; });
+
+      if (it != m_aAssets.end ())
+         m_aAssets.erase (it);
    }
-
-   pAsset->Detach ();
-
-   auto it = std::find_if (m_aAssets.begin (), m_aAssets.end (),
-      [pAsset] (const std::unique_ptr<ASSET>& p) { return p.get () == pAsset; });
-
-   if (it != m_aAssets.end ())
-      m_aAssets.erase (it);
 }
 
 // ---------------------------------------------------------------------------
@@ -148,10 +145,9 @@ void SNEEZE::STORAGE::Close (ASSET* pAsset)
 
 void SNEEZE::STORAGE::Enumerate (IENUM* pEnum)
 {
-   if (!pEnum)
-      return;
-
-   std::lock_guard<std::recursive_mutex> guard (m_mutex);
+   if (pEnum)
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
    // Walk both permanent and temporary paths looking for .meta files
    std::vector<std::string> aPaths;
@@ -177,8 +173,7 @@ void SNEEZE::STORAGE::Enumerate (IENUM* pEnum)
          {
             for (int i = 0; i < SCOPE_COUNT; i++)
             {
-               if (pAsset->GetUnit (static_cast<SCOPE> (i))  &&
-                   pAsset->GetUnit (static_cast<SCOPE> (i))->GetJsonPath () == sJsonPath)
+               if (pAsset->GetUnit (static_cast<SCOPE> (i))  &&  pAsset->GetUnit (static_cast<SCOPE> (i))->GetJsonPath () == sJsonPath)
                {
                   pFound = pAsset.get ();
                   break;
@@ -215,7 +210,7 @@ void SNEEZE::STORAGE::Enumerate (IENUM* pEnum)
                UNIT* pUnit = FindOrCreateUnit (sJsonPath);
                pUnit->LoadMeta ();
 
-               auto pTempAsset = std::make_unique<ASSET> (this, pName);
+               auto pTempAsset = std::make_unique<ASSET> (this, pName, nullptr);
                pTempAsset->SetUnit (eScope, pUnit);
 
                pEnum->OnAsset (pTempAsset.get ());
@@ -224,14 +219,14 @@ void SNEEZE::STORAGE::Enumerate (IENUM* pEnum)
          }
       }
    }
+   }
 }
 
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-std::string SNEEZE::STORAGE::ComputeUnitPath (const std::string& sBasePath, const std::string& sPersonaHash,
-                                      const std::string& sFingerprint, const std::string& sFileName) const
+std::string SNEEZE::STORAGE::ComputeUnitPath (const std::string& sBasePath, const std::string& sPersonaHash, const std::string& sFingerprint, const std::string& sFileName) const
 {
    return (std::filesystem::path (sBasePath) / sPersonaHash / sFingerprint / sFileName).string ();
 }

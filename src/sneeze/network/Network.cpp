@@ -30,6 +30,7 @@
 size_t SNEEZE::NETWORK::FetchWriteCallback (char* pData, size_t nSize, size_t nMembers, void* pUser)
 {
    FETCH_CONTEXT* pCtx = static_cast<FETCH_CONTEXT*> (pUser);
+
    return std::fwrite (pData, nSize, nMembers, pCtx->pFile);
 }
 
@@ -46,7 +47,7 @@ size_t SNEEZE::NETWORK::FetchHeaderCallback (char* pData, size_t nSize, size_t n
       std::string sValue = sLine.substr (nColon + 1);
 
       auto nStart = sValue.find_first_not_of (" \t\r\n");
-      auto nEnd   = sValue.find_last_not_of (" \t\r\n");
+      auto nEnd   = sValue.find_last_not_of  (" \t\r\n");
       if (nStart != std::string::npos  &&  nEnd != std::string::npos)
          sValue = sValue.substr (nStart, nEnd - nStart + 1);
       else
@@ -88,25 +89,26 @@ bool SNEEZE::NETWORK::Initialize ()
    {
       m_pSneeze->Log (ISNEEZE::kLOGLEVEL_Error, "NETWORK",
          "curl_global_init failed (code " + std::to_string (static_cast<int> (nCurlInit)) + ")");
-      return false;
-   }
-
-   m_tpEpoch    = std::chrono::steady_clock::now ();
-   m_sCachePath = GetCachePath ();
-
-   if (!m_sCachePath.empty ())
-   {
-      std::filesystem::create_directories (m_sCachePath);
-
-      LoadRules ();
-
-      m_pSneeze->Log (ISNEEZE::kLOGLEVEL_Info, "NETWORK", "Initialized (path: " + m_sCachePath + ", rules: " + std::to_string (m_aRules.size ()) + ", nAssetIx: " + std::to_string (m_nNextAssetIx) + ")");
-
-      bResult = true;
    }
    else
    {
-      m_pSneeze->Log (ISNEEZE::kLOGLEVEL_Error, "NETWORK", "Failed to determine cache path");
+      m_tpEpoch    = std::chrono::steady_clock::now ();
+      m_sCachePath = GetCachePath ();
+
+      if (!m_sCachePath.empty ())
+      {
+         std::filesystem::create_directories (m_sCachePath);
+
+         LoadRules ();
+
+         m_pSneeze->Log (ISNEEZE::kLOGLEVEL_Info, "NETWORK", "Initialized (path: " + m_sCachePath + ", rules: " + std::to_string (m_aRules.size ()) + ", nAssetIx: " + std::to_string (m_nNextAssetIx) + ")");
+
+         bResult = true;
+      }
+      else
+      {
+         m_pSneeze->Log (ISNEEZE::kLOGLEVEL_Error, "NETWORK", "Failed to determine cache path");
+      }
    }
 
    return bResult;
@@ -239,12 +241,14 @@ void SNEEZE::NETWORK::DispatchFetch (ASSET* pAsset)
 // Request / Release
 // ---------------------------------------------------------------------------
 
-SNEEZE::NETWORK::FILE* SNEEZE::NETWORK::Request (IFILE* pListener, std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName, const std::string& sUrl)
+SNEEZE::NETWORK::FILE* SNEEZE::NETWORK::Request (IFILE* pListener, SNEEZE::VIEWPORT* pViewport,
+   std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName, const std::string& sUrl)
 {
-   return Request (pListener, pName, sUrl, std::string (), kREQUEST_DEFAULT);
+   return Request (pListener, pViewport, pName, sUrl, std::string (), kREQUEST_DEFAULT, 0);
 }
 
-SNEEZE::NETWORK::FILE* SNEEZE::NETWORK::Request (IFILE* pListener, std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName, const std::string& sUrl, const std::string& sHash, uint32_t bFlags, uint32_t nAssetIx)
+SNEEZE::NETWORK::FILE* SNEEZE::NETWORK::Request (IFILE* pListener, SNEEZE::VIEWPORT* pViewport,
+   std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName, const std::string& sUrl, const std::string& sHash, uint32_t bFlags, uint32_t nAssetIx)
 {
    bool bCreate = (bFlags & REQUEST_CREATE) != 0;
    bool bFetch  = (bFlags & REQUEST_FETCH)  != 0;
@@ -300,7 +304,7 @@ SNEEZE::NETWORK::FILE* SNEEZE::NETWORK::Request (IFILE* pListener, std::shared_p
       {
          ASSET* pAsset = it->second.get ();
 
-         pFile = new FILE (this, pAsset, pName, pListener, m_nNextFileIx++);
+         pFile = new FILE (this, pAsset, pName, pViewport, pListener, m_nNextFileIx++);
          pAsset->AttachFile (pFile);
          m_apFile.push_back (pFile);
 
@@ -558,7 +562,7 @@ void SNEEZE::NETWORK::Enumerate (IENUM* pEnum)
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-   FILE* pFile = new FILE (this, nullptr, nullptr, nullptr, 0);
+   FILE* pFile = new FILE (this, nullptr, nullptr, nullptr, nullptr, 0);
    pFile->SetEnumeration (true);
 
    for (auto& pDirEntry : std::filesystem::recursive_directory_iterator (m_sCachePath))
@@ -645,17 +649,18 @@ void SNEEZE::NETWORK::Enumerate (IENUM* pEnum)
 std::string SNEEZE::NETWORK::GetCachePath () const
 {
    std::string sResult;
-   std::string sSession = m_pSneeze->GetHost ()->SessionPath ();
+   std::string sSession = m_pSneeze->Host ()->SessionPath ();
    if (!sSession.empty ())
       sResult = (std::filesystem::path (sSession) / "Cache").string ();
+
    return sResult;
 }
 
 std::string SNEEZE::NETWORK::ComputeDiskKey (const std::string& sUrl) const
 {
    unsigned char aDigest[SHA_DIGEST_LENGTH];
-   SHA1 (reinterpret_cast<const unsigned char*> (sUrl.data ()),
-      sUrl.size (), aDigest);
+
+   SHA1 (reinterpret_cast<const unsigned char*> (sUrl.data ()), sUrl.size (), aDigest);
 
    static const int kTRUNCATED_BYTES = 12;
    char szHex[kTRUNCATED_BYTES * 2 + 1];
@@ -672,6 +677,7 @@ std::string SNEEZE::NETWORK::DiskKeyToPath (const std::string& sDiskKey, DISKFIL
 
    std::string sDir  = sDiskKey.substr (0, 2);
    std::string sFile = sDiskKey.substr (2);
+
    return (std::filesystem::path (m_sCachePath) / sDir / sFile).string () + aExt[eType];
 }
 
@@ -703,6 +709,7 @@ static const EVP_MD* GetEvpMd (const std::string& sAlgo)
       pMd = EVP_sha384 ();
    else if (sAlgo == "sha512")
       pMd = EVP_sha512 ();
+
    return pMd;
 }
 

@@ -15,12 +15,23 @@
 #ifndef SNEEZE_SOM_MAPOBJECT_H
 #define SNEEZE_SOM_MAPOBJECT_H
 
-#include "Types.h"
+#include <atomic>
 #include <cstdint>
 #include <string>
 #include <vector>
 #include <mutex>
-#include <atomic>
+
+// ---------------------------------------------------------------------------
+// Map object type identifiers
+// ---------------------------------------------------------------------------
+
+enum MAP_OBJECT_TYPE
+{
+   MAP_OBJECT_TYPE_ROOT        = 0,
+   MAP_OBJECT_TYPE_CELESTIAL   = 1,
+   MAP_OBJECT_TYPE_TERRESTRIAL = 2,
+   MAP_OBJECT_TYPE_PHYSICAL    = 3,
+};
 
 // ---------------------------------------------------------------------------
 // MAP_OBJECT — base class for all 3D objects referenced by SOM::NODEs.

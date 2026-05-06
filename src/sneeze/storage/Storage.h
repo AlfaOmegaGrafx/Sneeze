@@ -168,12 +168,14 @@ public:
    class ASSET : public SNEEZE::NOTIFICATION
    {
    public:
-      ASSET (STORAGE* pStorage, std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName);
+      ASSET (STORAGE* pStorage, std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName,
+         SNEEZE::VIEWPORT* pViewport);
 
       // --- Identity ---
 
       std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME>  GetName () const { return m_pName; }
       std::string  GetDisplayName () const { return m_pName ? m_pName->DisplayName () : ""; }
+      SNEEZE::VIEWPORT* Viewport () const { return m_pViewport; }
 
       // --- Path-based API ---
 
@@ -206,6 +208,7 @@ public:
    private:
       STORAGE*    m_pStorage;
       std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME>  m_pName;
+      SNEEZE::VIEWPORT* m_pViewport;
       UNIT*       m_apUnits[SCOPE_COUNT];
       uint32_t    m_nRefCount;
       bool        m_bPendingClear;
@@ -223,7 +226,8 @@ public:
 
    // --- Container lifecycle ---
 
-   ASSET*  Open (std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName);
+   ASSET*  Open (std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName,
+                  SNEEZE::VIEWPORT* pViewport = nullptr);
    void    Close (ASSET* pAsset);
 
    // --- Inspector ---

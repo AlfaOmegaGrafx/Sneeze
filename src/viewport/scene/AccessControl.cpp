@@ -41,10 +41,10 @@ bool CanRead (const NODE* pNode, const void* pRequestingOwner)
    if (!pFabric)
       return true;
 
-   if (pNode->IsPrivate ()  &&  pFabric->GetOwner () != pRequestingOwner)
+   if (pNode->IsPrivate ()  &&  pFabric->Owner () != pRequestingOwner)
       return false;
 
-   if (pFabric->IsPrivate ()  &&  pFabric->GetOwner () != pRequestingOwner)
+   if (pFabric->IsPrivate ()  &&  pFabric->Owner () != pRequestingOwner)
       return false;
 
    return true;
@@ -70,7 +70,7 @@ bool CanWrite (const NODE* pNode, const void* pRequestingOwner)
    if (!pFabric)
       return false;
 
-   return pFabric->GetOwner () == pRequestingOwner;
+   return pFabric->Owner () == pRequestingOwner;
 }
 
 // ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ bool CanReadFabric (const FABRIC* pFabric, const void* pRequestingOwner)
    if (!pFabric)
       return false;
 
-   if (pFabric->IsPrivate ()  &&  pFabric->GetOwner () != pRequestingOwner)
+   if (pFabric->IsPrivate ()  &&  pFabric->Owner () != pRequestingOwner)
       return false;
 
    return true;
@@ -99,5 +99,5 @@ bool CanWriteFabric (const FABRIC* pFabric, const void* pRequestingOwner)
    if (!pFabric)
       return false;
 
-   return pFabric->GetOwner () == pRequestingOwner;
+   return pFabric->Owner () == pRequestingOwner;
 }

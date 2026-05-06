@@ -16,15 +16,17 @@
 #include "Node.h"
 #include <algorithm>
 
+using SCENE  = SNEEZE::VIEWPORT::SCENE;
 using FABRIC = SNEEZE::VIEWPORT::SCENE::FABRIC;
+using NODE   = SNEEZE::VIEWPORT::SCENE::FABRIC::NODE;
 
-FABRIC::FABRIC (SCENE* pScene)
-   : m_pScene (pScene)
-   , m_pParent (nullptr)
-   , m_pRootNode (nullptr)
-   , m_pAttachingNode (nullptr)
-   , m_pOwner (nullptr)
-   , m_bPrivate (false)
+FABRIC::FABRIC (SCENE* pScene) :
+   m_pScene (pScene),
+   m_pFabric_Parent (nullptr),
+   m_pNode_Root (nullptr),
+   m_pNode_Attaching (nullptr),
+   m_pOwner (nullptr),
+   m_bPrivate (false)
 {
 }
 
@@ -32,21 +34,38 @@ FABRIC::~FABRIC ()
 {
 }
 
-void FABRIC::AddChildFabric (FABRIC* pChild)
+// --- Accessors ---
+
+SCENE*  FABRIC::Scene () const                          { return m_pScene; }
+FABRIC* FABRIC::Fabric_Parent () const                  { return m_pFabric_Parent; }
+void    FABRIC::Fabric_Set_Parent (FABRIC* pParent)     { m_pFabric_Parent = pParent; }
+const std::vector<FABRIC*>& FABRIC::Fabric_Children () const { return m_apFabric; }
+NODE* FABRIC::Node_Root () const                { return m_pNode_Root; }
+void    FABRIC::Node_Set_Root (NODE* pNode)             { m_pNode_Root = pNode; }
+NODE* FABRIC::Node_Attaching () const           { return m_pNode_Attaching; }
+void    FABRIC::Node_Set_Attaching (NODE* pNode)        { m_pNode_Attaching = pNode; }
+void*   FABRIC::Owner () const                          { return m_pOwner; }
+void    FABRIC::Owner_Set (void* pOwner)                { m_pOwner = pOwner; }
+bool    FABRIC::IsPrivate () const                      { return m_bPrivate; }
+void    FABRIC::SetPrivate (bool bPrivate)              { m_bPrivate = bPrivate; }
+const std::string& FABRIC::Url () const                 { return m_sUrl; }
+void    FABRIC::Url_Set (const std::string& sUrl)       { m_sUrl = sUrl; }
+
+void FABRIC::Fabric_Add (FABRIC* pChild)
 {
-   pChild->m_pParent = this;
-   m_apChildren.push_back (pChild);
+   pChild->m_pFabric_Parent = this;
+   m_apFabric.push_back (pChild);
 }
 
-void FABRIC::RemoveChildFabric (FABRIC* pChild)
+void FABRIC::Fabric_Remove (FABRIC* pChild)
 {
-   if (!pChild)
-      return;
-
-   auto it = std::find (m_apChildren.begin (), m_apChildren.end (), pChild);
-   if (it != m_apChildren.end ())
+   if (pChild)
    {
-      (*it)->m_pParent = nullptr;
-      m_apChildren.erase (it);
+      auto it = std::find (m_apFabric.begin (), m_apFabric.end (), pChild);
+      if (it != m_apFabric.end ())
+      {
+         (*it)->m_pFabric_Parent = nullptr;
+         m_apFabric.erase (it);
+      }
    }
 }

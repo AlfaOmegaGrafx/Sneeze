@@ -100,7 +100,7 @@ void EVENT_SYSTEM::Fire_NodeAdded (NODE* pParent, NODE* pChild)
    pEvent.bType      = EVENT_TYPE_NODE_ADDED;
    pEvent.pNode      = pChild;
    pEvent.pParent    = pParent;
-   pEvent.twObjectIx = pChild ? pChild->GetObjectIx () : 0;
+   pEvent.twObjectIx = pChild ? pChild->ObjectIx () : 0;
 
    for (auto& pWatch : m_aWatches)
    {
@@ -119,7 +119,7 @@ void EVENT_SYSTEM::Fire_NodeRemoved (NODE* pParent, NODE* pChild)
    pEvent.bType      = EVENT_TYPE_NODE_REMOVED;
    pEvent.pNode      = pChild;
    pEvent.pParent    = pParent;
-   pEvent.twObjectIx = pChild ? pChild->GetObjectIx () : 0;
+   pEvent.twObjectIx = pChild ? pChild->ObjectIx () : 0;
 
    for (auto& pWatch : m_aWatches)
    {
@@ -138,7 +138,7 @@ void EVENT_SYSTEM::Fire_NodeModified (NODE* pNode)
    pEvent.bType      = EVENT_TYPE_NODE_MODIFIED;
    pEvent.pNode      = pNode;
    pEvent.pParent    = pNode ? pNode->Parent () : nullptr;
-   pEvent.twObjectIx = pNode ? pNode->GetObjectIx () : 0;
+   pEvent.twObjectIx = pNode ? pNode->ObjectIx () : 0;
 
    for (auto& pWatch : m_aWatches)
    {

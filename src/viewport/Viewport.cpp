@@ -13,15 +13,220 @@
 // limitations under the License.
 
 #include "viewport/Viewport.h"
+#include "scene/Scene.h"
+#include "renderer/AnariRenderer.h"
+#include <cstring>
 
 using VIEWPORT = SNEEZE::VIEWPORT;
 
-VIEWPORT::VIEWPORT (SNEEZE* pSneeze)
-   : m_pSneeze (pSneeze),
-     m_pScene  (nullptr)
+VIEWPORT::VIEWPORT (SNEEZE* pSneeze, SNEEZE::IVIEWPORT* pHost) :
+   m_pSneeze          (pSneeze),
+   m_pHost            (pHost),
+   m_pScene           (nullptr),
+   m_pRenderer        (nullptr),
+   m_bRendererPending (false),
+   m_nFbWidth         (0),
+   m_nFbHeight        (0),
+   m_nWidth           (0),
+   m_nHeight          (0),
+   m_bResizePending   (false),
+   m_nResizeWidth     (0),
+   m_nResizeHeight    (0)
 {
 }
 
 VIEWPORT::~VIEWPORT ()
 {
+   Shutdown ();
+}
+
+bool VIEWPORT::Initialize (const std::string& sUrl)
+{
+   m_nWidth  = m_pHost->nWidth;
+   m_nHeight = m_pHost->nHeight;
+
+   // Mark renderer as pending -- actual creation deferred to the compositor
+   // thread (Filament requires the rendering thread to be the one that creates
+   // the engine, otherwise it fails with "This thread has not been adopted").
+   std::string sLibrary = m_pSneeze->Host ()->sRenderer;
+   if (!sLibrary.empty ()  &&  m_pHost->pNativeWindow)
+      m_bRendererPending = true;
+
+   // Create scene
+   m_pScene = new SCENE (this);
+   if (!m_pScene->Initialize (sUrl))
+   {
+      delete m_pScene;
+      m_pScene = nullptr;
+      return false;
+   }
+
+   m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Info, "VIEWPORT", "Initialized");
+   return true;
+}
+
+bool VIEWPORT::InitializeRenderer ()
+{
+   if (!m_bRendererPending)
+      return m_pRenderer != nullptr;
+
+   m_bRendererPending = false;
+
+   std::string sLibrary = m_pSneeze->Host ()->sRenderer;
+   auto* pRenderer = new RENDERER::ANARI (m_pSneeze, sLibrary);
+
+   void* pNativeWindow = m_pHost->pNativeWindow;
+   if (pNativeWindow)
+      pRenderer->SetNativeWindow (pNativeWindow);
+
+   if (pRenderer->Initialize (m_nWidth, m_nHeight))
+   {
+      m_pRenderer = pRenderer;
+      m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Info, "VIEWPORT", "Renderer initialized on compositor thread");
+   }
+   else
+   {
+      delete pRenderer;
+      m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Warning, "VIEWPORT", "Renderer unavailable -- headless mode");
+   }
+
+   return m_pRenderer != nullptr;
+}
+
+void VIEWPORT::Shutdown ()
+{
+   if (m_pScene)
+   {
+      m_pScene->Shutdown ();
+      delete m_pScene;
+      m_pScene = nullptr;
+   }
+
+   if (m_pRenderer)
+   {
+      m_pRenderer->Shutdown ();
+      delete m_pRenderer;
+      m_pRenderer = nullptr;
+   }
+}
+
+SNEEZE*            VIEWPORT::Sneeze () const   { return m_pSneeze; }
+SNEEZE::IVIEWPORT* VIEWPORT::Host () const     { return m_pHost; }
+SNEEZE::VIEWPORT::SCENE* VIEWPORT::Scene () const { return m_pScene; }
+int                VIEWPORT::Width () const     { return m_nWidth; }
+int                VIEWPORT::Height () const    { return m_nHeight; }
+SNEEZE::VIEWPORT::VIEW& VIEWPORT::View ()      { return m_View; }
+SNEEZE::VIEWPORT::RENDERER* VIEWPORT::Renderer () const { return m_pRenderer; }
+
+// ---------------------------------------------------------------------------
+// Input
+// ---------------------------------------------------------------------------
+
+void VIEWPORT::SetMouseInput (int nDX, int nDY, float dScrollY, bool bMouseLeft, bool bMouseRight)
+{
+   std::lock_guard<std::mutex> guard (m_inputMutex);
+   m_Input.nMouseDX   += nDX;
+   m_Input.nMouseDY   += nDY;
+   m_Input.dScrollY   += dScrollY;
+   m_Input.bMouseLeft  = bMouseLeft;
+   m_Input.bMouseRight = bMouseRight;
+}
+
+void VIEWPORT::SetKeyInput (bool bKeySpace, bool bKeyPlus, bool bKeyMinus)
+{
+   std::lock_guard<std::mutex> guard (m_inputMutex);
+   m_Input.bKeySpace = bKeySpace;
+   m_Input.bKeyPlus  = bKeyPlus;
+   m_Input.bKeyMinus = bKeyMinus;
+}
+
+VIEWPORT::INPUT VIEWPORT::ConsumeInput ()
+{
+   std::lock_guard<std::mutex> guard (m_inputMutex);
+   INPUT Input = m_Input;
+   m_Input.nMouseDX = 0;
+   m_Input.nMouseDY = 0;
+   m_Input.dScrollY = 0.0f;
+   return Input;
+}
+
+// ---------------------------------------------------------------------------
+// Framebuffer
+// ---------------------------------------------------------------------------
+
+void VIEWPORT::WriteFrameBuffer (const uint32_t* pPixels, int nWidth, int nHeight)
+{
+   std::lock_guard<std::mutex> guard (m_fbMutex);
+   int nSize = nWidth * nHeight;
+   m_aFrameBuffer.resize (nSize);
+   std::memcpy (m_aFrameBuffer.data (), pPixels, nSize * sizeof (uint32_t));
+   m_nFbWidth  = nWidth;
+   m_nFbHeight = nHeight;
+}
+
+const uint32_t* VIEWPORT::LockFrameBuffer (int& nWidth, int& nHeight)
+{
+   m_fbMutex.lock ();
+   nWidth  = m_nFbWidth;
+   nHeight = m_nFbHeight;
+   return m_aFrameBuffer.empty () ? nullptr : m_aFrameBuffer.data ();
+}
+
+void VIEWPORT::UnlockFrameBuffer ()
+{
+   m_fbMutex.unlock ();
+}
+
+// ---------------------------------------------------------------------------
+// Resize
+// ---------------------------------------------------------------------------
+
+void VIEWPORT::Resize (int nWidth, int nHeight)
+{
+   std::lock_guard<std::mutex> guard (m_resizeMutex);
+   m_bResizePending = true;
+   m_nResizeWidth   = nWidth;
+   m_nResizeHeight  = nHeight;
+}
+
+bool VIEWPORT::ConsumePendingResize (int& nWidth, int& nHeight)
+{
+   std::lock_guard<std::mutex> guard (m_resizeMutex);
+   bool bResult = m_bResizePending;
+   if (m_bResizePending)
+   {
+      nWidth  = m_nResizeWidth;
+      nHeight = m_nResizeHeight;
+      m_nWidth  = nWidth;
+      m_nHeight = nHeight;
+      m_bResizePending = false;
+   }
+   return bResult;
+}
+
+// ---------------------------------------------------------------------------
+// VIEW (camera orbit)
+// ---------------------------------------------------------------------------
+
+static constexpr float MOUSE_SENSITIVITY = 0.005f;
+static constexpr float SCROLL_FACTOR     = 1.1f;
+static constexpr float MIN_DISTANCE      = 0.1f;
+static constexpr float MAX_DISTANCE      = 1e14f;
+static constexpr float PI_F              = 3.14159265358979f;
+
+void VIEWPORT::VIEW::Update (int nDX, int nDY, float dScrollY, bool bMouseLeft, bool /*bMouseRight*/)
+{
+   if (bMouseLeft)
+   {
+      dTheta += nDX * MOUSE_SENSITIVITY;
+      dPhi   += nDY * MOUSE_SENSITIVITY;
+      dPhi = std::max (-PI_F * 0.49f, std::min (PI_F * 0.49f, dPhi));
+   }
+
+   if (dScrollY != 0.0f)
+   {
+      float dFactor = (dScrollY > 0.0f) ? (1.0f / SCROLL_FACTOR) : SCROLL_FACTOR;
+      dDistance *= dFactor;
+      dDistance = std::max (MIN_DISTANCE, std::min (MAX_DISTANCE, dDistance));
+   }
 }

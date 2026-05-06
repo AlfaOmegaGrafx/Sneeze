@@ -55,10 +55,10 @@ ASTRO_SERVICE::~ASTRO_SERVICE ()
 bool ASTRO_SERVICE::Initialize (SNEEZE::VIEWPORT::SCENE::FABRIC* pPrimaryFabric)
 {
    m_pFabric = pPrimaryFabric;
-   if (!m_pFabric  ||  !m_pFabric->GetRootNode ())
+   if (!m_pFabric  ||  !m_pFabric->Node_Root ())
       return false;
 
-   SNEEZE::VIEWPORT::SCENE::FABRIC::NODE* pRoot = m_pFabric->GetRootNode ();
+   SNEEZE::VIEWPORT::SCENE::FABRIC::NODE* pRoot = m_pFabric->Node_Root ();
 
    // --- Sun node (no orbit, sits at origin) ---
    {
@@ -75,8 +75,8 @@ bool ASTRO_SERVICE::Initialize (SNEEZE::VIEWPORT::SCENE::FABRIC* pPrimaryFabric)
       pMapObj->m_sTextureUrl = pSun ? pSun->sTexture : "";
 
       auto* pNode = new SNEEZE::VIEWPORT::SCENE::FABRIC::NODE (m_pFabric);
-      pNode->SetMapObject (pMapObj);
-      pRoot->AddChild (pNode);
+      pNode->MapObject_Set (pMapObj);
+      pRoot->Node_Add (pNode);
 
       m_apNodes.push_back (pNode);
       m_apMapObjects.push_back (pMapObj);
@@ -121,8 +121,8 @@ bool ASTRO_SERVICE::Initialize (SNEEZE::VIEWPORT::SCENE::FABRIC* pPrimaryFabric)
       pMapObj->m_sTextureUrl = sTexture;
 
       auto* pNode = new SNEEZE::VIEWPORT::SCENE::FABRIC::NODE (m_pFabric);
-      pNode->SetMapObject (pMapObj);
-      pRoot->AddChild (pNode);
+      pNode->MapObject_Set (pMapObj);
+      pRoot->Node_Add (pNode);
 
       m_apNodes.push_back (pNode);
       m_apMapObjects.push_back (pMapObj);

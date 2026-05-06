@@ -15,6 +15,7 @@
 #include "storage/Storage.h"
 #include "container/Container.h"
 #include "Sneeze.h"
+#include "viewport/Viewport.h"
 
 #include <cstdio>
 #include <cstring>
@@ -46,30 +47,36 @@ static void Check (bool bCondition, const char* szName)
 class STORAGE_TEST_HOST : public SNEEZE::ISNEEZE
 {
 public:
-   int m_nCreatedCount = 0;
-   int m_nChangedCount = 0;
-   int m_nDeletedCount = 0;
-
    STORAGE_TEST_HOST ()
    {
       sAppDataPath = ".";
       sSessionPath = "test_storage_session";
    }
 
-   void OnFrameReady (const uint32_t*, int, int) override {}
    void Log (eLOGLEVEL, const std::string& sModule, const std::string& sMessage) override
    {
       std::printf ("    [%s] %s\n", sModule.c_str (), sMessage.c_str ());
    }
+};
+
+class STORAGE_TEST_VIEWPORT_HOST : public SNEEZE::IVIEWPORT
+{
+public:
+   int m_nCreatedCount = 0;
+   int m_nChangedCount = 0;
+   int m_nDeletedCount = 0;
+
+   void OnFrameReady (const uint32_t*, int, int) override {}
 
    void OnStorageUnitCreated (SNEEZE::NOTIFICATION*) override { m_nCreatedCount++; }
    void OnStorageUnitChanged (SNEEZE::NOTIFICATION*) override { m_nChangedCount++; }
    void OnStorageUnitDeleted (SNEEZE::NOTIFICATION*) override { m_nDeletedCount++; }
 };
 
-static STORAGE_TEST_HOST*       s_pHost    = nullptr;
-static SNEEZE*    s_pSneeze  = nullptr;
-static SNEEZE::STORAGE*         s_pStorage = nullptr;
+static STORAGE_TEST_HOST*          s_pHost    = nullptr;
+static STORAGE_TEST_VIEWPORT_HOST* s_pVPHost  = nullptr;
+static SNEEZE*                     s_pSneeze  = nullptr;
+static SNEEZE::STORAGE*            s_pStorage = nullptr;
 
 static std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> MakeTestName (const std::string& sContainer = "poker")
 {
@@ -106,7 +113,7 @@ static void TestInitializeAndOpenClose ()
    Check (pAsset->GetName () == pName, "ASSET holds correct NAME");
    Check (pAsset->GetRefCount () == 1, "Ref count is 1 after Open");
 
-   Check (s_pHost->m_nCreatedCount == 1, "OnStorageUnitCreated fired");
+   Check (s_pVPHost->m_nCreatedCount == 1, "OnStorageUnitCreated fired");
 
    pStorage->Close (pAsset);
 }
@@ -123,10 +130,10 @@ static void TestBasicOperations ()
    auto pName = MakeTestName ();
    SNEEZE::STORAGE::ASSET* pAsset = pStorage->Open (pName);
 
-   s_pHost->m_nChangedCount = 0;
+   s_pVPHost->m_nChangedCount = 0;
 
    pAsset->Set (SNEEZE::STORAGE::CONTAINER_PERMANENT, "player.name", "Dean");
-   Check (s_pHost->m_nChangedCount == 1, "OnStorageUnitChanged fired on Set");
+   Check (s_pVPHost->m_nChangedCount == 1, "OnStorageUnitChanged fired on Set");
 
    auto jValue = pAsset->Get (SNEEZE::STORAGE::CONTAINER_PERMANENT, "player.name");
    Check (jValue.is_string (), "Get returns string type");
@@ -427,6 +434,9 @@ int RunStorageTests (int nArgc, char** aArgv)
 
    s_pHost = new STORAGE_TEST_HOST ();
    s_pSneeze = new SNEEZE (s_pHost);
+
+   s_pVPHost = new STORAGE_TEST_VIEWPORT_HOST ();
+   s_pSneeze->OpenViewport (s_pVPHost);
 
    s_pStorage = new SNEEZE::STORAGE (s_pSneeze);
    bool bInit = s_pStorage->Initialize ();

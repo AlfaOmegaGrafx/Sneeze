@@ -15,8 +15,8 @@
 #ifndef SNEEZE_VIEWPORT_NODE_H
 #define SNEEZE_VIEWPORT_NODE_H
 
-#include "Types.h"
 #include "scene/Fabric.h"
+#include "scene/MapObject.h"
 #include "network/Network.h"
 #include <atomic>
 #include <mutex>
@@ -27,7 +27,27 @@
 class MAP_OBJECT;
 
 // ---------------------------------------------------------------------------
-// SNEEZE::VIEWPORT::SCENE::FABRIC::NODE — structural element in the scene.
+// CAS Multi-Writer Seqlock
+//
+// Protects MAP_OBJECT references on NODEs from concurrent read/write.
+// ---------------------------------------------------------------------------
+
+class SEQLOCK
+{
+public:
+   SEQLOCK ();
+
+   uint32_t BeginRead () const;
+   bool     EndRead (uint32_t nSeq) const;
+   void     BeginWrite ();
+   void     EndWrite ();
+
+private:
+   std::atomic<uint32_t> m_nSequence;
+};
+
+// ---------------------------------------------------------------------------
+// SNEEZE::VIEWPORT::SCENE::FABRIC::NODE -- structural element in the scene.
 //
 // Each node participates in a tree owned by a single FABRIC. When a
 // MAP_OBJECT with a non-empty texture URL is assigned, the node requests the
@@ -42,45 +62,45 @@ public:
 
    // --- Identity ---
 
-   uint32_t GetObjectIx () const { return m_twObjectIx; }
-   void     SetObjectIx (uint32_t twObjectIx) { m_twObjectIx = twObjectIx; }
+   uint32_t ObjectIx () const;
+   void     ObjectIx_Set (uint32_t twObjectIx);
 
    // --- Tree structure ---
 
    NODE*   Parent () const;
-   int     ChildCount () const;
+   int     Node_Count () const;
    NODE*   Child (int nPosition) const;
-   NODE*   FindChild (uint32_t twObjectIx) const;
-   const std::vector<NODE*>& Children () const { return m_apChildren; }
+   NODE*   Node_Find (uint32_t twObjectIx) const;
+   const std::vector<NODE*>& Node_Children () const;
 
-   void    AddChild (NODE* pChild);
-   void    RemoveChild (NODE* pChild);
+   void    Node_Add (NODE* pChild);
+   void    Node_Remove (NODE* pChild);
 
-   // --- Fabric (owner — immutable after construction) ---
+   // --- Fabric (owner -- immutable after construction) ---
 
-   FABRIC* Fabric () const { return m_pFabric; }
+   FABRIC* Fabric () const;
 
    // --- Map object ---
 
-   MAP_OBJECT* GetMapObject () const { return m_pMapObject; }
-   void        SetMapObject (MAP_OBJECT* pMapObject);
+   MAP_OBJECT* MapObject () const;
+   void        MapObject_Set (MAP_OBJECT* pMapObject);
 
    // --- Attached fabric (this node is an attachment point) ---
 
-   FABRIC* GetAttachedFabric () const { return m_pAttachedFabric; }
-   void    SetAttachedFabric (FABRIC* pFabric) { m_pAttachedFabric = pFabric; }
+   FABRIC* Fabric_Attached () const;
+   void    Fabric_Set_Attached (FABRIC* pFabric);
 
    // --- Flags ---
 
-   bool IsPrivate () const { return m_bPrivate; }
-   void SetPrivate (bool bPrivate) { m_bPrivate = bPrivate; }
+   bool IsPrivate () const;
+   void SetPrivate (bool bPrivate);
 
-   bool IsPrimary () const { return m_bPrimary; }
-   void SetPrimary (bool bPrimary) { m_bPrimary = bPrimary; }
+   bool IsPrimary () const;
+   void SetPrimary (bool bPrimary);
 
    // --- Seqlock (protects map object property reads/writes) ---
 
-   SEQLOCK& GetSeqlock () { return m_pSeqlock; }
+   SEQLOCK& Seqlock ();
 
    // --- SNEEZE::NETWORK::IFILE ---
 
@@ -88,24 +108,24 @@ public:
    void OnFileFailed (SNEEZE::NETWORK::FILE* pFile) override;
 
 private:
-   void RequestTexture ();
-   void ReleaseTexture ();
+   void Texture_Request ();
+   void Texture_Release ();
 
    uint32_t             m_twObjectIx;
 
-   NODE*                m_pParent;
-   std::vector<NODE*>   m_apChildren;
-   std::unordered_map<uint32_t, NODE*> m_mapChildren;
-   mutable std::mutex   m_childMutex;
+   NODE*                m_pNode_Parent;
+   std::vector<NODE*>   m_apNode;
+   std::unordered_map<uint32_t, NODE*> m_umpNode;
+   mutable std::mutex   m_mutex_pNode;
 
    FABRIC*              m_pFabric;
    MAP_OBJECT*          m_pMapObject;
-   FABRIC*              m_pAttachedFabric;
+   FABRIC*              m_pFabric_Attached;
 
    bool                 m_bPrivate;
    bool                 m_bPrimary;
 
-   SEQLOCK              m_pSeqlock;
+   SEQLOCK              m_Seqlock;
 
    SNEEZE::NETWORK::FILE*         m_pFile;
 };

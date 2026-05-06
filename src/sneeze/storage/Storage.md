@@ -109,7 +109,7 @@ pName->sContainerName = "poker";
 pName->sPersonaHash   = "def456...";
 pName->bValidated     = true;
 
-STORAGE::ASSET* pAsset = pSneeze->GetStorage ()->Open (pName);
+STORAGE::ASSET* pAsset = pSneeze->Storage ()->Open (pName);
 
 // Path-based JSON access
 pAsset->Set (STORAGE::CONTAINER_PERMANENT, "player.name", "Dean");
@@ -130,7 +130,7 @@ std::string sJson = pAsset->GetJson (STORAGE::CONTAINER_PERMANENT);
 pAsset->SetJson (STORAGE::CONTAINER_TEMPORARY, "{\"session\": {\"start\": 12345}}");
 
 // Close when container is destroyed
-pSneeze->GetStorage ()->Close (pAsset);
+pSneeze->Storage ()->Close (pAsset);
 ```
 
 ## Data Model

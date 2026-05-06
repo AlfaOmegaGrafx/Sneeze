@@ -22,25 +22,87 @@
 #include <algorithm>
 #include <memory>
 
+using FABRIC    = SNEEZE::VIEWPORT::SCENE::FABRIC;
 using NODE      = SNEEZE::VIEWPORT::SCENE::FABRIC::NODE;
 using CONTAINER = SNEEZE::VIEWPORT::CONTAINER;
 
-NODE::NODE (FABRIC* pFabric)
-   : m_twObjectIx (0)
-   , m_pParent (nullptr)
-   , m_pFabric (pFabric)
-   , m_pMapObject (nullptr)
-   , m_pAttachedFabric (nullptr)
-   , m_bPrivate (false)
-   , m_bPrimary (false)
-   , m_pFile (nullptr)
+// ---------------------------------------------------------------------------
+// SEQLOCK
+// ---------------------------------------------------------------------------
+
+SEQLOCK::SEQLOCK () : m_nSequence (0) {}
+
+uint32_t SEQLOCK::BeginRead () const
+{
+   uint32_t nSeq;
+   do
+   {
+      nSeq = m_nSequence.load (std::memory_order_acquire);
+   }
+   while (nSeq & 1);
+   return nSeq;
+}
+
+bool SEQLOCK::EndRead (uint32_t nSeq) const
+{
+   std::atomic_thread_fence (std::memory_order_acquire);
+   return m_nSequence.load (std::memory_order_relaxed) == nSeq;
+}
+
+void SEQLOCK::BeginWrite ()
+{
+   uint32_t nExpected = m_nSequence.load (std::memory_order_relaxed);
+   uint32_t nDesired;
+   do
+   {
+      while (nExpected & 1)
+         nExpected = m_nSequence.load (std::memory_order_relaxed);
+      nDesired = nExpected + 1;
+   }
+   while (!m_nSequence.compare_exchange_weak (nExpected, nDesired,
+      std::memory_order_acquire, std::memory_order_relaxed));
+}
+
+void SEQLOCK::EndWrite ()
+{
+   m_nSequence.fetch_add (1, std::memory_order_release);
+}
+
+// ---------------------------------------------------------------------------
+// NODE
+// ---------------------------------------------------------------------------
+
+NODE::NODE (FABRIC* pFabric) :
+   m_twObjectIx (0),
+   m_pNode_Parent (nullptr),
+   m_pFabric (pFabric),
+   m_pMapObject (nullptr),
+   m_pFabric_Attached (nullptr),
+   m_bPrivate (false),
+   m_bPrimary (false),
+   m_pFile (nullptr)
 {
 }
 
 NODE::~NODE ()
 {
-   ReleaseTexture ();
+   Texture_Release ();
 }
+
+// --- Accessors ---
+
+uint32_t NODE::ObjectIx () const                        { return m_twObjectIx; }
+void     NODE::ObjectIx_Set (uint32_t twObjectIx)        { m_twObjectIx = twObjectIx; }
+FABRIC*  NODE::Fabric () const                          { return m_pFabric; }
+const std::vector<NODE*>& NODE::Node_Children () const       { return m_apNode; }
+FABRIC*  NODE::Fabric_Attached () const                 { return m_pFabric_Attached; }
+void     NODE::Fabric_Set_Attached (FABRIC* pFabric)    { m_pFabric_Attached = pFabric; }
+bool     NODE::IsPrivate () const                       { return m_bPrivate; }
+void     NODE::SetPrivate (bool bPrivate)               { m_bPrivate = bPrivate; }
+bool     NODE::IsPrimary () const                       { return m_bPrimary; }
+void     NODE::SetPrimary (bool bPrimary)               { m_bPrimary = bPrimary; }
+SEQLOCK& NODE::Seqlock ()                               { return m_Seqlock; }
+MAP_OBJECT* NODE::MapObject () const                    { return m_pMapObject; }
 
 // ---------------------------------------------------------------------------
 // Parent () -- returns the logical parent, crossing fabric boundaries.
@@ -51,93 +113,94 @@ NODE::~NODE ()
 
 NODE* NODE::Parent () const
 {
-   if (m_pParent)
-      return m_pParent;
+   NODE* pResult = m_pNode_Parent;
 
-   if (m_pFabric)
-   {
-      NODE* pAttaching = m_pFabric->GetAttachingNode ();
-      if (pAttaching)
-         return pAttaching;
-   }
+   if (!pResult  &&  m_pFabric)
+      pResult = m_pFabric->Node_Attaching ();
 
-   return nullptr;
+   return pResult;
 }
 
-int NODE::ChildCount () const
+int NODE::Node_Count () const
 {
-   std::lock_guard<std::mutex> guard (m_childMutex);
-   return static_cast<int> (m_apChildren.size ());
+   std::lock_guard<std::mutex> guard (m_mutex_pNode);
+   return static_cast<int> (m_apNode.size ());
 }
 
 NODE* NODE::Child (int nPosition) const
 {
-   std::lock_guard<std::mutex> guard (m_childMutex);
-   if (nPosition < 0  ||  nPosition >= static_cast<int> (m_apChildren.size ()))
-      return nullptr;
-   return m_apChildren[nPosition];
+   std::lock_guard<std::mutex> guard (m_mutex_pNode);
+
+   NODE* pResult = nullptr;
+   if (nPosition >= 0  &&  nPosition < static_cast<int> (m_apNode.size ()))
+      pResult = m_apNode[nPosition];
+
+   return pResult;
 }
 
-NODE* NODE::FindChild (uint32_t twObjectIx) const
+NODE* NODE::Node_Find (uint32_t twObjectIx) const
 {
-   std::lock_guard<std::mutex> guard (m_childMutex);
-   auto it = m_mapChildren.find (twObjectIx);
-   if (it != m_mapChildren.end ())
-      return it->second;
-   return nullptr;
-}
+   std::lock_guard<std::mutex> guard (m_mutex_pNode);
 
-// ---------------------------------------------------------------------------
-// AddChild -- appends to the child vector and inserts into the lookup map.
-// ---------------------------------------------------------------------------
+   NODE* pResult = nullptr;
+   auto it = m_umpNode.find (twObjectIx);
+   if (it != m_umpNode.end ())
+      pResult = it->second;
 
-void NODE::AddChild (NODE* pChild)
-{
-   std::lock_guard<std::mutex> guard (m_childMutex);
-   pChild->m_pParent = this;
-   m_apChildren.push_back (pChild);
-   m_mapChildren[pChild->m_twObjectIx] = pChild;
+   return pResult;
 }
 
 // ---------------------------------------------------------------------------
-// RemoveChild -- removes from both the vector (swap-and-pop) and the map.
+// Node_Add -- appends to the child vector and inserts into the lookup map.
 // ---------------------------------------------------------------------------
 
-void NODE::RemoveChild (NODE* pChild)
+void NODE::Node_Add (NODE* pChild)
 {
-   if (!pChild)
-      return;
+   std::lock_guard<std::mutex> guard (m_mutex_pNode);
+   pChild->m_pNode_Parent = this;
+   m_apNode.push_back (pChild);
+   m_umpNode[pChild->m_twObjectIx] = pChild;
+}
 
-   std::lock_guard<std::mutex> guard (m_childMutex);
-   m_mapChildren.erase (pChild->m_twObjectIx);
+// ---------------------------------------------------------------------------
+// Node_Remove -- removes from both the vector (swap-and-pop) and the map.
+// ---------------------------------------------------------------------------
 
-   auto it = std::find (m_apChildren.begin (), m_apChildren.end (), pChild);
-   if (it != m_apChildren.end ())
+void NODE::Node_Remove (NODE* pChild)
+{
+   if (pChild)
    {
-      (*it)->m_pParent = nullptr;
-      *it = m_apChildren.back ();
-      m_apChildren.pop_back ();
+      std::lock_guard<std::mutex> guard (m_mutex_pNode);
+      m_umpNode.erase (pChild->m_twObjectIx);
+
+      auto it = std::find (m_apNode.begin (), m_apNode.end (), pChild);
+      if (it != m_apNode.end ())
+      {
+         (*it)->m_pNode_Parent = nullptr;
+         *it = m_apNode.back ();
+         m_apNode.pop_back ();
+      }
    }
 }
 
 // ---------------------------------------------------------------------------
-// SetMapObject -- assigns the map object and initiates a texture fetch if the
+// MapObject_Set -- assigns the map object and initiates a texture fetch if the
 // object has a texture URL and the node can reach the network.
 // ---------------------------------------------------------------------------
 
-void NODE::SetMapObject (MAP_OBJECT* pMapObject)
+void NODE::MapObject_Set (MAP_OBJECT* pMapObject)
 {
-   ReleaseTexture ();
+   Texture_Release ();
    m_pMapObject = pMapObject;
-   RequestTexture ();
+   Texture_Request ();
 }
 
 // ---------------------------------------------------------------------------
-// RequestTexture -- if the map object has a texture URL, request it from the
+// Texture_Request -- if the map object has a texture URL, request it from the
 // network via NODE -> FABRIC -> SCENE -> SNEEZE -> Network().
 // ---------------------------------------------------------------------------
 
-void NODE::RequestTexture ()
+void NODE::Texture_Request ()
 {
    if (m_pMapObject  &&  !m_pMapObject->m_sTextureUrl.empty ())
    {
@@ -149,15 +212,17 @@ void NODE::RequestTexture ()
       pName->sPersonaHash   = "ZklkNVZTY0cxb2ZqUmtTWGpMVHE2bHkyQT09IiwiTUlJRFBUQ0NBaVdnQXdJQkFn";
       pName->bValidated     = true;
 
-      m_pFile = m_pFabric->Scene ()->Sneeze ()->Network ()->Request (this, pName, m_pMapObject->m_sTextureUrl);
+      SNEEZE::NETWORK* pNetwork = m_pFabric->Scene ()->Sneeze ()->Network ();
+      if (pNetwork)
+         m_pFile = pNetwork->Request (this, m_pFabric->Scene ()->Viewport (), pName, m_pMapObject->m_sTextureUrl);
    }
 }
 
 // ---------------------------------------------------------------------------
-// ReleaseTexture -- release any outstanding network file handle.
+// Texture_Release -- release any outstanding network file handle.
 // ---------------------------------------------------------------------------
 
-void NODE::ReleaseTexture ()
+void NODE::Texture_Release ()
 {
    if (m_pFile)
    {
@@ -183,10 +248,7 @@ void NODE::OnFileReady (SNEEZE::NETWORK::FILE* pFile)
    if (!aData.empty ()  &&  m_pMapObject)
    {
       int nW = 0, nH = 0, nChannels = 0;
-      unsigned char* pPixels = stbi_load_from_memory (
-         aData.data (),
-         static_cast<int> (aData.size ()),
-         &nW, &nH, &nChannels, 4);
+      unsigned char* pPixels = stbi_load_from_memory (aData.data (), static_cast<int> (aData.size ()), &nW, &nH, &nChannels, 4);
 
       if (pPixels)
       {

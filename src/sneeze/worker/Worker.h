@@ -16,9 +16,6 @@
 #define SNEEZE_CORE_WORKER_H
 
 #include "Sneeze.h"
-#include "renderer/AnariRenderer.h"
-#include "view/CameraOrbit.h"
-#include "renderer/Renderer.h"
 
 #include <thread>
 #include <mutex>
@@ -92,8 +89,7 @@ protected:
    void ThreadLoop () override;
 
 private:
-   SNEEZE::VIEWPORT::RENDERER::ANARI  m_pRenderer;
-   SNEEZE::VIEWPORT::VIEW     m_pCameraOrbit;
+   void RenderViewport (SNEEZE::VIEWPORT* pViewport, std::chrono::steady_clock::time_point tpLoopStart);
 
    int64_t m_tmNow;
    double  m_dTimeScale;

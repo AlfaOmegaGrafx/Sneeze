@@ -16,11 +16,14 @@
 #define SNEEZE_VIEWPORT_SCENE_H
 
 #include "viewport/Viewport.h"
+#include <string>
+
+namespace astro { class ASTRO_SERVICE; }
 
 // ---------------------------------------------------------------------------
 // SNEEZE::VIEWPORT::SCENE — root container for the scene object model.
 //
-// Owned by SNEEZE. Every FABRIC in the scene holds a back-pointer to
+// Owned by VIEWPORT. Every FABRIC in the scene holds a back-pointer to
 // the SCENE, giving any NODE a path to engine services:
 //     NODE -> FABRIC -> SCENE -> SNEEZE -> Network(), etc.
 // ---------------------------------------------------------------------------
@@ -30,21 +33,24 @@ class SNEEZE::VIEWPORT::SCENE
 public:
    class FABRIC;
 
-   explicit SCENE (SNEEZE* pSneeze);
+   explicit SCENE (VIEWPORT* pViewport);
    ~SCENE ();
 
-   SNEEZE* Sneeze () const { return m_pSneeze; }
+   bool Initialize (const std::string& sUrl);
+   void Shutdown ();
 
-   FABRIC* GetRootFabric () const    { return m_pRootFabric; }
-   void    SetRootFabric (FABRIC* p) { m_pRootFabric = p; }
-
-   FABRIC* GetPrimaryFabric () const    { return m_pPrimaryFabric; }
-   void    SetPrimaryFabric (FABRIC* p) { m_pPrimaryFabric = p; }
+   VIEWPORT* Viewport () const;
+   SNEEZE*   Sneeze () const;
+   FABRIC* Fabric_Root () const;
+   FABRIC* Fabric_Primary () const;
 
 private:
-   SNEEZE* m_pSneeze;
-   FABRIC* m_pRootFabric;
-   FABRIC* m_pPrimaryFabric;
+   bool Fabric_Open_Primary (const std::string& sUrl);
+
+   VIEWPORT*             m_pViewport;
+   FABRIC*               m_pFabric_Root;
+   FABRIC*               m_pFabric_Primary;
+   astro::ASTRO_SERVICE* m_pAstroService;
 };
 
 #endif // SNEEZE_VIEWPORT_SCENE_H

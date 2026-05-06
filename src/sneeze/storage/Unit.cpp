@@ -66,68 +66,68 @@ void SNEEZE::STORAGE::UNIT::NavigatePath (const std::string& sPath, nlohmann::js
    pParent = const_cast<nlohmann::json*> (&m_jData);
    sFinalKey.clear ();
 
-   if (sPath.empty ())
-      return;
-
-   std::vector<std::string> aSegments;
-   std::string sCurrent;
-
-   for (size_t i = 0; i < sPath.size (); i++)
+   if (!sPath.empty ())
    {
-      char c = sPath[i];
-      if (c == '.')
+      std::vector<std::string> aSegments;
+      std::string sCurrent;
+
+      for (size_t i = 0; i < sPath.size (); i++)
       {
-         if (!sCurrent.empty ())
+         char c = sPath[i];
+         if (c == '.')
          {
-            aSegments.push_back (sCurrent);
-            sCurrent.clear ();
+            if (!sCurrent.empty ())
+            {
+               aSegments.push_back (sCurrent);
+               sCurrent.clear ();
+            }
+         }
+         else if (c == '[')
+         {
+            if (!sCurrent.empty ())
+            {
+               aSegments.push_back (sCurrent);
+               sCurrent.clear ();
+            }
+            i++;
+            std::string sIndex;
+            while (i < sPath.size ()  &&  sPath[i] != ']')
+               sIndex += sPath[i++];
+            aSegments.push_back ("[" + sIndex + "]");
+         }
+         else
+         {
+            sCurrent += c;
          }
       }
-      else if (c == '[')
+      if (!sCurrent.empty ())
+         aSegments.push_back (sCurrent);
+
+      if (!aSegments.empty ())
       {
-         if (!sCurrent.empty ())
+         sFinalKey = aSegments.back ();
+         aSegments.pop_back ();
+
+         for (auto& sSeg : aSegments)
          {
-            aSegments.push_back (sCurrent);
-            sCurrent.clear ();
+            if (sSeg.size () > 2  &&  sSeg[0] == '['  &&  sSeg.back () == ']')
+            {
+               int nIdx = std::stoi (sSeg.substr (1, sSeg.size () - 2));
+               if (!pParent->is_array ())
+                  *pParent = nlohmann::json::array ();
+               while (static_cast<size_t> (nIdx) >= pParent->size ())
+                  pParent->push_back (nlohmann::json::object ());
+               pParent = &(*pParent)[nIdx];
+            }
+            else
+            {
+               if (!pParent->is_object ())
+                  *pParent = nlohmann::json::object ();
+               if (!pParent->contains (sSeg))
+                  (*pParent)[sSeg] = nlohmann::json::object ();
+               pParent = &(*pParent)[sSeg];
+            }
          }
-         i++;
-         std::string sIndex;
-         while (i < sPath.size ()  &&  sPath[i] != ']')
-            sIndex += sPath[i++];
-         aSegments.push_back ("[" + sIndex + "]");
-      }
-      else
-      {
-         sCurrent += c;
-      }
-   }
-   if (!sCurrent.empty ())
-      aSegments.push_back (sCurrent);
-
-   if (aSegments.empty ())
-      return;
-
-   sFinalKey = aSegments.back ();
-   aSegments.pop_back ();
-
-   for (auto& sSeg : aSegments)
-   {
-      if (sSeg.size () > 2  &&  sSeg[0] == '['  &&  sSeg.back () == ']')
-      {
-         int nIdx = std::stoi (sSeg.substr (1, sSeg.size () - 2));
-         if (!pParent->is_array ())
-            *pParent = nlohmann::json::array ();
-         while (static_cast<size_t> (nIdx) >= pParent->size ())
-            pParent->push_back (nlohmann::json::object ());
-         pParent = &(*pParent)[nIdx];
-      }
-      else
-      {
-         if (!pParent->is_object ())
-            *pParent = nlohmann::json::object ();
-         if (!pParent->contains (sSeg))
-            (*pParent)[sSeg] = nlohmann::json::object ();
-         pParent = &(*pParent)[sSeg];
       }
    }
 }
@@ -144,21 +144,20 @@ nlohmann::json SNEEZE::STORAGE::UNIT::Get (const std::string& sPath) const
    std::string sFinalKey;
    NavigatePath (sPath, pParent, sFinalKey);
 
-   if (!pParent  ||  sFinalKey.empty ())
-      return nlohmann::json ();
-
-   if (sFinalKey.size () > 2  &&  sFinalKey[0] == '['  &&  sFinalKey.back () == ']')
+   nlohmann::json jResult;
+   if (pParent  &&  !sFinalKey.empty ())
    {
-      int nIdx = std::stoi (sFinalKey.substr (1, sFinalKey.size () - 2));
-      if (pParent->is_array ()  &&  nIdx >= 0  &&  static_cast<size_t> (nIdx) < pParent->size ())
-         return (*pParent)[nIdx];
-      return nlohmann::json ();
+      if (sFinalKey.size () > 2  &&  sFinalKey[0] == '['  &&  sFinalKey.back () == ']')
+      {
+         int nIdx = std::stoi (sFinalKey.substr (1, sFinalKey.size () - 2));
+         if (pParent->is_array ()  &&  nIdx >= 0  &&  static_cast<size_t> (nIdx) < pParent->size ())
+            jResult = (*pParent)[nIdx];
+      }
+      else if (pParent->is_object ()  &&  pParent->contains (sFinalKey))
+         jResult = (*pParent)[sFinalKey];
    }
 
-   if (pParent->is_object ()  &&  pParent->contains (sFinalKey))
-      return (*pParent)[sFinalKey];
-
-   return nlohmann::json ();
+   return jResult;
 }
 
 void SNEEZE::STORAGE::UNIT::Set (const std::string& sPath, const nlohmann::json& jValue)
@@ -169,27 +168,27 @@ void SNEEZE::STORAGE::UNIT::Set (const std::string& sPath, const nlohmann::json&
    std::string sFinalKey;
    NavigatePath (sPath, pParent, sFinalKey);
 
-   if (!pParent  ||  sFinalKey.empty ())
-      return;
-
-   if (sFinalKey.size () > 2  &&  sFinalKey[0] == '['  &&  sFinalKey.back () == ']')
+   if (pParent  &&  !sFinalKey.empty ())
    {
-      int nIdx = std::stoi (sFinalKey.substr (1, sFinalKey.size () - 2));
-      if (!pParent->is_array ())
-         *pParent = nlohmann::json::array ();
-      while (static_cast<size_t> (nIdx) >= pParent->size ())
-         pParent->push_back (nlohmann::json ());
-      (*pParent)[nIdx] = jValue;
-   }
-   else
-   {
-      if (!pParent->is_object ())
-         *pParent = nlohmann::json::object ();
-      (*pParent)[sFinalKey] = jValue;
-   }
+      if (sFinalKey.size () > 2  &&  sFinalKey[0] == '['  &&  sFinalKey.back () == ']')
+      {
+         int nIdx = std::stoi (sFinalKey.substr (1, sFinalKey.size () - 2));
+         if (!pParent->is_array ())
+            *pParent = nlohmann::json::array ();
+         while (static_cast<size_t> (nIdx) >= pParent->size ())
+            pParent->push_back (nlohmann::json ());
+         (*pParent)[nIdx] = jValue;
+      }
+      else
+      {
+         if (!pParent->is_object ())
+            *pParent = nlohmann::json::object ();
+         (*pParent)[sFinalKey] = jValue;
+      }
 
-   m_bDirty = true;
-   AppendLog ("Set", sPath, jValue);
+      m_bDirty = true;
+      AppendLog ("Set", sPath, jValue);
+   }
 }
 
 void SNEEZE::STORAGE::UNIT::Remove (const std::string& sPath)
@@ -200,23 +199,23 @@ void SNEEZE::STORAGE::UNIT::Remove (const std::string& sPath)
    std::string sFinalKey;
    NavigatePath (sPath, pParent, sFinalKey);
 
-   if (!pParent  ||  sFinalKey.empty ())
-      return;
-
-   if (sFinalKey.size () > 2  &&  sFinalKey[0] == '['  &&  sFinalKey.back () == ']')
+   if (pParent  &&  !sFinalKey.empty ())
    {
-      int nIdx = std::stoi (sFinalKey.substr (1, sFinalKey.size () - 2));
-      if (pParent->is_array ()  &&  nIdx >= 0  &&  static_cast<size_t> (nIdx) < pParent->size ())
-         pParent->erase (nIdx);
-   }
-   else
-   {
-      if (pParent->is_object ()  &&  pParent->contains (sFinalKey))
-         pParent->erase (sFinalKey);
-   }
+      if (sFinalKey.size () > 2  &&  sFinalKey[0] == '['  &&  sFinalKey.back () == ']')
+      {
+         int nIdx = std::stoi (sFinalKey.substr (1, sFinalKey.size () - 2));
+         if (pParent->is_array ()  &&  nIdx >= 0  &&  static_cast<size_t> (nIdx) < pParent->size ())
+            pParent->erase (nIdx);
+      }
+      else
+      {
+         if (pParent->is_object ()  &&  pParent->contains (sFinalKey))
+            pParent->erase (sFinalKey);
+      }
 
-   m_bDirty = true;
-   AppendLog ("Remove", sPath, nlohmann::json ());
+      m_bDirty = true;
+      AppendLog ("Remove", sPath, nlohmann::json ());
+   }
 }
 
 bool SNEEZE::STORAGE::UNIT::Has (const std::string& sPath) const
@@ -227,16 +226,19 @@ bool SNEEZE::STORAGE::UNIT::Has (const std::string& sPath) const
    std::string sFinalKey;
    NavigatePath (sPath, pParent, sFinalKey);
 
-   if (!pParent  ||  sFinalKey.empty ())
-      return false;
-
-   if (sFinalKey.size () > 2  &&  sFinalKey[0] == '['  &&  sFinalKey.back () == ']')
+   bool bHas = false;
+   if (pParent  &&  !sFinalKey.empty ())
    {
-      int nIdx = std::stoi (sFinalKey.substr (1, sFinalKey.size () - 2));
-      return pParent->is_array ()  &&  nIdx >= 0  &&  static_cast<size_t> (nIdx) < pParent->size ();
+      if (sFinalKey.size () > 2  &&  sFinalKey[0] == '['  &&  sFinalKey.back () == ']')
+      {
+         int nIdx = std::stoi (sFinalKey.substr (1, sFinalKey.size () - 2));
+         bHas = pParent->is_array ()  &&  nIdx >= 0  &&  static_cast<size_t> (nIdx) < pParent->size ();
+      }
+      else
+         bHas = pParent->is_object ()  &&  pParent->contains (sFinalKey);
    }
 
-   return pParent->is_object ()  &&  pParent->contains (sFinalKey);
+   return bHas;
 }
 
 std::string SNEEZE::STORAGE::UNIT::GetJson () const
@@ -286,75 +288,75 @@ void SNEEZE::STORAGE::UNIT::ReplayLog ()
    std::string sLogPath = m_sJsonPath + ".log";
 
    std::ifstream file (sLogPath);
-   if (!file.is_open ())
-      return;
-
-   std::string sLine;
-   while (std::getline (file, sLine))
+   if (file.is_open ())
    {
-      if (sLine.empty ())
-         continue;
-
-      try
+      std::string sLine;
+      while (std::getline (file, sLine))
       {
-         nlohmann::json jEntry = nlohmann::json::parse (sLine);
-         if (!jEntry.is_array ()  ||  jEntry.size () < 2)
+         if (sLine.empty ())
             continue;
 
-         std::string sOp   = jEntry[0].get<std::string> ();
-         std::string sPath = jEntry[1].get<std::string> ();
-
-         if (sOp == "Set"  &&  jEntry.size () >= 3)
+         try
          {
-            nlohmann::json* pParent = nullptr;
-            std::string sFinalKey;
-            NavigatePath (sPath, pParent, sFinalKey);
+            nlohmann::json jEntry = nlohmann::json::parse (sLine);
+            if (!jEntry.is_array ()  ||  jEntry.size () < 2)
+               continue;
 
-            if (pParent  &&  !sFinalKey.empty ())
+            std::string sOp   = jEntry[0].get<std::string> ();
+            std::string sPath = jEntry[1].get<std::string> ();
+
+            if (sOp == "Set"  &&  jEntry.size () >= 3)
             {
-               if (sFinalKey.size () > 2  &&  sFinalKey[0] == '['  &&  sFinalKey.back () == ']')
+               nlohmann::json* pParent = nullptr;
+               std::string sFinalKey;
+               NavigatePath (sPath, pParent, sFinalKey);
+
+               if (pParent  &&  !sFinalKey.empty ())
                {
-                  int nIdx = std::stoi (sFinalKey.substr (1, sFinalKey.size () - 2));
-                  if (!pParent->is_array ())
-                     *pParent = nlohmann::json::array ();
-                  while (static_cast<size_t> (nIdx) >= pParent->size ())
-                     pParent->push_back (nlohmann::json ());
-                  (*pParent)[nIdx] = jEntry[2];
+                  if (sFinalKey.size () > 2  &&  sFinalKey[0] == '['  &&  sFinalKey.back () == ']')
+                  {
+                     int nIdx = std::stoi (sFinalKey.substr (1, sFinalKey.size () - 2));
+                     if (!pParent->is_array ())
+                        *pParent = nlohmann::json::array ();
+                     while (static_cast<size_t> (nIdx) >= pParent->size ())
+                        pParent->push_back (nlohmann::json ());
+                     (*pParent)[nIdx] = jEntry[2];
+                  }
+                  else
+                  {
+                     if (!pParent->is_object ())
+                        *pParent = nlohmann::json::object ();
+                     (*pParent)[sFinalKey] = jEntry[2];
+                  }
                }
-               else
+            }
+            else if (sOp == "Remove")
+            {
+               nlohmann::json* pParent = nullptr;
+               std::string sFinalKey;
+               NavigatePath (sPath, pParent, sFinalKey);
+
+               if (pParent  &&  !sFinalKey.empty ())
                {
-                  if (!pParent->is_object ())
-                     *pParent = nlohmann::json::object ();
-                  (*pParent)[sFinalKey] = jEntry[2];
+                  if (sFinalKey.size () > 2  &&  sFinalKey[0] == '['  &&  sFinalKey.back () == ']')
+                  {
+                     int nIdx = std::stoi (sFinalKey.substr (1, sFinalKey.size () - 2));
+                     if (pParent->is_array ()  &&  nIdx >= 0  &&  static_cast<size_t> (nIdx) < pParent->size ())
+                        pParent->erase (nIdx);
+                  }
+                  else
+                  {
+                     if (pParent->is_object ()  &&  pParent->contains (sFinalKey))
+                        pParent->erase (sFinalKey);
+                  }
                }
             }
          }
-         else if (sOp == "Remove")
-         {
-            nlohmann::json* pParent = nullptr;
-            std::string sFinalKey;
-            NavigatePath (sPath, pParent, sFinalKey);
-
-            if (pParent  &&  !sFinalKey.empty ())
-            {
-               if (sFinalKey.size () > 2  &&  sFinalKey[0] == '['  &&  sFinalKey.back () == ']')
-               {
-                  int nIdx = std::stoi (sFinalKey.substr (1, sFinalKey.size () - 2));
-                  if (pParent->is_array ()  &&  nIdx >= 0  &&  static_cast<size_t> (nIdx) < pParent->size ())
-                     pParent->erase (nIdx);
-               }
-               else
-               {
-                  if (pParent->is_object ()  &&  pParent->contains (sFinalKey))
-                     pParent->erase (sFinalKey);
-               }
-            }
-         }
+         catch (...) {}
       }
-      catch (...) {}
-   }
 
-   m_bDirty = true;
+      m_bDirty = true;
+   }
 }
 
 void SNEEZE::STORAGE::UNIT::DeleteLog ()
@@ -372,67 +374,67 @@ void SNEEZE::STORAGE::UNIT::Load ()
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-   if (m_bLoaded)
-      return;
-
-   m_jData = nlohmann::json::object ();
-
-   if (std::filesystem::exists (m_sJsonPath))
+   if (!m_bLoaded)
    {
-      std::ifstream file (m_sJsonPath);
-      if (file.is_open ())
+      m_jData = nlohmann::json::object ();
+
+      if (std::filesystem::exists (m_sJsonPath))
       {
-         try
+         std::ifstream file (m_sJsonPath);
+         if (file.is_open ())
          {
-            m_jData = nlohmann::json::parse (file);
-         }
-         catch (...)
-         {
-            m_jData = nlohmann::json::object ();
+            try
+            {
+               m_jData = nlohmann::json::parse (file);
+            }
+            catch (...)
+            {
+               m_jData = nlohmann::json::object ();
+            }
          }
       }
+
+      ReplayLog ();
+
+      if (m_sCreatedAt.empty ())
+         m_sCreatedAt = NowIso8601 ();
+
+      m_bLoaded = true;
+
+      if (m_bDirty)
+         Save ();
    }
-
-   ReplayLog ();
-
-   if (m_sCreatedAt.empty ())
-      m_sCreatedAt = NowIso8601 ();
-
-   m_bLoaded = true;
-
-   if (m_bDirty)
-      Save ();
 }
 
 void SNEEZE::STORAGE::UNIT::Save ()
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-   if (!m_bLoaded)
-      return;
-
-   std::filesystem::create_directories (std::filesystem::path (m_sJsonPath).parent_path ());
-
-   std::string sTmpPath = m_sJsonPath + ".temp";
-   std::ofstream file (sTmpPath, std::ios::trunc);
-   if (file.is_open ())
+   if (m_bLoaded)
    {
-      file << m_jData.dump (2);
-      file.close ();
+      std::filesystem::create_directories (std::filesystem::path (m_sJsonPath).parent_path ());
 
-      std::error_code ec;
-      std::filesystem::rename (sTmpPath, m_sJsonPath, ec);
-
-      if (!ec)
+      std::string sTmpPath = m_sJsonPath + ".temp";
+      std::ofstream file (sTmpPath, std::ios::trunc);
+      if (file.is_open ())
       {
-         auto nSize = std::filesystem::file_size (m_sJsonPath, ec);
-         if (!ec)
-            m_nSizeBytes = static_cast<uint64_t> (nSize);
-      }
-   }
+         file << m_jData.dump (2);
+         file.close ();
 
-   DeleteLog ();
-   m_bDirty = false;
+         std::error_code ec;
+         std::filesystem::rename (sTmpPath, m_sJsonPath, ec);
+
+         if (!ec)
+         {
+            auto nSize = std::filesystem::file_size (m_sJsonPath, ec);
+            if (!ec)
+               m_nSizeBytes = static_cast<uint64_t> (nSize);
+         }
+      }
+
+      DeleteLog ();
+      m_bDirty = false;
+   }
 }
 
 void SNEEZE::STORAGE::UNIT::Evict ()
@@ -496,17 +498,17 @@ void SNEEZE::STORAGE::UNIT::LoadMeta ()
    std::string sMetaPath = m_sJsonPath + ".meta";
 
    std::ifstream file (sMetaPath);
-   if (!file.is_open ())
-      return;
-
-   try
+   if (file.is_open ())
    {
-      nlohmann::json jMeta = nlohmann::json::parse (file);
-      m_nSizeBytes      = jMeta.value ("sizeBytes", static_cast<uint64_t> (0));
-      m_sCreatedAt      = jMeta.value ("createdAt", "");
-      m_sLastAccessedAt = jMeta.value ("lastAccessedAt", "");
-      m_nAccessCount    = jMeta.value ("accessCount", static_cast<uint32_t> (0));
+      try
+      {
+         nlohmann::json jMeta = nlohmann::json::parse (file);
+         m_nSizeBytes      = jMeta.value ("sizeBytes", static_cast<uint64_t> (0));
+         m_sCreatedAt      = jMeta.value ("createdAt", "");
+         m_sLastAccessedAt = jMeta.value ("lastAccessedAt", "");
+         m_nAccessCount    = jMeta.value ("accessCount", static_cast<uint32_t> (0));
+      }
+      catch (...) {}
    }
-   catch (...) {}
 }
 
