@@ -131,6 +131,7 @@ private:
    std::vector<int>         m_anWorkerSignalCount;
 
    // Viewports
+   std::mutex               m_viewportMutex;
    std::vector<VIEWPORT*>   m_apViewport;
 
    // Subsystems

@@ -92,9 +92,6 @@ private:
    void RenderViewport (SNEEZE::VIEWPORT* pViewport, std::chrono::steady_clock::time_point tpLoopStart);
 
    int64_t m_tmNow;
-   double  m_dTimeScale;
-   bool    m_bPaused;
-   bool    m_bSpaceWasDown;
 
    std::chrono::steady_clock::time_point m_tpLastFrame;
 

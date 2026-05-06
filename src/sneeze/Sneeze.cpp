@@ -184,13 +184,23 @@ void SNEEZE::Shutdown ()
 {
    // --- Close all viewports (while workers are still running) ---
 
-   for (int nIz = static_cast<int> (m_apViewport.size ()) - 1; nIz >= 0; nIz--)
+   while (true)
    {
-      m_apViewport[nIz]->RequestRendererShutdown ();
-      m_apViewport[nIz]->Shutdown ();
-      delete m_apViewport[nIz];
+      VIEWPORT* pViewport = nullptr;
+      {
+         std::lock_guard<std::mutex> guard (m_viewportMutex);
+         if (!m_apViewport.empty ())
+         {
+            pViewport = m_apViewport.back ();
+            m_apViewport.pop_back ();
+         }
+      }
+      if (!pViewport)
+         break;
+      pViewport->RequestRendererShutdown ();
+      pViewport->Shutdown ();
+      delete pViewport;
    }
-   m_apViewport.clear ();
 
    // --- Stop engine thread (shuts down workers internally) ---
 
@@ -258,6 +268,7 @@ SNEEZE::VIEWPORT* SNEEZE::Viewport_Open (IVIEWPORT* pHost, const std::string& sU
    }
    else
    {
+      std::lock_guard<std::mutex> guard (m_viewportMutex);
       m_apViewport.push_back (pViewport);
    }
 
@@ -268,17 +279,20 @@ void SNEEZE::Viewport_Close (VIEWPORT* pViewport)
 {
    if (pViewport)
    {
-      for (auto it = m_apViewport.begin (); it != m_apViewport.end (); ++it)
+      pViewport->RequestRendererShutdown ();
+      pViewport->Shutdown ();
       {
-         if (*it == pViewport)
+         std::lock_guard<std::mutex> guard (m_viewportMutex);
+         for (auto it = m_apViewport.begin (); it != m_apViewport.end (); ++it)
          {
-            pViewport->RequestRendererShutdown ();
-            pViewport->Shutdown ();
-            delete pViewport;
-            m_apViewport.erase (it);
-            break;
+            if (*it == pViewport)
+            {
+               m_apViewport.erase (it);
+               break;
+            }
          }
       }
+      delete pViewport;
    }
 }
 

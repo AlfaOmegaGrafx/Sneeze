@@ -87,9 +87,6 @@ static void ColorFromU32 (uint32_t nColor, float& r, float& g, float& b)
 WORKER::COMPOSITOR::COMPOSITOR (SNEEZE* pSneeze)
    : WORKER (pSneeze)
    , m_tmNow (0)
-   , m_dTimeScale (1.0)
-   , m_bPaused (false)
-   , m_bSpaceWasDown (false)
    , m_nFrameCount (0)
    , m_dFpsAccum (0.0)
    , m_dAccumInput (0.0)
@@ -147,52 +144,43 @@ void WORKER::COMPOSITOR::ThreadLoop ()
          m_dAccumFlush    = 0.0;
       }
 
-      // --- Input from first viewport controls time (global) ---
-
-      SNEEZE::VIEWPORT* pFirstVP = m_pSneeze->Viewport ();
-      if (pFirstVP)
-      {
-         SNEEZE::VIEWPORT::INPUT Input = pFirstVP->ConsumeInput ();
-         if (Input.bKeyPlus)   m_dTimeScale *= 1.05;
-         if (Input.bKeyMinus)  m_dTimeScale *= 0.95;
-         if (Input.bKeySpace  &&  !m_bSpaceWasDown)  m_bPaused = !m_bPaused;
-         m_bSpaceWasDown = Input.bKeySpace;
-
-         SNEEZE::VIEWPORT::VIEW& View = pFirstVP->View ();
-         View.Update (Input.nMouseDX, Input.nMouseDY, Input.dScrollY, Input.bMouseLeft, Input.bMouseRight);
-      }
-
-      if (!m_bPaused)
-      {
-         int64_t tmDelta = static_cast<int64_t> (dDeltaS * TICKS_PER_S * m_dTimeScale);
-         m_tmNow += tmDelta;
-      }
-
-      // --- Render each viewport ---
-
-      for (SNEEZE::VIEWPORT* pViewport : m_pSneeze->Viewports ())
-      {
-         if (pViewport->ServiceRendererShutdown ())
-            continue;
-         RenderViewport (pViewport, tpLoopStart);
-      }
-
-      // --- Pace to display refresh (readback path only) ---
-      //
-      // Native surface (Filament/Vulkan swapchain) presents on its own vsync;
-      // DwmFlush here only adds an extra ~one-frame wait and capped FPS.
-      // Keep DwmFlush when using CPU framebuffer + host present.
-
       bool bNeedFlush = false;
-      for (SNEEZE::VIEWPORT* pViewport : m_pSneeze->Viewports ())
+
       {
-         SNEEZE::VIEWPORT::RENDERER* pRenderer = pViewport->Renderer ();
-         if (pRenderer  &&  !pRenderer->IsRenderingToNativeSurface ())
+         std::lock_guard<std::mutex> guard (m_pSneeze->m_viewportMutex);
+
+         // --- Consume input per viewport ---
+
+         for (SNEEZE::VIEWPORT* pViewport : m_pSneeze->Viewports ())
          {
-            bNeedFlush = true;
-            break;
+            SNEEZE::VIEWPORT::INPUT Input = pViewport->ConsumeInput ();
+            SNEEZE::VIEWPORT::VIEW& View = pViewport->View ();
+            View.Update (Input.nMouseDX, Input.nMouseDY, Input.dScrollY, Input.bMouseLeft, Input.bMouseRight);
+         }
+
+         // --- Render each viewport ---
+
+         for (SNEEZE::VIEWPORT* pViewport : m_pSneeze->Viewports ())
+         {
+            if (pViewport->ServiceRendererShutdown ())
+               continue;
+            RenderViewport (pViewport, tpLoopStart);
+         }
+
+         // --- Check if any viewport needs readback flush ---
+
+         for (SNEEZE::VIEWPORT* pViewport : m_pSneeze->Viewports ())
+         {
+            SNEEZE::VIEWPORT::RENDERER* pRenderer = pViewport->Renderer ();
+            if (pRenderer  &&  !pRenderer->IsRenderingToNativeSurface ())
+            {
+               bNeedFlush = true;
+               break;
+            }
          }
       }
+
+      // --- Pace to display refresh (outside lock) ---
 
       auto tpFlushStart = std::chrono::steady_clock::now ();
 
