@@ -16,7 +16,9 @@
 #define SNEEZE_VIEWPORT_H
 
 #include "Sneeze.h"
+#include <atomic>
 #include <mutex>
+#include <condition_variable>
 #include <vector>
 #include <cstdint>
 #include <cmath>
@@ -102,6 +104,8 @@ public:
    bool InitializeRenderer ();
    void Shutdown ();
    void ShutdownRenderer ();
+   void RequestRendererShutdown ();
+   void ServiceRendererShutdown ();
 
    SNEEZE*            Sneeze () const;
    SNEEZE::IVIEWPORT* Host () const;
@@ -140,6 +144,10 @@ private:
    SCENE*               m_pScene;
    RENDERER*            m_pRenderer;
    bool                 m_bRendererPending;
+   std::atomic<bool>    m_bRendererShutdownRequested;
+   bool                 m_bRendererShutdownComplete;
+   std::mutex           m_rendererMutex;
+   std::condition_variable m_rendererCondVar;
 
    // Input
    std::mutex           m_inputMutex;

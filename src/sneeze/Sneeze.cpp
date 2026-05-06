@@ -303,6 +303,7 @@ void SNEEZE::Viewport_Close (VIEWPORT* pViewport)
       {
          if (*it == pViewport)
          {
+            pViewport->RequestRendererShutdown ();
             pViewport->Shutdown ();
             delete pViewport;
             m_apViewport.erase (it);

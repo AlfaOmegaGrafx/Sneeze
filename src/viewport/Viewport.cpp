@@ -20,18 +20,20 @@
 using VIEWPORT = SNEEZE::VIEWPORT;
 
 VIEWPORT::VIEWPORT (SNEEZE* pSneeze, SNEEZE::IVIEWPORT* pHost) :
-   m_pSneeze          (pSneeze),
-   m_pHost            (pHost),
-   m_pScene           (nullptr),
-   m_pRenderer        (nullptr),
-   m_bRendererPending (false),
-   m_nFbWidth         (0),
-   m_nFbHeight        (0),
-   m_nWidth           (0),
-   m_nHeight          (0),
-   m_bResizePending   (false),
-   m_nResizeWidth     (0),
-   m_nResizeHeight    (0)
+   m_pSneeze                    (pSneeze),
+   m_pHost                      (pHost),
+   m_pScene                     (nullptr),
+   m_pRenderer                  (nullptr),
+   m_bRendererPending           (false),
+   m_bRendererShutdownRequested (false),
+   m_bRendererShutdownComplete  (false),
+   m_nFbWidth                   (0),
+   m_nFbHeight                  (0),
+   m_nWidth                     (0),
+   m_nHeight                    (0),
+   m_bResizePending             (false),
+   m_nResizeWidth               (0),
+   m_nResizeHeight              (0)
 {
 }
 
@@ -101,13 +103,6 @@ void VIEWPORT::Shutdown ()
       delete m_pScene;
       m_pScene = nullptr;
    }
-
-   if (m_pRenderer)
-   {
-      m_pRenderer->Shutdown ();
-      delete m_pRenderer;
-      m_pRenderer = nullptr;
-   }
 }
 
 void VIEWPORT::ShutdownRenderer ()
@@ -117,6 +112,29 @@ void VIEWPORT::ShutdownRenderer ()
       m_pRenderer->Shutdown ();
       delete m_pRenderer;
       m_pRenderer = nullptr;
+   }
+}
+
+void VIEWPORT::RequestRendererShutdown ()
+{
+   if (m_pRenderer)
+   {
+      m_bRendererShutdownRequested.store (true);
+      std::unique_lock<std::mutex> lock (m_rendererMutex);
+      m_rendererCondVar.wait (lock, [this] { return m_bRendererShutdownComplete; });
+   }
+}
+
+void VIEWPORT::ServiceRendererShutdown ()
+{
+   if (m_bRendererShutdownRequested.load ())
+   {
+      ShutdownRenderer ();
+      {
+         std::lock_guard<std::mutex> guard (m_rendererMutex);
+         m_bRendererShutdownComplete = true;
+      }
+      m_rendererCondVar.notify_one ();
    }
 }
 
