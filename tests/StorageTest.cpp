@@ -58,7 +58,6 @@ public:
    }
 
    std::string const& sAppDataPath () const& override { return m_sAppDataPath; }
-   std::string const& sSessionPath () const& override { return m_sSessionPath; }
    std::string const& sRenderer ()    const& override { return m_sRenderer; }
 
    void Log (eLOGLEVEL, const std::string& sModule, const std::string& sMessage) override

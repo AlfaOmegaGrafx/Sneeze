@@ -577,9 +577,9 @@ void SNEEZE::NETWORK::Enumerate (IENUM* pEnum, SNEEZE::VIEWPORT* pViewport)
 std::string SNEEZE::NETWORK::GetCachePath () const
 {
    std::string sResult;
-   std::string sSession = m_pSneeze->Host ()->sSessionPath ();
-   if (!sSession.empty ())
-      sResult = (std::filesystem::path (sSession) / "Cache").string ();
+   std::string sAppDataPath = m_pSneeze->Host ()->sAppDataPath ();
+   if (!sAppDataPath.empty ())
+      sResult = (std::filesystem::path (sAppDataPath) / "Persistent" / "Cache").string ();
 
    return sResult;
 }

@@ -36,12 +36,12 @@ bool SNEEZE::STORAGE::Initialize ()
    bool bResult = false;
 
    ISNEEZE* pHost = m_pSneeze->Host ();
-   std::string sSession = pHost->sSessionPath ();
+   std::string sAppDataPath = pHost->sAppDataPath ();
 
-   if (!sSession.empty ())
+   if (!sAppDataPath.empty ())
    {
-      m_sPermanentPath = (std::filesystem::path (sSession) / "Storage" / "Permanent").string ();
-      m_sTemporaryPath = (std::filesystem::path (sSession) / "Storage" / "Temporary").string ();
+      m_sPermanentPath = (std::filesystem::path (sAppDataPath) / "Persistent" / "Storage" / "Permanent").string ();
+      m_sTemporaryPath = (std::filesystem::path (sAppDataPath) / "Persistent" / "Storage" / "Temporary").string ();
 
       std::filesystem::create_directories (m_sPermanentPath);
       std::filesystem::create_directories (m_sTemporaryPath);

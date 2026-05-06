@@ -65,7 +65,6 @@ public:
 
       // Accessors
       virtual std::string const& sAppDataPath ()       const& = 0;
-      virtual std::string const& sSessionPath ()       const& = 0;
       virtual std::string const& sRenderer ()          const& = 0;
 
       // Methods
