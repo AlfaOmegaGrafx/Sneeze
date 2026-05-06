@@ -94,7 +94,7 @@ bool SNEEZE::Initialize ()
 {
    bool bResult = false;
 
-   if (!m_pHost  ||  m_pHost->sAppDataPath.empty ())
+   if (!m_pHost  ||  m_pHost->sAppDataPath ().empty ())
       Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Host configuration incomplete (sAppDataPath required)");
    else if (s_pWasmRuntime.Initialize (this))
    {
@@ -323,10 +323,12 @@ SNEEZE::NETWORK*  SNEEZE::Network () const    { return m_pNetwork; }
 SNEEZE::STORAGE*  SNEEZE::Storage () const    { return m_pStorage; }
 persona::PERSONA* SNEEZE::Persona () const    { return m_pPersona; }
 
+#ifdef CLAUDEWRONG
 std::string SNEEZE::ISNEEZE::SessionPath () const
 {
    return (std::filesystem::path (sAppDataPath) / sSessionPath).string ();
 }
+#endif
 
 // ---------------------------------------------------------------------------
 // Logging and notifications

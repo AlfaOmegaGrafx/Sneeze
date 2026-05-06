@@ -47,11 +47,19 @@ static void Check (bool bCondition, const char* szName)
 class STORAGE_TEST_HOST : public SNEEZE::ISNEEZE
 {
 public:
+   std::string m_sAppDataPath;
+   std::string m_sSessionPath;
+   std::string m_sRenderer;
+
    STORAGE_TEST_HOST ()
    {
-      sAppDataPath = ".";
-      sSessionPath = "test_storage_session";
+      m_sAppDataPath = ".";
+      m_sSessionPath = "test_storage_session";
    }
+
+   std::string const& sAppDataPath () const& override { return m_sAppDataPath; }
+   std::string const& sSessionPath () const& override { return m_sSessionPath; }
+   std::string const& sRenderer ()    const& override { return m_sRenderer; }
 
    void Log (eLOGLEVEL, const std::string& sModule, const std::string& sMessage) override
    {

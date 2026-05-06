@@ -649,7 +649,7 @@ void SNEEZE::NETWORK::Enumerate (IENUM* pEnum)
 std::string SNEEZE::NETWORK::GetCachePath () const
 {
    std::string sResult;
-   std::string sSession = m_pSneeze->Host ()->SessionPath ();
+   std::string sSession = m_pSneeze->Host ()->sSessionPath ();
    if (!sSession.empty ())
       sResult = (std::filesystem::path (sSession) / "Cache").string ();
 

@@ -55,6 +55,14 @@ static void Check (bool bCondition, const char* szName)
 class CACHE_TEST_LISTENER : public SNEEZE::ISNEEZE
 {
 public:
+   std::string m_sAppDataPath;
+   std::string m_sSessionPath;
+   std::string m_sRenderer;
+
+   std::string const& sAppDataPath () const& override { return m_sAppDataPath; }
+   std::string const& sSessionPath () const& override { return m_sSessionPath; }
+   std::string const& sRenderer ()    const& override { return m_sRenderer; }
+
    void Log (eLOGLEVEL, const std::string& sModule, const std::string& sMessage) override
    {
       std::printf ("    [%s] %s\n", sModule.c_str (), sMessage.c_str ());
@@ -1153,9 +1161,10 @@ int RunNetworkTests (int /*nArgc*/, char** /*aArgv*/)
    std::printf ("=== Network Test Suite ===\n");
 
    s_pTestListener = new CACHE_TEST_LISTENER ();
-   s_pTestListener->sAppDataPath = (std::filesystem::temp_directory_path () / "SneezeTest").string ();
+   s_pTestListener->m_sAppDataPath = (std::filesystem::temp_directory_path () / "SneezeTest").string ();
+   s_pTestListener->m_sSessionPath = s_pTestListener->m_sAppDataPath;
 
-   auto sCachePath = std::filesystem::path (s_pTestListener->sAppDataPath) / "Cache";
+   auto sCachePath = std::filesystem::path (s_pTestListener->m_sAppDataPath) / "Cache";
    std::filesystem::remove_all (sCachePath);
 
    s_pSneeze = new SNEEZE (s_pTestListener);
