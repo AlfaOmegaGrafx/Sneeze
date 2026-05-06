@@ -232,7 +232,7 @@ public:
 
    // --- Inspector ---
 
-   void    Enumerate (IENUM* pEnum);
+   void    Enumerate (IENUM* pEnum, SNEEZE::VIEWPORT* pViewport);
 
    // --- Paths ---
 

@@ -14,6 +14,7 @@
 
 #include "Storage.h"
 #include "Sneeze.h"
+#include "viewport/Viewport.h"
 
 
 // ===========================================================================
@@ -46,9 +47,7 @@ void SNEEZE::STORAGE::ASSET::Set (SCOPE eScope, const std::string& sPath, const 
    {
       m_apUnits[eScope]->Set (sPath, jValue);
       m_apUnits[eScope]->TouchAccess ();
-
-      if (m_pStorage  &&  m_pStorage->m_pSneeze)
-         m_pStorage->m_pSneeze->OnStorageUnitChanged (this);
+      m_pViewport->Host ()->OnStorageUnitChanged (this);
    }
 }
 
@@ -58,9 +57,7 @@ void SNEEZE::STORAGE::ASSET::Remove (SCOPE eScope, const std::string& sPath)
    {
       m_apUnits[eScope]->Remove (sPath);
       m_apUnits[eScope]->TouchAccess ();
-
-      if (m_pStorage  &&  m_pStorage->m_pSneeze)
-         m_pStorage->m_pSneeze->OnStorageUnitChanged (this);
+      m_pViewport->Host ()->OnStorageUnitChanged (this);
    }
 }
 
@@ -86,9 +83,7 @@ void SNEEZE::STORAGE::ASSET::SetJson (SCOPE eScope, const std::string& sJson)
    {
       m_apUnits[eScope]->SetJson (sJson);
       m_apUnits[eScope]->TouchAccess ();
-
-      if (m_pStorage  &&  m_pStorage->m_pSneeze)
-         m_pStorage->m_pSneeze->OnStorageUnitChanged (this);
+      m_pViewport->Host ()->OnStorageUnitChanged (this);
    }
 }
 

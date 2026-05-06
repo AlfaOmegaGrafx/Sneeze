@@ -47,7 +47,6 @@ FILE (per-caller handle)
  │       └── hash, content-type, size, HTTP status, fetch end time, served-from-cache
  ├── m_bPendingClear (deferred history removal flag)
  ├── m_bReleased (detached from ASSET)
- ├── m_bEnumeration (guards Release during Enumerate)
  └── Request() to reattach a released FILE to its ASSET
 
 SNEEZE::VIEWPORT::CONTAINER::NAME (identity record, shared via shared_ptr)
@@ -274,26 +273,21 @@ pNetwork->Reset ();
 
 ### Enumerate
 
-`Enumerate(IENUM*)` walks all `.meta` files on disk (via `recursive_directory_iterator`), loading each cached resource's metadata and passing a temporary FILE handle to the callback. The callback can inspect the FILE (URL, content-type, headers, hash, state) and call `Reset()` or `Clear()` on it. `Release()` is guarded — it no-ops on enumeration FILEs to prevent double-detach.
-
-For assets already in `m_mapAssets`, the existing ASSET is used. For assets only on disk, a temporary ASSET is created from the `.meta` sidecar, used for the callback, then discarded.
-
-Internally, a single FILE object is allocated before the loop, with `m_bEnumeration` set to true. On each iteration, `SetAsset()` swaps the ASSET pointer, `AttachFile` / `DetachFile` manage the attachment, and the callback fires. The FILE is deleted after the loop completes.
+`Enumerate(IENUM*, VIEWPORT*)` walks the live `m_apFile` list and yields each FILE whose `Viewport()` matches the given viewport. This scopes the enumeration to a single inspector — each viewport sees only the files it requested.
 
 ```cpp
-struct ENUM_PURGE : SNEEZE::NETWORK::IENUM
+struct ENUM_LIST : SNEEZE::NETWORK::IENUM
 {
    void OnAsset (SNEEZE::NETWORK::FILE* pFile) override
    {
-      if (pFile->GetContentType () == "application/jose+msf")
-         pFile->Reset ();
+      // Populate the inspector listview with pFile
    }
 };
-ENUM_PURGE pEnum_Purge;
-pNetwork->Enumerate (&pEnum_Purge);
+ENUM_LIST enumList;
+pNetwork->Enumerate (&enumList, pViewport);
 ```
 
-**Use case: MSF file freshness.** Artemis calls `Enumerate()` immediately after `SNEEZE::Initialize()` to reset all cached assets with content-type `application/jose+msf`. MSF files are trust anchors (signed service manifests) that should always be re-fetched from the network on startup rather than served from stale cache. The policy decision lives in Artemis, not the engine — Sneeze's `Enumerate` is type-agnostic.
+Cache-wide policy changes (e.g. invalidating stale content-types) are handled via staleness rules (`AddRule`) rather than enumeration.
 
 ## FILE Data Ownership (Snapshotting)
 

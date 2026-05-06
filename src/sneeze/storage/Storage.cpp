@@ -14,6 +14,7 @@
 
 #include "Storage.h"
 #include "Sneeze.h"
+#include "viewport/Viewport.h"
 
 
 // ===========================================================================
@@ -105,7 +106,7 @@ SNEEZE::STORAGE::ASSET* SNEEZE::STORAGE::Open (std::shared_ptr<SNEEZE::VIEWPORT:
       pRaw = pAsset.get ();
       m_aAssets.push_back (std::move (pAsset));
 
-      m_pSneeze->OnStorageUnitCreated (pRaw);
+      pRaw->Viewport ()->Host ()->OnStorageUnitCreated (pRaw);
    }
 
    return pRaw;
@@ -143,82 +144,17 @@ void SNEEZE::STORAGE::Close (ASSET* pAsset)
 // Inspector enumeration
 // ---------------------------------------------------------------------------
 
-void SNEEZE::STORAGE::Enumerate (IENUM* pEnum)
+void SNEEZE::STORAGE::Enumerate (IENUM* pEnum, SNEEZE::VIEWPORT* pViewport)
 {
    if (pEnum)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-   // Walk both permanent and temporary paths looking for .meta files
-   std::vector<std::string> aPaths;
-   aPaths.push_back (m_sPermanentPath);
-   if (m_sTemporaryPath != m_sPermanentPath)
-      aPaths.push_back (m_sTemporaryPath);
-
-   for (auto& sRoot : aPaths)
-   {
-      if (!std::filesystem::exists (sRoot))
-         continue;
-
-      for (auto& entry : std::filesystem::recursive_directory_iterator (sRoot))
+      for (auto& pAsset : m_aAssets)
       {
-         if (!entry.is_regular_file ()  ||  entry.path ().extension () != ".meta")
-            continue;
-
-         std::string sMetaPath = entry.path ().string ();
-         std::string sJsonPath = sMetaPath.substr (0, sMetaPath.size () - 5);
-
-         ASSET* pFound = nullptr;
-         for (auto& pAsset : m_aAssets)
-         {
-            for (int i = 0; i < SCOPE_COUNT; i++)
-            {
-               if (pAsset->GetUnit (static_cast<SCOPE> (i))  &&  pAsset->GetUnit (static_cast<SCOPE> (i))->GetJsonPath () == sJsonPath)
-               {
-                  pFound = pAsset.get ();
-                  break;
-               }
-            }
-            if (pFound)
-               break;
-         }
-
-         if (pFound)
-         {
-            pEnum->OnAsset (pFound);
-         }
-         else
-         {
-            std::ifstream metaFile (sMetaPath);
-            if (!metaFile.is_open ())
-               continue;
-
-            try
-            {
-               nlohmann::json jMeta = nlohmann::json::parse (metaFile);
-
-               auto pName = std::make_shared<SNEEZE::VIEWPORT::CONTAINER::NAME> ();
-               pName->sFingerprint   = jMeta.value ("fingerprint", "");
-               pName->sOrganization  = jMeta.value ("organization", "");
-               pName->sCommonName    = jMeta.value ("commonName", "");
-               pName->sContainerName = jMeta.value ("containerName", "");
-               pName->sPersonaHash   = jMeta.value ("personaHash", "");
-               pName->bValidated     = jMeta.value ("validated", false);
-
-               SCOPE eScope = static_cast<SCOPE> (jMeta.value ("scope", 0));
-
-               UNIT* pUnit = FindOrCreateUnit (sJsonPath);
-               pUnit->LoadMeta ();
-
-               auto pTempAsset = std::make_unique<ASSET> (this, pName, nullptr);
-               pTempAsset->SetUnit (eScope, pUnit);
-
-               pEnum->OnAsset (pTempAsset.get ());
-            }
-            catch (...) {}
-         }
+         if (pAsset->Viewport () == pViewport)
+            pEnum->OnAsset (pAsset.get ());
       }
-   }
    }
 }
 

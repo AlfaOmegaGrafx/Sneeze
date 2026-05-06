@@ -42,6 +42,7 @@ public:
    class STORAGE;
    class WORKER;
    class VIEWPORT;
+   class IVIEWPORT;
 
    // ------------------------------------------------------------------------
    // ISNEEZE -- interface between the host application and the engine.
@@ -75,37 +76,6 @@ public:
    };
 
    // ------------------------------------------------------------------------
-   // IVIEWPORT -- per-viewport interface between the host and a viewport.
-   // Each viewport gets its own IVIEWPORT instance from the application.
-   // ------------------------------------------------------------------------
-
-   class IVIEWPORT
-   {
-   public:
-      virtual ~IVIEWPORT () = default;
-
-      // --- Configuration (set by host before OpenViewport) ---
-
-      void*       pNativeWindow  = nullptr;
-      int         nWidth         = 0;
-      int         nHeight        = 0;
-
-      // --- Callbacks (host must implement) ---
-
-      virtual void OnFrameReady (const uint32_t* pFB, int nFbW, int nFbH) = 0;
-
-      // --- Inspector callbacks (optional) ---
-
-      virtual void OnNetworkFileCreated (NOTIFICATION* pNotification) { (void)pNotification; }
-      virtual void OnNetworkFileChanged (NOTIFICATION* pNotification) { (void)pNotification; }
-      virtual void OnNetworkFileDeleted (NOTIFICATION* pNotification) { (void)pNotification; }
-
-      virtual void OnStorageUnitCreated (NOTIFICATION* pNotification) { (void)pNotification; }
-      virtual void OnStorageUnitChanged (NOTIFICATION* pNotification) { (void)pNotification; }
-      virtual void OnStorageUnitDeleted (NOTIFICATION* pNotification) { (void)pNotification; }
-   };
-
-   // ------------------------------------------------------------------------
 
    explicit SNEEZE (ISNEEZE* pHost);
    ~SNEEZE ();
@@ -117,8 +87,8 @@ public:
 
    // --- Viewport management ---
 
-   VIEWPORT* OpenViewport (IVIEWPORT* pHost, const std::string& sUrl = "");
-   void      CloseViewport (VIEWPORT* pViewport);
+   VIEWPORT* Viewport_Open (IVIEWPORT* pHost, const std::string& sUrl = "");
+   void      Viewport_Close (VIEWPORT* pViewport);
    VIEWPORT* Viewport () const;
    const std::vector<VIEWPORT*>& Viewports () const;
 
@@ -143,14 +113,6 @@ public:
    NETWORK*                 Network () const;
    STORAGE*                 Storage () const;
    persona::PERSONA*        Persona () const;
-
-   void OnNetworkFileCreated (NOTIFICATION* pNotification);
-   void OnNetworkFileChanged (NOTIFICATION* pNotification);
-   void OnNetworkFileDeleted (NOTIFICATION* pNotification);
-
-   void OnStorageUnitCreated (NOTIFICATION* pNotification);
-   void OnStorageUnitChanged (NOTIFICATION* pNotification);
-   void OnStorageUnitDeleted (NOTIFICATION* pNotification);
 
 private:
    void EngineThreadLoop ();

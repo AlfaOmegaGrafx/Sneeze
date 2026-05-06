@@ -23,6 +23,39 @@
 #include <algorithm>
 #include <string>
 
+// ---------------------------------------------------------------------------
+// IVIEWPORT -- per-viewport interface between the host and a viewport.
+// Each viewport gets its own IVIEWPORT instance from the application.
+// ---------------------------------------------------------------------------
+
+class SNEEZE::IVIEWPORT
+{
+public:
+   virtual ~IVIEWPORT () = default;
+
+   // --- Configuration (set by host before Viewport_Open) ---
+
+   void*       pNativeWindow  = nullptr;
+   int         nWidth         = 0;
+   int         nHeight        = 0;
+
+   // --- Callbacks (host must implement) ---
+
+   virtual void OnFrameReady (const uint32_t* pFB, int nFbW, int nFbH) = 0;
+
+   // --- Inspector callbacks (optional) ---
+
+   virtual void OnNetworkFileCreated (NOTIFICATION*) {}
+   virtual void OnNetworkFileChanged (NOTIFICATION*) {}
+   virtual void OnNetworkFileDeleted (NOTIFICATION*) {}
+
+   virtual void OnStorageUnitCreated (NOTIFICATION*) {}
+   virtual void OnStorageUnitChanged (NOTIFICATION*) {}
+   virtual void OnStorageUnitDeleted (NOTIFICATION*) {}
+};
+
+// ---------------------------------------------------------------------------
+
 class SNEEZE::VIEWPORT
 {
 public:

@@ -33,8 +33,7 @@ SNEEZE::NETWORK::FILE::FILE (NETWORK* pNetwork, ASSET* pAsset, std::shared_ptr<S
    m_dFetchEndTime    (0.0),
    m_bServedFromCache (false),
    m_bPendingClear    (false),
-   m_bReleased        (false),
-   m_bEnumeration     (false)
+   m_bReleased        (false)
 {
    SnapshotInitial ();
 }
@@ -94,8 +93,7 @@ bool SNEEZE::NETWORK::FILE::Request (IFILE* pListener)
 
 void SNEEZE::NETWORK::FILE::Release ()
 {
-   if (!m_bEnumeration)
-      m_pNetwork->Release (this);
+   m_pNetwork->Release (this);
 }
 
 void SNEEZE::NETWORK::FILE::Clear (bool b)

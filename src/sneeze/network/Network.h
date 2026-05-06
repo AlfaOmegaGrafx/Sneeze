@@ -271,7 +271,6 @@ public:
 
       void        SetReleased ()                { m_bReleased = true; }
       bool        SetPendingClear (bool b)      { bool bChanged = (b != m_bPendingClear); m_bPendingClear = b; return bChanged; }
-      void        SetEnumeration (bool b)       { m_bEnumeration = b; }
 
       void        SnapshotInitial ();
       void        SnapshotProgress ();
@@ -305,7 +304,6 @@ public:
       // Control flags
       bool        m_bPendingClear;
       bool        m_bReleased;
-      bool        m_bEnumeration;
 
       static const std::unordered_map<std::string, std::string> s_mapEmpty;
    };
@@ -343,7 +341,7 @@ public:
 
    void Clear ();
    void Reset ();
-   void Enumerate (IENUM* pEnum);
+   void Enumerate (IENUM* pEnum, SNEEZE::VIEWPORT* pViewport);
 
    void AddRule (const std::string& sContentType, const std::string& sOlderThan);
 

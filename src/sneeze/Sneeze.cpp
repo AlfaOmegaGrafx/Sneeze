@@ -278,7 +278,7 @@ void SNEEZE::Shutdown ()
 // Viewport management
 // ---------------------------------------------------------------------------
 
-SNEEZE::VIEWPORT* SNEEZE::OpenViewport (IVIEWPORT* pHost, const std::string& sUrl)
+SNEEZE::VIEWPORT* SNEEZE::Viewport_Open (IVIEWPORT* pHost, const std::string& sUrl)
 {
    VIEWPORT* pViewport = new VIEWPORT (this, pHost);
 
@@ -295,7 +295,7 @@ SNEEZE::VIEWPORT* SNEEZE::OpenViewport (IVIEWPORT* pHost, const std::string& sUr
    return pViewport;
 }
 
-void SNEEZE::CloseViewport (VIEWPORT* pViewport)
+void SNEEZE::Viewport_Close (VIEWPORT* pViewport)
 {
    if (pViewport)
    {
@@ -350,96 +350,6 @@ std::vector<void*>& SNEEZE::Bodies ()
    for (auto* pBody : aAll)
       aBodies.push_back (static_cast<void*> (pBody));
    return aBodies;
-}
-
-void SNEEZE::OnNetworkFileCreated (NOTIFICATION* pNotification)
-{
-   NETWORK::FILE* pFile     = dynamic_cast<NETWORK::FILE*> (pNotification);
-   VIEWPORT*      pViewport = pFile ? pFile->Viewport () : nullptr;
-
-   if (pViewport  &&  pViewport->Host ())
-      pViewport->Host ()->OnNetworkFileCreated (pNotification);
-   else
-   {
-      for (VIEWPORT* pLoop : m_apViewport)
-         if (pLoop->Host ())
-            pLoop->Host ()->OnNetworkFileCreated (pNotification);
-   }
-}
-
-void SNEEZE::OnNetworkFileChanged (NOTIFICATION* pNotification)
-{
-   NETWORK::FILE* pFile     = dynamic_cast<NETWORK::FILE*> (pNotification);
-   VIEWPORT*      pViewport = pFile ? pFile->Viewport () : nullptr;
-
-   if (pViewport  &&  pViewport->Host ())
-      pViewport->Host ()->OnNetworkFileChanged (pNotification);
-   else
-   {
-      for (VIEWPORT* pLoop : m_apViewport)
-         if (pLoop->Host ())
-            pLoop->Host ()->OnNetworkFileChanged (pNotification);
-   }
-}
-
-void SNEEZE::OnNetworkFileDeleted (NOTIFICATION* pNotification)
-{
-   NETWORK::FILE* pFile     = dynamic_cast<NETWORK::FILE*> (pNotification);
-   VIEWPORT*      pViewport = pFile ? pFile->Viewport () : nullptr;
-
-   if (pViewport  &&  pViewport->Host ())
-      pViewport->Host ()->OnNetworkFileDeleted (pNotification);
-   else
-   {
-      for (VIEWPORT* pLoop : m_apViewport)
-         if (pLoop->Host ())
-            pLoop->Host ()->OnNetworkFileDeleted (pNotification);
-   }
-}
-
-void SNEEZE::OnStorageUnitCreated (NOTIFICATION* pNotification)
-{
-   STORAGE::ASSET* pAsset    = dynamic_cast<STORAGE::ASSET*> (pNotification);
-   VIEWPORT*       pViewport = pAsset ? pAsset->Viewport () : nullptr;
-
-   if (pViewport  &&  pViewport->Host ())
-      pViewport->Host ()->OnStorageUnitCreated (pNotification);
-   else
-   {
-      for (VIEWPORT* pLoop : m_apViewport)
-         if (pLoop->Host ())
-            pLoop->Host ()->OnStorageUnitCreated (pNotification);
-   }
-}
-
-void SNEEZE::OnStorageUnitChanged (NOTIFICATION* pNotification)
-{
-   STORAGE::ASSET* pAsset    = dynamic_cast<STORAGE::ASSET*> (pNotification);
-   VIEWPORT*       pViewport = pAsset ? pAsset->Viewport () : nullptr;
-
-   if (pViewport  &&  pViewport->Host ())
-      pViewport->Host ()->OnStorageUnitChanged (pNotification);
-   else
-   {
-      for (VIEWPORT* pLoop : m_apViewport)
-         if (pLoop->Host ())
-            pLoop->Host ()->OnStorageUnitChanged (pNotification);
-   }
-}
-
-void SNEEZE::OnStorageUnitDeleted (NOTIFICATION* pNotification)
-{
-   STORAGE::ASSET* pAsset    = dynamic_cast<STORAGE::ASSET*> (pNotification);
-   VIEWPORT*       pViewport = pAsset ? pAsset->Viewport () : nullptr;
-
-   if (pViewport  &&  pViewport->Host ())
-      pViewport->Host ()->OnStorageUnitDeleted (pNotification);
-   else
-   {
-      for (VIEWPORT* pLoop : m_apViewport)
-         if (pLoop->Host ())
-            pLoop->Host ()->OnStorageUnitDeleted (pNotification);
-   }
 }
 
 // ---------------------------------------------------------------------------

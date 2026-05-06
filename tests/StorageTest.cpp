@@ -436,7 +436,7 @@ int RunStorageTests (int nArgc, char** aArgv)
    s_pSneeze = new SNEEZE (s_pHost);
 
    s_pVPHost = new STORAGE_TEST_VIEWPORT_HOST ();
-   s_pSneeze->OpenViewport (s_pVPHost);
+   s_pSneeze->Viewport_Open (s_pVPHost);
 
    s_pStorage = new SNEEZE::STORAGE (s_pSneeze);
    bool bInit = s_pStorage->Initialize ();

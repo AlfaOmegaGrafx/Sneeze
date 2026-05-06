@@ -14,6 +14,7 @@
 
 #include "Network.h"
 #include "Sneeze.h"
+#include "viewport/Viewport.h"
 
 #include <nlohmann/json.hpp>
 #include <openssl/evp.h>
@@ -382,7 +383,7 @@ SNEEZE::NETWORK::FILE* SNEEZE::NETWORK::Request (IFILE* pListener, SNEEZE::VIEWP
             pFile->SetPendingClear (true);
 
          if (!pFile->IsPendingClear ())
-            m_pSneeze->OnNetworkFileCreated (pFile);
+            pFile->Viewport ()->Host ()->OnNetworkFileCreated (pFile);
       }
    }
 
@@ -483,7 +484,7 @@ void SNEEZE::NETWORK::Clear (FILE* pFile, bool b)
       {
          if (b)
          {
-            m_pSneeze->OnNetworkFileDeleted (pFile);
+            pFile->Viewport ()->Host ()->OnNetworkFileDeleted (pFile);
 
             if (pFile->IsReleased ())
             {
@@ -495,7 +496,7 @@ void SNEEZE::NETWORK::Clear (FILE* pFile, bool b)
          }
          else
          {
-            m_pSneeze->OnNetworkFileCreated (pFile);
+            pFile->Viewport ()->Host ()->OnNetworkFileCreated (pFile);
          }
       }
    }
@@ -525,7 +526,7 @@ void SNEEZE::NETWORK::Clear ()
       FILE* pFile = *it;
 
       if (pFile->SetPendingClear (true))
-         m_pSneeze->OnNetworkFileDeleted (pFile);
+         pFile->Viewport ()->Host ()->OnNetworkFileDeleted (pFile);
 
       if (pFile->IsReleased ())
       {
@@ -558,88 +559,15 @@ void SNEEZE::NETWORK::Reset ()
    SaveRules ();
 }
 
-void SNEEZE::NETWORK::Enumerate (IENUM* pEnum)
+void SNEEZE::NETWORK::Enumerate (IENUM* pEnum, SNEEZE::VIEWPORT* pViewport)
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-   FILE* pFile = new FILE (this, nullptr, nullptr, nullptr, nullptr, 0);
-   pFile->SetEnumeration (true);
-
-   for (auto& pDirEntry : std::filesystem::recursive_directory_iterator (m_sCachePath))
+   for (FILE* pFile : m_apFile)
    {
-      if (!pDirEntry.is_regular_file ()  ||  pDirEntry.path ().extension () != ".meta")
-         continue;
-
-      std::ifstream metaFile (pDirEntry.path ());
-      if (!metaFile.is_open ())
-         continue;
-
-      nlohmann::json jMeta;
-      bool bParsed = false;
-
-      try
-      {
-         metaFile >> jMeta;
-         bParsed = true;
-      }
-      catch (...) {}
-
-      if (!bParsed)
-         continue;
-
-      std::string sUrl  = jMeta.value ("url", "");
-      std::string sHash = jMeta.value ("hash", "");
-      if (sUrl.empty ())
-         continue;
-
-      auto it = m_mapAssets.find (sUrl);
-      if (it != m_mapAssets.end ())
-      {
-         ASSET* pAsset = it->second.get ();
-         pFile->SetAsset (pAsset);
-         pFile->SnapshotFinal ();
-         pAsset->AttachFile (pFile);
-
+      if (pFile->Viewport () == pViewport)
          pEnum->OnAsset (pFile);
-
-         pAsset->DetachFile (pFile);
-      }
-      else
-      {
-         std::string sDataPath = pDirEntry.path ().string ();
-         sDataPath = sDataPath.substr (0, sDataPath.size () - 5) + ".data";
-
-         auto pAsset = std::make_unique<ASSET> (this, sUrl, sHash);
-         pAsset->SetDiskPath (sDataPath);
-         pAsset->SetSizeBytes (jMeta.value ("sizeBytes", static_cast<uint64_t> (0)));
-         pAsset->SetCreatedTime (jMeta.value ("createdAt", ""));
-         pAsset->SetAssetIx (jMeta.value ("nMetaIx", static_cast<uint32_t> (0)));
-         pAsset->SetHttpStatus (jMeta.value ("httpStatus", static_cast<long> (0)));
-
-         if (jMeta.contains ("headers"))
-         {
-            std::unordered_map<std::string, std::string> mapHeaders;
-            for (auto& [sKey, sVal] : jMeta["headers"].items ())
-               mapHeaders[sKey] = sVal.get<std::string> ();
-            pAsset->SetHeaders (mapHeaders);
-         }
-
-         if (std::filesystem::exists (sDataPath))
-            pAsset->Complete (sDataPath, pAsset->GetSizeBytes ());
-
-         ASSET* pRaw = pAsset.get ();
-         pFile->SetAsset (pRaw);
-         pFile->SnapshotFinal ();
-         pRaw->AttachFile (pFile);
-
-         pEnum->OnAsset (pFile);
-
-         pRaw->DetachFile (pFile);
-      }
    }
-
-   pFile->SetAsset (nullptr);
-   delete pFile;
 }
 
 // ---------------------------------------------------------------------------
@@ -1177,7 +1105,7 @@ void SNEEZE::NETWORK::NotifyFiles (const std::vector<SNEEZE::NETWORK::FILE*>& ap
       }
 
       if (!pFile->IsPendingClear ())
-         m_pSneeze->OnNetworkFileChanged (pFile);
+         pFile->Viewport ()->Host ()->OnNetworkFileChanged (pFile);
    }
 }
 
