@@ -36,7 +36,7 @@ bool SNEEZE::STORAGE::Initialize ()
    bool bResult = false;
 
    ISNEEZE* pHost = m_pSneeze->Host ();
-   std::string sSession = pHost->SessionPath ();
+   std::string sSession = pHost->sSessionPath ();
 
    if (!sSession.empty ())
    {

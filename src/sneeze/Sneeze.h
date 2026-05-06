@@ -60,18 +60,15 @@ public:
          kLOGLEVEL_Error
       };
 
+   public:
       virtual ~ISNEEZE () = default;
 
-      // --- Configuration (set by host before Initialize) ---
+      // Accessors
+      virtual std::string const& sAppDataPath ()       const& = 0;
+      virtual std::string const& sSessionPath ()       const& = 0;
+      virtual std::string const& sRenderer ()          const& = 0;
 
-      std::string sAppDataPath;
-      std::string sSessionPath;
-      std::string sRenderer;
-
-      std::string SessionPath () const;
-
-      // --- Callbacks (host must implement) ---
-
+      // Methods
       virtual void Log (eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage) = 0;
    };
 
