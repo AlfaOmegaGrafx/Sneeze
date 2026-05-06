@@ -12,6 +12,39 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// ---------------------------------------------------------------------------
+// THREAD AFFINITY WORKAROUND (Halogen / Filament)
+//
+// Problem:
+//   Filament requires its Engine to be created and destroyed on the same
+//   thread. Halogen (our ANARI implementation backed by Filament) does not
+//   expose Filament's adoptCommandStream() or any thread-transfer API.
+//   This means we cannot create the renderer on one thread and destroy it
+//   on another without triggering:
+//     "Precondition: Engine::shutdown() called from the wrong thread!"
+//
+// Mitigation:
+//   Both creation and destruction are forced onto the compositor thread.
+//   - Creation: VIEWPORT::InitializeRenderer() is called from
+//     RenderViewport() on the compositor thread (deferred via
+//     m_bRendererPending flag set by the main thread).
+//   - Destruction: After the render loop exits, ShutdownRenderer() is
+//     called for every viewport while still on the compositor thread,
+//     before the thread returns.
+//
+// Preferred fix (Halogen):
+//   Expose a thread-transfer API on the ANARI device (equivalent to
+//   Filament's Engine::adoptCommandStream or Engine::unprotect) so that
+//   ownership can be handed from the compositor thread back to the main
+//   thread before destruction.
+//
+// Desired behavior once fixed:
+//   Remove the deferred init/shutdown dance entirely. Create the renderer
+//   wherever convenient (e.g. during Viewport_Open on the main thread),
+//   call the transfer API before shutdown, and destroy it on the main
+//   thread alongside the rest of the viewport teardown.
+// ---------------------------------------------------------------------------
+
 #include "Worker.h"
 #include "Sneeze.h"
 #include "Types.h"
@@ -173,6 +206,9 @@ void WORKER::COMPOSITOR::ThreadLoop ()
       auto tpFlushEnd = std::chrono::steady_clock::now ();
       m_dAccumFlush += std::chrono::duration<double> (tpFlushEnd - tpFlushStart).count ();
    }
+
+   for (SNEEZE::VIEWPORT* pViewport : m_pSneeze->Viewports ())
+      pViewport->ShutdownRenderer ();
 }
 
 void WORKER::COMPOSITOR::RenderViewport (SNEEZE::VIEWPORT* pViewport,

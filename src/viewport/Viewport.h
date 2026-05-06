@@ -101,6 +101,7 @@ public:
    bool Initialize (const std::string& sUrl);
    bool InitializeRenderer ();
    void Shutdown ();
+   void ShutdownRenderer ();
 
    SNEEZE*            Sneeze () const;
    SNEEZE::IVIEWPORT* Host () const;

@@ -110,6 +110,16 @@ void VIEWPORT::Shutdown ()
    }
 }
 
+void VIEWPORT::ShutdownRenderer ()
+{
+   if (m_pRenderer)
+   {
+      m_pRenderer->Shutdown ();
+      delete m_pRenderer;
+      m_pRenderer = nullptr;
+   }
+}
+
 SNEEZE*            VIEWPORT::Sneeze () const   { return m_pSneeze; }
 SNEEZE::IVIEWPORT* VIEWPORT::Host () const     { return m_pHost; }
 SNEEZE::VIEWPORT::SCENE* VIEWPORT::Scene () const { return m_pScene; }
