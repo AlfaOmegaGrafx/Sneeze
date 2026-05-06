@@ -105,7 +105,7 @@ public:
    void Shutdown ();
    void ShutdownRenderer ();
    void RequestRendererShutdown ();
-   void ServiceRendererShutdown ();
+   bool ServiceRendererShutdown ();
 
    SNEEZE*            Sneeze () const;
    SNEEZE::IVIEWPORT* Host () const;

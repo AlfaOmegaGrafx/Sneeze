@@ -172,7 +172,8 @@ void WORKER::COMPOSITOR::ThreadLoop ()
 
       for (SNEEZE::VIEWPORT* pViewport : m_pSneeze->Viewports ())
       {
-         pViewport->ServiceRendererShutdown ();
+         if (pViewport->ServiceRendererShutdown ())
+            continue;
          RenderViewport (pViewport, tpLoopStart);
       }
 

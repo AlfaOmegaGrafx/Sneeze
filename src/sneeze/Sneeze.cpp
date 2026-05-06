@@ -95,85 +95,87 @@ bool SNEEZE::Initialize ()
 {
    bool bResult = false;
 
-   if (!m_pHost  ||  m_pHost->sAppDataPath ().empty ())
-      Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Host configuration incomplete (sAppDataPath required)");
-   else if (s_pWasmRuntime.Initialize (this))
+   if (m_pHost  &&  !m_pHost->sAppDataPath ().empty ())
    {
-      if (s_pSpvPipeline.Initialize (this))
+      if (s_pWasmRuntime.Initialize (this))
       {
-#ifdef SNEEZE_HAS_XR
-         if (s_pXrRuntime.Initialize (this))
+         if (s_pSpvPipeline.Initialize (this))
          {
-#endif
-            if (s_pUiContext.Initialize (this))
+   #ifdef SNEEZE_HAS_XR
+            if (s_pXrRuntime.Initialize (this))
             {
-                  // --- Initialize shared subsystems ---
-
-                  m_pNetwork = new NETWORK (this);
-                  m_pNetwork->Initialize ();
-
-                  m_pStorage = new STORAGE (this);
-                  m_pStorage->Initialize ();
-
-                  m_pPersona = new persona::PERSONA (this);
-
-                  // --- Start engine thread (creates workers internally) ---
-
-                  m_pThread_Engine = new std::thread (&SNEEZE::EngineThreadLoop, this);
-                  {
-                     std::unique_lock<std::mutex> lock (m_mutex);
-                     m_condVar.wait (lock, [this] { return m_bReady; });
-                  }
-
-                  bResult = m_bEngineInitOk;
-
-                  if (bResult)
-                     Log (ISNEEZE::kLOGLEVEL_Info, "SNEEZE", "Initialized (1 engine thread + " + std::to_string (m_apWorker.size ()) + " workers)");
-
+   #endif
+               if (s_pUiContext.Initialize (this))
+               {
+                     // --- Initialize shared subsystems ---
+   
+                     m_pNetwork = new NETWORK (this);
+                     m_pNetwork->Initialize ();
+   
+                     m_pStorage = new STORAGE (this);
+                     m_pStorage->Initialize ();
+   
+                     m_pPersona = new persona::PERSONA (this);
+   
+                     // --- Start engine thread (creates workers internally) ---
+   
+                     m_pThread_Engine = new std::thread (&SNEEZE::EngineThreadLoop, this);
+                     {
+                        std::unique_lock<std::mutex> lock (m_mutex);
+                        m_condVar.wait (lock, [this] { return m_bReady; });
+                     }
+   
+                     bResult = m_bEngineInitOk;
+   
+                     if (bResult)
+                        Log (ISNEEZE::kLOGLEVEL_Info, "SNEEZE", "Initialized (1 engine thread + " + std::to_string (m_apWorker.size ()) + " workers)");
+   
+                     if (!bResult)
+                     {
+                        m_pThread_Engine->join ();
+                        delete m_pThread_Engine;
+                        m_pThread_Engine = nullptr;
+                        m_apWorker.clear ();
+                        m_anWorkerHertz.clear ();
+                        m_anWorkerLastTick.clear ();
+                        m_anWorkerSignalCount.clear ();
+                     }
+   
                   if (!bResult)
-                  {
-                     m_pThread_Engine->join ();
-                     delete m_pThread_Engine;
-                     m_pThread_Engine = nullptr;
-                     m_apWorker.clear ();
-                     m_anWorkerHertz.clear ();
-                     m_anWorkerLastTick.clear ();
-                     m_anWorkerSignalCount.clear ();
-                  }
-
+                     s_pUiContext.Shutdown ();
+               }
+               else
+               {
+                  Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize UI context");
+               }
+   
+   #ifdef SNEEZE_HAS_XR
                if (!bResult)
-                  s_pUiContext.Shutdown ();
+                  s_pXrRuntime.Shutdown ();
             }
             else
             {
-               Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize UI context");
+               Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize XR runtime");
             }
-
-#ifdef SNEEZE_HAS_XR
+   #endif
+   
             if (!bResult)
-               s_pXrRuntime.Shutdown ();
+               s_pSpvPipeline.Shutdown ();
          }
          else
          {
-            Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize XR runtime");
+            Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize SPIR-V pipeline");
          }
-#endif
-
+   
          if (!bResult)
-            s_pSpvPipeline.Shutdown ();
+            s_pWasmRuntime.Shutdown ();
       }
       else
       {
-         Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize SPIR-V pipeline");
+         Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize WASM runtime");
       }
-
-      if (!bResult)
-         s_pWasmRuntime.Shutdown ();
    }
-   else
-   {
-      Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize WASM runtime");
-   }
+   else Log (ISNEEZE::kLOGLEVEL_Error, "SNEEZE", "Host configuration incomplete (sAppDataPath required)");
 
    return bResult;
 }

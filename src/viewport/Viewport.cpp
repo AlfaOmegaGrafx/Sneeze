@@ -125,9 +125,10 @@ void VIEWPORT::RequestRendererShutdown ()
    }
 }
 
-void VIEWPORT::ServiceRendererShutdown ()
+bool VIEWPORT::ServiceRendererShutdown ()
 {
-   if (m_bRendererShutdownRequested.load ())
+   bool bResult = m_bRendererShutdownRequested.load ();
+   if (bResult)
    {
       ShutdownRenderer ();
       {
@@ -136,6 +137,7 @@ void VIEWPORT::ServiceRendererShutdown ()
       }
       m_rendererCondVar.notify_one ();
    }
+   return bResult;
 }
 
 SNEEZE*            VIEWPORT::Sneeze () const   { return m_pSneeze; }
