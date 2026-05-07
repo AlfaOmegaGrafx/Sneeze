@@ -715,21 +715,23 @@ endif ()
 # IDE source grouping
 # ---------------------------------------------------------------------------
 
-source_group ("core"     FILES ${CORE_SOURCES} ${CORE_HEADERS})
-source_group ("astro"    FILES ${ASTRO_SOURCES} ${ASTRO_HEADERS})
-source_group ("scene"     FILES ${SOM_SOURCES} ${SOM_HEADERS})
-source_group ("network"   FILES ${NETWORK_SOURCES} ${NETWORK_HEADERS})
-source_group ("container" FILES ${CONTAINER_HEADERS})
-source_group ("storage"   FILES ${STORAGE_SOURCES} ${STORAGE_HEADERS})
-source_group ("persona"  FILES ${PERSONA_SOURCES} ${PERSONA_HEADERS})
-source_group ("renderer" FILES ${RENDERER_SOURCES} ${RENDERER_HEADERS})
-source_group ("wasm"     FILES ${WASM_SOURCES} ${WASM_HEADERS})
-source_group ("spirv"    FILES ${SPIRV_SOURCES} ${SPIRV_HEADERS})
-source_group ("xr"       FILES ${XR_SOURCES} ${XR_HEADERS})
-source_group ("ui"       FILES ${UI_SOURCES} ${UI_HEADERS})
-source_group ("compute"  FILES ${COMPUTE_SOURCES} ${COMPUTE_HEADERS})
-source_group ("msf"      FILES ${MSF_SOURCES} ${MSF_HEADERS})
-source_group ("stb"      FILES ${STB_SOURCES} ${STB_HEADERS})
+source_group (TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
+   ${CORE_SOURCES}      ${CORE_HEADERS}
+   ${ASTRO_SOURCES}     ${ASTRO_HEADERS}
+   ${SOM_SOURCES}       ${SOM_HEADERS}
+   ${NETWORK_SOURCES}   ${NETWORK_HEADERS}
+   ${CONTAINER_HEADERS}
+   ${STORAGE_SOURCES}   ${STORAGE_HEADERS}
+   ${PERSONA_SOURCES}   ${PERSONA_HEADERS}
+   ${RENDERER_SOURCES}  ${RENDERER_HEADERS}
+   ${WASM_SOURCES}      ${WASM_HEADERS}
+   ${SPIRV_SOURCES}     ${SPIRV_HEADERS}
+   ${XR_SOURCES}        ${XR_HEADERS}
+   ${UI_SOURCES}        ${UI_HEADERS}
+   ${COMPUTE_SOURCES}   ${COMPUTE_HEADERS}
+   ${MSF_SOURCES}       ${MSF_HEADERS}
+   ${STB_SOURCES}       ${STB_HEADERS}
+)
 
 # ---------------------------------------------------------------------------
 # Tools (desktop-only CLI utilities built on top of the Sneeze library)
