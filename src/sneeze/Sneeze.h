@@ -23,8 +23,7 @@
 #include <filesystem>
 #include <cstdint>
 
-namespace astro { class ASTRO_SERVICE; }
-namespace persona { class PERSONA; }
+#include "persona/persona.h"
 
 // ---------------------------------------------------------------------------
 
@@ -40,9 +39,10 @@ public:
 
    class NETWORK;
    class STORAGE;
-   class WORKER;
    class VIEWPORT;
    class IVIEWPORT;
+
+   class WORKER;
 
    // ------------------------------------------------------------------------
    // ISNEEZE -- interface between the host application and the engine.
@@ -71,10 +71,15 @@ public:
       virtual void Log (eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage) = 0;
    };
 
-   // ------------------------------------------------------------------------
-
+public:
+   // Constructors, assignments, and destructor
    explicit SNEEZE (ISNEEZE* pHost);
-   ~SNEEZE ();
+
+   SNEEZE & operator=(SNEEZE const  & rhs)   = delete;
+   SNEEZE & operator=(SNEEZE       && rhs)   = delete;
+   SNEEZE            (SNEEZE const  & other) = delete;
+   SNEEZE            (SNEEZE       && other) = delete;
+   ~SNEEZE           ();
 
    ISNEEZE* Host () const;
 
@@ -83,15 +88,12 @@ public:
 
    // --- Viewport management ---
 
-   VIEWPORT* Viewport_Open (IVIEWPORT* pHost, const std::string& sUrl = "");
-   void      Viewport_Close (VIEWPORT* pViewport);
-   VIEWPORT* Viewport () const;
-   const std::vector<VIEWPORT*>& Viewports () const;
-
-   SNEEZE (const SNEEZE&) = delete;
-   SNEEZE& operator= (const SNEEZE&) = delete;
-   SNEEZE (SNEEZE&&) = delete;
-   SNEEZE& operator= (SNEEZE&&) = delete;
+   VIEWPORT*                              Viewport_Open  (IVIEWPORT* pHost, const std::string& sUrl = "");
+   void                                   Viewport_Close (VIEWPORT* pViewport);
+   VIEWPORT*                              Viewport       () const;
+   void                                   Viewport_Capture ();
+   const std::vector<SNEEZE::VIEWPORT*>&  Viewport_GetList () const;
+   void                                   Viewport_Release ();
 
    // --- Shared services ---
 
@@ -111,32 +113,8 @@ public:
    persona::PERSONA*        Persona () const;
 
 private:
-   void EngineThreadLoop ();
-
-   ISNEEZE*                 m_pHost;
-
-   // Engine thread
-   std::thread*             m_pThread_Engine;
-   std::mutex               m_mutex;
-   std::condition_variable  m_condVar;
-   bool                     m_bShutdown;
-   bool                     m_bReady;
-   bool                     m_bEngineInitOk;
-
-   // Workers
-   std::vector<WORKER*>     m_apWorker;
-   std::vector<int>         m_anWorkerHertz;
-   std::vector<int64_t>     m_anWorkerLastTick;
-   std::vector<int>         m_anWorkerSignalCount;
-
-   // Viewports
-   std::mutex               m_viewportMutex;
-   std::vector<VIEWPORT*>   m_apViewport;
-
-   // Subsystems
-   NETWORK*                 m_pNetwork;
-   STORAGE*                 m_pStorage;
-   persona::PERSONA*        m_pPersona;
+   class Impl;
+   Impl* m_pImpl;
 };
 
 #endif // SNEEZE_CORE_SNEEZE_H

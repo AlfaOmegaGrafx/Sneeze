@@ -146,12 +146,11 @@ void WORKER::COMPOSITOR::ThreadLoop ()
 
       bool bNeedFlush = false;
 
+      m_pSneeze->Viewport_Capture ();
       {
-         std::lock_guard<std::mutex> guard (m_pSneeze->m_viewportMutex);
-
          // --- Consume input per viewport ---
 
-         for (SNEEZE::VIEWPORT* pViewport : m_pSneeze->Viewports ())
+         for (SNEEZE::VIEWPORT* pViewport : m_pSneeze->Viewport_GetList ())
          {
             SNEEZE::VIEWPORT::INPUT Input = pViewport->ConsumeInput ();
             SNEEZE::VIEWPORT::VIEW& View = pViewport->View ();
@@ -160,7 +159,7 @@ void WORKER::COMPOSITOR::ThreadLoop ()
 
          // --- Render each viewport ---
 
-         for (SNEEZE::VIEWPORT* pViewport : m_pSneeze->Viewports ())
+         for (SNEEZE::VIEWPORT* pViewport : m_pSneeze->Viewport_GetList ())
          {
             if (pViewport->ServiceRendererShutdown ())
                continue;
@@ -169,7 +168,7 @@ void WORKER::COMPOSITOR::ThreadLoop ()
 
          // --- Check if any viewport needs readback flush ---
 
-         for (SNEEZE::VIEWPORT* pViewport : m_pSneeze->Viewports ())
+         for (SNEEZE::VIEWPORT* pViewport : m_pSneeze->Viewport_GetList ())
          {
             SNEEZE::VIEWPORT::RENDERER* pRenderer = pViewport->Renderer ();
             if (pRenderer  &&  !pRenderer->IsRenderingToNativeSurface ())
@@ -178,6 +177,8 @@ void WORKER::COMPOSITOR::ThreadLoop ()
                break;
             }
          }
+
+         m_pSneeze->Viewport_Release ();
       }
 
       // --- Pace to display refresh (outside lock) ---
