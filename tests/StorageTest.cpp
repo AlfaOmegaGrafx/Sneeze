@@ -73,6 +73,17 @@ public:
    int m_nChangedCount = 0;
    int m_nDeletedCount = 0;
 
+   void* GetFrameWindow () override
+   {
+      return nullptr;
+   }
+
+   void GetFrameSize (int& nWidth, int& nHeight) override
+   {
+      nWidth = 0;
+      nHeight = 0;
+   }
+
    void OnFrameReady (const uint32_t*, int, int) override {}
 
    void OnStorageUnitCreated (SNEEZE::NOTIFICATION*) override { m_nCreatedCount++; }

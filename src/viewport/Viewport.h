@@ -35,15 +35,12 @@ class SNEEZE::IVIEWPORT
 public:
    virtual ~IVIEWPORT () = default;
 
-   // --- Configuration (set by host before Viewport_Open) ---
-
-   void*       pNativeWindow  = nullptr;
-   int         nWidth         = 0;
-   int         nHeight        = 0;
-
    // --- Callbacks (host must implement) ---
 
-   virtual void OnFrameReady (const uint32_t* pFB, int nFbW, int nFbH) = 0;
+   virtual void* GetFrameWindow ()                                         = 0;
+   virtual void  GetFrameSize   (int &nWidth, int& nHeight)                = 0;
+
+   virtual void  OnFrameReady   (const uint32_t* pFB, int nFbW, int nFbH)  = 0;
 
    // --- Inspector callbacks (optional) ---
 
