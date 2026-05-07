@@ -20,11 +20,12 @@
 # Flags switch the script into deps mode, reconfigure mode, or deps+Sneeze mode:
 #
 #   -Deps         Build the 15 third-party libs into deps/builds/windows-x64/<config>/libs/.
-#   -Fresh        Reconfigure the Sneeze tree from scratch (cmake -S src --fresh),
-#                 then build it. Wipes CMakeCache.txt + CMakeFiles/ so stale
-#                 cached values (anari_DIR, compiler paths, toolchain tweaks,
-#                 etc.) can't linger. Deps tree is never touched. Requires
-#                 CMake >= 3.24 (VS 2022 ships 3.28+, so effectively everyone).
+#   -Fresh        Reconfigure the Sneeze tree from scratch (cmake -S src --fresh).
+#                 Wipes CMakeCache.txt + CMakeFiles/ so stale cached values
+#                 (anari_DIR, compiler paths, toolchain tweaks, etc.) can't
+#                 linger. Does NOT build -- just regenerates the project files.
+#                 Deps tree is never touched. Requires CMake >= 3.24 (VS 2022
+#                 ships 3.28+, so effectively everyone).
 #   -All          Build deps, then configure + build Sneeze.
 #   -Only <dep>   Build a single dep (implies deps-targeting).
 #   -List         Show dep stamp cache.
@@ -62,7 +63,7 @@
 # Usage:
 #   .\scripts\build-windows.ps1                        # Sneeze (Release)
 #   .\scripts\build-windows.ps1 -Config Debug          # Sneeze (Debug)
-#   .\scripts\build-windows.ps1 -Fresh                 # Reconfigure + build Sneeze
+#   .\scripts\build-windows.ps1 -Fresh                 # Reconfigure Sneeze (no build)
 #   .\scripts\build-windows.ps1 -Deps                  # Deps only (cached ones skipped)
 #   .\scripts\build-windows.ps1 -All                   # Deps, then Sneeze
 #   .\scripts\build-windows.ps1 -Only filament         # Build one dep (cached = skip)
@@ -370,14 +371,18 @@ if ($Fresh -or $SneezeMode) {
       }
    }
 
-   Write-Host ''
-   Write-Host "==> Building Sneeze ($Platform, $Config)"
-   & cmake --build $SneezeBuildDir --config $Config
-   if ($LASTEXITCODE -ne 0) {
-      Write-Error 'Sneeze build failed'
-      exit 1
+   if ($Fresh -and -not $Rebuild) {
+      Write-Host "==> Sneeze reconfigure complete (no build)"
+   } else {
+      Write-Host ''
+      Write-Host "==> Building Sneeze ($Platform, $Config)"
+      & cmake --build $SneezeBuildDir --config $Config
+      if ($LASTEXITCODE -ne 0) {
+         Write-Error 'Sneeze build failed'
+         exit 1
+      }
+      Write-Host "==> Sneeze Windows build complete ($Config)"
+      Write-Host "    Sneeze.lib -> $SneezeInstallDir\lib"
+      Write-Host "    test .exes -> $SneezeInstallDir\bin"
    }
-   Write-Host "==> Sneeze Windows build complete ($Config)"
-   Write-Host "    Sneeze.lib -> $SneezeInstallDir\lib"
-   Write-Host "    test .exes -> $SneezeInstallDir\bin"
 }

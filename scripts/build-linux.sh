@@ -20,11 +20,11 @@
 # Flags switch the script into deps mode or deps+Sneeze mode:
 #
 #   --deps         Build the 15 third-party libs into deps/builds/linux-<arch>/<config>/libs/.
-#   --fresh        Reconfigure the Sneeze tree from scratch (cmake -S src --fresh),
-#                  then build it. Wipes CMakeCache.txt + CMakeFiles/ so stale
-#                  cached values (compiler paths, toolchain tweaks, find_package
-#                  results, etc.) can't linger. Deps tree is never touched.
-#                  Requires CMake >= 3.24.
+#   --fresh        Reconfigure the Sneeze tree from scratch (cmake -S src --fresh).
+#                  Wipes CMakeCache.txt + CMakeFiles/ so stale cached values
+#                  (compiler paths, toolchain tweaks, find_package results, etc.)
+#                  can't linger. Does NOT build -- just regenerates the project
+#                  files. Deps tree is never touched. Requires CMake >= 3.24.
 #   --all          Build deps, then configure + build Sneeze.
 #   --only <dep>   Build a single dep (implies deps-targeting).
 #   --list         Show dep stamp cache.
@@ -56,7 +56,7 @@
 # Usage:
 #   ./scripts/build-linux.sh                      # Sneeze (Release)
 #   ./scripts/build-linux.sh --config Debug       # Sneeze (Debug)
-#   ./scripts/build-linux.sh --fresh              # Reconfigure + build Sneeze
+#   ./scripts/build-linux.sh --fresh              # Reconfigure Sneeze (no build)
 #   ./scripts/build-linux.sh --deps               # Deps only
 #   ./scripts/build-linux.sh --all                # Deps, then Sneeze
 set -euo pipefail
@@ -207,10 +207,14 @@ if [[ $FRESH -eq 1 || $SNEEZE_MODE -eq 1 ]]; then
          -DSNEEZE_BUILD_ROOT="$SNEEZE_OUT_DIR"
    fi
 
-   echo ""
-   echo "==> Building Sneeze ($PLATFORM, $CONFIG)"
-   cmake --build "$SNEEZE_BUILD_DIR" --config "$CONFIG"
-   echo "==> Sneeze Linux build complete ($CONFIG)"
-   echo "    libSneeze.a -> $SNEEZE_INSTALL_DIR/lib"
-   echo "    test bins   -> $SNEEZE_INSTALL_DIR/bin"
+   if [[ $FRESH -eq 1 && $REBUILD -eq 0 ]]; then
+      echo "==> Sneeze reconfigure complete (no build)"
+   else
+      echo ""
+      echo "==> Building Sneeze ($PLATFORM, $CONFIG)"
+      cmake --build "$SNEEZE_BUILD_DIR" --config "$CONFIG"
+      echo "==> Sneeze Linux build complete ($CONFIG)"
+      echo "    libSneeze.a -> $SNEEZE_INSTALL_DIR/lib"
+      echo "    test bins   -> $SNEEZE_INSTALL_DIR/bin"
+   fi
 fi
