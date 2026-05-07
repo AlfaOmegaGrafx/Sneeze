@@ -15,13 +15,8 @@
 #ifndef SNEEZE_CORE_SNEEZE_H
 #define SNEEZE_CORE_SNEEZE_H
 
-#include <thread>
-#include <mutex>
-#include <condition_variable>
 #include <vector>
 #include <string>
-#include <filesystem>
-#include <cstdint>
 
 #include "persona/persona.h"
 
@@ -88,9 +83,8 @@ public:
 
    // --- Viewport management ---
 
-   VIEWPORT*                              Viewport_Open  (IVIEWPORT* pHost, const std::string& sUrl = "");
-   void                                   Viewport_Close (VIEWPORT* pViewport);
-   VIEWPORT*                              Viewport       () const;
+   VIEWPORT*                              Viewport_Open    (IVIEWPORT* pHost, const std::string& sUrl = "");
+   void                                   Viewport_Close   (VIEWPORT* pViewport);
    void                                   Viewport_Capture ();
    const std::vector<SNEEZE::VIEWPORT*>&  Viewport_GetList () const;
    void                                   Viewport_Release ();

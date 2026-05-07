@@ -496,11 +496,6 @@ void SNEEZE::Viewport_Close (VIEWPORT* pViewport)
    }
 }
 
-SNEEZE::VIEWPORT* SNEEZE::Viewport () const
-{
-   return m_pImpl->ViewportGet ();
-}
-
 void SNEEZE::Viewport_Capture () 
 { 
    m_pImpl->Capture (); 
