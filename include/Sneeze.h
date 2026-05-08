@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef SNEEZE_CORE_SNEEZE_H
-#define SNEEZE_CORE_SNEEZE_H
+#ifndef SNEEZE_SNEEZE_H
+#define SNEEZE_SNEEZE_H
 
 #include <vector>
 #include <string>
@@ -111,4 +111,4 @@ private:
    Impl* m_pImpl;
 };
 
-#endif // SNEEZE_CORE_SNEEZE_H
+#endif // SNEEZE_SNEEZE_H

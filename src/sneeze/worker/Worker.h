@@ -15,7 +15,7 @@
 #ifndef SNEEZE_CORE_WORKER_H
 #define SNEEZE_CORE_WORKER_H
 
-#include "Sneeze.h"
+#include <Sneeze.h>
 
 #include <thread>
 #include <mutex>

@@ -513,7 +513,6 @@ set (CORE_SOURCES
    sneeze/worker/WorkerH.cpp)
 set (CORE_HEADERS
    sneeze/Types.h
-   sneeze/Sneeze.h
    sneeze/worker/Worker.h)
 
 set (ASTRO_SOURCES
@@ -606,6 +605,8 @@ set (MSF_HEADERS
 set (STB_SOURCES  deps/stb/stb_image_impl.cpp)
 set (STB_HEADERS  deps/stb/stb_image.h)
 
+set (INCLUDE_HEADERS  ../include/Sneeze.h)
+
 # ---------------------------------------------------------------------------
 # Static library
 # ---------------------------------------------------------------------------
@@ -626,6 +627,7 @@ add_library (Sneeze STATIC
    ${COMPUTE_SOURCES}   ${COMPUTE_HEADERS}
    ${MSF_SOURCES}       ${MSF_HEADERS}
    ${STB_SOURCES}       ${STB_HEADERS}
+   ${INCLUDE_HEADERS}
    ${KERNEL_EMBED_FILES}
 )
 add_dependencies (Sneeze CompileKernels)
@@ -639,6 +641,7 @@ endif ()
 
 target_include_directories (Sneeze PUBLIC
    ${CMAKE_CURRENT_SOURCE_DIR}
+   ${CMAKE_CURRENT_SOURCE_DIR}/../include
    ${CMAKE_CURRENT_SOURCE_DIR}/sneeze
    ${CMAKE_CURRENT_SOURCE_DIR}/viewport
    ${CMAKE_CURRENT_SOURCE_DIR}/deps
@@ -732,6 +735,7 @@ source_group (TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
    ${MSF_SOURCES}       ${MSF_HEADERS}
    ${STB_SOURCES}       ${STB_HEADERS}
 )
+source_group ("include" FILES ${INCLUDE_HEADERS})
 
 # ---------------------------------------------------------------------------
 # Tools (desktop-only CLI utilities built on top of the Sneeze library)

@@ -15,7 +15,7 @@
 #ifndef SNEEZE_STORAGE_STORAGE_H
 #define SNEEZE_STORAGE_STORAGE_H
 
-#include "Sneeze.h"
+#include <Sneeze.h>
 #include "container/Container.h"
 #include <nlohmann/json.hpp>
 #include <string>

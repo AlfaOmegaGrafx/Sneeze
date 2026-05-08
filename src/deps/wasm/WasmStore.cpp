@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <Sneeze.h>
 #include "WasmStore.h"
 #include "WasmInstance.h"
-#include "Sneeze.h"
 #include <cstdio>
 
 namespace DEP {

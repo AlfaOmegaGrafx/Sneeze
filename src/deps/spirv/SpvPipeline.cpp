@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <Sneeze.h>
 #include "spirv/SpvPipeline.h"
-#include "Sneeze.h"
 
 #include <spirv-tools/libspirv.hpp>
 

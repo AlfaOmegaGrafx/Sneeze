@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <Sneeze.h>
 #include "Node.h"
 #include "Fabric.h"
 #include "Scene.h"
 #include "MapObject.h"
-#include "Sneeze.h"
 #include "container/Container.h"
 #include "stb/stb_image.h"
 #include <algorithm>

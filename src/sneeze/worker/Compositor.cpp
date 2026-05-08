@@ -45,8 +45,8 @@
 //   thread alongside the rest of the viewport teardown.
 // ---------------------------------------------------------------------------
 
+#include <Sneeze.h>
 #include "Worker.h"
-#include "Sneeze.h"
 #include "Types.h"
 #include "viewport/Viewport.h"
 #include "renderer/Renderer.h"

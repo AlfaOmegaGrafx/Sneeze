@@ -15,7 +15,7 @@
 #ifndef SNEEZE_VIEWPORT_H
 #define SNEEZE_VIEWPORT_H
 
-#include "Sneeze.h"
+#include <Sneeze.h>
 #include <atomic>
 #include <mutex>
 #include <condition_variable>

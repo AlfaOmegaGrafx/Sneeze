@@ -15,7 +15,7 @@
 #ifndef SNEEZE_NETWORK_H
 #define SNEEZE_NETWORK_H
 
-#include "Sneeze.h"
+#include <Sneeze.h>
 #include "container/Container.h"
 #include <string>
 #include <vector>
