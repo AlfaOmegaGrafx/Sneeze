@@ -63,6 +63,12 @@ public:
    class MSF;
    class RENDERER;
 
+   enum eSESSION
+   {
+      kPERSISTENT,
+      kTRANSITORY
+   };
+
    // --- Camera orbit state ---
 
    struct VIEW
