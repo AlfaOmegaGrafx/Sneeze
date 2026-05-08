@@ -17,7 +17,7 @@
 
 #include "scene/Fabric.h"
 #include "scene/MapObject.h"
-#include "network/Network.h"
+#include <Sneeze.h>
 #include <atomic>
 #include <mutex>
 #include <vector>

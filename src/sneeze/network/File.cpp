@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Network.h"
+#include <Sneeze.h>
 
 const std::unordered_map<std::string, std::string> SNEEZE::NETWORK::FILE::s_mapEmpty;
 

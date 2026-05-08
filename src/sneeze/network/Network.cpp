@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include <Sneeze.h>
-#include "Network.h"
 #include "viewport/Viewport.h"
 
 #include <nlohmann/json.hpp>

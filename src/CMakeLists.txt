@@ -553,8 +553,7 @@ set (NETWORK_SOURCES
    sneeze/network/Asset.cpp
    sneeze/network/File.cpp
    sneeze/network/Network.cpp)
-set (NETWORK_HEADERS
-   sneeze/network/Network.h)
+set (NETWORK_HEADERS)
 
 set (CONTAINER_HEADERS  viewport/container/Container.h)
 
@@ -562,7 +561,7 @@ set (STORAGE_SOURCES  sneeze/storage/Storage.cpp sneeze/storage/Unit.cpp sneeze/
 set (STORAGE_HEADERS  sneeze/storage/Storage.h)
 
 set (PERSONA_SOURCES  persona/Persona.cpp)
-set (PERSONA_HEADERS  persona/Persona.h)
+set (PERSONA_HEADERS)
 
 set (RENDERER_SOURCES  viewport/renderer/AnariRenderer.cpp  viewport/renderer/UVSphere.cpp)
 set (RENDERER_HEADERS  viewport/renderer/Renderer.h  viewport/renderer/AnariRenderer.h  viewport/renderer/UVSphere.h)
@@ -605,7 +604,10 @@ set (MSF_HEADERS
 set (STB_SOURCES  deps/stb/stb_image_impl.cpp)
 set (STB_HEADERS  deps/stb/stb_image.h)
 
-set (INCLUDE_HEADERS  ../include/Sneeze.h)
+set (INCLUDE_HEADERS
+   ../include/Sneeze.h
+   ../include/Persona.h
+   ../include/Network.h)
 
 # ---------------------------------------------------------------------------
 # Static library

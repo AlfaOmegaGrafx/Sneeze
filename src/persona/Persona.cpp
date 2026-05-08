@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include <Sneeze.h>
-#include "Persona.h"
 #include <openssl/sha.h>
 #include <cstring>
 

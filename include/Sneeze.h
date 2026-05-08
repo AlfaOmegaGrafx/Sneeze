@@ -18,7 +18,8 @@
 #include <vector>
 #include <string>
 
-#include "persona/persona.h"
+#include "Persona.h"
+#include "Network.h"
 
 // ---------------------------------------------------------------------------
 

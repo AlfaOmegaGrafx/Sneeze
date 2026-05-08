@@ -16,9 +16,8 @@
 #include "Types.h"
 #include "worker/Worker.h"
 #include "astro/RMCObject.h"
-#include "network/Network.h"
 #include "storage/Storage.h"
-#include "persona/Persona.h"
+#include <Persona.h>
 #include "viewport/Viewport.h"
 #include "wasm/WasmRuntime.h"
 #include "spirv/SpvPipeline.h"
