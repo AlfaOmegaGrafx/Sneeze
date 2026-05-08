@@ -12,11 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <Sneeze.h>
 #include "Events.h"
 #include "Node.h"
 #include <algorithm>
 
-using NODE = SNEEZE::VIEWPORT::SCENE::FABRIC::NODE;
+using namespace SNEEZE;
+
+using NODE = VIEWPORT::SCENE::FABRIC::NODE;
 
 EVENT_SYSTEM::EVENT_SYSTEM ()
    : m_twNextWatchId (1)

@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <Sneeze.h>
 #include "Worker.h"
 
-using WORKER = SNEEZE::WORKER;
+using namespace SNEEZE;
 
-WORKER::C::C (SNEEZE* pSneeze)
-   : WORKER (pSneeze)
+WORKER::C::C (ENGINE* pEngine)
+   : WORKER (pEngine)
 {
 }
 

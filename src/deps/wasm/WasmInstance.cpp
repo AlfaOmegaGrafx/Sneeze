@@ -17,10 +17,10 @@
 #include "WasmStore.h"
 #include <cstdio>
 
-namespace DEP {
+using namespace SNEEZE::DEP;
 
-WASM_INSTANCE::WASM_INSTANCE (SNEEZE* pSneeze, WASM_STORE* pStore, const std::string& sUrl, const std::string& sSha256)
-   : m_pSneeze (pSneeze)
+WASM_INSTANCE::WASM_INSTANCE (ENGINE* pEngine, WASM_STORE* pStore, const std::string& sUrl, const std::string& sSha256)
+   : m_pEngine (pEngine)
    , m_pStore (pStore)
    , m_sUrl (sUrl)
    , m_sSha256 (sSha256)
@@ -54,7 +54,7 @@ bool WASM_INSTANCE::Compile (wasm_engine_t* pEngine, const uint8_t* pBytes, size
    {
       wasm_message_t msg;
       wasmtime_error_message (pError, &msg);
-      m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Error, "WASM_INSTANCE",
+      m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Error, "WASM_INSTANCE",
          "Compile failed [" + m_sUrl + "]: " + std::string (msg.data, msg.size));
       wasm_byte_vec_delete (&msg);
       wasmtime_error_delete (pError);
@@ -63,7 +63,7 @@ bool WASM_INSTANCE::Compile (wasm_engine_t* pEngine, const uint8_t* pBytes, size
 
    char sSizeBuf[32];
    std::snprintf (sSizeBuf, sizeof (sSizeBuf), "%.1f", static_cast<double> (nSize) / 1024.0);
-   m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Info, "WASM_INSTANCE",
+   m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "WASM_INSTANCE",
       "Compiled module [" + m_sUrl + "] (" + sSizeBuf + " KB)");
    return true;
 }
@@ -103,14 +103,14 @@ int WASM_INSTANCE::ReleaseRef ()
 bool WASM_INSTANCE::CallInit ()
 {
    m_bState = INSTANCE_STATE_ACTIVE;
-   m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Trace, "WASM_INSTANCE",
+   m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Trace, "WASM_INSTANCE",
       "Init [" + m_sUrl + "]");
    return true;
 }
 
 bool WASM_INSTANCE::CallOpen (uint32_t twFabricId, const uint8_t* pParams, size_t nParamsSize)
 {
-   m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Trace, "WASM_INSTANCE",
+   m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Trace, "WASM_INSTANCE",
       "Open [" + m_sUrl + "] fabric=" + std::to_string (twFabricId) +
       " params=" + std::to_string (nParamsSize) + " bytes");
    return true;
@@ -118,7 +118,7 @@ bool WASM_INSTANCE::CallOpen (uint32_t twFabricId, const uint8_t* pParams, size_
 
 bool WASM_INSTANCE::CallClose (uint32_t twFabricId)
 {
-   m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Trace, "WASM_INSTANCE",
+   m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Trace, "WASM_INSTANCE",
       "Close [" + m_sUrl + "] fabric=" + std::to_string (twFabricId));
    return true;
 }
@@ -126,9 +126,7 @@ bool WASM_INSTANCE::CallClose (uint32_t twFabricId)
 bool WASM_INSTANCE::CallShutdown ()
 {
    m_bState = INSTANCE_STATE_DORMANT;
-   m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Trace, "WASM_INSTANCE",
+   m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Trace, "WASM_INSTANCE",
       "Shutdown [" + m_sUrl + "]");
    return true;
 }
-
-} // namespace DEP

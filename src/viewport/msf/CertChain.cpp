@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <Sneeze.h>
 #include "Msf.h"
 
 #include <openssl/bio.h>
@@ -35,8 +36,10 @@
 #include <sstream>
 #include <vector>
 
-using CHAIN   = SNEEZE::VIEWPORT::MSF::CHAIN;
-using MSF_CERT = SNEEZE::VIEWPORT::MSF::CERT;
+using namespace SNEEZE;
+
+using CHAIN    = VIEWPORT::MSF::CHAIN;
+using MSF_CERT = VIEWPORT::MSF::CERT;
 
 struct CHAIN::IMPL
 {

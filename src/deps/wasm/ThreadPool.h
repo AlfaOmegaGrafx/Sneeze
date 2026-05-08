@@ -23,43 +23,43 @@
 #include <functional>
 #include <atomic>
 
-class SNEEZE;
-
-namespace DEP {
-
-// ---------------------------------------------------------------------------
-// THREAD_POOL — fixed-size pool for dispatching WASM store work items.
-//
-// Stores are not bound to specific threads. Work items (function calls into
-// WASM instances) are queued and executed by the next available worker.
-// The pool size defaults to hardware_concurrency - 2 (reserving threads for
-// the compositor and engine thread).
-// ---------------------------------------------------------------------------
-
-class THREAD_POOL
+namespace SNEEZE
 {
-public:
-   explicit THREAD_POOL (SNEEZE* pSneeze);
-   ~THREAD_POOL ();
+   namespace DEP 
+   {
+      // ---------------------------------------------------------------------------
+      // THREAD_POOL — fixed-size pool for dispatching WASM store work items.
+      //
+      // Stores are not bound to specific threads. Work items (function calls into
+      // WASM instances) are queued and executed by the next available worker.
+      // The pool size defaults to hardware_concurrency - 2 (reserving threads for
+      // the compositor and engine thread).
+      // ---------------------------------------------------------------------------
 
-   bool Initialize (int nThreads = 0);
-   void Shutdown ();
+      class THREAD_POOL
+      {
+      public:
+         explicit THREAD_POOL (ENGINE* pEngine);
+         ~THREAD_POOL ();
 
-   void Submit (std::function<void ()> pfnWork);
-   int  GetThreadCount () const { return static_cast<int> (m_aThreads.size ()); }
-   int  GetPendingCount () const;
+         bool Initialize (int nThreads = 0);
+         void Shutdown ();
 
-private:
-   void WorkerLoop ();
+         void Submit (std::function<void ()> pfnWork);
+         int  GetThreadCount () const { return static_cast<int> (m_aThreads.size ()); }
+         int  GetPendingCount () const;
 
-   SNEEZE*                       m_pSneeze;
-   std::vector<std::thread>            m_aThreads;
-   std::queue<std::function<void ()>>  m_aQueue;
-   mutable std::mutex                  m_mutex;
-   std::condition_variable             m_condVar;
-   std::atomic<bool>                   m_bShutdown;
-};
+      private:
+         void WorkerLoop ();
 
-} // namespace DEP
+         ENGINE*                             m_pEngine;
+         std::vector<std::thread>            m_aThreads;
+         std::queue<std::function<void ()>>  m_aQueue;
+         mutable std::mutex                  m_mutex;
+         std::condition_variable             m_condVar;
+         std::atomic<bool>                   m_bShutdown;
+      };
+   } // namespace DEP
+}
 
 #endif // SNEEZE_WASM_THREADPOOL_H

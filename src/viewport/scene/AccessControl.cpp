@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <Sneeze.h>
 #include "AccessControl.h"
 #include "Node.h"
 #include "Fabric.h"
 
-using NODE   = SNEEZE::VIEWPORT::SCENE::FABRIC::NODE;
-using FABRIC = SNEEZE::VIEWPORT::SCENE::FABRIC;
+using namespace SNEEZE;
+
+using NODE   = VIEWPORT::SCENE::FABRIC::NODE;
+using FABRIC = VIEWPORT::SCENE::FABRIC;
 
 // ---------------------------------------------------------------------------
 // CanRead -- determines if pRequestingOwner may read this node's data.

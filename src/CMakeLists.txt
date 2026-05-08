@@ -501,7 +501,7 @@ endif ()
 # ---------------------------------------------------------------------------
 
 set (CORE_SOURCES
-   sneeze/Sneeze.cpp
+   sneeze/Engine.cpp
    sneeze/worker/Worker.cpp
    sneeze/worker/Compositor.cpp
    sneeze/worker/WorkerB.cpp
@@ -540,7 +540,6 @@ set (SOM_SOURCES
    viewport/scene/Events.cpp
    viewport/scene/SpatialIndex.cpp)
 set (SOM_HEADERS
-   viewport/Viewport.h
    viewport/scene/Node.h
    viewport/scene/Fabric.h
    viewport/scene/Scene.h
@@ -555,7 +554,7 @@ set (NETWORK_SOURCES
    sneeze/network/Network.cpp)
 set (NETWORK_HEADERS)
 
-set (CONTAINER_HEADERS  viewport/container/Container.h)
+set (CONTAINER_HEADERS)
 
 set (STORAGE_SOURCES  sneeze/storage/Storage.cpp sneeze/storage/Unit.cpp sneeze/storage/Asset.cpp)
 set (STORAGE_HEADERS  sneeze/storage/Storage.h)
@@ -607,7 +606,9 @@ set (STB_HEADERS  deps/stb/stb_image.h)
 set (INCLUDE_HEADERS
    ../include/Sneeze.h
    ../include/Persona.h
-   ../include/Network.h)
+   ../include/Network.h
+   ../include/Container.h
+   ../include/Viewport.h)
 
 # ---------------------------------------------------------------------------
 # Static library

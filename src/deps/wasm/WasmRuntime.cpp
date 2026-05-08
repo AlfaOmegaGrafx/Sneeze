@@ -16,11 +16,11 @@
 #include "WasmRuntime.h"
 #include <cstdio>
 
-namespace DEP {
+using namespace SNEEZE::DEP;
 
-WASM_RUNTIME::WASM_RUNTIME ()
-   : m_pSneeze (nullptr)
-   , m_pEngine (nullptr)
+WASM_RUNTIME::WASM_RUNTIME () : 
+   m_pEngine (nullptr), 
+   m_pWsam_Engine (nullptr)
 {
 }
 
@@ -29,20 +29,19 @@ WASM_RUNTIME::~WASM_RUNTIME ()
    Shutdown ();
 }
 
-bool WASM_RUNTIME::Initialize (SNEEZE* pSneeze)
+bool WASM_RUNTIME::Initialize (SNEEZE::ENGINE* pEngine)
 {
-   m_pSneeze = pSneeze;
+   m_pEngine = pEngine;
 
-   m_pEngine = wasm_engine_new ();
-   if (!m_pEngine)
+   m_pWsam_Engine = wasm_engine_new ();
+   if (!m_pWsam_Engine)
    {
-      m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Error, "WASM_RUNTIME",
-         "Failed to create Wasmtime engine");
+      m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Error, "WASM_RUNTIME", "Failed to create Wasmtime engine");
       return false;
    }
 
-   m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Info, "WASM_RUNTIME",
-      "Wasmtime " + std::string (WASMTIME_VERSION) + " initialized");
+   m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "WASM_RUNTIME", "Wasmtime " + std::string (WASMTIME_VERSION) + " initialized");
+
    return true;
 }
 
@@ -50,10 +49,10 @@ void WASM_RUNTIME::Shutdown ()
 {
    DestroyAllStores ();
 
-   if (m_pEngine)
+   if (m_pWsam_Engine)
    {
-      wasm_engine_delete (m_pEngine);
-      m_pEngine = nullptr;
+      wasm_engine_delete (m_pWsam_Engine);
+      m_pWsam_Engine = nullptr;
    }
 }
 
@@ -71,11 +70,11 @@ WASM_STORE* WASM_RUNTIME::FindOrCreateStore (const STORE_IDENTITY& pIdentity)
    if (it != m_mapStores.end ())
       return it->second.get ();
 
-   auto pStore = std::make_unique<WASM_STORE> (m_pSneeze, m_pEngine, pIdentity);
+   auto pStore = std::make_unique<WASM_STORE> (m_pEngine, m_pWsam_Engine, pIdentity);
    WASM_STORE* pRaw = pStore.get ();
    m_mapStores[sKey] = std::move (pStore);
 
-   m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Info, "WASM_RUNTIME",
+   m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "WASM_RUNTIME",
       "Created store [" + pIdentity.sFingerprint + "|" + pIdentity.sContainer + "]");
 
    return pRaw;
@@ -106,5 +105,3 @@ void WASM_RUNTIME::DestroyAllStores ()
    std::lock_guard<std::mutex> guard (m_storesMutex);
    m_mapStores.clear ();
 }
-
-} // namespace DEP

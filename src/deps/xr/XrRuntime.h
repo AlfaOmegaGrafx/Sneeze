@@ -16,32 +16,30 @@
 #define SNEEZE_XR_RUNTIME_H
 
 #include <openxr/openxr.h>
-#include <string>
 
-class SNEEZE;
-
-namespace DEP
+namespace SNEEZE
 {
+   namespace DEP
+   {
+      class XR_RUNTIME
+      {
+      public:
+         XR_RUNTIME ();
+         ~XR_RUNTIME ();
 
-class XR_RUNTIME
-{
-public:
-   XR_RUNTIME ();
-   ~XR_RUNTIME ();
+         bool Initialize (ENGINE* pEngine);
+         void Shutdown ();
 
-   bool Initialize (SNEEZE* pSneeze);
-   void Shutdown ();
+         bool        HasRuntime () const;
+         std::string GetRuntimeName () const;
 
-   bool        HasRuntime () const;
-   std::string GetRuntimeName () const;
-
-private:
-   SNEEZE* m_pSneeze;
-   XrInstance  hInstance;
-   bool        bHasRuntime;
-   std::string sRuntimeName;
-};
-
-} // namespace DEP
+      private:
+         ENGINE* m_pEngine;
+         XrInstance  hInstance;
+         bool        bHasRuntime;
+         std::string sRuntimeName;
+      };
+   } // namespace DEP
+}
 
 #endif // SNEEZE_XR_RUNTIME_H

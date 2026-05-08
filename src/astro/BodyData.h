@@ -15,14 +15,12 @@
 #ifndef SNEEZE_ASTRO_BODYDATA_H
 #define SNEEZE_ASTRO_BODYDATA_H
 
-#include <vector>
-
-namespace astro {
-
-class RMCOBJECT;
-
-void CreateSolarSystem ();
-
-} // namespace astro
+namespace SNEEZE
+{
+   namespace astro
+   {
+      void CreateSolarSystem ();
+   } // namespace astro
+}
 
 #endif // SNEEZE_ASTRO_BODYDATA_H

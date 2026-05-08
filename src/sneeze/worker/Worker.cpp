@@ -12,11 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <Sneeze.h>
 #include "Worker.h"
 #include <cstdio>
 
-SNEEZE::WORKER::WORKER (SNEEZE* pSneeze)
-   : m_pSneeze (pSneeze)
+using namespace SNEEZE;
+
+WORKER::WORKER (ENGINE* pEngine)
+   : m_pEngine (pEngine)
    , m_pThread (nullptr)
    , m_bShutdown (false)
    , m_bReady (false)
@@ -26,19 +29,19 @@ SNEEZE::WORKER::WORKER (SNEEZE* pSneeze)
 {
 }
 
-void SNEEZE::WORKER::SetWorkerIndex (int nIndex)
+void WORKER::SetWorkerIndex (int nIndex)
 {
    m_nWorkerIndex = nIndex;
 }
 
-SNEEZE::WORKER::~WORKER ()
+WORKER::~WORKER ()
 {
    Shutdown ();
 }
 
-bool SNEEZE::WORKER::Initialize ()
+bool WORKER::Initialize ()
 {
-   m_pThread = new std::thread (&SNEEZE::WORKER::ThreadLoop, this);
+   m_pThread = new std::thread (&WORKER::ThreadLoop, this);
 
    std::unique_lock<std::mutex> lock (m_mutex);
    m_condVar.wait (lock, [this] { return m_bReady; });
@@ -46,7 +49,7 @@ bool SNEEZE::WORKER::Initialize ()
    return true;
 }
 
-void SNEEZE::WORKER::Shutdown ()
+void WORKER::Shutdown ()
 {
    if (m_pThread)
    {
@@ -62,22 +65,22 @@ void SNEEZE::WORKER::Shutdown ()
    }
 }
 
-void SNEEZE::WORKER::Signal ()
+void WORKER::Signal ()
 {
    CtlBreak_Thread ();
 }
 
-void SNEEZE::WORKER::ThreadLoop ()
+void WORKER::ThreadLoop ()
 {
    m_tpOrigin = std::chrono::steady_clock::now ();
 
    SignalReady ();
 
    std::unique_lock<std::mutex> mlock (m_mutex);
-   m_condVar.wait (mlock, std::bind (&SNEEZE::WORKER::Control, this));
+   m_condVar.wait (mlock, std::bind (&WORKER::Control, this));
 }
 
-void SNEEZE::WORKER::SignalReady ()
+void WORKER::SignalReady ()
 {
    {
       std::lock_guard<std::mutex> guard (m_mutex);
@@ -86,12 +89,12 @@ void SNEEZE::WORKER::SignalReady ()
    m_condVar.notify_all ();
 }
 
-bool SNEEZE::WORKER::IsShutdown () const
+bool WORKER::IsShutdown () const
 {
    return m_bShutdown;
 }
 
-bool SNEEZE::WORKER::Control ()
+bool WORKER::Control ()
 {
    if (m_bShutdown == false)
    {
@@ -114,7 +117,7 @@ bool SNEEZE::WORKER::Control ()
    return m_bShutdown;
 }
 
-void SNEEZE::WORKER::CtlBreak_Thread ()
+void WORKER::CtlBreak_Thread ()
 {
    std::lock_guard<std::mutex> guard (m_mutex);
    m_condVar.notify_all ();

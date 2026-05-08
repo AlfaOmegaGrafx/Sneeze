@@ -22,42 +22,42 @@
 #include <mutex>
 #include <string>
 
-class SNEEZE;
-
-namespace DEP {
-
-// ---------------------------------------------------------------------------
-// WASM_RUNTIME — top-level manager of the Wasmtime engine and all stores.
-//
-// Owns the shared wasm_engine_t. Provides store creation and lookup by
-// identity tuple (persona + fingerprint + container).
-// ---------------------------------------------------------------------------
-
-class WASM_RUNTIME
+namespace SNEEZE
 {
-public:
-   WASM_RUNTIME ();
-   ~WASM_RUNTIME ();
+   namespace DEP
+   {
+      // ---------------------------------------------------------------------------
+      // WASM_RUNTIME — top-level manager of the Wasmtime engine and all stores.
+      //
+      // Owns the shared wasm_engine_t. Provides store creation and lookup by
+      // identity tuple (persona + fingerprint + container).
+      // ---------------------------------------------------------------------------
 
-   bool Initialize (SNEEZE* pSneeze);
-   void Shutdown ();
+      class WASM_RUNTIME
+      {
+      public:
+         WASM_RUNTIME ();
+         ~WASM_RUNTIME ();
 
-   wasm_engine_t* GetEngine () const { return m_pEngine; }
+         bool Initialize (SNEEZE::ENGINE* pEngine);
+         void Shutdown ();
 
-   // --- Store management ---
+         wasm_engine_t* GetEngine () const { return m_pWsam_Engine; }
 
-   WASM_STORE* FindOrCreateStore (const STORE_IDENTITY& pIdentity);
-   WASM_STORE* FindStore (const STORE_IDENTITY& pIdentity) const;
-   void        DestroyStore (const STORE_IDENTITY& pIdentity);
-   void        DestroyAllStores ();
+         // --- Store management ---
 
-private:
-   SNEEZE*  m_pSneeze;
-   wasm_engine_t* m_pEngine;
-   std::unordered_map<std::string, std::unique_ptr<WASM_STORE>> m_mapStores;
-   mutable std::mutex m_storesMutex;
-};
+         WASM_STORE* FindOrCreateStore (const STORE_IDENTITY& pIdentity);
+         WASM_STORE* FindStore (const STORE_IDENTITY& pIdentity) const;
+         void        DestroyStore (const STORE_IDENTITY& pIdentity);
+         void        DestroyAllStores ();
 
-} // namespace DEP
+      private:
+         ENGINE*           m_pEngine;
+         wasm_engine_t*    m_pWsam_Engine;
+         std::unordered_map<std::string, std::unique_ptr<WASM_STORE>> m_mapStores;
+         mutable std::mutex m_storesMutex;
+      };
+   } // namespace DEP
+}
 
 #endif // SNEEZE_WASM_RUNTIME_H

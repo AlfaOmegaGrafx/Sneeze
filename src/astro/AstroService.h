@@ -18,54 +18,52 @@
 #include "scene/Fabric.h"
 #include "scene/Node.h"
 #include "scene/MapObject.h"
-#include <vector>
 
-class SNEEZE;
-
-namespace astro {
-
-class RMCOBJECT;
-class ORBIT;
-
-// ---------------------------------------------------------------------------
-// CELESTIAL_MAP_OBJECT — a MAP_OBJECT_CELESTIAL that also references the
-// source RMCOBJECT for orbit computation. This is the bridge between the
-// disposable astro proof-of-concept and the SOM.
-// ---------------------------------------------------------------------------
-
-class CELESTIAL_MAP_OBJECT : public MAP_OBJECT_CELESTIAL
+namespace SNEEZE
 {
-public:
-   CELESTIAL_MAP_OBJECT ();
+   namespace astro 
+   {
+      class RMCOBJECT;
+      class ORBIT;
 
-   RMCOBJECT*    m_pBody;
-   ORBIT*        m_pOrbit;
-};
+      // ---------------------------------------------------------------------------
+      // CELESTIAL_MAP_OBJECT — a MAP_OBJECT_CELESTIAL that also references the
+      // source RMCOBJECT for orbit computation. This is the bridge between the
+      // disposable astro proof-of-concept and the SOM.
+      // ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// ASTRO_SERVICE — populates the primary fabric with celestial body nodes.
-//
-// Creates one SOM::NODE + CELESTIAL_MAP_OBJECT per renderable orbit body.
-// Ownership of all nodes and map objects is retained here and destroyed
-// on shutdown.
-// ---------------------------------------------------------------------------
+      class CELESTIAL_MAP_OBJECT : public MAP_OBJECT_CELESTIAL
+      {
+      public:
+         CELESTIAL_MAP_OBJECT ();
 
-class ASTRO_SERVICE
-{
-public:
-   explicit ASTRO_SERVICE (SNEEZE* pSneeze);
-   ~ASTRO_SERVICE ();
+         RMCOBJECT*    m_pBody;
+         ORBIT*        m_pOrbit;
+      };
 
-   bool Initialize (SNEEZE::VIEWPORT::SCENE::FABRIC* pPrimaryFabric);
-   void Shutdown ();
+      // ---------------------------------------------------------------------------
+      // ASTRO_SERVICE — populates the primary fabric with celestial body nodes.
+      //
+      // Creates one SOM::NODE + CELESTIAL_MAP_OBJECT per renderable orbit body.
+      // Ownership of all nodes and map objects is retained here and destroyed
+      // on shutdown.
+      // ---------------------------------------------------------------------------
 
-private:
-   SNEEZE*                                          m_pSneeze;
-   SNEEZE::VIEWPORT::SCENE::FABRIC*                 m_pFabric;
-   std::vector<SNEEZE::VIEWPORT::SCENE::FABRIC::NODE*> m_apNodes;
-   std::vector<CELESTIAL_MAP_OBJECT*>      m_apMapObjects;
-};
+      class ASTRO_SERVICE
+      {
+      public:
+         explicit ASTRO_SERVICE (ENGINE* pEngine);
+         ~ASTRO_SERVICE ();
 
-} // namespace astro
+         bool Initialize (VIEWPORT::SCENE::FABRIC* pPrimaryFabric);
+         void Shutdown ();
 
+      private:
+         ENGINE*                                      m_pEngine;
+         VIEWPORT::SCENE::FABRIC*                     m_pFabric;
+         std::vector<VIEWPORT::SCENE::FABRIC::NODE*>  m_apNodes;
+         std::vector<CELESTIAL_MAP_OBJECT*>           m_apMapObjects;
+      };
+   } // namespace astro
+}
 #endif // SNEEZE_ASTRO_ASTROSERVICE_H

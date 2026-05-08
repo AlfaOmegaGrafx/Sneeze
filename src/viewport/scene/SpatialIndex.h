@@ -16,91 +16,92 @@
 #define SNEEZE_SOM_SPATIALINDEX_H
 
 #include "scene/Fabric.h"
-#include <vector>
 #include <cstdint>
 
-// ---------------------------------------------------------------------------
-// AABB — axis-aligned bounding box
-// ---------------------------------------------------------------------------
-
-struct AABB
+namespace SNEEZE
 {
-   double dMinX, dMinY, dMinZ;
-   double dMaxX, dMaxY, dMaxZ;
+   // ---------------------------------------------------------------------------
+   // AABB — axis-aligned bounding box
+   // ---------------------------------------------------------------------------
 
-   bool Contains (double x, double y, double z) const;
-   bool Intersects (const AABB& other) const;
-   void Expand (const AABB& other);
-   void Expand (double x, double y, double z, double dRadius);
-};
+   struct AABB
+   {
+      double dMinX, dMinY, dMinZ;
+      double dMaxX, dMaxY, dMaxZ;
 
-// ---------------------------------------------------------------------------
-// FRUSTUM — six-plane view frustum for culling
-// ---------------------------------------------------------------------------
+      bool Contains (double x, double y, double z) const;
+      bool Intersects (const AABB& other) const;
+      void Expand (const AABB& other);
+      void Expand (double x, double y, double z, double dRadius);
+   };
 
-struct FRUSTUM_PLANE
-{
-   double dA, dB, dC, dD;
-};
+   // ---------------------------------------------------------------------------
+   // FRUSTUM — six-plane view frustum for culling
+   // ---------------------------------------------------------------------------
 
-struct FRUSTUM
-{
-   FRUSTUM_PLANE aPlanes[6];
+   struct FRUSTUM_PLANE
+   {
+      double dA, dB, dC, dD;
+   };
 
-   bool TestSphere (double x, double y, double z, double dRadius) const;
-   bool TestAABB (const AABB& pBox) const;
-};
+   struct FRUSTUM
+   {
+      FRUSTUM_PLANE aPlanes[6];
 
-// ---------------------------------------------------------------------------
-// BVH_NODE — internal node of the bounding volume hierarchy
-// ---------------------------------------------------------------------------
+      bool TestSphere (double x, double y, double z, double dRadius) const;
+      bool TestAABB (const AABB& pBox) const;
+   };
 
-struct BVH_NODE
-{
-   AABB     pBounds;
-   int      nLeft;
-   int      nRight;
-   int      nLeafIndex;
+   // ---------------------------------------------------------------------------
+   // BVH_NODE — internal node of the bounding volume hierarchy
+   // ---------------------------------------------------------------------------
 
-   bool IsLeaf () const { return nLeafIndex >= 0; }
-};
+   struct BVH_NODE
+   {
+      AABB     pBounds;
+      int      nLeft;
+      int      nRight;
+      int      nLeafIndex;
 
-// ---------------------------------------------------------------------------
-// SPATIAL_INDEX — bounding volume hierarchy built from SOM nodes.
-//
-// Rebuilt periodically (or on demand) from the current SOM state. Supports
-// frustum culling (return all visible nodes) and proximity queries (return
-// all nodes within a sphere).
-// ---------------------------------------------------------------------------
+      bool IsLeaf () const { return nLeafIndex >= 0; }
+   };
 
-class SPATIAL_INDEX
-{
-public:
-   SPATIAL_INDEX ();
-   ~SPATIAL_INDEX ();
+   // ---------------------------------------------------------------------------
+   // SPATIAL_INDEX — bounding volume hierarchy built from SOM nodes.
+   //
+   // Rebuilt periodically (or on demand) from the current SOM state. Supports
+   // frustum culling (return all visible nodes) and proximity queries (return
+   // all nodes within a sphere).
+   // ---------------------------------------------------------------------------
 
-   // --- Build/rebuild from a flat list of nodes ---
+   class SPATIAL_INDEX
+   {
+   public:
+      SPATIAL_INDEX ();
+      ~SPATIAL_INDEX ();
 
-   void Build (const std::vector<SNEEZE::VIEWPORT::SCENE::FABRIC::NODE*>& apNodes);
-   void Clear ();
+      // --- Build/rebuild from a flat list of nodes ---
 
-   // --- Queries ---
+      void Build (const std::vector<VIEWPORT::SCENE::FABRIC::NODE*>& apNodes);
+      void Clear ();
 
-   void QueryFrustum (const FRUSTUM& pFrustum, std::vector<SNEEZE::VIEWPORT::SCENE::FABRIC::NODE*>& aResults) const;
-   void QuerySphere (double x, double y, double z, double dRadius, std::vector<SNEEZE::VIEWPORT::SCENE::FABRIC::NODE*>& aResults) const;
+      // --- Queries ---
 
-   int  GetNodeCount () const { return static_cast<int> (m_apLeaves.size ()); }
+      void QueryFrustum (const FRUSTUM& pFrustum, std::vector<VIEWPORT::SCENE::FABRIC::NODE*>& aResults) const;
+      void QuerySphere (double x, double y, double z, double dRadius, std::vector<VIEWPORT::SCENE::FABRIC::NODE*>& aResults) const;
 
-private:
-   int  BuildRecursive (std::vector<int>& aIndices, int nStart, int nEnd);
-   AABB ComputeBounds (const std::vector<int>& aIndices, int nStart, int nEnd) const;
-   void QueryFrustumRecursive (int nBvhIndex, const FRUSTUM& pFrustum, std::vector<SNEEZE::VIEWPORT::SCENE::FABRIC::NODE*>& aResults) const;
-   void QuerySphereRecursive (int nBvhIndex, double x, double y, double z, double dRadius, std::vector<SNEEZE::VIEWPORT::SCENE::FABRIC::NODE*>& aResults) const;
+      int  GetNodeCount () const { return static_cast<int> (m_apLeaves.size ()); }
 
-   std::vector<BVH_NODE>  m_aBvhNodes;
-   std::vector<SNEEZE::VIEWPORT::SCENE::FABRIC::NODE*>     m_apLeaves;
-   std::vector<AABB>      m_aLeafBounds;
-   int                    m_nRootIndex;
-};
+   private:
+      int  BuildRecursive (std::vector<int>& aIndices, int nStart, int nEnd);
+      AABB ComputeBounds (const std::vector<int>& aIndices, int nStart, int nEnd) const;
+      void QueryFrustumRecursive (int nBvhIndex, const FRUSTUM& pFrustum, std::vector<VIEWPORT::SCENE::FABRIC::NODE*>& aResults) const;
+      void QuerySphereRecursive (int nBvhIndex, double x, double y, double z, double dRadius, std::vector<VIEWPORT::SCENE::FABRIC::NODE*>& aResults) const;
 
+      std::vector<BVH_NODE>  m_aBvhNodes;
+      std::vector<VIEWPORT::SCENE::FABRIC::NODE*>     m_apLeaves;
+      std::vector<AABB>      m_aLeafBounds;
+      int                    m_nRootIndex;
+   };
+}
 #endif // SNEEZE_SOM_SPATIALINDEX_H

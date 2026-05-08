@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <Sneeze.h>
 #include "RMCObject.h"
 
-namespace astro {
-
+using namespace SNEEZE::astro;
 
 // Static members
 std::map<std::string, RMCOBJECT*>  RMCOBJECT::s_pRegistry;
@@ -139,5 +139,3 @@ uint32_t RMCOBJECT::GetColor () const
 {
    return pColor.nNormal;
 }
-
-} // namespace astro

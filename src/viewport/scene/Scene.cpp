@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <Sneeze.h>
 #include "scene/Scene.h"
 #include "scene/Fabric.h"
 #include "scene/Node.h"
@@ -19,10 +20,12 @@
 #include "astro/BodyData.h"
 #include "astro/RMCObject.h"
 
-using SCENE  = SNEEZE::VIEWPORT::SCENE;
-using FABRIC = SNEEZE::VIEWPORT::SCENE::FABRIC;
-using NODE   = SNEEZE::VIEWPORT::SCENE::FABRIC::NODE;
-using VIEWPORT = SNEEZE::VIEWPORT;
+using namespace SNEEZE;
+
+using SCENE    = VIEWPORT::SCENE;
+using FABRIC   = VIEWPORT::SCENE::FABRIC;
+using NODE     = VIEWPORT::SCENE::FABRIC::NODE;
+using VIEWPORT = VIEWPORT;
 
 SCENE::SCENE (VIEWPORT* pViewport) :
    m_pViewport       (pViewport),
@@ -39,7 +42,7 @@ SCENE::~SCENE ()
 
 VIEWPORT* SCENE::Viewport () const   { return m_pViewport; }
 
-SNEEZE*  SCENE::Sneeze () const         { return m_pViewport ? m_pViewport->Sneeze () : nullptr; }
+ENGINE*  SCENE::Sneeze () const         { return m_pViewport ? m_pViewport->Sneeze () : nullptr; }
 FABRIC*  SCENE::Fabric_Root () const    { return m_pFabric_Root; }
 FABRIC*  SCENE::Fabric_Primary () const { return m_pFabric_Primary; }
 
@@ -61,7 +64,7 @@ bool SCENE::Initialize (const std::string& sUrl)
    pNode_Attach->Fabric_Set_Attached (m_pFabric_Primary);
    m_pFabric_Root->Fabric_Add (m_pFabric_Primary);
 
-   Sneeze ()->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Info, "SCENE", "Initialized (root fabric + primary fabric)");
+   Sneeze ()->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "SCENE", "Initialized (root fabric + primary fabric)");
 
    return Fabric_Open_Primary (sUrl);
 }
@@ -98,7 +101,7 @@ void SCENE::Shutdown ()
 
 bool SCENE::Fabric_Open_Primary (const std::string& /*sUrl*/)
 {
-   astro::CreateSolarSystem ();
+   SNEEZE::astro::CreateSolarSystem ();
    auto& aBodies = astro::RMCOBJECT::All ();
 
    for (auto* pBody : aBodies)
@@ -106,7 +109,7 @@ bool SCENE::Fabric_Open_Primary (const std::string& /*sUrl*/)
    for (auto* pBody : aBodies)
       pBody->ConvertToOutput ();
 
-   Sneeze ()->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Info, "SCENE", "Created " + std::to_string (aBodies.size ()) + " bodies");
+   Sneeze ()->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "SCENE", "Created " + std::to_string (aBodies.size ()) + " bodies");
 
    m_pAstroService = new astro::ASTRO_SERVICE (Sneeze ());
    m_pAstroService->Initialize (m_pFabric_Primary);

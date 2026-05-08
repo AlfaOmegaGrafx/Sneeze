@@ -15,27 +15,23 @@
 #ifndef SNEEZE_UI_CONTEXT_H
 #define SNEEZE_UI_CONTEXT_H
 
-#include <string>
-
-class SNEEZE;
-
-namespace DEP
+namespace SNEEZE
 {
+   namespace DEP
+   {
+      class UI_CONTEXT
+      {
+      public:
+         UI_CONTEXT ();
+         ~UI_CONTEXT ();
 
-class UI_CONTEXT
-{
-public:
-   UI_CONTEXT ();
-   ~UI_CONTEXT ();
+         bool Initialize (ENGINE* pEngine);
+         void Shutdown ();
 
-   bool Initialize (SNEEZE* pSneeze);
-   void Shutdown ();
-
-private:
-   SNEEZE* m_pSneeze;
-   bool bInitialized;
-};
-
-} // namespace DEP
-
+      private:
+         ENGINE* m_pEngine;
+         bool bInitialized;
+      };
+   } // namespace DEP
+}
 #endif // SNEEZE_UI_CONTEXT_H

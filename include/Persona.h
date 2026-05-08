@@ -15,42 +15,40 @@
 #ifndef SNEEZE_PERSONA_PERSONA_H
 #define SNEEZE_PERSONA_PERSONA_H
 
-#include <string>
-
-class SNEEZE;
-
-namespace persona {
-
-// ---------------------------------------------------------------------------
-// PERSONA — temporary local identity proxy.
-//
-// A user "logs in" with a first name and optional second name. The combined
-// "First.Second" string is hashed (SHA-256) to produce a persona key used
-// to scope stores and storage.
-// ---------------------------------------------------------------------------
-
-class PERSONA
+namespace SNEEZE
 {
-public:
-   explicit PERSONA (SNEEZE* pSneeze);
+   namespace persona
+   {
+      // ---------------------------------------------------------------------------
+      // PERSONA — temporary local identity proxy.
+      //
+      // A user "logs in" with a first name and optional second name. The combined
+      // "First.Second" string is hashed (SHA-256) to produce a persona key used
+      // to scope stores and storage.
+      // ---------------------------------------------------------------------------
 
-   bool IsLoggedIn () const { return m_bLoggedIn; }
+      class PERSONA
+      {
+      public:
+         explicit PERSONA (SNEEZE::ENGINE* pEngine);
 
-   void Login (const std::string& sFirst, const std::string& sSecond);
-   void Logout ();
+         bool IsLoggedIn () const { return m_bLoggedIn; }
 
-   const std::string& GetName () const { return m_sName; }
-   const std::string& GetHash () const { return m_sHash; }
+         void Login (const std::string& sFirst, const std::string& sSecond);
+         void Logout ();
 
-private:
-   static std::string ComputeHash (const std::string& sInput);
+         const std::string& GetName () const { return m_sName; }
+         const std::string& GetHash () const { return m_sHash; }
 
-   SNEEZE* m_pSneeze;
-   bool        m_bLoggedIn;
-   std::string m_sName;
-   std::string m_sHash;
-};
+      private:
+         static std::string ComputeHash (const std::string& sInput);
 
-} // namespace persona
+         SNEEZE::ENGINE* m_pEngine;
+         bool        m_bLoggedIn;
+         std::string m_sName;
+         std::string m_sHash;
+      };
+   } // namespace persona
+}
 
 #endif // SNEEZE_PERSONA_PERSONA_H

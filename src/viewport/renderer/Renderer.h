@@ -15,72 +15,73 @@
 #ifndef SNEEZE_VIEWPORT_RENDERER_H
 #define SNEEZE_VIEWPORT_RENDERER_H
 
-#include "viewport/Viewport.h"
 #include "Types.h"
 #include <cstdint>
-#include <vector>
 
-struct SPHERE_DATA
+namespace SNEEZE
 {
-   float x, y, z;
-   float dRadius;
-   float r, g, b;
+   struct SPHERE_DATA
+   {
+      float x, y, z;
+      float dRadius;
+      float r, g, b;
 
-   const uint8_t* pTexturePixels  = nullptr;
-   int            nTextureWidth   = 0;
-   int            nTextureHeight  = 0;
-   bool           bEmissive       = false;
-};
+      const uint8_t* pTexturePixels  = nullptr;
+      int            nTextureWidth   = 0;
+      int            nTextureHeight  = 0;
+      bool           bEmissive       = false;
+   };
 
-struct CURVE_POINT
-{
-   float x, y, z;
-   float dRadius;
-};
+   struct CURVE_POINT
+   {
+      float x, y, z;
+      float dRadius;
+   };
 
-struct CURVE_DATA
-{
-   std::vector<CURVE_POINT> aPoints;
-   float r, g, b;
-};
+   struct CURVE_DATA
+   {
+      std::vector<CURVE_POINT> aPoints;
+      float r, g, b;
+   };
 
-struct CAMERA_DATA
-{
-   float dPosX, dPosY, dPosZ;
-   float dDirX, dDirY, dDirZ;
-   float dUpX,  dUpY,  dUpZ;
-   float dFovY;
-   float dAspect;
-   float dNear;
-   float dFar;
-};
+   struct CAMERA_DATA
+   {
+      float dPosX, dPosY, dPosZ;
+      float dDirX, dDirY, dDirZ;
+      float dUpX,  dUpY,  dUpZ;
+      float dFovY;
+      float dAspect;
+      float dNear;
+      float dFar;
+   };
 
-class SNEEZE::VIEWPORT::RENDERER
-{
-public:
-   class ANARI;
+   class VIEWPORT::RENDERER
+   {
+   public:
+      class ANARI;
 
-   virtual ~RENDERER () = default;
+      virtual ~RENDERER () = default;
 
-   virtual void SetNativeWindow (void* pHandle) { (void) pHandle; }
-   virtual bool IsRenderingToNativeSurface () const { return false; }
+      virtual void SetNativeWindow (void* pHandle) { (void) pHandle; }
+      virtual bool IsRenderingToNativeSurface () const { return false; }
 
-   virtual bool Initialize (int nWidth, int nHeight) = 0;
-   virtual void Resize (int nWidth, int nHeight) = 0;
-   virtual void Shutdown () = 0;
+      virtual bool Initialize (int nWidth, int nHeight) = 0;
+      virtual void Resize (int nWidth, int nHeight) = 0;
+      virtual void Shutdown () = 0;
 
-   virtual void SetCamera (const CAMERA_DATA& pCamera) = 0;
-   virtual void BeginFrame () = 0;
-   virtual void SubmitSpheres (const std::vector<SPHERE_DATA>& aSpheres) = 0;
-   virtual void SubmitCurves (const std::vector<CURVE_DATA>& aCurves) = 0;
-   virtual void EndFrame () = 0;
+      virtual void SetCamera (const CAMERA_DATA& pCamera) = 0;
+      virtual void BeginFrame () = 0;
+      virtual void SubmitSpheres (const std::vector<SPHERE_DATA>& aSpheres) = 0;
+      virtual void SubmitCurves (const std::vector<CURVE_DATA>& aCurves) = 0;
+      virtual void EndFrame () = 0;
 
-   virtual const uint32_t* GetFrameBuffer () const = 0;
-   virtual int GetWidth () const = 0;
-   virtual int GetHeight () const = 0;
+      virtual const uint32_t* GetFrameBuffer () const = 0;
+      virtual int GetWidth () const = 0;
+      virtual int GetHeight () const = 0;
 
-   virtual double GetLastSubmitSeconds () const { return 0.0; }
-   virtual double GetLastRenderSeconds () const { return 0.0; }
-};
+      virtual double GetLastSubmitSeconds () const { return 0.0; }
+      virtual double GetLastRenderSeconds () const { return 0.0; }
+   };
+}
 
 #endif // SNEEZE_VIEWPORT_RENDERER_H

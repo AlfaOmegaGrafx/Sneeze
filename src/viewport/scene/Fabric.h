@@ -16,75 +16,75 @@
 #define SNEEZE_VIEWPORT_FABRIC_H
 
 #include "scene/Scene.h"
-#include <vector>
-#include <string>
 
-// ---------------------------------------------------------------------------
-// SNEEZE::VIEWPORT::SCENE::FABRIC -- a spatial fabric's branch in the scene graph.
-//
-// Each fabric owns a tree of NODEs rooted at m_pNode_Root. Fabrics form their
-// own hierarchy (parent/child) mirroring the attachment relationships in the
-// SOM tree. The attaching node is the NODE in the parent fabric's tree that
-// serves as the attachment point for this fabric.
-// ---------------------------------------------------------------------------
-
-class SNEEZE::VIEWPORT::SCENE::FABRIC
+namespace SNEEZE
 {
-public:
-   class NODE;
+   // ---------------------------------------------------------------------------
+   // VIEWPORT::SCENE::FABRIC -- a spatial fabric's branch in the scene graph.
+   //
+   // Each fabric owns a tree of NODEs rooted at m_pNode_Root. Fabrics form their
+   // own hierarchy (parent/child) mirroring the attachment relationships in the
+   // SOM tree. The attaching node is the NODE in the parent fabric's tree that
+   // serves as the attachment point for this fabric.
+   // ---------------------------------------------------------------------------
 
-   explicit FABRIC (SCENE* pScene);
-   ~FABRIC ();
+   class VIEWPORT::SCENE::FABRIC
+   {
+   public:
+      class NODE;
 
-   // --- Scene (owner -- immutable after construction) ---
+      explicit FABRIC (SCENE* pScene);
+      ~FABRIC ();
 
-   SCENE*  Scene () const;
+      // --- Scene (owner -- immutable after construction) ---
 
-   // --- Fabric hierarchy ---
+      SCENE*  Scene () const;
 
-   FABRIC* Fabric_Parent () const;
-   void    Fabric_Set_Parent (FABRIC* pParent);
+      // --- Fabric hierarchy ---
 
-   void    Fabric_Add (FABRIC* pChild);
-   void    Fabric_Remove (FABRIC* pChild);
-   const std::vector<FABRIC*>& Fabric_Children () const;
+      FABRIC* Fabric_Parent () const;
+      void    Fabric_Set_Parent (FABRIC* pParent);
 
-   // --- Root node (the single root of this fabric's node tree) ---
+      void    Fabric_Add (FABRIC* pChild);
+      void    Fabric_Remove (FABRIC* pChild);
+      const std::vector<FABRIC*>& Fabric_Children () const;
 
-   NODE*   Node_Root () const;
-   void    Node_Set_Root (NODE* pNode);
+      // --- Root node (the single root of this fabric's node tree) ---
 
-   // --- Attaching node (the node in the parent fabric where this hangs) ---
+      NODE*   Node_Root () const;
+      void    Node_Set_Root (NODE* pNode);
 
-   NODE*   Node_Attaching () const;
-   void    Node_Set_Attaching (NODE* pNode);
+      // --- Attaching node (the node in the parent fabric where this hangs) ---
 
-   // --- Owning store (opaque for now; will be WASM::STORE*) ---
+      NODE*   Node_Attaching () const;
+      void    Node_Set_Attaching (NODE* pNode);
 
-   void*   Owner () const;
-   void    Owner_Set (void* pOwner);
+      // --- Owning store (opaque for now; will be WASM::STORE*) ---
 
-   // --- Flags ---
+      void*   Owner () const;
+      void    Owner_Set (void* pOwner);
 
-   bool    IsPrivate () const;
-   void    SetPrivate (bool bPrivate);
+      // --- Flags ---
 
-   // --- Identity ---
+      bool    IsPrivate () const;
+      void    SetPrivate (bool bPrivate);
 
-   const std::string& Url () const;
-   void  Url_Set (const std::string& sUrl);
+      // --- Identity ---
 
-private:
-   FABRIC*               m_pFabric_Parent;
-   std::vector<FABRIC*>  m_apFabric;
+      const std::string& Url () const;
+      void  Url_Set (const std::string& sUrl);
 
-   NODE*                 m_pNode_Root;
-   NODE*                 m_pNode_Attaching;
-   SCENE*                m_pScene;
-   void*                 m_pOwner;
+   private:
+      FABRIC*               m_pFabric_Parent;
+      std::vector<FABRIC*>  m_apFabric;
 
-   bool                  m_bPrivate;
-   std::string           m_sUrl;
-};
+      NODE*                 m_pNode_Root;
+      NODE*                 m_pNode_Attaching;
+      SCENE*                m_pScene;
+      void*                 m_pOwner;
 
+      bool                  m_bPrivate;
+      std::string           m_sUrl;
+   };
+}
 #endif // SNEEZE_VIEWPORT_FABRIC_H

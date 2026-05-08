@@ -17,117 +17,118 @@
 
 #include "scene/Fabric.h"
 #include "scene/MapObject.h"
-#include <Sneeze.h>
+
 #include <atomic>
 #include <mutex>
-#include <vector>
 #include <unordered_map>
 #include <cstdint>
 
-class MAP_OBJECT;
-
-// ---------------------------------------------------------------------------
-// CAS Multi-Writer Seqlock
-//
-// Protects MAP_OBJECT references on NODEs from concurrent read/write.
-// ---------------------------------------------------------------------------
-
-class SEQLOCK
+namespace SNEEZE
 {
-public:
-   SEQLOCK ();
+   class MAP_OBJECT;
 
-   uint32_t BeginRead () const;
-   bool     EndRead (uint32_t nSeq) const;
-   void     BeginWrite ();
-   void     EndWrite ();
+   // ---------------------------------------------------------------------------
+   // CAS Multi-Writer Seqlock
+   //
+   // Protects MAP_OBJECT references on NODEs from concurrent read/write.
+   // ---------------------------------------------------------------------------
 
-private:
-   std::atomic<uint32_t> m_nSequence;
-};
+   class SEQLOCK
+   {
+   public:
+      SEQLOCK ();
 
-// ---------------------------------------------------------------------------
-// SNEEZE::VIEWPORT::SCENE::FABRIC::NODE -- structural element in the scene.
-//
-// Each node participates in a tree owned by a single FABRIC. When a
-// MAP_OBJECT with a non-empty texture URL is assigned, the node requests the
-// texture from the network and decodes it on completion.
-// ---------------------------------------------------------------------------
+      uint32_t BeginRead () const;
+      bool     EndRead (uint32_t nSeq) const;
+      void     BeginWrite ();
+      void     EndWrite ();
 
-class SNEEZE::VIEWPORT::SCENE::FABRIC::NODE : public SNEEZE::NETWORK::IFILE
-{
-public:
-   explicit NODE (FABRIC* pFabric);
-   ~NODE () override;
+   private:
+      std::atomic<uint32_t> m_nSequence;
+   };
 
-   // --- Identity ---
+   // ---------------------------------------------------------------------------
+   // VIEWPORT::SCENE::FABRIC::NODE -- structural element in the scene.
+   //
+   // Each node participates in a tree owned by a single FABRIC. When a
+   // MAP_OBJECT with a non-empty texture URL is assigned, the node requests the
+   // texture from the network and decodes it on completion.
+   // ---------------------------------------------------------------------------
 
-   uint32_t ObjectIx () const;
-   void     ObjectIx_Set (uint32_t twObjectIx);
+   class VIEWPORT::SCENE::FABRIC::NODE : public NETWORK::IFILE
+   {
+   public:
+      explicit NODE (FABRIC* pFabric);
+      ~NODE () override;
 
-   // --- Tree structure ---
+      // --- Identity ---
 
-   NODE*   Parent () const;
-   int     Node_Count () const;
-   NODE*   Child (int nPosition) const;
-   NODE*   Node_Find (uint32_t twObjectIx) const;
-   const std::vector<NODE*>& Node_Children () const;
+      uint32_t ObjectIx () const;
+      void     ObjectIx_Set (uint32_t twObjectIx);
 
-   void    Node_Add (NODE* pChild);
-   void    Node_Remove (NODE* pChild);
+      // --- Tree structure ---
 
-   // --- Fabric (owner -- immutable after construction) ---
+      NODE* Parent () const;
+      int     Node_Count () const;
+      NODE* Child (int nPosition) const;
+      NODE* Node_Find (uint32_t twObjectIx) const;
+      const std::vector<NODE*>& Node_Children () const;
 
-   FABRIC* Fabric () const;
+      void    Node_Add (NODE* pChild);
+      void    Node_Remove (NODE* pChild);
 
-   // --- Map object ---
+      // --- Fabric (owner -- immutable after construction) ---
 
-   MAP_OBJECT* MapObject () const;
-   void        MapObject_Set (MAP_OBJECT* pMapObject);
+      FABRIC* Fabric () const;
 
-   // --- Attached fabric (this node is an attachment point) ---
+      // --- Map object ---
 
-   FABRIC* Fabric_Attached () const;
-   void    Fabric_Set_Attached (FABRIC* pFabric);
+      MAP_OBJECT* MapObject () const;
+      void        MapObject_Set (MAP_OBJECT* pMapObject);
 
-   // --- Flags ---
+      // --- Attached fabric (this node is an attachment point) ---
 
-   bool IsPrivate () const;
-   void SetPrivate (bool bPrivate);
+      FABRIC* Fabric_Attached () const;
+      void    Fabric_Set_Attached (FABRIC* pFabric);
 
-   bool IsPrimary () const;
-   void SetPrimary (bool bPrimary);
+      // --- Flags ---
 
-   // --- Seqlock (protects map object property reads/writes) ---
+      bool IsPrivate () const;
+      void SetPrivate (bool bPrivate);
 
-   SEQLOCK& Seqlock ();
+      bool IsPrimary () const;
+      void SetPrimary (bool bPrimary);
 
-   // --- SNEEZE::NETWORK::IFILE ---
+      // --- Seqlock (protects map object property reads/writes) ---
 
-   void OnFileReady  (SNEEZE::NETWORK::FILE* pFile) override;
-   void OnFileFailed (SNEEZE::NETWORK::FILE* pFile) override;
+      SEQLOCK& Seqlock ();
 
-private:
-   void Texture_Request ();
-   void Texture_Release ();
+      // --- NETWORK::IFILE ---
 
-   uint32_t             m_twObjectIx;
+      void OnFileReady (NETWORK::FILE* pFile) override;
+      void OnFileFailed (NETWORK::FILE* pFile) override;
 
-   NODE*                m_pNode_Parent;
-   std::vector<NODE*>   m_apNode;
-   std::unordered_map<uint32_t, NODE*> m_umpNode;
-   mutable std::mutex   m_mutex_pNode;
+   private:
+      void Texture_Request ();
+      void Texture_Release ();
 
-   FABRIC*              m_pFabric;
-   MAP_OBJECT*          m_pMapObject;
-   FABRIC*              m_pFabric_Attached;
+      uint32_t                m_twObjectIx;
 
-   bool                 m_bPrivate;
-   bool                 m_bPrimary;
+      NODE* m_pNode_Parent;
+      std::vector<NODE*>      m_apNode;
+      std::unordered_map<uint32_t, NODE*> m_umpNode;
+      mutable std::mutex      m_mutex_pNode;
 
-   SEQLOCK              m_Seqlock;
+      FABRIC* m_pFabric;
+      MAP_OBJECT* m_pMapObject;
+      FABRIC* m_pFabric_Attached;
 
-   SNEEZE::NETWORK::FILE*         m_pFile;
-};
+      bool                    m_bPrivate;
+      bool                    m_bPrimary;
 
+      SEQLOCK                 m_Seqlock;
+
+      NETWORK::FILE* m_pFile;
+   };
+}
 #endif // SNEEZE_VIEWPORT_NODE_H

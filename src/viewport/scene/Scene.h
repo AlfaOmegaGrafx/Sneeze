@@ -15,42 +15,41 @@
 #ifndef SNEEZE_VIEWPORT_SCENE_H
 #define SNEEZE_VIEWPORT_SCENE_H
 
-#include "viewport/Viewport.h"
-#include <string>
-
-namespace astro { class ASTRO_SERVICE; }
-
-// ---------------------------------------------------------------------------
-// SNEEZE::VIEWPORT::SCENE — root container for the scene object model.
-//
-// Owned by VIEWPORT. Every FABRIC in the scene holds a back-pointer to
-// the SCENE, giving any NODE a path to engine services:
-//     NODE -> FABRIC -> SCENE -> SNEEZE -> Network(), etc.
-// ---------------------------------------------------------------------------
-
-class SNEEZE::VIEWPORT::SCENE
+namespace SNEEZE
 {
-public:
-   class FABRIC;
+   namespace astro { class ASTRO_SERVICE; }
 
-   explicit SCENE (VIEWPORT* pViewport);
-   ~SCENE ();
+   // ---------------------------------------------------------------------------
+   // VIEWPORT::SCENE — root container for the scene object model.
+   //
+   // Owned by VIEWPORT. Every FABRIC in the scene holds a back-pointer to
+   // the SCENE, giving any NODE a path to engine services:
+   //     NODE -> FABRIC -> SCENE -> SNEEZE -> Network(), etc.
+   // ---------------------------------------------------------------------------
 
-   bool Initialize (const std::string& sUrl);
-   void Shutdown ();
+   class VIEWPORT::SCENE
+   {
+   public:
+      class FABRIC;
 
-   VIEWPORT* Viewport () const;
-   SNEEZE*   Sneeze () const;
-   FABRIC* Fabric_Root () const;
-   FABRIC* Fabric_Primary () const;
+      explicit SCENE (VIEWPORT* pViewport);
+      ~SCENE ();
 
-private:
-   bool Fabric_Open_Primary (const std::string& sUrl);
+      bool Initialize (const std::string& sUrl);
+      void Shutdown ();
 
-   VIEWPORT*             m_pViewport;
-   FABRIC*               m_pFabric_Root;
-   FABRIC*               m_pFabric_Primary;
-   astro::ASTRO_SERVICE* m_pAstroService;
-};
+      VIEWPORT* Viewport () const;
+      ENGINE*   Sneeze () const;
+      FABRIC* Fabric_Root () const;
+      FABRIC* Fabric_Primary () const;
 
+   private:
+      bool Fabric_Open_Primary (const std::string& sUrl);
+
+      VIEWPORT*             m_pViewport;
+      FABRIC*               m_pFabric_Root;
+      FABRIC*               m_pFabric_Primary;
+      astro::ASTRO_SERVICE* m_pAstroService;
+   };
+}
 #endif // SNEEZE_VIEWPORT_SCENE_H

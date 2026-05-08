@@ -17,14 +17,16 @@
 #include "Fabric.h"
 #include "Scene.h"
 #include "MapObject.h"
-#include "container/Container.h"
+#include <Container.h>
 #include "stb/stb_image.h"
 #include <algorithm>
 #include <memory>
 
-using FABRIC    = SNEEZE::VIEWPORT::SCENE::FABRIC;
-using NODE      = SNEEZE::VIEWPORT::SCENE::FABRIC::NODE;
-using CONTAINER = SNEEZE::VIEWPORT::CONTAINER;
+using namespace SNEEZE;
+
+using FABRIC    = VIEWPORT::SCENE::FABRIC;
+using NODE      = VIEWPORT::SCENE::FABRIC::NODE;
+using CONTAINER = VIEWPORT::CONTAINER;
 
 // ---------------------------------------------------------------------------
 // SEQLOCK
@@ -212,7 +214,7 @@ void NODE::Texture_Request ()
       pName->sPersonaHash   = "ZklkNVZTY0cxb2ZqUmtTWGpMVHE2bHkyQT09IiwiTUlJRFBUQ0NBaVdnQXdJQkFn";
       pName->bValidated     = true;
 
-      SNEEZE::NETWORK* pNetwork = m_pFabric->Scene ()->Sneeze ()->Network ();
+      NETWORK* pNetwork = m_pFabric->Scene ()->Sneeze ()->Network ();
       if (pNetwork)
          m_pFile = pNetwork->Request (this, m_pFabric->Scene ()->Viewport (), pName, m_pMapObject->m_sTextureUrl);
    }
@@ -235,7 +237,7 @@ void NODE::Texture_Release ()
 // OnFileReady -- decode the fetched texture data and populate the map object.
 // ---------------------------------------------------------------------------
 
-void NODE::OnFileReady (SNEEZE::NETWORK::FILE* pFile)
+void NODE::OnFileReady (NETWORK::FILE* pFile)
 {
    std::vector<uint8_t> aData;
 
@@ -269,7 +271,7 @@ void NODE::OnFileReady (SNEEZE::NETWORK::FILE* pFile)
 // OnFileFailed -- release the network file handle.
 // ---------------------------------------------------------------------------
 
-void NODE::OnFileFailed (SNEEZE::NETWORK::FILE* pFile)
+void NODE::OnFileFailed (NETWORK::FILE* pFile)
 {
    pFile->Release ();
    m_pFile = nullptr;

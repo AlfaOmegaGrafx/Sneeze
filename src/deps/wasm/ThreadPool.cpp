@@ -17,10 +17,10 @@
 #include <cstdio>
 #include <algorithm>
 
-namespace DEP {
+using namespace SNEEZE::DEP;
 
-THREAD_POOL::THREAD_POOL (SNEEZE* pSneeze)
-   : m_pSneeze (pSneeze)
+THREAD_POOL::THREAD_POOL (ENGINE* pEngine)
+   : m_pEngine (pEngine)
    , m_bShutdown (false)
 {
 }
@@ -43,8 +43,8 @@ bool THREAD_POOL::Initialize (int nThreads)
    for (int i = 0; i < nThreads; i++)
       m_aThreads.emplace_back (&THREAD_POOL::WorkerLoop, this);
 
-   m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Info, "WASM_THREAD_POOL",
-      "Initialized with " + std::to_string (nThreads) + " workers");
+   m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "WASM_THREAD_POOL", "Initialized with " + std::to_string (nThreads) + " workers");
+
    return true;
 }
 
@@ -100,5 +100,3 @@ void THREAD_POOL::WorkerLoop ()
       pfnWork ();
    }
 }
-
-} // namespace DEP

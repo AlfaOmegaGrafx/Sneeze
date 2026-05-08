@@ -12,13 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <Sneeze.h>
 #include "Msf.h"
 
 #include <jwt-cpp/traits/nlohmann-json/defaults.h>
 
 #include <cstdio>
 
-using MSF     = SNEEZE::VIEWPORT::MSF;
+using namespace SNEEZE;
+
+using MSF     = VIEWPORT::MSF;
 using SERVICE = MSF::SERVICE;
 using MODULE  = MSF::MODULE;
 
@@ -26,11 +29,11 @@ using MODULE  = MSF::MODULE;
 // Construction / Destruction
 // ---------------------------------------------------------------------------
 
-MSF::MSF (SNEEZE* pSneeze)
+MSF::MSF (ENGINE* pEngine)
    : m_bSignatureValid (false)
    , m_bChainTrusted (false)
    , m_bParsed (false)
-   , m_pSneeze (pSneeze)
+   , m_pEngine (pEngine)
 {
 }
 
@@ -101,8 +104,8 @@ bool MSF::Parse (const std::string& sJws)
       }
       catch (const std::exception& ex)
       {
-         if (m_pSneeze)
-            m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Error, "MSF", std::string ("Parse: ") + ex.what ());
+         if (m_pEngine)
+            m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Error, "MSF", std::string ("Parse: ") + ex.what ());
       }
    }
 
@@ -155,15 +158,15 @@ std::string MSF::Sign (const std::string& sPrivateKeyPem,
             sResult = pBuilder.sign (jwt::algorithm::es512 ("", sPrivateKeyPem));
          else
          {
-            if (m_pSneeze)
-               m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Error, "MSF", "Sign: unknown algorithm \"" + sAlgorithm + "\"");
+            if (m_pEngine)
+               m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Error, "MSF", "Sign: unknown algorithm \"" + sAlgorithm + "\"");
          }
       }
    }
    catch (const std::exception& ex)
    {
-      if (m_pSneeze)
-         m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Error, "MSF", std::string ("Sign: exception: ") + ex.what ());
+      if (m_pEngine)
+         m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Error, "MSF", std::string ("Sign: exception: ") + ex.what ());
 
       sResult.clear ();
    }

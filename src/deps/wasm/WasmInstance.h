@@ -19,78 +19,78 @@
 #include <string>
 #include <cstdint>
 
-class SNEEZE;
-
-namespace DEP {
-
-class WASM_STORE;
-
-// ---------------------------------------------------------------------------
-// Instance lifecycle states
-// ---------------------------------------------------------------------------
-
-enum INSTANCE_STATE
+namespace SNEEZE
 {
-   INSTANCE_STATE_DORMANT  = 0,
-   INSTANCE_STATE_ACTIVE   = 1,
-};
+   namespace DEP 
+   {
+      class WASM_STORE;
 
-// ---------------------------------------------------------------------------
-// WASM_INSTANCE — a single compiled module instance within a WASM_STORE.
-//
-// Identity: URL + SHA256 (same bytecode from different URLs = different
-// instances). Lifecycle:
-//   - Init:     called when refcount goes 0 -> 1 (first fabric references it)
-//   - Open:     called per fabric attachment (with fabric-specific params)
-//   - Close:    called per fabric detachment
-//   - Shutdown: called when refcount goes 1 -> 0 (instance goes dormant)
-//
-// Instances cannot be unloaded from a live store. When dormant they simply
-// stop receiving calls. Memory is freed only when the entire store is
-// destroyed.
-// ---------------------------------------------------------------------------
+      // ---------------------------------------------------------------------------
+      // Instance lifecycle states
+      // ---------------------------------------------------------------------------
 
-class WASM_INSTANCE
-{
-public:
-   WASM_INSTANCE (SNEEZE* pSneeze, WASM_STORE* pStore, const std::string& sUrl, const std::string& sSha256);
-   ~WASM_INSTANCE ();
+      enum INSTANCE_STATE
+      {
+         INSTANCE_STATE_DORMANT  = 0,
+         INSTANCE_STATE_ACTIVE   = 1,
+      };
 
-   // --- Identity ---
+      // ---------------------------------------------------------------------------
+      // WASM_INSTANCE — a single compiled module instance within a WASM_STORE.
+      //
+      // Identity: URL + SHA256 (same bytecode from different URLs = different
+      // instances). Lifecycle:
+      //   - Init:     called when refcount goes 0 -> 1 (first fabric references it)
+      //   - Open:     called per fabric attachment (with fabric-specific params)
+      //   - Close:    called per fabric detachment
+      //   - Shutdown: called when refcount goes 1 -> 0 (instance goes dormant)
+      //
+      // Instances cannot be unloaded from a live store. When dormant they simply
+      // stop receiving calls. Memory is freed only when the entire store is
+      // destroyed.
+      // ---------------------------------------------------------------------------
 
-   const std::string& GetUrl () const { return m_sUrl; }
-   const std::string& GetSha256 () const { return m_sSha256; }
-   WASM_STORE*        GetStore () const { return m_pStore; }
-   INSTANCE_STATE     GetState () const { return m_bState; }
+      class WASM_INSTANCE
+      {
+      public:
+         WASM_INSTANCE (ENGINE* pEngine, WASM_STORE* pStore, const std::string& sUrl, const std::string& sSha256);
+         ~WASM_INSTANCE ();
 
-   // --- Module compilation ---
+         // --- Identity ---
 
-   bool Compile (wasm_engine_t* pEngine, const uint8_t* pBytes, size_t nSize);
-   bool IsCompiled () const { return m_pModule != nullptr; }
+         const std::string& GetUrl () const { return m_sUrl; }
+         const std::string& GetSha256 () const { return m_sSha256; }
+         WASM_STORE*        GetStore () const { return m_pStore; }
+         INSTANCE_STATE     GetState () const { return m_bState; }
 
-   // --- Lifecycle ---
+         // --- Module compilation ---
 
-   int  AddRef ();
-   int  ReleaseRef ();
-   int  GetRefCount () const { return m_nRefCount; }
+         bool Compile (wasm_engine_t* pEngine, const uint8_t* pBytes, size_t nSize);
+         bool IsCompiled () const { return m_pModule != nullptr; }
 
-   bool CallInit ();
-   bool CallOpen (uint32_t twFabricId, const uint8_t* pParams, size_t nParamsSize);
-   bool CallClose (uint32_t twFabricId);
-   bool CallShutdown ();
+         // --- Lifecycle ---
 
-private:
-   SNEEZE*      m_pSneeze;
-   WASM_STORE*        m_pStore;
-   std::string        m_sUrl;
-   std::string        m_sSha256;
-   INSTANCE_STATE     m_bState;
-   int                m_nRefCount;
+         int  AddRef ();
+         int  ReleaseRef ();
+         int  GetRefCount () const { return m_nRefCount; }
 
-   wasmtime_module_t* m_pModule;
-   bool               m_bInstantiated;
-};
+         bool CallInit ();
+         bool CallOpen (uint32_t twFabricId, const uint8_t* pParams, size_t nParamsSize);
+         bool CallClose (uint32_t twFabricId);
+         bool CallShutdown ();
 
-} // namespace DEP
+      private:
+         ENGINE*      m_pEngine;
+         WASM_STORE*        m_pStore;
+         std::string        m_sUrl;
+         std::string        m_sSha256;
+         INSTANCE_STATE     m_bState;
+         int                m_nRefCount;
+
+         wasmtime_module_t* m_pModule;
+         bool               m_bInstantiated;
+      };
+   } // namespace DEP
+}
 
 #endif // SNEEZE_WASM_WASMINSTANCE_H

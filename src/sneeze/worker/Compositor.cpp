@@ -21,7 +21,7 @@
 //   expose Filament's adoptCommandStream() or any thread-transfer API.
 //   This means we cannot create the renderer on one thread and destroy it
 //   on another without triggering:
-//     "Precondition: Engine::shutdown() called from the wrong thread!"
+//     "Precondition: shutdown() called from the wrong thread!"
 //
 // Mitigation:
 //   Both creation and destruction are forced onto the compositor thread.
@@ -34,7 +34,7 @@
 //
 // Preferred fix (Halogen):
 //   Expose a thread-transfer API on the ANARI device (equivalent to
-//   Filament's Engine::adoptCommandStream or Engine::unprotect) so that
+//   Filament's adoptCommandStream or unprotect) so that
 //   ownership can be handed from the compositor thread back to the main
 //   thread before destruction.
 //
@@ -48,7 +48,6 @@
 #include <Sneeze.h>
 #include "Worker.h"
 #include "Types.h"
-#include "viewport/Viewport.h"
 #include "renderer/Renderer.h"
 #include "astro/Epoch.h"
 #include "astro/AstroService.h"
@@ -60,14 +59,14 @@
 #include <cmath>
 #include <cstdio>
 
-using WORKER = SNEEZE::WORKER;
-
 #ifdef _WIN32
 #include <dwmapi.h>
 #pragma comment (lib, "dwmapi.lib")
 #else
 #include <thread>
 #endif
+
+using namespace SNEEZE;
 
 static constexpr float METERS_TO_AU     = 1.0f / 149597870700.0f;
 static constexpr float MIN_SPHERE_RADIUS = 0.005f;
@@ -84,8 +83,8 @@ static void ColorFromU32 (uint32_t nColor, float& r, float& g, float& b)
 
 // ---------------------------------------------------------------------------
 
-WORKER::COMPOSITOR::COMPOSITOR (SNEEZE* pSneeze)
-   : WORKER (pSneeze)
+WORKER::COMPOSITOR::COMPOSITOR (ENGINE* pEngine)
+   : WORKER (pEngine)
    , m_tmNow (0)
    , m_nFrameCount (0)
    , m_dFpsAccum (0.0)
@@ -133,7 +132,7 @@ void WORKER::COMPOSITOR::ThreadLoop ()
          double dAvgFrame   = (m_nFrameCount > 0) ? m_dFpsAccum     / m_nFrameCount * 1000.0 : 0.0;
          char szFps[256];
          std::snprintf (szFps, sizeof (szFps), "%d  (frame %.1f ms | input %.1f ms | scene %.1f ms | submit %.1f ms | render %.1f ms | publish %.1f ms | flush %.1f ms)", m_nFrameCount, dAvgFrame, dAvgInput, dAvgScene, dAvgSubmit, dAvgRender, dAvgPublish, dAvgFlush);
-         m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Trace, "FPS", std::string (szFps));
+         m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Trace, "FPS", std::string (szFps));
          m_nFrameCount    = 0;
          m_dFpsAccum     -= 1.0;
          m_dAccumInput    = 0.0;
@@ -146,20 +145,20 @@ void WORKER::COMPOSITOR::ThreadLoop ()
 
       bool bNeedFlush = false;
 
-      m_pSneeze->Viewport_Capture ();
+      m_pEngine->Viewport_Capture ();
       {
          // --- Consume input per viewport ---
 
-         for (SNEEZE::VIEWPORT* pViewport : m_pSneeze->Viewport_GetList ())
+         for (VIEWPORT* pViewport : m_pEngine->Viewport_GetList ())
          {
-            SNEEZE::VIEWPORT::INPUT Input = pViewport->ConsumeInput ();
-            SNEEZE::VIEWPORT::VIEW& View = pViewport->View ();
+            VIEWPORT::INPUT Input = pViewport->ConsumeInput ();
+            VIEWPORT::VIEW& View = pViewport->View ();
             View.Update (Input.nMouseDX, Input.nMouseDY, Input.dScrollY, Input.bMouseLeft, Input.bMouseRight);
          }
 
          // --- Render each viewport ---
 
-         for (SNEEZE::VIEWPORT* pViewport : m_pSneeze->Viewport_GetList ())
+         for (VIEWPORT* pViewport : m_pEngine->Viewport_GetList ())
          {
             if (pViewport->ServiceRendererShutdown ())
                continue;
@@ -168,9 +167,9 @@ void WORKER::COMPOSITOR::ThreadLoop ()
 
          // --- Check if any viewport needs readback flush ---
 
-         for (SNEEZE::VIEWPORT* pViewport : m_pSneeze->Viewport_GetList ())
+         for (VIEWPORT* pViewport : m_pEngine->Viewport_GetList ())
          {
-            SNEEZE::VIEWPORT::RENDERER* pRenderer = pViewport->Renderer ();
+            VIEWPORT::RENDERER* pRenderer = pViewport->Renderer ();
             if (pRenderer  &&  !pRenderer->IsRenderingToNativeSurface ())
             {
                bNeedFlush = true;
@@ -178,7 +177,7 @@ void WORKER::COMPOSITOR::ThreadLoop ()
             }
          }
 
-         m_pSneeze->Viewport_Release ();
+         m_pEngine->Viewport_Release ();
       }
 
       // --- Pace to display refresh (outside lock) ---
@@ -200,17 +199,16 @@ void WORKER::COMPOSITOR::ThreadLoop ()
 
 }
 
-void WORKER::COMPOSITOR::RenderViewport (SNEEZE::VIEWPORT* pViewport,
-   std::chrono::steady_clock::time_point tpLoopStart)
+void WORKER::COMPOSITOR::RenderViewport (VIEWPORT* pViewport, std::chrono::steady_clock::time_point tpLoopStart)
 {
    // Deferred renderer init -- must happen on the compositor thread because
    // Filament auto-adopts the thread that creates its Engine.
    pViewport->InitializeRenderer ();
 
-   SNEEZE::VIEWPORT::RENDERER* pRenderer = pViewport->Renderer ();
+   VIEWPORT::RENDERER* pRenderer = pViewport->Renderer ();
    if (pRenderer)
    {
-   SNEEZE::IVIEWPORT* pVPHost = pViewport->Host ();
+   IVIEWPORT* pVPHost = pViewport->Host ();
 
    // --- Consume pending resize ---
 
@@ -220,7 +218,7 @@ void WORKER::COMPOSITOR::RenderViewport (SNEEZE::VIEWPORT* pViewport,
 
    // --- Camera ---
 
-   SNEEZE::VIEWPORT::VIEW& View = pViewport->View ();
+   VIEWPORT::VIEW& View = pViewport->View ();
 
    float dCamX = View.dTargetX + View.dDistance * std::cos (View.dPhi) * std::cos (View.dTheta);
    float dCamY = View.dTargetY + View.dDistance * std::sin (View.dPhi);
@@ -257,15 +255,15 @@ void WORKER::COMPOSITOR::RenderViewport (SNEEZE::VIEWPORT* pViewport,
    std::vector<SPHERE_DATA> aSpheres;
    std::vector<CURVE_DATA>  aCurves;
 
-   SNEEZE::VIEWPORT::SCENE* pScene = pViewport->Scene ();
-   SNEEZE::VIEWPORT::SCENE::FABRIC* pPrimaryFabric = pScene ? pScene->Fabric_Primary () : nullptr;
-   SNEEZE::VIEWPORT::SCENE::FABRIC::NODE* pSomRoot = pPrimaryFabric ? pPrimaryFabric->Node_Root () : nullptr;
+   VIEWPORT::SCENE* pScene = pViewport->Scene ();
+   VIEWPORT::SCENE::FABRIC* pPrimaryFabric = pScene ? pScene->Fabric_Primary () : nullptr;
+   VIEWPORT::SCENE::FABRIC::NODE* pSomRoot = pPrimaryFabric ? pPrimaryFabric->Node_Root () : nullptr;
 
    if (pSomRoot)
    {
       astro::ORBIT_POSITION pos;
 
-      for (SNEEZE::VIEWPORT::SCENE::FABRIC::NODE* pNode : pSomRoot->Node_Children ())
+      for (VIEWPORT::SCENE::FABRIC::NODE* pNode : pSomRoot->Node_Children ())
       {
          MAP_OBJECT* pObj = pNode->MapObject ();
          if (!pObj  ||  pObj->GetType () != MAP_OBJECT_TYPE_CELESTIAL)

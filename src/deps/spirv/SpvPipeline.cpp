@@ -17,11 +17,10 @@
 
 #include <spirv-tools/libspirv.hpp>
 
-namespace DEP
-{
+using namespace SNEEZE::DEP;
 
 SPV_PIPELINE::SPV_PIPELINE ()
-   : m_pSneeze (nullptr)
+   : m_pEngine (nullptr)
    , bInitialized (false)
 {
 }
@@ -31,11 +30,11 @@ SPV_PIPELINE::~SPV_PIPELINE ()
    Shutdown ();
 }
 
-bool SPV_PIPELINE::Initialize (SNEEZE* pSneeze)
+bool SPV_PIPELINE::Initialize (ENGINE* pEngine)
 {
-   m_pSneeze = pSneeze;
+   m_pEngine = pEngine;
    bInitialized = true;
-   m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Info, "SPV_PIPELINE",
+   m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "SPV_PIPELINE",
       "SPIR-V validation pipeline initialized (SPIRV-Tools)");
    return true;
 }
@@ -63,5 +62,3 @@ bool SPV_PIPELINE::Validate (const std::vector<uint32_t>& aBinary, std::string& 
 
    return bValid;
 }
-
-} // namespace DEP

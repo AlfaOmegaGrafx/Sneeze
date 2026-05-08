@@ -17,7 +17,7 @@
 #include "RMCObject.h"
 #include "Orbit.h"
 
-namespace astro {
+using namespace SNEEZE::astro;
 
 // ---------------------------------------------------------------------------
 // CELESTIAL_MAP_OBJECT
@@ -33,8 +33,8 @@ CELESTIAL_MAP_OBJECT::CELESTIAL_MAP_OBJECT () :
 // ASTRO_SERVICE
 // ---------------------------------------------------------------------------
 
-ASTRO_SERVICE::ASTRO_SERVICE (SNEEZE* pSneeze) :
-   m_pSneeze (pSneeze),
+ASTRO_SERVICE::ASTRO_SERVICE (ENGINE* pEngine) :
+   m_pEngine (pEngine),
    m_pFabric (nullptr)
 {
 }
@@ -52,13 +52,13 @@ ASTRO_SERVICE::~ASTRO_SERVICE ()
 // The sun gets a standalone node with no orbit.
 // ---------------------------------------------------------------------------
 
-bool ASTRO_SERVICE::Initialize (SNEEZE::VIEWPORT::SCENE::FABRIC* pPrimaryFabric)
+bool ASTRO_SERVICE::Initialize (VIEWPORT::SCENE::FABRIC* pPrimaryFabric)
 {
    m_pFabric = pPrimaryFabric;
    if (!m_pFabric  ||  !m_pFabric->Node_Root ())
       return false;
 
-   SNEEZE::VIEWPORT::SCENE::FABRIC::NODE* pRoot = m_pFabric->Node_Root ();
+   VIEWPORT::SCENE::FABRIC::NODE* pRoot = m_pFabric->Node_Root ();
 
    // --- Sun node (no orbit, sits at origin) ---
    {
@@ -74,7 +74,7 @@ bool ASTRO_SERVICE::Initialize (SNEEZE::VIEWPORT::SCENE::FABRIC* pPrimaryFabric)
       pMapObj->m_pOrbit      = nullptr;
       pMapObj->m_sTextureUrl = pSun ? pSun->sTexture : "";
 
-      auto* pNode = new SNEEZE::VIEWPORT::SCENE::FABRIC::NODE (m_pFabric);
+      auto* pNode = new VIEWPORT::SCENE::FABRIC::NODE (m_pFabric);
       pNode->MapObject_Set (pMapObj);
       pRoot->Node_Add (pNode);
 
@@ -120,7 +120,7 @@ bool ASTRO_SERVICE::Initialize (SNEEZE::VIEWPORT::SCENE::FABRIC* pPrimaryFabric)
       pMapObj->m_pOrbit      = pBody->pOrbit.get ();
       pMapObj->m_sTextureUrl = sTexture;
 
-      auto* pNode = new SNEEZE::VIEWPORT::SCENE::FABRIC::NODE (m_pFabric);
+      auto* pNode = new VIEWPORT::SCENE::FABRIC::NODE (m_pFabric);
       pNode->MapObject_Set (pMapObj);
       pRoot->Node_Add (pNode);
 
@@ -128,8 +128,7 @@ bool ASTRO_SERVICE::Initialize (SNEEZE::VIEWPORT::SCENE::FABRIC* pPrimaryFabric)
       m_apMapObjects.push_back (pMapObj);
    }
 
-   m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Info, "ASTRO_SERVICE",
-      "Populated " + std::to_string (static_cast<int> (m_apNodes.size ())) + " SOM nodes");
+   m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "ASTRO_SERVICE", "Populated " + std::to_string (static_cast<int> (m_apNodes.size ())) + " SOM nodes");
 
    return true;
 }
@@ -146,5 +145,3 @@ void ASTRO_SERVICE::Shutdown ()
 
    m_pFabric = nullptr;
 }
-
-} // namespace astro

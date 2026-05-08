@@ -17,94 +17,94 @@
 
 #include <atomic>
 #include <cstdint>
-#include <string>
-#include <vector>
 #include <mutex>
 
-// ---------------------------------------------------------------------------
-// Map object type identifiers
-// ---------------------------------------------------------------------------
-
-enum MAP_OBJECT_TYPE
+namespace SNEEZE
 {
-   MAP_OBJECT_TYPE_ROOT        = 0,
-   MAP_OBJECT_TYPE_CELESTIAL   = 1,
-   MAP_OBJECT_TYPE_TERRESTRIAL = 2,
-   MAP_OBJECT_TYPE_PHYSICAL    = 3,
-};
+   // ---------------------------------------------------------------------------
+   // Map object type identifiers
+   // ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// MAP_OBJECT — base class for all 3D objects referenced by SOM::NODEs.
-// All spatial properties (position, orientation, scale, bounding volume,
-// visual appearance) belong here, not on the NODE itself.
-// ---------------------------------------------------------------------------
+   enum MAP_OBJECT_TYPE
+   {
+      MAP_OBJECT_TYPE_ROOT        = 0,
+      MAP_OBJECT_TYPE_CELESTIAL   = 1,
+      MAP_OBJECT_TYPE_TERRESTRIAL = 2,
+      MAP_OBJECT_TYPE_PHYSICAL    = 3,
+   };
 
-class MAP_OBJECT
-{
-public:
-   explicit MAP_OBJECT (MAP_OBJECT_TYPE bType);
-   virtual ~MAP_OBJECT () = default;
+   // ---------------------------------------------------------------------------
+   // MAP_OBJECT — base class for all 3D objects referenced by SOM::NODEs.
+   // All spatial properties (position, orientation, scale, bounding volume,
+   // visual appearance) belong here, not on the NODE itself.
+   // ---------------------------------------------------------------------------
 
-   MAP_OBJECT_TYPE GetType () const { return m_bType; }
+   class MAP_OBJECT
+   {
+   public:
+      explicit MAP_OBJECT (MAP_OBJECT_TYPE bType);
+      virtual ~MAP_OBJECT () = default;
 
-   // Position in parent-relative coordinates (meters)
-   double m_dPosX   = 0.0;
-   double m_dPosY   = 0.0;
-   double m_dPosZ   = 0.0;
+      MAP_OBJECT_TYPE GetType () const { return m_bType; }
 
-   // Scale (uniform for now)
-   double m_dScale  = 1.0;
+      // Position in parent-relative coordinates (meters)
+      double m_dPosX   = 0.0;
+      double m_dPosY   = 0.0;
+      double m_dPosZ   = 0.0;
 
-   // Bounding sphere radius (meters)
-   double m_dBound  = 0.0;
+      // Scale (uniform for now)
+      double m_dScale  = 1.0;
 
-   // Visual color (0xRRGGBB)
-   uint32_t m_nColor = 0xcccccc;
+      // Bounding sphere radius (meters)
+      double m_dBound  = 0.0;
 
-   // Texture
-   std::string              m_sTextureUrl;
-   std::vector<uint8_t>     m_aTexturePixels;
-   int                      m_nTextureWidth  = 0;
-   int                      m_nTextureHeight = 0;
-   int                      m_nTextureChannels = 0;
-   std::atomic<bool>        m_bTextureReady {false};
-   mutable std::mutex       m_textureMutex;
+      // Visual color (0xRRGGBB)
+      uint32_t m_nColor = 0xcccccc;
 
-   void LockTexture () const   { m_textureMutex.lock (); }
-   void UnlockTexture () const { m_textureMutex.unlock (); }
+      // Texture
+      std::string              m_sTextureUrl;
+      std::vector<uint8_t>     m_aTexturePixels;
+      int                      m_nTextureWidth  = 0;
+      int                      m_nTextureHeight = 0;
+      int                      m_nTextureChannels = 0;
+      std::atomic<bool>        m_bTextureReady {false};
+      mutable std::mutex       m_textureMutex;
 
-private:
-   MAP_OBJECT_TYPE m_bType;
-};
+      void LockTexture () const   { m_textureMutex.lock (); }
+      void UnlockTexture () const { m_textureMutex.unlock (); }
 
-// ---------------------------------------------------------------------------
-// Derived map object types
-// ---------------------------------------------------------------------------
+   private:
+      MAP_OBJECT_TYPE m_bType;
+   };
 
-class MAP_OBJECT_ROOT : public MAP_OBJECT
-{
-public:
-   MAP_OBJECT_ROOT () : MAP_OBJECT (MAP_OBJECT_TYPE_ROOT) {}
-};
+   // ---------------------------------------------------------------------------
+   // Derived map object types
+   // ---------------------------------------------------------------------------
 
-class MAP_OBJECT_CELESTIAL : public MAP_OBJECT
-{
-public:
-   MAP_OBJECT_CELESTIAL () : MAP_OBJECT (MAP_OBJECT_TYPE_CELESTIAL) {}
+   class MAP_OBJECT_ROOT : public MAP_OBJECT
+   {
+   public:
+      MAP_OBJECT_ROOT () : MAP_OBJECT (MAP_OBJECT_TYPE_ROOT) {}
+   };
 
-   double m_dRadius = 0.0;
-};
+   class MAP_OBJECT_CELESTIAL : public MAP_OBJECT
+   {
+   public:
+      MAP_OBJECT_CELESTIAL () : MAP_OBJECT (MAP_OBJECT_TYPE_CELESTIAL) {}
 
-class MAP_OBJECT_TERRESTRIAL : public MAP_OBJECT
-{
-public:
-   MAP_OBJECT_TERRESTRIAL () : MAP_OBJECT (MAP_OBJECT_TYPE_TERRESTRIAL) {}
-};
+      double m_dRadius = 0.0;
+   };
 
-class MAP_OBJECT_PHYSICAL : public MAP_OBJECT
-{
-public:
-   MAP_OBJECT_PHYSICAL () : MAP_OBJECT (MAP_OBJECT_TYPE_PHYSICAL) {}
-};
+   class MAP_OBJECT_TERRESTRIAL : public MAP_OBJECT
+   {
+   public:
+      MAP_OBJECT_TERRESTRIAL () : MAP_OBJECT (MAP_OBJECT_TYPE_TERRESTRIAL) {}
+   };
 
+   class MAP_OBJECT_PHYSICAL : public MAP_OBJECT
+   {
+   public:
+      MAP_OBJECT_PHYSICAL () : MAP_OBJECT (MAP_OBJECT_TYPE_PHYSICAL) {}
+   };
+}
 #endif // SNEEZE_SOM_MAPOBJECT_H

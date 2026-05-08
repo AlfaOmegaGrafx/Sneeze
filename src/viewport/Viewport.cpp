@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "viewport/Viewport.h"
+#include <Sneeze.h>
 #include "scene/Scene.h"
 #include "renderer/AnariRenderer.h"
 #include <cstring>
 
-using VIEWPORT = SNEEZE::VIEWPORT;
+using namespace SNEEZE;
 
-VIEWPORT::VIEWPORT (SNEEZE* pSneeze, SNEEZE::IVIEWPORT* pHost) :
-   m_pSneeze                    (pSneeze),
+VIEWPORT::VIEWPORT (ENGINE* pEngine, IVIEWPORT* pHost) :
+   m_pEngine                    (pEngine),
    m_pHost                      (pHost),
    m_pScene                     (nullptr),
    m_pRenderer                  (nullptr),
@@ -49,7 +49,7 @@ bool VIEWPORT::Initialize (const std::string& sUrl)
    // Mark renderer as pending -- actual creation deferred to the compositor
    // thread (Filament requires the rendering thread to be the one that creates
    // the engine, otherwise it fails with "This thread has not been adopted").
-   std::string sLibrary = m_pSneeze->Host ()->sRenderer ();
+   std::string sLibrary = m_pEngine->Host ()->sRenderer ();
    if (!sLibrary.empty ()  &&  m_pHost->GetFrameWindow ())
       m_bRendererPending = true;
 
@@ -62,7 +62,7 @@ bool VIEWPORT::Initialize (const std::string& sUrl)
       return false;
    }
 
-   m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Info, "VIEWPORT", "Initialized");
+   m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "VIEWPORT", "Initialized");
    return true;
 }
 
@@ -73,8 +73,8 @@ bool VIEWPORT::InitializeRenderer ()
 
    m_bRendererPending = false;
 
-   std::string sLibrary = m_pSneeze->Host ()->sRenderer ();
-   auto* pRenderer = new RENDERER::ANARI (m_pSneeze, sLibrary);
+   std::string sLibrary = m_pEngine->Host ()->sRenderer ();
+   auto* pRenderer = new RENDERER::ANARI (m_pEngine, sLibrary);
 
    void* pNativeWindow = m_pHost->GetFrameWindow ();
    if (pNativeWindow)
@@ -83,12 +83,12 @@ bool VIEWPORT::InitializeRenderer ()
    if (pRenderer->Initialize (m_nWidth, m_nHeight))
    {
       m_pRenderer = pRenderer;
-      m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Info, "VIEWPORT", "Renderer initialized on compositor thread");
+      m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "VIEWPORT", "Renderer initialized on compositor thread");
    }
    else
    {
       delete pRenderer;
-      m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Warning, "VIEWPORT", "Renderer unavailable -- headless mode");
+      m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Warning, "VIEWPORT", "Renderer unavailable -- headless mode");
    }
 
    return m_pRenderer != nullptr;
@@ -139,13 +139,13 @@ bool VIEWPORT::ServiceRendererShutdown ()
    return bResult;
 }
 
-SNEEZE*            VIEWPORT::Sneeze () const   { return m_pSneeze; }
-SNEEZE::IVIEWPORT* VIEWPORT::Host () const     { return m_pHost; }
-SNEEZE::VIEWPORT::SCENE* VIEWPORT::Scene () const { return m_pScene; }
-int                VIEWPORT::Width () const     { return m_nWidth; }
-int                VIEWPORT::Height () const    { return m_nHeight; }
-SNEEZE::VIEWPORT::VIEW& VIEWPORT::View ()      { return m_View; }
-SNEEZE::VIEWPORT::RENDERER* VIEWPORT::Renderer () const { return m_pRenderer; }
+ENGINE*              VIEWPORT::Sneeze () const     { return m_pEngine; }
+IVIEWPORT*           VIEWPORT::Host () const       { return m_pHost; }
+VIEWPORT::SCENE*     VIEWPORT::Scene () const      { return m_pScene; }
+int                  VIEWPORT::Width () const      { return m_nWidth; }
+int                  VIEWPORT::Height () const     { return m_nHeight; }
+VIEWPORT::VIEW&      VIEWPORT::View ()             { return m_View; }
+VIEWPORT::RENDERER*  VIEWPORT::Renderer () const   { return m_pRenderer; }
 
 // ---------------------------------------------------------------------------
 // Input

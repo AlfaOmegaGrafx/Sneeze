@@ -12,13 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <Sneeze.h>
 #include "Fabric.h"
 #include "Node.h"
 #include <algorithm>
 
-using SCENE  = SNEEZE::VIEWPORT::SCENE;
-using FABRIC = SNEEZE::VIEWPORT::SCENE::FABRIC;
-using NODE   = SNEEZE::VIEWPORT::SCENE::FABRIC::NODE;
+using namespace SNEEZE;
+
+using SCENE  = VIEWPORT::SCENE;
+using FABRIC = VIEWPORT::SCENE::FABRIC;
+using NODE   = VIEWPORT::SCENE::FABRIC::NODE;
 
 FABRIC::FABRIC (SCENE* pScene) :
    m_pScene (pScene),

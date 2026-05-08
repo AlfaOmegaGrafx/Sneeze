@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include <Sneeze.h>
-#include "viewport/Viewport.h"
 
 #include <nlohmann/json.hpp>
 #include <openssl/evp.h>
@@ -27,14 +26,16 @@
 #include <cstring>
 #include <algorithm>
 
-size_t SNEEZE::NETWORK::FetchWriteCallback (char* pData, size_t nSize, size_t nMembers, void* pUser)
+using namespace SNEEZE;
+
+size_t NETWORK::FetchWriteCallback (char* pData, size_t nSize, size_t nMembers, void* pUser)
 {
    FETCH_CONTEXT* pCtx = static_cast<FETCH_CONTEXT*> (pUser);
 
    return std::fwrite (pData, nSize, nMembers, pCtx->pFile);
 }
 
-size_t SNEEZE::NETWORK::FetchHeaderCallback (char* pData, size_t nSize, size_t nMembers, void* pUser)
+size_t NETWORK::FetchHeaderCallback (char* pData, size_t nSize, size_t nMembers, void* pUser)
 {
    FETCH_CONTEXT* pCtx = static_cast<FETCH_CONTEXT*> (pUser);
    size_t nTotal = nSize * nMembers;
@@ -64,8 +65,8 @@ size_t SNEEZE::NETWORK::FetchHeaderCallback (char* pData, size_t nSize, size_t n
 // NETWORK
 // ---------------------------------------------------------------------------
 
-SNEEZE::NETWORK::NETWORK (SNEEZE* pSneeze) :
-   m_pSneeze         (pSneeze),
+NETWORK::NETWORK (ENGINE* pEngine) :
+   m_pEngine         (pEngine),
    m_bShuttingDown   (false),
    m_bCacheEnabled   (true),
    m_bDisplayEnabled (true),
@@ -75,19 +76,19 @@ SNEEZE::NETWORK::NETWORK (SNEEZE* pSneeze) :
 {
 }
 
-SNEEZE::NETWORK::~NETWORK ()
+NETWORK::~NETWORK ()
 {
    Shutdown ();
 }
 
-bool SNEEZE::NETWORK::Initialize ()
+bool NETWORK::Initialize ()
 {
    bool bResult = false;
 
    CURLcode nCurlInit = curl_global_init (CURL_GLOBAL_DEFAULT);
    if (nCurlInit != CURLE_OK)
    {
-      m_pSneeze->Log (ISNEEZE::kLOGLEVEL_Error, "NETWORK",
+      m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Error, "NETWORK",
          "curl_global_init failed (code " + std::to_string (static_cast<int> (nCurlInit)) + ")");
    }
    else
@@ -101,20 +102,20 @@ bool SNEEZE::NETWORK::Initialize ()
 
          LoadRules ();
 
-         m_pSneeze->Log (ISNEEZE::kLOGLEVEL_Info, "NETWORK", "Initialized (path: " + m_sCachePath + ", rules: " + std::to_string (m_aRules.size ()) + ", nAssetIx: " + std::to_string (m_nNextAssetIx) + ")");
+         m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "NETWORK", "Initialized (path: " + m_sCachePath + ", rules: " + std::to_string (m_aRules.size ()) + ", nAssetIx: " + std::to_string (m_nNextAssetIx) + ")");
 
          bResult = true;
       }
       else
       {
-         m_pSneeze->Log (ISNEEZE::kLOGLEVEL_Error, "NETWORK", "Failed to determine cache path");
+         m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Error, "NETWORK", "Failed to determine cache path");
       }
    }
 
    return bResult;
 }
 
-void SNEEZE::NETWORK::Shutdown ()
+void NETWORK::Shutdown ()
 {
    if (!m_sCachePath.empty ())
    {
@@ -157,14 +158,14 @@ void SNEEZE::NETWORK::Shutdown ()
 // Timing helpers
 // ---------------------------------------------------------------------------
 
-double SNEEZE::NETWORK::SecondsSinceEpoch () const
+double NETWORK::SecondsSinceEpoch () const
 {
    auto tpNow = std::chrono::steady_clock::now ();
 
    return std::chrono::duration<double> (tpNow - m_tpEpoch).count ();
 }
 
-double SNEEZE::NETWORK::GetEpochAge () const
+double NETWORK::GetEpochAge () const
 {
    return SecondsSinceEpoch ();
 }
@@ -173,14 +174,14 @@ double SNEEZE::NETWORK::GetEpochAge () const
 // File ownership
 // ---------------------------------------------------------------------------
 
-void SNEEZE::NETWORK::DeleteFiles ()
+void NETWORK::DeleteFiles ()
 {
    for (auto* pFile : m_apFile)
       delete pFile;
    m_apFile.clear ();
 }
 
-void SNEEZE::NETWORK::ResetAsset (ASSET* pAsset)
+void NETWORK::ResetAsset (ASSET* pAsset)
 {
    std::string sDiskKey = ComputeDiskKey (pAsset->GetUrl ());
    std::error_code ec;
@@ -197,7 +198,7 @@ void SNEEZE::NETWORK::ResetAsset (ASSET* pAsset)
 // Fetch thread management (capped at kMAX_CONCURRENT_FETCHES)
 // ---------------------------------------------------------------------------
 
-void SNEEZE::NETWORK::SweepCompletedThreads ()
+void NETWORK::SweepCompletedThreads ()
 {
    auto it = m_apFetchSlots.begin ();
    while (it != m_apFetchSlots.end ())
@@ -217,7 +218,7 @@ void SNEEZE::NETWORK::SweepCompletedThreads ()
    }
 }
 
-void SNEEZE::NETWORK::DispatchFetch (ASSET* pAsset)
+void NETWORK::DispatchFetch (ASSET* pAsset)
 {
    SweepCompletedThreads ();
 
@@ -241,14 +242,12 @@ void SNEEZE::NETWORK::DispatchFetch (ASSET* pAsset)
 // Request / Release
 // ---------------------------------------------------------------------------
 
-SNEEZE::NETWORK::FILE* SNEEZE::NETWORK::Request (IFILE* pListener, SNEEZE::VIEWPORT* pViewport,
-   std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName, const std::string& sUrl)
+NETWORK::FILE* NETWORK::Request (IFILE* pListener, VIEWPORT* pViewport, std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, const std::string& sUrl)
 {
    return Request (pListener, pViewport, pName, sUrl, std::string (), kREQUEST_DEFAULT, 0);
 }
 
-SNEEZE::NETWORK::FILE* SNEEZE::NETWORK::Request (IFILE* pListener, SNEEZE::VIEWPORT* pViewport,
-   std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName, const std::string& sUrl, const std::string& sHash, uint32_t bFlags, uint32_t nAssetIx)
+NETWORK::FILE* NETWORK::Request (IFILE* pListener, VIEWPORT* pViewport, std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, const std::string& sUrl, const std::string& sHash, uint32_t bFlags, uint32_t nAssetIx)
 {
    bool bCreate = (bFlags & REQUEST_CREATE) != 0;
    bool bFetch  = (bFlags & REQUEST_FETCH)  != 0;
@@ -389,7 +388,7 @@ SNEEZE::NETWORK::FILE* SNEEZE::NETWORK::Request (IFILE* pListener, SNEEZE::VIEWP
    return pFile;
 }
 
-void SNEEZE::NETWORK::Release (FILE* pFile)
+void NETWORK::Release (FILE* pFile)
 {
    if (pFile)
    {
@@ -427,7 +426,7 @@ void SNEEZE::NETWORK::Release (FILE* pFile)
    }
 }
 
-bool SNEEZE::NETWORK::ReopenFile (FILE* pFile)
+bool NETWORK::ReopenFile (FILE* pFile)
 {
    bool bResult = false;
 
@@ -473,7 +472,7 @@ bool SNEEZE::NETWORK::ReopenFile (FILE* pFile)
    return bResult;
 }
 
-void SNEEZE::NETWORK::Clear (FILE* pFile, bool b)
+void NETWORK::Clear (FILE* pFile, bool b)
 {
    if (pFile)
    {
@@ -501,7 +500,7 @@ void SNEEZE::NETWORK::Clear (FILE* pFile, bool b)
    }
 }
 
-void SNEEZE::NETWORK::Reset (FILE* pFile, bool b)
+void NETWORK::Reset (FILE* pFile, bool b)
 {
    if (pFile  &&  pFile->GetAsset ())
    {
@@ -515,7 +514,7 @@ void SNEEZE::NETWORK::Reset (FILE* pFile, bool b)
 // Cache management
 // ---------------------------------------------------------------------------
 
-void SNEEZE::NETWORK::Clear ()
+void NETWORK::Clear ()
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -539,7 +538,7 @@ void SNEEZE::NETWORK::Clear ()
    }
 }
 
-void SNEEZE::NETWORK::Reset ()
+void NETWORK::Reset ()
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -558,7 +557,7 @@ void SNEEZE::NETWORK::Reset ()
    SaveRules ();
 }
 
-void SNEEZE::NETWORK::Enumerate (IENUM* pEnum, SNEEZE::VIEWPORT* pViewport)
+void NETWORK::Enumerate (IENUM* pEnum, VIEWPORT* pViewport)
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -573,17 +572,17 @@ void SNEEZE::NETWORK::Enumerate (IENUM* pEnum, SNEEZE::VIEWPORT* pViewport)
 // Path helpers
 // ---------------------------------------------------------------------------
 
-std::string SNEEZE::NETWORK::GetCachePath () const
+std::string NETWORK::GetCachePath () const
 {
    std::string sResult;
-   std::string sAppDataPath = m_pSneeze->Host ()->sAppDataPath ();
+   std::string sAppDataPath = m_pEngine->Host ()->sAppDataPath ();
    if (!sAppDataPath.empty ())
       sResult = (std::filesystem::path (sAppDataPath) / "Persistent" / "Cache").string ();
 
    return sResult;
 }
 
-std::string SNEEZE::NETWORK::ComputeDiskKey (const std::string& sUrl) const
+std::string NETWORK::ComputeDiskKey (const std::string& sUrl) const
 {
    unsigned char aDigest[SHA_DIGEST_LENGTH];
 
@@ -598,7 +597,7 @@ std::string SNEEZE::NETWORK::ComputeDiskKey (const std::string& sUrl) const
    return std::string (szHex);
 }
 
-std::string SNEEZE::NETWORK::DiskKeyToPath (const std::string& sDiskKey, DISKFILE eType) const
+std::string NETWORK::DiskKeyToPath (const std::string& sDiskKey, DISKFILE eType) const
 {
    static const char* aExt[] = { ".data", ".temp", ".meta" };
 
@@ -612,7 +611,7 @@ std::string SNEEZE::NETWORK::DiskKeyToPath (const std::string& sDiskKey, DISKFIL
 // SRI hash parsing and verification
 // ---------------------------------------------------------------------------
 
-bool SNEEZE::NETWORK::ParseSriHash (const std::string& sSri, std::string& sAlgo, std::string& sDigest) const
+bool NETWORK::ParseSriHash (const std::string& sSri, std::string& sAlgo, std::string& sDigest) const
 {
    bool bResult = false;
 
@@ -640,7 +639,7 @@ static const EVP_MD* GetEvpMd (const std::string& sAlgo)
    return pMd;
 }
 
-std::string SNEEZE::NETWORK::ComputeFileHash (const std::string& sFilePath, const std::string& sAlgo) const
+std::string NETWORK::ComputeFileHash (const std::string& sFilePath, const std::string& sAlgo) const
 {
    std::string sResult;
 
@@ -685,7 +684,7 @@ std::string SNEEZE::NETWORK::ComputeFileHash (const std::string& sFilePath, cons
    return sResult;
 }
 
-std::string SNEEZE::NETWORK::ComputeDataHash (const uint8_t* pData, size_t nLen, const std::string& sAlgo) const
+std::string NETWORK::ComputeDataHash (const uint8_t* pData, size_t nLen, const std::string& sAlgo) const
 {
    std::string sResult;
 
@@ -715,7 +714,7 @@ std::string SNEEZE::NETWORK::ComputeDataHash (const uint8_t* pData, size_t nLen,
 // Sidecar metadata (per-asset .meta files)
 // ---------------------------------------------------------------------------
 
-void SNEEZE::NETWORK::SaveMeta (ASSET* pAsset)
+void NETWORK::SaveMeta (ASSET* pAsset)
 {
    std::string sDiskKey  = ComputeDiskKey (pAsset->GetUrl ());
    std::string sMetaPath = DiskKeyToPath (sDiskKey, DISKFILE_META);
@@ -747,11 +746,11 @@ void SNEEZE::NETWORK::SaveMeta (ASSET* pAsset)
       std::error_code ec;
       std::filesystem::rename (sTmpPath, sMetaPath, ec);
       if (ec)
-         m_pSneeze->Log (ISNEEZE::kLOGLEVEL_Warning, "NETWORK", "Failed to rename meta temp: " + ec.message ());
+         m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to rename meta temp: " + ec.message ());
    }
 }
 
-bool SNEEZE::NETWORK::LoadMeta (const std::string& sDiskKey, const std::string& sUrl)
+bool NETWORK::LoadMeta (const std::string& sDiskKey, const std::string& sUrl)
 {
    bool bResult = false;
 
@@ -771,7 +770,7 @@ bool SNEEZE::NETWORK::LoadMeta (const std::string& sDiskKey, const std::string& 
       }
       catch (...)
       {
-         m_pSneeze->Log (ISNEEZE::kLOGLEVEL_Warning, "NETWORK", "Failed to parse sidecar: " + sMetaPath);
+         m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to parse sidecar: " + sMetaPath);
       }
 
       if (bParsed)
@@ -811,7 +810,7 @@ bool SNEEZE::NETWORK::LoadMeta (const std::string& sDiskKey, const std::string& 
 // Staleness rules (persisted in rules.json)
 // ---------------------------------------------------------------------------
 
-void SNEEZE::NETWORK::LoadRules ()
+void NETWORK::LoadRules ()
 {
    std::string sRulesPath = (std::filesystem::path (m_sCachePath) / "rules.json").string ();
    std::ifstream file (sRulesPath);
@@ -827,7 +826,7 @@ void SNEEZE::NETWORK::LoadRules ()
       }
       catch (...)
       {
-         m_pSneeze->Log (ISNEEZE::kLOGLEVEL_Warning, "NETWORK", "Failed to parse rules.json -- defaulting to stale");
+         m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to parse rules.json -- defaulting to stale");
       }
 
       if (bParsed)
@@ -848,12 +847,12 @@ void SNEEZE::NETWORK::LoadRules ()
    }
    else
    {
-      m_pSneeze->Log (ISNEEZE::kLOGLEVEL_Info, "NETWORK", "No rules.json -- creating fresh");
+      m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "NETWORK", "No rules.json -- creating fresh");
       SaveRules ();
    }
 }
 
-void SNEEZE::NETWORK::SaveRules ()
+void NETWORK::SaveRules ()
 {
    if (!m_sCachePath.empty ())
    {
@@ -885,7 +884,7 @@ void SNEEZE::NETWORK::SaveRules ()
    }
 }
 
-void SNEEZE::NETWORK::AddRule (const std::string& sContentType, const std::string& sOlderThan)
+void NETWORK::AddRule (const std::string& sContentType, const std::string& sOlderThan)
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -900,7 +899,7 @@ void SNEEZE::NETWORK::AddRule (const std::string& sContentType, const std::strin
    SaveRules ();
 }
 
-bool SNEEZE::NETWORK::IsAssetStale (ASSET* pAsset) const
+bool NETWORK::IsAssetStale (ASSET* pAsset) const
 {
    bool bResult = false;
 
@@ -926,7 +925,7 @@ bool SNEEZE::NETWORK::IsAssetStale (ASSET* pAsset) const
 // Background fetch
 // ---------------------------------------------------------------------------
 
-void SNEEZE::NETWORK::FetchAsset (ASSET* pAsset)
+void NETWORK::FetchAsset (ASSET* pAsset)
 {
    std::string sUrl;
    std::string sHash;
@@ -965,7 +964,7 @@ void SNEEZE::NETWORK::FetchAsset (ASSET* pAsset)
       }
       else
       {
-         m_pSneeze->Log (ISNEEZE::kLOGLEVEL_Error, "NETWORK", "Failed to open temp file: " + sTmpPath);
+         m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Error, "NETWORK", "Failed to open temp file: " + sTmpPath);
          bOk = false;
       }
    }
@@ -997,7 +996,7 @@ void SNEEZE::NETWORK::FetchAsset (ASSET* pAsset)
             bOk = false;
          else if (nCode != CURLE_OK  ||  ctx.nHttpCode < 200  ||  ctx.nHttpCode >= 300)
          {
-            m_pSneeze->Log (ISNEEZE::kLOGLEVEL_Warning, "NETWORK", "Fetch failed for " + sUrl + " (HTTP " + std::to_string (ctx.nHttpCode) + ")");
+            m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Warning, "NETWORK", "Fetch failed for " + sUrl + " (HTTP " + std::to_string (ctx.nHttpCode) + ")");
             bOk = false;
          }
       }
@@ -1018,7 +1017,7 @@ void SNEEZE::NETWORK::FetchAsset (ASSET* pAsset)
          std::string sActual = ComputeFileHash (sTmpPath, sAlgo);
          if (sActual != sExpected)
          {
-            m_pSneeze->Log (ISNEEZE::kLOGLEVEL_Warning, "NETWORK", "Hash mismatch for " + sUrl + " (expected " + sExpected + ", got " + sActual + ")");
+            m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Warning, "NETWORK", "Hash mismatch for " + sUrl + " (expected " + sExpected + ", got " + sActual + ")");
             bOk = false;
          }
       }
@@ -1033,7 +1032,7 @@ void SNEEZE::NETWORK::FetchAsset (ASSET* pAsset)
       std::filesystem::rename (sTmpPath, sFinalPath, ec);
       if (ec)
       {
-         m_pSneeze->Log (ISNEEZE::kLOGLEVEL_Warning, "NETWORK", "Failed to rename " + sTmpPath + " -> " + sFinalPath + ": " + ec.message ());
+         m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to rename " + sTmpPath + " -> " + sFinalPath + ": " + ec.message ());
          bOk = false;
       }
       else
@@ -1078,7 +1077,7 @@ void SNEEZE::NETWORK::FetchAsset (ASSET* pAsset)
 
    if (bOk)
    {
-      m_pSneeze->Log (ISNEEZE::kLOGLEVEL_Trace, "NETWORK", "Cached " + sUrl + " (" + std::to_string (nSizeBytes) + " bytes)");
+      m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Trace, "NETWORK", "Cached " + sUrl + " (" + std::to_string (nSizeBytes) + " bytes)");
    }
 
    DispatchNextFromQueue ();
@@ -1088,7 +1087,7 @@ void SNEEZE::NETWORK::FetchAsset (ASSET* pAsset)
 // Notification helpers (called under m_mutex -- recursive lock allows re-entry)
 // ---------------------------------------------------------------------------
 
-void SNEEZE::NETWORK::NotifyFiles (const std::vector<SNEEZE::NETWORK::FILE*>& apFiles, SNEEZE::NETWORK::STATE bState)
+void NETWORK::NotifyFiles (const std::vector<NETWORK::FILE*>& apFiles, NETWORK::STATE bState)
 {
    for (auto* pFile : apFiles)
    {
@@ -1108,7 +1107,7 @@ void SNEEZE::NETWORK::NotifyFiles (const std::vector<SNEEZE::NETWORK::FILE*>& ap
    }
 }
 
-void SNEEZE::NETWORK::DispatchNextFromQueue ()
+void NETWORK::DispatchNextFromQueue ()
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
 

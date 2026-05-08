@@ -21,6 +21,7 @@
 // Verify / dump:
 //   SignMsf --verify <file.msf> [--trust <ca.pem>]
 
+#include <Sneeze.h>
 #include "msf/Msf.h"
 
 #include <cstdio>
@@ -30,6 +31,8 @@
 #include <sstream>
 #include <string>
 #include <vector>
+
+using namespace SNEEZE;
 
 static std::string ReadFile (const char* sPath)
 {
@@ -70,7 +73,7 @@ static void PrintUsage ()
 // Verify mode
 // ---------------------------------------------------------------------------
 
-static void PrintCertChain (const SNEEZE::VIEWPORT::MSF& msf)
+static void PrintCertChain (const VIEWPORT::MSF& msf)
 {
    const auto& aCerts = msf.GetCertInfos ();
 
@@ -102,7 +105,7 @@ static int DoVerify (const char* sMsfPath,
    }
    else
    {
-      SNEEZE::VIEWPORT::MSF msf;
+      VIEWPORT::MSF msf;
 
       for (const char* sTrustPath : aTrustPaths)
       {
@@ -178,7 +181,7 @@ static int DoSign (const char* sPayloadPath, const char* sKeyPath,
       std::cerr << "Error: cannot read key file: " << sKeyPath << "\n";
    else
    {
-      SNEEZE::VIEWPORT::MSF msf;
+      VIEWPORT::MSF msf;
 
       msf.SetPayload (nlohmann::json::parse (sPayload));
 

@@ -17,11 +17,10 @@
 #include <cstdlib>
 #include <cstring>
 
-namespace DEP
-{
+using namespace SNEEZE::DEP;
 
 XR_RUNTIME::XR_RUNTIME ()
-   : m_pSneeze    (nullptr)
+   : m_pEngine    (nullptr)
    , hInstance   (XR_NULL_HANDLE)
    , bHasRuntime (false)
 {
@@ -32,9 +31,9 @@ XR_RUNTIME::~XR_RUNTIME ()
    Shutdown ();
 }
 
-bool XR_RUNTIME::Initialize (SNEEZE* pSneeze)
+bool XR_RUNTIME::Initialize (ENGINE* pEngine)
 {
-   m_pSneeze = pSneeze;
+   m_pEngine = pEngine;
    // Suppress the loader's own stderr diagnostics - we handle all error cases
    // ourselves with clearer messages. Without this, the loader prints alarming
    // "Error [GENERAL | xrCreateInstance | OpenXR-Loader]" lines on machines
@@ -61,9 +60,9 @@ bool XR_RUNTIME::Initialize (SNEEZE* pSneeze)
    if (XR_FAILED (nResult))
    {
       bHasRuntime = false;
-      m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Warning, "XR_RUNTIME",
+      m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Warning, "XR_RUNTIME",
          "OpenXR loader initialized - no XR runtime detected (code " + std::to_string (nResult) + ")");
-      m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Warning, "XR_RUNTIME",
+      m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Warning, "XR_RUNTIME",
          "This is normal on machines without a VR/AR headset or runtime installed.");
       return true;
    }
@@ -74,7 +73,7 @@ bool XR_RUNTIME::Initialize (SNEEZE* pSneeze)
    if (XR_SUCCEEDED (xrGetInstanceProperties (hInstance, &pProps)))
    {
       sRuntimeName = pProps.runtimeName;
-      m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Info, "XR_RUNTIME",
+      m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "XR_RUNTIME",
          "OpenXR " + std::to_string (XR_VERSION_MAJOR (XR_CURRENT_API_VERSION)) + "."
          + std::to_string (XR_VERSION_MINOR (XR_CURRENT_API_VERSION)) + "."
          + std::to_string (XR_VERSION_PATCH (XR_CURRENT_API_VERSION))
@@ -107,5 +106,3 @@ std::string XR_RUNTIME::GetRuntimeName () const
 {
    return sRuntimeName;
 }
-
-} // namespace DEP

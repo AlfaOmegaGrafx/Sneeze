@@ -16,8 +16,7 @@
 #include <cmath>
 #include <algorithm>
 
-namespace astro {
-
+using namespace SNEEZE::astro;
 
 // ---------------------------------------------------------------------------
 
@@ -239,5 +238,3 @@ void CELESTIAL::ConvertFrameYUp ()
    dPrecY /= static_cast<double> (TICKS_PER_CY);
    dPrecZ /= static_cast<double> (TICKS_PER_CY);
 }
-
-} // namespace astro

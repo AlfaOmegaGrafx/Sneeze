@@ -17,17 +17,17 @@
 #include "WasmInstance.h"
 #include <cstdio>
 
-namespace DEP {
+using namespace SNEEZE::DEP;
 
-WASM_STORE::WASM_STORE (SNEEZE* pSneeze, wasm_engine_t* pEngine, const STORE_IDENTITY& pIdentity)
-   : m_pSneeze (pSneeze)
+WASM_STORE::WASM_STORE (ENGINE* pEngine, wasm_engine_t* pWASM_Engine, const STORE_IDENTITY& pIdentity)
+   : m_pEngine (pEngine)
    , m_pIdentity (pIdentity)
    , m_pStore (nullptr)
    , m_nFabricRefCount (0)
 {
-   m_pStore = wasmtime_store_new (pEngine, nullptr, nullptr);
+   m_pStore = wasmtime_store_new (pWASM_Engine, nullptr, nullptr);
    if (!m_pStore)
-      m_pSneeze->Log (SNEEZE::ISNEEZE::kLOGLEVEL_Error, "WASM_STORE",
+      m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Error, "WASM_STORE",
          "Failed to create native store for [" + pIdentity.sContainer + "]");
 }
 
@@ -82,5 +82,3 @@ void WASM_STORE::AddInstance (WASM_INSTANCE* pInstance)
    std::lock_guard<std::mutex> guard (m_mutex);
    m_apInstances.push_back (pInstance);
 }
-
-} // namespace DEP

@@ -18,11 +18,13 @@
 #include <ctime>
 #include <cstdio>
 
+using namespace SNEEZE;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-std::string SNEEZE::NETWORK::ASSET::NowIso8601 ()
+std::string NETWORK::ASSET::NowIso8601 ()
 {
    auto tpNow  = std::chrono::system_clock::now ();
    auto tmTime = std::chrono::system_clock::to_time_t (tpNow);
@@ -43,7 +45,7 @@ std::string SNEEZE::NETWORK::ASSET::NowIso8601 ()
 // ASSET
 // ---------------------------------------------------------------------------
 
-SNEEZE::NETWORK::ASSET::ASSET (NETWORK* pNetwork, const std::string& sUrl, const std::string& sHash) :
+NETWORK::ASSET::ASSET (NETWORK* pNetwork, const std::string& sUrl, const std::string& sHash) :
    m_pNetwork         (pNetwork),
    m_sUrl             (sUrl),
    m_sHash            (sHash),
@@ -62,12 +64,12 @@ SNEEZE::NETWORK::ASSET::ASSET (NETWORK* pNetwork, const std::string& sUrl, const
    m_sLastAccessedAt = m_sCreatedAt;
 }
 
-SNEEZE::NETWORK::STATE SNEEZE::NETWORK::ASSET::GetState () const
+NETWORK::STATE NETWORK::ASSET::GetState () const
 {
    return m_bState.load ();
 }
 
-std::string SNEEZE::NETWORK::ASSET::GetHeader (const std::string& sName) const
+std::string NETWORK::ASSET::GetHeader (const std::string& sName) const
 {
    auto it = m_mapHeaders.find (sName);
    std::string sResult;
@@ -76,23 +78,23 @@ std::string SNEEZE::NETWORK::ASSET::GetHeader (const std::string& sName) const
    return sResult;
 }
 
-void SNEEZE::NETWORK::ASSET::SetHeaders (const std::unordered_map<std::string, std::string>& mapHeaders)
+void NETWORK::ASSET::SetHeaders (const std::unordered_map<std::string, std::string>& mapHeaders)
 {
    m_mapHeaders = mapHeaders;
 }
 
-void SNEEZE::NETWORK::ASSET::TouchAccess ()
+void NETWORK::ASSET::TouchAccess ()
 {
    m_sLastAccessedAt = NowIso8601 ();
    m_nAccessCount++;
 }
 
-void SNEEZE::NETWORK::ASSET::AttachFile (FILE* pFile)
+void NETWORK::ASSET::AttachFile (FILE* pFile)
 {
    m_apFiles.push_back (pFile);
 }
 
-void SNEEZE::NETWORK::ASSET::DetachFile (FILE* pFile)
+void NETWORK::ASSET::DetachFile (FILE* pFile)
 {
    for (auto it = m_apFiles.begin (); it != m_apFiles.end (); ++it)
    {
@@ -108,29 +110,29 @@ void SNEEZE::NETWORK::ASSET::DetachFile (FILE* pFile)
 // State transitions
 // ---------------------------------------------------------------------------
 
-void SNEEZE::NETWORK::ASSET::SetFetching ()
+void NETWORK::ASSET::SetFetching ()
 {
    m_bState.store (STATE_FETCHING);
 }
 
-void SNEEZE::NETWORK::ASSET::SetValidating ()
+void NETWORK::ASSET::SetValidating ()
 {
    m_bState.store (STATE_VALIDATING);
 }
 
-void SNEEZE::NETWORK::ASSET::Complete (const std::string& sDiskPath, uint64_t nSizeBytes)
+void NETWORK::ASSET::Complete (const std::string& sDiskPath, uint64_t nSizeBytes)
 {
    m_sDiskPath  = sDiskPath;
    m_nSizeBytes = nSizeBytes;
    m_bState.store (STATE_READY);
 }
 
-void SNEEZE::NETWORK::ASSET::Fail ()
+void NETWORK::ASSET::Fail ()
 {
    m_bState.store (STATE_FAILED);
 }
 
-void SNEEZE::NETWORK::ASSET::ResetState ()
+void NETWORK::ASSET::ResetState ()
 {
    m_bState.store (STATE_IDLE);
    m_sDiskPath.clear ();
@@ -146,7 +148,7 @@ void SNEEZE::NETWORK::ASSET::ResetState ()
    m_mapHeaders.clear ();
 }
 
-std::vector<SNEEZE::NETWORK::FILE*> SNEEZE::NETWORK::ASSET::CollectFiles () const
+std::vector<NETWORK::FILE*> NETWORK::ASSET::CollectFiles () const
 {
    return m_apFiles;
 }
@@ -155,7 +157,7 @@ std::vector<SNEEZE::NETWORK::FILE*> SNEEZE::NETWORK::ASSET::CollectFiles () cons
 // Data access
 // ---------------------------------------------------------------------------
 
-std::vector<uint8_t> SNEEZE::NETWORK::ASSET::ReadData () const
+std::vector<uint8_t> NETWORK::ASSET::ReadData () const
 {
    std::vector<uint8_t> aData;
 

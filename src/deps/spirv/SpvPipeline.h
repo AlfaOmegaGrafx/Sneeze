@@ -15,31 +15,27 @@
 #ifndef SNEEZE_SPV_PIPELINE_H
 #define SNEEZE_SPV_PIPELINE_H
 
-#include <string>
-#include <vector>
 #include <cstdint>
 
-class SNEEZE;
-
-namespace DEP
+namespace SNEEZE
 {
+   namespace DEP
+   {
+      class SPV_PIPELINE
+      {
+      public:
+         SPV_PIPELINE ();
+         ~SPV_PIPELINE ();
 
-class SPV_PIPELINE
-{
-public:
-   SPV_PIPELINE ();
-   ~SPV_PIPELINE ();
+         bool Initialize (ENGINE* pEngine);
+         void Shutdown ();
 
-   bool Initialize (SNEEZE* pSneeze);
-   void Shutdown ();
+         bool Validate (const std::vector<uint32_t>& aBinary, std::string& sError);
 
-   bool Validate (const std::vector<uint32_t>& aBinary, std::string& sError);
-
-private:
-   SNEEZE* m_pSneeze;
-   bool bInitialized;
-};
-
-} // namespace DEP
-
+      private:
+         ENGINE* m_pEngine;
+         bool bInitialized;
+      };
+   } // namespace DEP
+}
 #endif // SNEEZE_SPV_PIPELINE_H

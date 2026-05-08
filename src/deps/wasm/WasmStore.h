@@ -21,72 +21,72 @@
 #include <mutex>
 #include <cstdint>
 
-class SNEEZE;
-
-namespace DEP {
-
-class WASM_INSTANCE;
-
-// ---------------------------------------------------------------------------
-// STORE_IDENTITY — the triple that uniquely identifies a WASM store.
-// ---------------------------------------------------------------------------
-
-struct STORE_IDENTITY
+namespace SNEEZE
 {
-   std::string sPersonaHash;
-   std::string sFingerprint;
-   std::string sContainer;
-
-   bool operator== (const STORE_IDENTITY& other) const
+   namespace DEP 
    {
-      return sPersonaHash == other.sPersonaHash  &&
-             sFingerprint == other.sFingerprint  &&
-             sContainer == other.sContainer;
-   }
+      class WASM_INSTANCE;
 
-   std::string Key () const { return sPersonaHash + "|" + sFingerprint + "|" + sContainer; }
-};
+      // ---------------------------------------------------------------------------
+      // STORE_IDENTITY — the triple that uniquely identifies a WASM store.
+      // ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// WASM_STORE — isolated execution context for one or more WASM instances.
-//
-// Identified by (persona, fingerprint, container). Multiple fabrics from the
-// same organization and container share one store. Fabric attachments are
-// reference-counted; when the fabric refcount drops to zero, the store is
-// eligible for destruction.
-// ---------------------------------------------------------------------------
+      struct STORE_IDENTITY
+      {
+         std::string sPersonaHash;
+         std::string sFingerprint;
+         std::string sContainer;
 
-class WASM_STORE
-{
-public:
-   WASM_STORE (SNEEZE* pSneeze, wasm_engine_t* pEngine, const STORE_IDENTITY& pIdentity);
-   ~WASM_STORE ();
+         bool operator== (const STORE_IDENTITY& other) const
+         {
+            return sPersonaHash == other.sPersonaHash  &&
+                   sFingerprint == other.sFingerprint  &&
+                   sContainer == other.sContainer;
+         }
 
-   const STORE_IDENTITY& GetIdentity () const { return m_pIdentity; }
-   wasmtime_store_t*     GetNativeStore () const { return m_pStore; }
-   wasmtime_context_t*   GetContext () const;
+         std::string Key () const { return sPersonaHash + "|" + sFingerprint + "|" + sContainer; }
+      };
 
-   // --- Fabric reference counting ---
+      // ---------------------------------------------------------------------------
+      // WASM_STORE — isolated execution context for one or more WASM instances.
+      //
+      // Identified by (persona, fingerprint, container). Multiple fabrics from the
+      // same organization and container share one store. Fabric attachments are
+      // reference-counted; when the fabric refcount drops to zero, the store is
+      // eligible for destruction.
+      // ---------------------------------------------------------------------------
 
-   int  AddFabricRef ();
-   int  ReleaseFabricRef ();
-   int  GetFabricRefCount () const { return m_nFabricRefCount; }
+      class WASM_STORE
+      {
+      public:
+         WASM_STORE (ENGINE* pEngine, wasm_engine_t* pWASM_Engine, const STORE_IDENTITY& pIdentity);
+         ~WASM_STORE ();
 
-   // --- Instance management ---
+         const STORE_IDENTITY& GetIdentity () const { return m_pIdentity; }
+         wasmtime_store_t*     GetNativeStore () const { return m_pStore; }
+         wasmtime_context_t*   GetContext () const;
 
-   WASM_INSTANCE* FindInstance (const std::string& sUrl, const std::string& sSha256) const;
-   void           AddInstance (WASM_INSTANCE* pInstance);
-   const std::vector<WASM_INSTANCE*>& GetInstances () const { return m_apInstances; }
+         // --- Fabric reference counting ---
 
-private:
-   SNEEZE*                m_pSneeze;
-   STORE_IDENTITY               m_pIdentity;
-   wasmtime_store_t*            m_pStore;
-   int                          m_nFabricRefCount;
-   std::vector<WASM_INSTANCE*>  m_apInstances;
-   mutable std::mutex           m_mutex;
-};
+         int  AddFabricRef ();
+         int  ReleaseFabricRef ();
+         int  GetFabricRefCount () const { return m_nFabricRefCount; }
 
-} // namespace DEP
+         // --- Instance management ---
+
+         WASM_INSTANCE* FindInstance (const std::string& sUrl, const std::string& sSha256) const;
+         void           AddInstance (WASM_INSTANCE* pInstance);
+         const std::vector<WASM_INSTANCE*>& GetInstances () const { return m_apInstances; }
+
+      private:
+         ENGINE*                m_pEngine;
+         STORE_IDENTITY               m_pIdentity;
+         wasmtime_store_t*            m_pStore;
+         int                          m_nFabricRefCount;
+         std::vector<WASM_INSTANCE*>  m_apInstances;
+         mutable std::mutex           m_mutex;
+      };
+   } // namespace DEP
+}
 
 #endif // SNEEZE_WASM_WASMSTORE_H

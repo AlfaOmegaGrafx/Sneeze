@@ -14,28 +14,28 @@
 
 #include <Sneeze.h>
 #include "Storage.h"
-#include "viewport/Viewport.h"
 
+using namespace SNEEZE;
 
 // ===========================================================================
 // STORAGE
 // ===========================================================================
 
-SNEEZE::STORAGE::STORAGE (SNEEZE* pSneeze) :
-   m_pSneeze (pSneeze)
+STORAGE::STORAGE (ENGINE* pEngine) :
+   m_pEngine (pEngine)
 {
 }
 
-SNEEZE::STORAGE::~STORAGE ()
+STORAGE::~STORAGE ()
 {
    Shutdown ();
 }
 
-bool SNEEZE::STORAGE::Initialize ()
+bool STORAGE::Initialize ()
 {
    bool bResult = false;
 
-   ISNEEZE* pHost = m_pSneeze->Host ();
+   ENGINE::IENGINE* pHost = m_pEngine->Host ();
    std::string sAppDataPath = pHost->sAppDataPath ();
 
    if (!sAppDataPath.empty ())
@@ -46,20 +46,20 @@ bool SNEEZE::STORAGE::Initialize ()
       std::filesystem::create_directories (m_sPermanentPath);
       std::filesystem::create_directories (m_sTemporaryPath);
 
-      m_pSneeze->Log (ISNEEZE::kLOGLEVEL_Info, "STORAGE",
+      m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "STORAGE",
          "Initialized (permanent: " + m_sPermanentPath + ", temporary: " + m_sTemporaryPath + ")");
       bResult = true;
    }
    else
    {
-      m_pSneeze->Log (ISNEEZE::kLOGLEVEL_Error, "STORAGE",
+      m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Error, "STORAGE",
          "Failed to determine storage path");
    }
 
    return bResult;
 }
 
-void SNEEZE::STORAGE::Shutdown ()
+void STORAGE::Shutdown ()
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -73,8 +73,7 @@ void SNEEZE::STORAGE::Shutdown ()
 // Container lifecycle
 // ---------------------------------------------------------------------------
 
-SNEEZE::STORAGE::ASSET* SNEEZE::STORAGE::Open (std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> pName,
-   SNEEZE::VIEWPORT* pViewport)
+STORAGE::ASSET* STORAGE::Open (std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, VIEWPORT* pViewport)
 {
    ASSET* pRaw = nullptr;
 
@@ -112,7 +111,7 @@ SNEEZE::STORAGE::ASSET* SNEEZE::STORAGE::Open (std::shared_ptr<SNEEZE::VIEWPORT:
    return pRaw;
 }
 
-void SNEEZE::STORAGE::Close (ASSET* pAsset)
+void STORAGE::Close (ASSET* pAsset)
 {
    if (pAsset)
    {
@@ -144,7 +143,7 @@ void SNEEZE::STORAGE::Close (ASSET* pAsset)
 // Inspector enumeration
 // ---------------------------------------------------------------------------
 
-void SNEEZE::STORAGE::Enumerate (IENUM* pEnum, SNEEZE::VIEWPORT* pViewport)
+void STORAGE::Enumerate (IENUM* pEnum, VIEWPORT* pViewport)
 {
    if (pEnum)
    {
@@ -162,12 +161,12 @@ void SNEEZE::STORAGE::Enumerate (IENUM* pEnum, SNEEZE::VIEWPORT* pViewport)
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-std::string SNEEZE::STORAGE::ComputeUnitPath (const std::string& sBasePath, const std::string& sPersonaHash, const std::string& sFingerprint, const std::string& sFileName) const
+std::string STORAGE::ComputeUnitPath (const std::string& sBasePath, const std::string& sPersonaHash, const std::string& sFingerprint, const std::string& sFileName) const
 {
    return (std::filesystem::path (sBasePath) / sPersonaHash / sFingerprint / sFileName).string ();
 }
 
-SNEEZE::STORAGE::UNIT* SNEEZE::STORAGE::FindOrCreateUnit (const std::string& sJsonPath)
+STORAGE::UNIT* STORAGE::FindOrCreateUnit (const std::string& sJsonPath)
 {
    auto it = m_mapUnits.find (sJsonPath);
    if (it != m_mapUnits.end ())
@@ -189,7 +188,7 @@ SNEEZE::STORAGE::UNIT* SNEEZE::STORAGE::FindOrCreateUnit (const std::string& sJs
    return pRaw;
 }
 
-void SNEEZE::STORAGE::SaveAllDirty ()
+void STORAGE::SaveAllDirty ()
 {
    for (auto& [sPath, pUnit] : m_mapUnits)
    {

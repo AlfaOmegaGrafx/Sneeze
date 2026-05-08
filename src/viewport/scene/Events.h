@@ -17,86 +17,87 @@
 
 #include "scene/Fabric.h"
 #include <cstdint>
-#include <vector>
 #include <mutex>
 #include <functional>
 
-// ---------------------------------------------------------------------------
-// Event types that watchers can subscribe to
-// ---------------------------------------------------------------------------
-
-enum EVENT_TYPE
+namespace SNEEZE
 {
-   EVENT_TYPE_NODE_ADDED    = 0x01,
-   EVENT_TYPE_NODE_REMOVED  = 0x02,
-   EVENT_TYPE_NODE_MODIFIED = 0x04,
-   EVENT_TYPE_ALL           = 0x07,
-};
+   // ---------------------------------------------------------------------------
+   // Event types that watchers can subscribe to
+   // ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// EVENT_DATA — payload delivered to watchers
-// ---------------------------------------------------------------------------
+   enum EVENT_TYPE
+   {
+      EVENT_TYPE_NODE_ADDED    = 0x01,
+      EVENT_TYPE_NODE_REMOVED  = 0x02,
+      EVENT_TYPE_NODE_MODIFIED = 0x04,
+      EVENT_TYPE_ALL           = 0x07,
+   };
 
-struct EVENT_DATA
-{
-   EVENT_TYPE  bType;
-   SNEEZE::VIEWPORT::SCENE::FABRIC::NODE*  pNode;
-   SNEEZE::VIEWPORT::SCENE::FABRIC::NODE*  pParent;
-   uint32_t    twObjectIx;
-};
+   // ---------------------------------------------------------------------------
+   // EVENT_DATA — payload delivered to watchers
+   // ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// Watcher callback signature
-// ---------------------------------------------------------------------------
+   struct EVENT_DATA
+   {
+      EVENT_TYPE  bType;
+      VIEWPORT::SCENE::FABRIC::NODE*  pNode;
+      VIEWPORT::SCENE::FABRIC::NODE*  pParent;
+      uint32_t    twObjectIx;
+   };
 
-using EVENT_CALLBACK = std::function<void (const EVENT_DATA& pEvent)>;
+   // ---------------------------------------------------------------------------
+   // Watcher callback signature
+   // ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// WATCH — a single registered watcher
-// ---------------------------------------------------------------------------
+   using EVENT_CALLBACK = std::function<void (const EVENT_DATA& pEvent)>;
 
-struct WATCH
-{
-   uint32_t       twWatchId;
-   SNEEZE::VIEWPORT::SCENE::FABRIC::NODE*  pTarget;
-   bool           bRecursive;
-   uint32_t       nEventMask;
-   void*          pOwner;
-   EVENT_CALLBACK pfnCallback;
-};
+   // ---------------------------------------------------------------------------
+   // WATCH — a single registered watcher
+   // ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// EVENT_SYSTEM — manages watch registrations and dispatches events.
-//
-// Producers (AddChild, RemoveChild, property writes) call Fire_*() to notify
-// the event system. The event system then invokes all matching watchers.
-// ---------------------------------------------------------------------------
+   struct WATCH
+   {
+      uint32_t       twWatchId;
+      VIEWPORT::SCENE::FABRIC::NODE*  pTarget;
+      bool           bRecursive;
+      uint32_t       nEventMask;
+      void*          pOwner;
+      EVENT_CALLBACK pfnCallback;
+   };
 
-class EVENT_SYSTEM
-{
-public:
-   EVENT_SYSTEM ();
-   ~EVENT_SYSTEM ();
+   // ---------------------------------------------------------------------------
+   // EVENT_SYSTEM — manages watch registrations and dispatches events.
+   //
+   // Producers (AddChild, RemoveChild, property writes) call Fire_*() to notify
+   // the event system. The event system then invokes all matching watchers.
+   // ---------------------------------------------------------------------------
 
-   // --- Watch management ---
+   class EVENT_SYSTEM
+   {
+   public:
+      EVENT_SYSTEM ();
+      ~EVENT_SYSTEM ();
 
-   uint32_t Watch_Node (SNEEZE::VIEWPORT::SCENE::FABRIC::NODE* pNode, uint32_t nEventMask, void* pOwner, EVENT_CALLBACK pfnCallback);
-   uint32_t Watch_Tree (SNEEZE::VIEWPORT::SCENE::FABRIC::NODE* pNode, uint32_t nEventMask, void* pOwner, EVENT_CALLBACK pfnCallback);
-   void     Unwatch (uint32_t twWatchId);
-   void     UnwatchAll (void* pOwner);
+      // --- Watch management ---
 
-   // --- Event dispatch (called by SOM mutators) ---
+      uint32_t Watch_Node (VIEWPORT::SCENE::FABRIC::NODE* pNode, uint32_t nEventMask, void* pOwner, EVENT_CALLBACK pfnCallback);
+      uint32_t Watch_Tree (VIEWPORT::SCENE::FABRIC::NODE* pNode, uint32_t nEventMask, void* pOwner, EVENT_CALLBACK pfnCallback);
+      void     Unwatch (uint32_t twWatchId);
+      void     UnwatchAll (void* pOwner);
 
-   void Fire_NodeAdded (SNEEZE::VIEWPORT::SCENE::FABRIC::NODE* pParent, SNEEZE::VIEWPORT::SCENE::FABRIC::NODE* pChild);
-   void Fire_NodeRemoved (SNEEZE::VIEWPORT::SCENE::FABRIC::NODE* pParent, SNEEZE::VIEWPORT::SCENE::FABRIC::NODE* pChild);
-   void Fire_NodeModified (SNEEZE::VIEWPORT::SCENE::FABRIC::NODE* pNode);
+      // --- Event dispatch (called by SOM mutators) ---
 
-private:
-   bool MatchesTarget (const WATCH& pWatch, SNEEZE::VIEWPORT::SCENE::FABRIC::NODE* pNode) const;
+      void Fire_NodeAdded (VIEWPORT::SCENE::FABRIC::NODE* pParent, VIEWPORT::SCENE::FABRIC::NODE* pChild);
+      void Fire_NodeRemoved (VIEWPORT::SCENE::FABRIC::NODE* pParent, VIEWPORT::SCENE::FABRIC::NODE* pChild);
+      void Fire_NodeModified (VIEWPORT::SCENE::FABRIC::NODE* pNode);
 
-   std::vector<WATCH>  m_aWatches;
-   uint32_t            m_twNextWatchId;
-   mutable std::mutex  m_mutex;
-};
+   private:
+      bool MatchesTarget (const WATCH& pWatch, VIEWPORT::SCENE::FABRIC::NODE* pNode) const;
 
+      std::vector<WATCH>  m_aWatches;
+      uint32_t            m_twNextWatchId;
+      mutable std::mutex  m_mutex;
+   };
+}
 #endif // SNEEZE_SOM_EVENTS_H

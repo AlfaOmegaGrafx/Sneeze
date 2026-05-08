@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <Sneeze.h>
 #include "Orbit.h"
 #include <cmath>
 
-namespace astro {
-
+using namespace SNEEZE::astro;
 
 // ---------------------------------------------------------------------------
 
@@ -331,5 +331,3 @@ VEC3 ORBIT::PointOnOrbit (double dE, int64_t tmElapsed) const
 
    return CELESTIAL::RotateByQuat (dRx, dRy, dRz, dRw, dLX, 0.0, -dLY);
 }
-
-} // namespace astro

@@ -14,14 +14,16 @@
 
 #include <Sneeze.h>
 #include "storage/Storage.h"
-#include "container/Container.h"
-#include "viewport/Viewport.h"
+#include <Container.h>
+#include <Viewport.h>
 
 #include <cstdio>
 #include <cstring>
 #include <string>
 #include <filesystem>
 #include <fstream>
+
+using namespace SNEEZE;
 
 static int nPassed = 0;
 static int nFailed = 0;
@@ -44,7 +46,7 @@ static void Check (bool bCondition, const char* szName)
 // Minimal ISNEEZE for tests
 // ---------------------------------------------------------------------------
 
-class STORAGE_TEST_HOST : public SNEEZE::ISNEEZE
+class STORAGE_TEST_HOST : public SNEEZE::ENGINE::IENGINE
 {
 public:
    std::string m_sAppDataPath;
@@ -66,7 +68,7 @@ public:
    }
 };
 
-class STORAGE_TEST_VIEWPORT_HOST : public SNEEZE::IVIEWPORT
+class STORAGE_TEST_VIEWPORT_HOST : public IVIEWPORT
 {
 public:
    int m_nCreatedCount = 0;
@@ -86,19 +88,19 @@ public:
 
    void OnFrameReady (const uint32_t*, int, int) override {}
 
-   void OnStorageUnitCreated (SNEEZE::NOTIFICATION*) override { m_nCreatedCount++; }
-   void OnStorageUnitChanged (SNEEZE::NOTIFICATION*) override { m_nChangedCount++; }
-   void OnStorageUnitDeleted (SNEEZE::NOTIFICATION*) override { m_nDeletedCount++; }
+   void OnStorageUnitCreated (NOTIFICATION*) override { m_nCreatedCount++; }
+   void OnStorageUnitChanged (NOTIFICATION*) override { m_nChangedCount++; }
+   void OnStorageUnitDeleted (NOTIFICATION*) override { m_nDeletedCount++; }
 };
 
 static STORAGE_TEST_HOST*          s_pHost    = nullptr;
 static STORAGE_TEST_VIEWPORT_HOST* s_pVPHost  = nullptr;
-static SNEEZE*                     s_pSneeze  = nullptr;
-static SNEEZE::STORAGE*            s_pStorage = nullptr;
+static ENGINE*                     s_pSneeze  = nullptr;
+static STORAGE*                    s_pStorage = nullptr;
 
-static std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> MakeTestName (const std::string& sContainer = "poker")
+static std::shared_ptr<VIEWPORT::CONTAINER::NAME> MakeTestName (const std::string& sContainer = "poker")
 {
-   auto pName = std::make_shared<SNEEZE::VIEWPORT::CONTAINER::NAME> ();
+   auto pName = std::make_shared<VIEWPORT::CONTAINER::NAME> ();
    pName->sFingerprint   = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
    pName->sOrganization  = "TestOrg";
    pName->sCommonName    = "TestOrg";
@@ -122,11 +124,11 @@ static void TestInitializeAndOpenClose ()
 {
    std::printf ("\n[Test 1] Initialize and Open/Close\n");
 
-   SNEEZE::STORAGE* pStorage = s_pStorage;
+   STORAGE* pStorage = s_pStorage;
    Check (pStorage != nullptr, "Storage exists");
 
    auto pName = MakeTestName ();
-   SNEEZE::STORAGE::ASSET* pAsset = pStorage->Open (pName);
+   STORAGE::ASSET* pAsset = pStorage->Open (pName);
    Check (pAsset != nullptr, "Open returns ASSET");
    Check (pAsset->GetName () == pName, "ASSET holds correct NAME");
    Check (pAsset->GetRefCount () == 1, "Ref count is 1 after Open");
@@ -144,24 +146,24 @@ static void TestBasicOperations ()
 {
    std::printf ("\n[Test 2] Basic Set/Get/Has/Remove\n");
 
-   SNEEZE::STORAGE* pStorage = s_pStorage;
+   STORAGE* pStorage = s_pStorage;
    auto pName = MakeTestName ();
-   SNEEZE::STORAGE::ASSET* pAsset = pStorage->Open (pName);
+   STORAGE::ASSET* pAsset = pStorage->Open (pName);
 
    s_pVPHost->m_nChangedCount = 0;
 
-   pAsset->Set (SNEEZE::STORAGE::CONTAINER_PERMANENT, "player.name", "Dean");
+   pAsset->Set (STORAGE::CONTAINER_PERMANENT, "player.name", "Dean");
    Check (s_pVPHost->m_nChangedCount == 1, "OnStorageUnitChanged fired on Set");
 
-   auto jValue = pAsset->Get (SNEEZE::STORAGE::CONTAINER_PERMANENT, "player.name");
+   auto jValue = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "player.name");
    Check (jValue.is_string (), "Get returns string type");
    Check (jValue.get<std::string> () == "Dean", "Get returns correct value");
 
-   Check (pAsset->Has (SNEEZE::STORAGE::CONTAINER_PERMANENT, "player.name"), "Has returns true for existing key");
-   Check (!pAsset->Has (SNEEZE::STORAGE::CONTAINER_PERMANENT, "player.missing"), "Has returns false for missing key");
+   Check (pAsset->Has (STORAGE::CONTAINER_PERMANENT, "player.name"), "Has returns true for existing key");
+   Check (!pAsset->Has (STORAGE::CONTAINER_PERMANENT, "player.missing"), "Has returns false for missing key");
 
-   pAsset->Remove (SNEEZE::STORAGE::CONTAINER_PERMANENT, "player.name");
-   Check (!pAsset->Has (SNEEZE::STORAGE::CONTAINER_PERMANENT, "player.name"), "Remove deletes key");
+   pAsset->Remove (STORAGE::CONTAINER_PERMANENT, "player.name");
+   Check (!pAsset->Has (STORAGE::CONTAINER_PERMANENT, "player.name"), "Remove deletes key");
 
    pStorage->Close (pAsset);
 }
@@ -174,21 +176,21 @@ static void TestPathNavigation ()
 {
    std::printf ("\n[Test 3] Nested path navigation\n");
 
-   SNEEZE::STORAGE* pStorage = s_pStorage;
+   STORAGE* pStorage = s_pStorage;
    auto pName = MakeTestName ();
-   SNEEZE::STORAGE::ASSET* pAsset = pStorage->Open (pName);
+   STORAGE::ASSET* pAsset = pStorage->Open (pName);
 
-   pAsset->Set (SNEEZE::STORAGE::CONTAINER_PERMANENT, "game.poker.table.color", "green");
-   pAsset->Set (SNEEZE::STORAGE::CONTAINER_PERMANENT, "game.poker.table.seats", 8);
+   pAsset->Set (STORAGE::CONTAINER_PERMANENT, "game.poker.table.color", "green");
+   pAsset->Set (STORAGE::CONTAINER_PERMANENT, "game.poker.table.seats", 8);
 
-   auto jColor = pAsset->Get (SNEEZE::STORAGE::CONTAINER_PERMANENT, "game.poker.table.color");
+   auto jColor = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "game.poker.table.color");
    Check (jColor.is_string ()  &&  jColor.get<std::string> () == "green", "Deep nested string");
 
-   auto jSeats = pAsset->Get (SNEEZE::STORAGE::CONTAINER_PERMANENT, "game.poker.table.seats");
+   auto jSeats = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "game.poker.table.seats");
    Check (jSeats.is_number_integer ()  &&  jSeats.get<int> () == 8, "Deep nested number");
 
-   Check (pAsset->Has (SNEEZE::STORAGE::CONTAINER_PERMANENT, "game.poker.table.color"), "Has works for deep path");
-   Check (!pAsset->Has (SNEEZE::STORAGE::CONTAINER_PERMANENT, "game.poker.table.missing"), "Has fails for missing deep path");
+   Check (pAsset->Has (STORAGE::CONTAINER_PERMANENT, "game.poker.table.color"), "Has works for deep path");
+   Check (!pAsset->Has (STORAGE::CONTAINER_PERMANENT, "game.poker.table.missing"), "Has fails for missing deep path");
 
    pStorage->Close (pAsset);
 }
@@ -201,27 +203,27 @@ static void TestArrayAccess ()
 {
    std::printf ("\n[Test 4] Array index access\n");
 
-   SNEEZE::STORAGE* pStorage = s_pStorage;
+   STORAGE* pStorage = s_pStorage;
    auto pName = MakeTestName ();
-   SNEEZE::STORAGE::ASSET* pAsset = pStorage->Open (pName);
+   STORAGE::ASSET* pAsset = pStorage->Open (pName);
 
-   pAsset->Set (SNEEZE::STORAGE::CONTAINER_PERMANENT, "scores[0]", 100);
-   pAsset->Set (SNEEZE::STORAGE::CONTAINER_PERMANENT, "scores[1]", 200);
-   pAsset->Set (SNEEZE::STORAGE::CONTAINER_PERMANENT, "scores[2]", 300);
+   pAsset->Set (STORAGE::CONTAINER_PERMANENT, "scores[0]", 100);
+   pAsset->Set (STORAGE::CONTAINER_PERMANENT, "scores[1]", 200);
+   pAsset->Set (STORAGE::CONTAINER_PERMANENT, "scores[2]", 300);
 
-   auto j0 = pAsset->Get (SNEEZE::STORAGE::CONTAINER_PERMANENT, "scores[0]");
-   auto j1 = pAsset->Get (SNEEZE::STORAGE::CONTAINER_PERMANENT, "scores[1]");
-   auto j2 = pAsset->Get (SNEEZE::STORAGE::CONTAINER_PERMANENT, "scores[2]");
+   auto j0 = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "scores[0]");
+   auto j1 = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "scores[1]");
+   auto j2 = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "scores[2]");
 
    Check (j0.is_number ()  &&  j0.get<int> () == 100, "Array index 0");
    Check (j1.is_number ()  &&  j1.get<int> () == 200, "Array index 1");
    Check (j2.is_number ()  &&  j2.get<int> () == 300, "Array index 2");
 
-   pAsset->Set (SNEEZE::STORAGE::CONTAINER_PERMANENT, "game.players[0].name", "Alice");
-   pAsset->Set (SNEEZE::STORAGE::CONTAINER_PERMANENT, "game.players[1].name", "Bob");
+   pAsset->Set (STORAGE::CONTAINER_PERMANENT, "game.players[0].name", "Alice");
+   pAsset->Set (STORAGE::CONTAINER_PERMANENT, "game.players[1].name", "Bob");
 
-   auto jAlice = pAsset->Get (SNEEZE::STORAGE::CONTAINER_PERMANENT, "game.players[0].name");
-   auto jBob   = pAsset->Get (SNEEZE::STORAGE::CONTAINER_PERMANENT, "game.players[1].name");
+   auto jAlice = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "game.players[0].name");
+   auto jBob   = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "game.players[1].name");
 
    Check (jAlice.is_string ()  &&  jAlice.get<std::string> () == "Alice", "Nested array object [0]");
    Check (jBob.is_string ()  &&  jBob.get<std::string> () == "Bob", "Nested array object [1]");
@@ -237,20 +239,20 @@ static void TestPersistence ()
 {
    std::printf ("\n[Test 5] Persistence across Open/Close\n");
 
-   SNEEZE::STORAGE* pStorage = s_pStorage;
+   STORAGE* pStorage = s_pStorage;
    auto pName = MakeTestName ("persist-test");
 
    {
-      SNEEZE::STORAGE::ASSET* pAsset = pStorage->Open (pName);
-      pAsset->Set (SNEEZE::STORAGE::CONTAINER_PERMANENT, "saved.value", 42);
-      pAsset->Set (SNEEZE::STORAGE::CONTAINER_PERMANENT, "saved.text", "hello");
+      STORAGE::ASSET* pAsset = pStorage->Open (pName);
+      pAsset->Set (STORAGE::CONTAINER_PERMANENT, "saved.value", 42);
+      pAsset->Set (STORAGE::CONTAINER_PERMANENT, "saved.text", "hello");
       pStorage->Close (pAsset);
    }
 
    {
-      SNEEZE::STORAGE::ASSET* pAsset = pStorage->Open (pName);
-      auto jValue = pAsset->Get (SNEEZE::STORAGE::CONTAINER_PERMANENT, "saved.value");
-      auto jText  = pAsset->Get (SNEEZE::STORAGE::CONTAINER_PERMANENT, "saved.text");
+      STORAGE::ASSET* pAsset = pStorage->Open (pName);
+      auto jValue = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "saved.value");
+      auto jText  = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "saved.text");
 
       Check (jValue.is_number ()  &&  jValue.get<int> () == 42, "Number persisted across Open/Close");
       Check (jText.is_string ()  &&  jText.get<std::string> () == "hello", "String persisted across Open/Close");
@@ -267,21 +269,21 @@ static void TestOrgSharing ()
 {
    std::printf ("\n[Test 6] Organization storage shared across containers\n");
 
-   SNEEZE::STORAGE* pStorage = s_pStorage;
+   STORAGE* pStorage = s_pStorage;
    auto pNameA = MakeTestName ("container-a");
    auto pNameB = MakeTestName ("container-b");
 
-   SNEEZE::STORAGE::ASSET* pAssetA = pStorage->Open (pNameA);
-   pAssetA->Set (SNEEZE::STORAGE::ORG_PERMANENT, "org.setting", "shared-value");
+   STORAGE::ASSET* pAssetA = pStorage->Open (pNameA);
+   pAssetA->Set (STORAGE::ORG_PERMANENT, "org.setting", "shared-value");
 
-   SNEEZE::STORAGE::ASSET* pAssetB = pStorage->Open (pNameB);
-   auto jOrgB = pAssetB->Get (SNEEZE::STORAGE::ORG_PERMANENT, "org.setting");
+   STORAGE::ASSET* pAssetB = pStorage->Open (pNameB);
+   auto jOrgB = pAssetB->Get (STORAGE::ORG_PERMANENT, "org.setting");
 
    Check (jOrgB.is_string ()  &&  jOrgB.get<std::string> () == "shared-value",
       "Org storage visible to second container");
 
-   Check (pAssetA->GetUnit (SNEEZE::STORAGE::ORG_PERMANENT) ==
-          pAssetB->GetUnit (SNEEZE::STORAGE::ORG_PERMANENT),
+   Check (pAssetA->GetUnit (STORAGE::ORG_PERMANENT) ==
+          pAssetB->GetUnit (STORAGE::ORG_PERMANENT),
       "Both containers share the same org UNIT");
 
    pStorage->Close (pAssetA);
@@ -296,19 +298,19 @@ static void TestScopeIsolation ()
 {
    std::printf ("\n[Test 7] Scope isolation\n");
 
-   SNEEZE::STORAGE* pStorage = s_pStorage;
+   STORAGE* pStorage = s_pStorage;
    auto pName = MakeTestName ("scope-test");
-   SNEEZE::STORAGE::ASSET* pAsset = pStorage->Open (pName);
+   STORAGE::ASSET* pAsset = pStorage->Open (pName);
 
-   pAsset->Set (SNEEZE::STORAGE::CONTAINER_PERMANENT, "key", "permanent");
-   pAsset->Set (SNEEZE::STORAGE::CONTAINER_TEMPORARY, "key", "temporary");
-   pAsset->Set (SNEEZE::STORAGE::ORG_PERMANENT, "key", "org-permanent");
-   pAsset->Set (SNEEZE::STORAGE::ORG_TEMPORARY, "key", "org-temporary");
+   pAsset->Set (STORAGE::CONTAINER_PERMANENT, "key", "permanent");
+   pAsset->Set (STORAGE::CONTAINER_TEMPORARY, "key", "temporary");
+   pAsset->Set (STORAGE::ORG_PERMANENT, "key", "org-permanent");
+   pAsset->Set (STORAGE::ORG_TEMPORARY, "key", "org-temporary");
 
-   auto j1 = pAsset->Get (SNEEZE::STORAGE::CONTAINER_PERMANENT, "key");
-   auto j2 = pAsset->Get (SNEEZE::STORAGE::CONTAINER_TEMPORARY, "key");
-   auto j3 = pAsset->Get (SNEEZE::STORAGE::ORG_PERMANENT, "key");
-   auto j4 = pAsset->Get (SNEEZE::STORAGE::ORG_TEMPORARY, "key");
+   auto j1 = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "key");
+   auto j2 = pAsset->Get (STORAGE::CONTAINER_TEMPORARY, "key");
+   auto j3 = pAsset->Get (STORAGE::ORG_PERMANENT, "key");
+   auto j4 = pAsset->Get (STORAGE::ORG_TEMPORARY, "key");
 
    Check (j1.get<std::string> () == "permanent", "CONTAINER_PERMANENT isolated");
    Check (j2.get<std::string> () == "temporary", "CONTAINER_TEMPORARY isolated");
@@ -326,7 +328,7 @@ static void TestCrashRecovery ()
 {
    std::printf ("\n[Test 8] JSONL crash recovery\n");
 
-   SNEEZE::STORAGE* pStorage = s_pStorage;
+   STORAGE* pStorage = s_pStorage;
    auto pName = MakeTestName ("crash-test");
 
    // Compute the actual path that STORAGE will use
@@ -353,11 +355,11 @@ static void TestCrashRecovery ()
       f << "[\"Remove\",\"will-remove\"]\n";
    }
 
-   SNEEZE::STORAGE::ASSET* pAsset = pStorage->Open (pName);
+   STORAGE::ASSET* pAsset = pStorage->Open (pName);
 
-   auto jRecovered = pAsset->Get (SNEEZE::STORAGE::CONTAINER_PERMANENT, "recovered");
-   auto jBase      = pAsset->Get (SNEEZE::STORAGE::CONTAINER_PERMANENT, "base");
-   auto jRemoved   = pAsset->Get (SNEEZE::STORAGE::CONTAINER_PERMANENT, "will-remove");
+   auto jRecovered = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "recovered");
+   auto jBase      = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "base");
+   auto jRemoved   = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "will-remove");
 
    Check (jRecovered.is_string ()  &&  jRecovered.get<std::string> () == "yes",
       "Log Set replayed on recovery");
@@ -379,22 +381,22 @@ static void TestBulkJson ()
 {
    std::printf ("\n[Test 9] Bulk JSON get/set\n");
 
-   SNEEZE::STORAGE* pStorage = s_pStorage;
+   STORAGE* pStorage = s_pStorage;
    auto pName = MakeTestName ("bulk-test");
-   SNEEZE::STORAGE::ASSET* pAsset = pStorage->Open (pName);
+   STORAGE::ASSET* pAsset = pStorage->Open (pName);
 
-   pAsset->SetJson (SNEEZE::STORAGE::CONTAINER_PERMANENT,
+   pAsset->SetJson (STORAGE::CONTAINER_PERMANENT,
       "{\"bulk\": {\"a\": 1, \"b\": 2}, \"list\": [10, 20, 30]}");
 
-   auto jA = pAsset->Get (SNEEZE::STORAGE::CONTAINER_PERMANENT, "bulk.a");
-   auto jB = pAsset->Get (SNEEZE::STORAGE::CONTAINER_PERMANENT, "bulk.b");
-   auto jList1 = pAsset->Get (SNEEZE::STORAGE::CONTAINER_PERMANENT, "list[1]");
+   auto jA = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "bulk.a");
+   auto jB = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "bulk.b");
+   auto jList1 = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "list[1]");
 
    Check (jA.is_number ()  &&  jA.get<int> () == 1, "Bulk set: nested value a");
    Check (jB.is_number ()  &&  jB.get<int> () == 2, "Bulk set: nested value b");
    Check (jList1.is_number ()  &&  jList1.get<int> () == 20, "Bulk set: array access");
 
-   std::string sJson = pAsset->GetJson (SNEEZE::STORAGE::CONTAINER_PERMANENT);
+   std::string sJson = pAsset->GetJson (STORAGE::CONTAINER_PERMANENT);
    Check (sJson.find ("\"bulk\"") != std::string::npos, "GetJson contains data");
 
    pStorage->Close (pAsset);
@@ -408,11 +410,11 @@ static void TestMetaSidecar ()
 {
    std::printf ("\n[Test 10] Meta sidecar\n");
 
-   SNEEZE::STORAGE* pStorage = s_pStorage;
+   STORAGE* pStorage = s_pStorage;
    auto pName = MakeTestName ("meta-test");
 
-   SNEEZE::STORAGE::ASSET* pAsset = pStorage->Open (pName);
-   pAsset->Set (SNEEZE::STORAGE::CONTAINER_PERMANENT, "data", "value");
+   STORAGE::ASSET* pAsset = pStorage->Open (pName);
+   pAsset->Set (STORAGE::CONTAINER_PERMANENT, "data", "value");
    pStorage->Close (pAsset);
 
    std::string sFp2  = pName->sFingerprint.substr (0, 2);
@@ -451,12 +453,12 @@ int RunStorageTests (int nArgc, char** aArgv)
    CleanTestDir ();
 
    s_pHost = new STORAGE_TEST_HOST ();
-   s_pSneeze = new SNEEZE (s_pHost);
+   s_pSneeze = new ENGINE (s_pHost);
 
    s_pVPHost = new STORAGE_TEST_VIEWPORT_HOST ();
    s_pSneeze->Viewport_Open (s_pVPHost);
 
-   s_pStorage = new SNEEZE::STORAGE (s_pSneeze);
+   s_pStorage = new STORAGE (s_pSneeze);
    bool bInit = s_pStorage->Initialize ();
    Check (bInit, "Storage initialized");
 
