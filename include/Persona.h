@@ -37,8 +37,8 @@ namespace SNEEZE
          void Login (const std::string& sFirst, const std::string& sSecond);
          void Logout ();
 
-         const std::string& GetName () const { return m_sName; }
-         const std::string& GetHash () const { return m_sHash; }
+         const std::string& Name () const { return m_sName; }
+         const std::string& Hash () const { return m_sHash; }
 
       private:
          static std::string ComputeHash (const std::string& sInput);

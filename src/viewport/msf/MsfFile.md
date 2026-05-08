@@ -37,7 +37,7 @@ msf.GetSignatureError ();         // "" if valid, error message otherwise
 msf.GetChainError ();             // "" if trusted, error message otherwise
 
 // 5. Inspect the payload
-msf.GetNamespace ();              // "com.pokerstars.poker"
+msf.Namespace ();              // "com.pokerstars.poker"
 msf.GetOrganization ();           // "PokerStars"
 msf.GetSuccessor ();              // successor fingerprint (or "")
 msf.GetServices ();               // vector of MSF_SERVICE

@@ -71,7 +71,7 @@ WASM_INSTANCE* WASM_STORE::FindInstance (const std::string& sUrl, const std::str
    std::lock_guard<std::mutex> guard (m_mutex);
    for (auto* pInstance : m_apInstances)
    {
-      if (pInstance->GetUrl () == sUrl  &&  pInstance->GetSha256 () == sSha256)
+      if (pInstance->Url () == sUrl  &&  pInstance->GetSha256 () == sSha256)
          return pInstance;
    }
    return nullptr;

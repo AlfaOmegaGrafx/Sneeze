@@ -44,13 +44,13 @@ VIEWPORT::~VIEWPORT ()
 
 bool VIEWPORT::Initialize (const std::string& sUrl)
 {
-   m_pHost->GetFrameSize (m_nWidth, m_nHeight);
+   m_pHost->FrameSize (m_nWidth, m_nHeight);
 
    // Mark renderer as pending -- actual creation deferred to the compositor
    // thread (Filament requires the rendering thread to be the one that creates
    // the engine, otherwise it fails with "This thread has not been adopted").
    std::string sLibrary = m_pEngine->Host ()->sRenderer ();
-   if (!sLibrary.empty ()  &&  m_pHost->GetFrameWindow ())
+   if (!sLibrary.empty ()  &&  m_pHost->FrameWindow ())
       m_bRendererPending = true;
 
    // Create scene
@@ -76,7 +76,7 @@ bool VIEWPORT::InitializeRenderer ()
    std::string sLibrary = m_pEngine->Host ()->sRenderer ();
    auto* pRenderer = new RENDERER::ANARI (m_pEngine, sLibrary);
 
-   void* pNativeWindow = m_pHost->GetFrameWindow ();
+   void* pNativeWindow = m_pHost->FrameWindow ();
    if (pNativeWindow)
       pRenderer->SetNativeWindow (pNativeWindow);
 

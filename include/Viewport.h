@@ -38,8 +38,8 @@ namespace SNEEZE
 
       // --- Callbacks (host must implement) ---
 
-      virtual void* GetFrameWindow ()                                         = 0;
-      virtual void  GetFrameSize   (int &nWidth, int& nHeight)                = 0;
+      virtual void* FrameWindow    ()                                         = 0;
+      virtual void  FrameSize      (int &nWidth, int& nHeight)                = 0;
 
       virtual void  OnFrameReady   (const uint32_t* pFB, int nFbW, int nFbH)  = 0;
 
@@ -65,7 +65,7 @@ namespace SNEEZE
 
    public:
       // ---------------------------------------------------------------------------
-      // VIEWPORT::CONTAINER — the runtime manifestation of an MSF file.
+      // VIEWPORT::CONTAINER ï¿½ the runtime manifestation of an MSF file.
       //
       // NAME is the identity record for a container. Uniqueness is determined by
       // the tuple (persona hash, fingerprint, container name).
@@ -101,7 +101,7 @@ namespace SNEEZE
       {
          float dTheta    = 0.3f;
          float dPhi      = 0.4f;
-         float dDistance  = 10.0f;
+         float dDistance = 10.0f;
          float dTargetX  = 0.0f;
          float dTargetY  = 0.0f;
          float dTargetZ  = 0.0f;

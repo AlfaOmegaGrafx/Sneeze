@@ -64,12 +64,12 @@ NETWORK::ASSET::ASSET (NETWORK* pNetwork, const std::string& sUrl, const std::st
    m_sLastAccessedAt = m_sCreatedAt;
 }
 
-NETWORK::STATE NETWORK::ASSET::GetState () const
+NETWORK::STATE NETWORK::ASSET::State () const
 {
    return m_bState.load ();
 }
 
-std::string NETWORK::ASSET::GetHeader (const std::string& sName) const
+std::string NETWORK::ASSET::Header (const std::string& sName) const
 {
    auto it = m_mapHeaders.find (sName);
    std::string sResult;

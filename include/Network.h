@@ -109,57 +109,57 @@ namespace SNEEZE
       public:
          ASSET (NETWORK* pNetwork, const std::string& sUrl, const std::string& sHash);
 
-         const std::string& GetUrl ()  const { return m_sUrl; }
-         const std::string& GetHash () const { return m_sHash; }
-         bool               IsHashed () const { return !m_sHash.empty (); }
+         const std::string& Url               () const { return m_sUrl; }
+         const std::string& Hash              () const { return m_sHash; }
+         bool               IsHashed          () const { return !m_sHash.empty (); }
 
-         STATE              GetState () const;
-         const std::string& GetDiskPath () const { return m_sDiskPath; }
+         STATE              State             () const;
+         const std::string& DiskPath          () const { return m_sDiskPath; }
 
-         long               GetHttpStatus () const      { return m_nHttpStatus; }
-         double             GetFetchStartTime () const   { return m_dFetchStartTime; }
-         double             GetFetchEndTime () const     { return m_dFetchEndTime; }
-         double             GetFetchDuration () const    { return m_dFetchEndTime - m_dFetchStartTime; }
-         double             GetFetchQueuedTime () const  { return m_dFetchQueuedTime; }
-         double             GetQueueDuration () const    { return m_dFetchStartTime - m_dFetchQueuedTime; }
-         bool               IsServedFromCache () const   { return m_bServedFromCache; }
+         long               HttpStatus        () const { return m_nHttpStatus; }
+         double             FetchStartTime    () const { return m_dFetchStartTime; }
+         double             FetchEndTime      () const { return m_dFetchEndTime; }
+         double             FetchDuration     () const { return m_dFetchEndTime - m_dFetchStartTime; }
+         double             FetchQueuedTime   () const { return m_dFetchQueuedTime; }
+         double             GetQueueDuration  () const { return m_dFetchStartTime - m_dFetchQueuedTime; }
+         bool               IsServedFromCache () const { return m_bServedFromCache; }
 
-         void SetHttpStatus (long nStatus)               { m_nHttpStatus = nStatus; }
-         void SetFetchStartTime (double dTime)           { m_dFetchStartTime = dTime; }
-         void SetFetchEndTime (double dTime)             { m_dFetchEndTime = dTime; }
-         void SetFetchQueuedTime (double dTime)          { m_dFetchQueuedTime = dTime; }
-         void SetServedFromCache (bool bServed)           { m_bServedFromCache = bServed; }
+         void               SetHttpStatus        (long nStatus) { m_nHttpStatus = nStatus; }
+         void               SetFetchStartTime    (double dTime) { m_dFetchStartTime = dTime; }
+         void               SetFetchEndTime      (double dTime) { m_dFetchEndTime = dTime; }
+         void               SetFetchQueuedTime   (double dTime) { m_dFetchQueuedTime = dTime; }
+         void               SetServedFromCache   (bool bServed) { m_bServedFromCache = bServed; }
 
-         const std::unordered_map<std::string, std::string>& GetHeaders () const { return m_mapHeaders; }
-         std::string GetHeader (const std::string& sName) const;
+         const std::unordered_map<std::string, std::string>& Headers () const { return m_mapHeaders; }
+         std::string Header (const std::string& sName) const;
 
-         uint64_t    GetSizeBytes ()      const { return m_nSizeBytes; }
-         std::string GetCreatedTime ()    const { return m_sCreatedAt; }
-         std::string GetLastAccessTime () const { return m_sLastAccessedAt; }
-         uint32_t    GetAccessCount ()    const { return m_nAccessCount; }
-         uint32_t    GetAssetIx ()        const { return m_nAssetIx; }
+         uint64_t    SizeBytes      () const { return m_nSizeBytes; }
+         std::string CreatedTime    () const { return m_sCreatedAt; }
+         std::string LastAccessTime () const { return m_sLastAccessedAt; }
+         uint32_t    AccessCount    () const { return m_nAccessCount; }
+         uint32_t    AssetIx        () const { return m_nAssetIx; }
 
-         void SetDiskPath (const std::string& sPath) { m_sDiskPath = sPath; }
-         void SetHash (const std::string& sHash) { m_sHash = sHash; }
-         void SetHeaders (const std::unordered_map<std::string, std::string>& mapHeaders);
-         void SetSizeBytes (uint64_t nBytes) { m_nSizeBytes = nBytes; }
-         void SetCreatedTime (const std::string& sTime) { m_sCreatedAt = sTime; }
-         void SetAssetIx (uint32_t nAssetIx) { m_nAssetIx = nAssetIx; }
-         void TouchAccess ();
+         void        SetDiskPath (const std::string& sPath) { m_sDiskPath = sPath; }
+         void        SetHash (const std::string& sHash) { m_sHash = sHash; }
+         void        SetHeaders (const std::unordered_map<std::string, std::string>& mapHeaders);
+         void        SetSizeBytes (uint64_t nBytes) { m_nSizeBytes = nBytes; }
+         void        SetCreatedTime (const std::string& sTime) { m_sCreatedAt = sTime; }
+         void        SetAssetIx (uint32_t nAssetIx) { m_nAssetIx = nAssetIx; }
+         void        TouchAccess ();
 
-         void AttachFile (FILE* pFile);
-         void DetachFile (FILE* pFile);
+         void        AttachFile (FILE* pFile);
+         void        DetachFile (FILE* pFile);
 
-         void SetFetching ();
-         void SetValidating ();
-         void Complete (const std::string& sDiskPath, uint64_t nSizeBytes);
-         void Fail ();
+         void        SetFetching ();
+         void        SetValidating ();
+         void        Complete (const std::string& sDiskPath, uint64_t nSizeBytes);
+         void        Fail ();
 
-         void ResetState ();
+         void        ResetState ();
 
-         void SetPendingReset (bool b)           { m_bPendingReset = b; }
-         bool IsPendingReset () const            { return m_bPendingReset; }
-         size_t GetFileCount () const            { return m_apFiles.size (); }
+         void        SetPendingReset (bool b)           { m_bPendingReset = b; }
+         bool        IsPendingReset () const            { return m_bPendingReset; }
+         size_t      GetFileCount () const            { return m_apFiles.size (); }
 
          std::vector<FILE*> CollectFiles () const;
 
@@ -211,56 +211,56 @@ namespace SNEEZE
 
          // --- Snapshot fields (always available, even after Release) ---
 
-         STATE       GetState () const             { return m_bState; }
-         bool        IsReady () const              { return m_bState == STATE_READY; }
+         STATE                State             () const    { return m_bState; }
+         bool                 IsReady           () const    { return m_bState == STATE_READY; }
 
-         std::string GetUrl () const               { return m_sUrl; }
-         std::string GetHash () const              { return m_sHash; }
-         bool        IsHashed () const             { return !m_sHash.empty (); }
+         std::string          Url               () const    { return m_sUrl; }
+         std::string          Hash              () const    { return m_sHash; }
+         bool                 IsHashed          () const    { return !m_sHash.empty (); }
 
-         uint32_t    GetFileIx () const            { return m_nFileIx; }
-         uint32_t    GetAssetIx () const            { return m_nAssetIx; }
-         long        GetHttpStatus () const        { return m_nHttpStatus; }
-         double      GetFetchQueuedTime () const   { return m_dFetchQueuedTime; }
-         double      GetFetchStartTime () const    { return m_dFetchStartTime; }
-         double      GetFetchEndTime () const      { return m_dFetchEndTime; }
-         double      GetFetchDuration () const     { return m_dFetchEndTime - m_dFetchStartTime; }
-         bool        IsServedFromCache () const    { return m_bServedFromCache; }
+         uint32_t             FileIx            () const    { return m_nFileIx; }
+         uint32_t             AssetIx           () const    { return m_nAssetIx; }
+         long                 HttpStatus        () const    { return m_nHttpStatus; }
+         double               FetchQueuedTime   () const    { return m_dFetchQueuedTime; }
+         double               FetchStartTime    () const    { return m_dFetchStartTime; }
+         double               FetchEndTime      () const    { return m_dFetchEndTime; }
+         double               FetchDuration     () const    { return m_dFetchEndTime - m_dFetchStartTime; }
+         bool                 IsServedFromCache () const    { return m_bServedFromCache; }
 
-         std::string GetContentType () const       { return m_sContentType; }
-         uint64_t    GetSizeBytes () const         { return m_nSizeBytes; }
+         std::string          ContentType       () const    { return m_sContentType; }
+         uint64_t             SizeBytes         () const    { return m_nSizeBytes; }
 
          // --- ASSET-dependent (require attached ASSET, empty/default after Release) ---
 
-         std::vector<uint8_t> ReadData () const;
-         std::string GetHeader (const std::string& sName) const;
-         std::string GetDiskPath () const;
-         std::string GetCreatedTime () const;
-         std::string GetLastAccessTime () const;
-         uint32_t    GetAccessCount () const;
-         const std::unordered_map<std::string, std::string>& GetHeaders () const;
+         std::vector<uint8_t> ReadData          () const;
+         std::string          Header (const std::string& sName) const;
+         std::string          DiskPath          () const;
+         std::string          CreatedTime       () const;
+         std::string          LastAccessTime    () const;
+         uint32_t             AccessCount       () const;
+         const std::unordered_map<std::string, std::string>& Headers () const;
 
          // --- Actions ---
 
-         bool        Request (IFILE* pListener = nullptr);
-         void        Release ();
-         void        Clear (bool b = true);
-         void        Reset (bool b = true);
+         bool                 Request           (IFILE* pListener = nullptr);
+         void                 Release           ();
+         void                 Clear             (bool b = true);
+         void                 Reset             (bool b = true);
 
          // --- Container ---
 
-         const VIEWPORT::CONTAINER::NAME& GetName () const   { return *m_pName; }
-         std::string GetContainerName () const;
+         const VIEWPORT::CONTAINER::NAME& Name () const   { return *m_pName; }
+         std::string ContainerName () const;
 
          VIEWPORT* Viewport () const { return m_pViewport; }
 
          // --- Listener ---
 
-         IFILE*      GetListener () const          { return m_pListener; }
+         IFILE*      Listener () const          { return m_pListener; }
 
          // --- Internal (NETWORK use only) ---
 
-         ASSET*      GetAsset () const              { return m_pAsset; }
+         ASSET*      Asset () const              { return m_pAsset; }
          void        SetAsset (ASSET* pAsset)       { m_pAsset = pAsset; }
          bool        IsPendingClear () const       { return m_bPendingClear; }
          bool        IsReleased () const           { return m_bReleased; }
@@ -321,7 +321,7 @@ namespace SNEEZE
       FILE* Request (IFILE* pListener, VIEWPORT* pViewport, std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, const std::string& sUrl,
                      const std::string& sHash, uint32_t bFlags = kREQUEST_DEFAULT, uint32_t nMetaIx = 0);
       void  Release (FILE* pFile);
-      bool  ReopenFile (FILE* pFile);
+      bool  Reopen  (FILE* pFile);
       void  Clear   (FILE* pFile, bool b = true);
       void  Reset   (FILE* pFile, bool b = true);
 
@@ -341,11 +341,11 @@ namespace SNEEZE
 
       // --- Network inspector ---
 
-      const std::vector<FILE*>& GetFiles () const { return m_apFile; }
-      double                    GetEpochAge () const;
+      const std::vector<FILE*>& Files () const { return m_apFile; }
+      double                    EpochAge () const;
 
    private:
-      std::string GetCachePath () const;
+      std::string CachePath () const;
       std::string ComputeDiskKey (const std::string& sUrl) const;
       std::string DiskKeyToPath (const std::string& sDiskKey, DISKFILE eType) const;
 

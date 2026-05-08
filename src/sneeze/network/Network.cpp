@@ -94,7 +94,7 @@ bool NETWORK::Initialize ()
    else
    {
       m_tpEpoch    = std::chrono::steady_clock::now ();
-      m_sCachePath = GetCachePath ();
+      m_sCachePath = CachePath ();
 
       if (!m_sCachePath.empty ())
       {
@@ -137,7 +137,7 @@ void NETWORK::Shutdown ()
 
          for (auto& [sUrl, pAsset] : m_mapAssets)
          {
-            if (pAsset->GetState () == STATE_READY)
+            if (pAsset->State () == STATE_READY)
                SaveMeta (pAsset.get ());
          }
 
@@ -165,7 +165,7 @@ double NETWORK::SecondsSinceEpoch () const
    return std::chrono::duration<double> (tpNow - m_tpEpoch).count ();
 }
 
-double NETWORK::GetEpochAge () const
+double NETWORK::EpochAge () const
 {
    return SecondsSinceEpoch ();
 }
@@ -183,7 +183,7 @@ void NETWORK::DeleteFiles ()
 
 void NETWORK::ResetAsset (ASSET* pAsset)
 {
-   std::string sDiskKey = ComputeDiskKey (pAsset->GetUrl ());
+   std::string sDiskKey = ComputeDiskKey (pAsset->Url ());
    std::error_code ec;
 
    std::filesystem::remove (DiskKeyToPath (sDiskKey, DISKFILE_DATA), ec);
@@ -278,7 +278,7 @@ NETWORK::FILE* NETWORK::Request (IFILE* pListener, VIEWPORT* pViewport, std::sha
       {
          ASSET* pAsset = it->second.get ();
 
-         if (nAssetIx != 0  &&  pAsset->GetAssetIx () != nAssetIx)
+         if (nAssetIx != 0  &&  pAsset->AssetIx () != nAssetIx)
             it = m_mapAssets.end ();
       }
 
@@ -286,7 +286,7 @@ NETWORK::FILE* NETWORK::Request (IFILE* pListener, VIEWPORT* pViewport, std::sha
       {
          ASSET* pAsset = it->second.get ();
 
-         if (pAsset->GetState () == STATE_READY  &&  IsAssetStale (pAsset))
+         if (pAsset->State () == STATE_READY  &&  IsAssetStale (pAsset))
          {
             if (!bFetch)
             {
@@ -307,7 +307,7 @@ NETWORK::FILE* NETWORK::Request (IFILE* pListener, VIEWPORT* pViewport, std::sha
          pAsset->AttachFile (pFile);
          m_apFile.push_back (pFile);
 
-         STATE bState       = pAsset->GetState ();
+         STATE bState       = pAsset->State ();
          bool  bNeedsFetch  = false;
          bool  bNotifyReady = false;
          bool  bNotifyFailed = false;
@@ -317,7 +317,7 @@ NETWORK::FILE* NETWORK::Request (IFILE* pListener, VIEWPORT* pViewport, std::sha
             std::string sAlgo, sDigest;
             if (ParseSriHash (sHash, sAlgo, sDigest))
             {
-               std::string sComputed = ComputeFileHash (pAsset->GetDiskPath (), sAlgo);
+               std::string sComputed = ComputeFileHash (pAsset->DiskPath (), sAlgo);
                if (sComputed == sDigest)
                {
                   pAsset->SetHash (sHash);
@@ -331,7 +331,7 @@ NETWORK::FILE* NETWORK::Request (IFILE* pListener, VIEWPORT* pViewport, std::sha
                }
             }
          }
-         else if (bState != STATE_FETCHING  &&  !sHash.empty ()  &&  pAsset->IsHashed ()  &&  pAsset->GetHash () != sHash)
+         else if (bState != STATE_FETCHING  &&  !sHash.empty ()  &&  pAsset->IsHashed ()  &&  pAsset->Hash () != sHash)
          {
             pAsset->SetHash (sHash);
             bNeedsFetch = true;
@@ -394,7 +394,7 @@ void NETWORK::Release (FILE* pFile)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-      ASSET* pAsset = pFile->GetAsset ();
+      ASSET* pAsset = pFile->Asset ();
 
       if (pAsset)
       {
@@ -406,10 +406,10 @@ void NETWORK::Release (FILE* pFile)
          {
             if (pAsset->IsPendingReset ())
                ResetAsset (pAsset);
-            else if (pAsset->GetState () == STATE_READY)
+            else if (pAsset->State () == STATE_READY)
                SaveMeta (pAsset);
 
-            std::string sUrl = pAsset->GetUrl ();
+            std::string sUrl = pAsset->Url ();
             m_mapAssets.erase (sUrl);
          }
       }
@@ -426,16 +426,16 @@ void NETWORK::Release (FILE* pFile)
    }
 }
 
-bool NETWORK::ReopenFile (FILE* pFile)
+bool NETWORK::Reopen (FILE* pFile)
 {
    bool bResult = false;
 
-   if (pFile  &&  !pFile->GetUrl ().empty ())
+   if (pFile  &&  !pFile->Url ().empty ())
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-      std::string sUrl      = pFile->GetUrl ();
-      uint32_t    nAssetIx  = pFile->GetAssetIx ();
+      std::string sUrl      = pFile->Url ();
+      uint32_t    nAssetIx  = pFile->AssetIx ();
 
       auto it = m_mapAssets.find (sUrl);
 
@@ -450,17 +450,17 @@ bool NETWORK::ReopenFile (FILE* pFile)
       {
          ASSET* pAsset = it->second.get ();
 
-         if (pAsset->GetAssetIx () == nAssetIx)
+         if (pAsset->AssetIx () == nAssetIx)
          {
             pFile->SetAsset (pAsset);
             pAsset->AttachFile (pFile);
             pFile->SnapshotFinal ();
             bResult = true;
 
-            IFILE* pListener = pFile->GetListener ();
+            IFILE* pListener = pFile->Listener ();
             if (pListener)
             {
-               if (pAsset->GetState () == STATE_READY)
+               if (pAsset->State () == STATE_READY)
                   pListener->OnFileReady (pFile);
                else
                   pListener->OnFileFailed (pFile);
@@ -502,11 +502,11 @@ void NETWORK::Clear (FILE* pFile, bool b)
 
 void NETWORK::Reset (FILE* pFile, bool b)
 {
-   if (pFile  &&  pFile->GetAsset ())
+   if (pFile  &&  pFile->Asset ())
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-      pFile->GetAsset ()->SetPendingReset (b);
+      pFile->Asset ()->SetPendingReset (b);
    }
 }
 
@@ -572,7 +572,7 @@ void NETWORK::Enumerate (IENUM* pEnum, VIEWPORT* pViewport)
 // Path helpers
 // ---------------------------------------------------------------------------
 
-std::string NETWORK::GetCachePath () const
+std::string NETWORK::CachePath () const
 {
    std::string sResult;
    std::string sAppDataPath = m_pEngine->Host ()->sAppDataPath ();
@@ -716,23 +716,23 @@ std::string NETWORK::ComputeDataHash (const uint8_t* pData, size_t nLen, const s
 
 void NETWORK::SaveMeta (ASSET* pAsset)
 {
-   std::string sDiskKey  = ComputeDiskKey (pAsset->GetUrl ());
+   std::string sDiskKey  = ComputeDiskKey (pAsset->Url ());
    std::string sMetaPath = DiskKeyToPath (sDiskKey, DISKFILE_META);
 
    std::filesystem::create_directories (std::filesystem::path (sMetaPath).parent_path ());
 
    nlohmann::json jMeta;
-   jMeta["url"]            = pAsset->GetUrl ();
-   jMeta["hash"]           = pAsset->GetHash ();
-   jMeta["nMetaIx"]        = pAsset->GetAssetIx ();
-   jMeta["sizeBytes"]      = pAsset->GetSizeBytes ();
-   jMeta["createdAt"]      = pAsset->GetCreatedTime ();
-   jMeta["lastAccessedAt"] = pAsset->GetLastAccessTime ();
-   jMeta["accessCount"]    = pAsset->GetAccessCount ();
-   jMeta["httpStatus"]     = pAsset->GetHttpStatus ();
+   jMeta["url"]            = pAsset->Url ();
+   jMeta["hash"]           = pAsset->Hash ();
+   jMeta["nMetaIx"]        = pAsset->AssetIx ();
+   jMeta["sizeBytes"]      = pAsset->SizeBytes ();
+   jMeta["createdAt"]      = pAsset->CreatedTime ();
+   jMeta["lastAccessedAt"] = pAsset->LastAccessTime ();
+   jMeta["accessCount"]    = pAsset->AccessCount ();
+   jMeta["httpStatus"]     = pAsset->HttpStatus ();
 
    nlohmann::json jHeaders = nlohmann::json::object ();
-   for (auto& [sKey, sVal] : pAsset->GetHeaders ())
+   for (auto& [sKey, sVal] : pAsset->Headers ())
       jHeaders[sKey] = sVal;
    jMeta["headers"] = jHeaders;
 
@@ -795,7 +795,7 @@ bool NETWORK::LoadMeta (const std::string& sDiskKey, const std::string& sUrl)
 
             pAsset->SetHttpStatus (jMeta.value ("httpStatus", static_cast<long> (0)));
             pAsset->SetServedFromCache (true);
-            pAsset->Complete (sDataPath, pAsset->GetSizeBytes ());
+            pAsset->Complete (sDataPath, pAsset->SizeBytes ());
 
             m_mapAssets[sUrl] = std::move (pAsset);
             bResult = true;
@@ -903,8 +903,8 @@ bool NETWORK::IsAssetStale (ASSET* pAsset) const
 {
    bool bResult = false;
 
-   std::string sContentType = pAsset->GetHeader ("content-type");
-   std::string sCreatedAt   = pAsset->GetCreatedTime ();
+   std::string sContentType = pAsset->Header ("content-type");
+   std::string sCreatedAt   = pAsset->CreatedTime ();
 
    for (auto& rule : m_aRules)
    {
@@ -932,8 +932,8 @@ void NETWORK::FetchAsset (ASSET* pAsset)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-      sUrl  = pAsset->GetUrl ();
-      sHash = pAsset->GetHash ();
+      sUrl  = pAsset->Url ();
+      sHash = pAsset->Hash ();
       pAsset->SetFetchStartTime (SecondsSinceEpoch ());
    }
    std::string sDiskKey  = ComputeDiskKey (sUrl);
@@ -1093,7 +1093,7 @@ void NETWORK::NotifyFiles (const std::vector<NETWORK::FILE*>& apFiles, NETWORK::
    {
       pFile->SnapshotFinal ();
 
-      IFILE* pListener = pFile->GetListener ();
+      IFILE* pListener = pFile->Listener ();
       if (pListener)
       {
          if (bState == STATE_READY)

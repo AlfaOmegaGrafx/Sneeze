@@ -335,7 +335,7 @@ void MSF::SetNamespace (const std::string& sNamespace)
    m_payload["namespace"] = sNamespace;
 }
 
-std::string MSF::GetNamespace () const
+std::string MSF::Namespace () const
 {
    std::string sResult;
    if (m_payload.is_object ()  &&  m_payload.contains ("namespace"))

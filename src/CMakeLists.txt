@@ -518,20 +518,19 @@ set (CORE_HEADERS
 set (ASTRO_SOURCES
    astro/BodyData.cpp
    astro/Celestial.cpp
-   astro/Epoch.cpp
    astro/Orbit.cpp
    astro/RMCObject.cpp
    astro/AstroService.cpp)
 set (ASTRO_HEADERS
    astro/BodyData.h
    astro/Celestial.h
-   astro/Epoch.h
    astro/Orbit.h
    astro/RMCObject.h
    astro/AstroService.h)
 
 set (SOM_SOURCES
    viewport/Viewport.cpp
+   viewport/scene/Epoch.cpp
    viewport/scene/Node.cpp
    viewport/scene/Fabric.cpp
    viewport/scene/Scene.cpp
@@ -540,6 +539,7 @@ set (SOM_SOURCES
    viewport/scene/Events.cpp
    viewport/scene/SpatialIndex.cpp)
 set (SOM_HEADERS
+   viewport/scene/Epoch.h
    viewport/scene/Node.h
    viewport/scene/Fabric.h
    viewport/scene/Scene.h

@@ -107,4 +107,3 @@ double EPOCH::CalendarToJD (int dwY, int dwM, int dwD)
 }
 
 const EPOCH EPOCH_J2000;
-

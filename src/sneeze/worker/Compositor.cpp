@@ -49,7 +49,7 @@
 #include "Worker.h"
 #include "Types.h"
 #include "renderer/Renderer.h"
-#include "astro/Epoch.h"
+#include "scene/Epoch.h"
 #include "astro/AstroService.h"
 #include "astro/RMCObject.h"
 #include "astro/Orbit.h"

@@ -173,7 +173,7 @@ int RunJwsTests (int nArgc, char** aArgv)
    svc.VerifyChain ();
    ASSERT (svc.IsSignatureValid ()  &&  svc.IsChainTrusted (), "MSS verification succeeded");
 
-   ASSERT (svc.GetNamespace () == "com.pokerstars.poker", "Namespace parsed correctly");
+   ASSERT (svc.Namespace () == "com.pokerstars.poker", "Namespace parsed correctly");
    ASSERT (svc.GetOrganization () == "PokerStars", "Organization parsed correctly");
    ASSERT (svc.GetSuccessor () == "deadbeef0123456789abcdef", "Successor parsed correctly");
 
@@ -283,7 +283,7 @@ int RunJwsTests (int nArgc, char** aArgv)
    VIEWPORT::MSF parseOnly;
    bool bParsed = parseOnly.Parse (sMssJws);
    ASSERT (bParsed, "Parse succeeded without verification");
-   ASSERT (parseOnly.GetNamespace () == "com.pokerstars.poker", "Namespace available without verify");
+   ASSERT (parseOnly.Namespace () == "com.pokerstars.poker", "Namespace available without verify");
    ASSERT (!parseOnly.GetFingerprint ().empty (), "Fingerprint available without verify");
    ASSERT (parseOnly.GetCertCount () == 2, "Cert count available without verify");
 
@@ -310,7 +310,7 @@ int RunJwsTests (int nArgc, char** aArgv)
    reader.VerifySignature ();
    reader.VerifyChain ();
    ASSERT (reader.IsSignatureValid ()  &&  reader.IsChainTrusted (), "Composed MSF verifies");
-   ASSERT (reader.GetNamespace () == "com.test.composed", "Composed namespace round-trips");
+   ASSERT (reader.Namespace () == "com.test.composed", "Composed namespace round-trips");
    ASSERT (reader.GetOrganization () == "Test Org", "Composed organization round-trips");
    ASSERT (reader.GetServices ().size () == 1, "Composed service round-trips");
    ASSERT (reader.GetModules ().count ("mod.wasm") == 1, "Composed module round-trips");

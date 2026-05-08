@@ -118,11 +118,11 @@ namespace SNEEZE
 
          // --- Meta sidecar ---
 
-         const std::string&  GetJsonPath () const        { return m_sJsonPath; }
-         uint64_t            GetSizeBytes () const       { return m_nSizeBytes; }
-         const std::string&  GetCreatedTime () const     { return m_sCreatedAt; }
-         const std::string&  GetLastAccessTime () const  { return m_sLastAccessedAt; }
-         uint32_t            GetAccessCount () const     { return m_nAccessCount; }
+         const std::string&  GetJsonPath    () const { return m_sJsonPath; }
+         uint64_t            SizeBytes      () const { return m_nSizeBytes; }
+         const std::string&  CreatedTime    () const { return m_sCreatedAt; }
+         const std::string&  LastAccessTime () const { return m_sLastAccessedAt; }
+         uint32_t            AccessCount    () const { return m_nAccessCount; }
 
          void  TouchAccess ();
          void  SaveMeta (std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName);
@@ -172,8 +172,8 @@ namespace SNEEZE
 
          // --- Identity ---
 
-         std::shared_ptr<VIEWPORT::CONTAINER::NAME>  GetName () const { return m_pName; }
-         std::string  GetDisplayName () const { return m_pName ? m_pName->DisplayName () : ""; }
+         std::shared_ptr<VIEWPORT::CONTAINER::NAME>  Name () const { return m_pName; }
+         std::string  DisplayName () const { return m_pName ? m_pName->DisplayName () : ""; }
          VIEWPORT* Viewport () const { return m_pViewport; }
 
          // --- Path-based API ---

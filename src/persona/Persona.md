@@ -12,14 +12,14 @@ is implemented — this is a local testing proxy.
 persona::PERSONA persona;
 
 persona.Login ("Dean", "Abramson");
-// persona.GetName()  -> "Dean.Abramson"
-// persona.GetHash()  -> "a3f1..." (SHA-256 hex digest)
+// persona.Name()  -> "Dean.Abramson"
+// persona.Hash()  -> "a3f1..." (SHA-256 hex digest)
 // persona.IsLoggedIn() -> true
 
 persona.Logout ();
 // persona.IsLoggedIn() -> false
-// persona.GetName()    -> ""
-// persona.GetHash()    -> ""
+// persona.Name()    -> ""
+// persona.Hash()    -> ""
 ```
 
 ### How the Hash is Used

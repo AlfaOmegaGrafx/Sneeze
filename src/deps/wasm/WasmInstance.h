@@ -58,10 +58,10 @@ namespace SNEEZE
 
          // --- Identity ---
 
-         const std::string& GetUrl () const { return m_sUrl; }
+         const std::string& Url () const { return m_sUrl; }
          const std::string& GetSha256 () const { return m_sSha256; }
          WASM_STORE*        GetStore () const { return m_pStore; }
-         INSTANCE_STATE     GetState () const { return m_bState; }
+         INSTANCE_STATE     State () const { return m_bState; }
 
          // --- Module compilation ---
 

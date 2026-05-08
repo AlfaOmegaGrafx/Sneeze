@@ -86,11 +86,11 @@ namespace SNEEZE
 
       // --- Viewport management ---
 
-      VIEWPORT*                              Viewport_Open    (IVIEWPORT* pHost, const std::string& sUrl = "");
-      void                                   Viewport_Close   (VIEWPORT* pViewport);
-      void                                   Viewport_Capture ();
+      VIEWPORT*                      Viewport_Open    (IVIEWPORT* pHost, const std::string& sUrl = "");
+      void                           Viewport_Close   (VIEWPORT* pViewport);
+      void                           Viewport_Capture ();
       const std::vector<VIEWPORT*>&  Viewport_GetList () const;
-      void                                   Viewport_Release ();
+      void                           Viewport_Release ();
 
       // --- Shared services ---
 

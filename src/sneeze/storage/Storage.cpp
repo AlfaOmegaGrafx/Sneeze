@@ -125,7 +125,7 @@ void STORAGE::Close (ASSET* pAsset)
          {
             if (pUnit->IsDirty ())
                pUnit->Save ();
-            pUnit->SaveMeta (pAsset->GetName ());
+            pUnit->SaveMeta (pAsset->Name ());
          }
       }
 

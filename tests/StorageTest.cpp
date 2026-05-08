@@ -75,12 +75,12 @@ public:
    int m_nChangedCount = 0;
    int m_nDeletedCount = 0;
 
-   void* GetFrameWindow () override
+   void* FrameWindow () override
    {
       return nullptr;
    }
 
-   void GetFrameSize (int& nWidth, int& nHeight) override
+   void FrameSize (int& nWidth, int& nHeight) override
    {
       nWidth = 0;
       nHeight = 0;
@@ -130,7 +130,7 @@ static void TestInitializeAndOpenClose ()
    auto pName = MakeTestName ();
    STORAGE::ASSET* pAsset = pStorage->Open (pName);
    Check (pAsset != nullptr, "Open returns ASSET");
-   Check (pAsset->GetName () == pName, "ASSET holds correct NAME");
+   Check (pAsset->Name () == pName, "ASSET holds correct NAME");
    Check (pAsset->GetRefCount () == 1, "Ref count is 1 after Open");
 
    Check (s_pVPHost->m_nCreatedCount == 1, "OnStorageUnitCreated fired");

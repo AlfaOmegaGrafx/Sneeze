@@ -126,7 +126,7 @@ namespace SNEEZE
       // --- Payload (typed fields) ---
 
       void        SetNamespace    (const std::string& sNamespace);
-      std::string GetNamespace    () const;
+      std::string Namespace    () const;
       void        SetOrganization (const std::string& sOrganization);
       std::string GetOrganization () const;
       void        SetSuccessor    (const std::string& sSuccessor);

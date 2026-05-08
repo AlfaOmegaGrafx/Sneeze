@@ -76,12 +76,12 @@ public:
    int m_nChangedCount = 0;
    int m_nDeletedCount = 0;
 
-   void* GetFrameWindow () override
+   void* FrameWindow () override
    {
       return nullptr;
    }
 
-   void GetFrameSize (int& nWidth, int& nHeight) override
+   void FrameSize (int& nWidth, int& nHeight) override
    {
       nWidth  = 0;
       nHeight = 0;
@@ -212,7 +212,7 @@ static void TestUnhashedFetch ()
 
       if (pFile)
       {
-         Check (pFile->GetFileIx () > 0, "File index is non-zero");
+         Check (pFile->FileIx () > 0, "File index is non-zero");
 
          bool bGotResult = listener.WaitFor (15000);
 
@@ -221,20 +221,20 @@ static void TestUnhashedFetch ()
             Check (listener.Succeeded (), "Fetch succeeded");
             Check (pFile->IsReady (), "File is READY");
             Check (!pFile->IsHashed (), "File is not hashed");
-            Check (pFile->GetSizeBytes () > 0, "File has non-zero size");
+            Check (pFile->SizeBytes () > 0, "File has non-zero size");
 
-            Check (pFile->GetHttpStatus () == 200, "HTTP status is 200");
-            Check (pFile->GetFetchDuration () > 0.0, "Fetch duration is positive");
+            Check (pFile->HttpStatus () == 200, "HTTP status is 200");
+            Check (pFile->FetchDuration () > 0.0, "Fetch duration is positive");
             Check (!pFile->IsServedFromCache (), "Not served from cache");
 
             std::vector<uint8_t> aData = pFile->ReadData ();
             Check (!aData.empty (), "ReadData returned content");
-            Check (aData.size () == pFile->GetSizeBytes (), "ReadData size matches GetSizeBytes");
+            Check (aData.size () == pFile->SizeBytes (), "ReadData size matches SizeBytes");
 
             std::printf ("    Size: %llu bytes, ContentType: %s, Duration: %.3f s\n",
-               static_cast<unsigned long long> (pFile->GetSizeBytes ()),
-               pFile->GetContentType ().c_str (),
-               pFile->GetFetchDuration ());
+               static_cast<unsigned long long> (pFile->SizeBytes ()),
+               pFile->ContentType ().c_str (),
+               pFile->FetchDuration ());
          }
          else
          {
@@ -274,7 +274,7 @@ static void TestDeduplication ()
 
    if (pFileA  &&  pFileB)
    {
-      Check (pFileA->GetAsset () == pFileB->GetAsset (),
+      Check (pFileA->Asset () == pFileB->Asset (),
          "Both handles share the same ASSET");
 
       bool bGotA = listenerA.WaitFor (15000);
@@ -345,7 +345,7 @@ static void TestHashVerifiedFetch ()
             {
                Check (pVerFile->IsReady (), "Verified file is READY");
                Check (pVerFile->IsHashed (), "Verified file is persistent (hashed)");
-               Check (pVerFile->GetHash () == sSri, "Hash matches SRI");
+               Check (pVerFile->Hash () == sSri, "Hash matches SRI");
 
                std::vector<uint8_t> aVerData = pVerFile->ReadData ();
                Check (aVerData == aData, "Verified data matches original");
@@ -393,7 +393,7 @@ static void TestHashMismatch ()
       if (bGotResult)
       {
          Check (!listener.Succeeded (), "Bad hash correctly caused failure");
-         Check (pFile->GetState () == NETWORK::STATE_FAILED, "State is FAILED");
+         Check (pFile->State () == NETWORK::STATE_FAILED, "State is FAILED");
       }
       else
       {
@@ -439,7 +439,7 @@ static void TestReset ()
 
          if (pAfter)
          {
-            NETWORK::STATE bState = pAfter->GetState ();
+            NETWORK::STATE bState = pAfter->State ();
             Check (bState == NETWORK::STATE_FETCHING  ||
                    bState == NETWORK::STATE_READY,
                "After reset, new request is FETCHING or READY");
@@ -482,7 +482,7 @@ static void TestResetFlag ()
       bool bGot = listener.WaitFor (15000);
       if (bGot  &&  listener.Succeeded ())
       {
-         std::string sDiskPath = pFile->GetDiskPath ();
+         std::string sDiskPath = pFile->DiskPath ();
 
          Check (!sDiskPath.empty (), "File had a disk path");
          Check (std::filesystem::exists (sDiskPath), "Disk file exists before reset");
@@ -525,7 +525,7 @@ static void TestFailedFetch ()
       if (bGot)
       {
          Check (!listener.Succeeded (), "Invalid host correctly failed");
-         Check (pFile->GetState () == NETWORK::STATE_FAILED, "State is FAILED");
+         Check (pFile->State () == NETWORK::STATE_FAILED, "State is FAILED");
       }
       else
       {
@@ -573,7 +573,7 @@ static void TestSidecarPersistence ()
          {
             listenerHash.WaitFor (15000);
             Check (listenerHash.Succeeded (), "Persistent entry created");
-            Check (pHash->GetAssetIx () > 0, "Asset index assigned on creation");
+            Check (pHash->AssetIx () > 0, "Asset index assigned on creation");
             pHash->Release ();
          }
       }
@@ -604,8 +604,8 @@ static void TestSidecarPersistence ()
       {
          Check (pReload->IsReady (), "Meta survived shutdown (loaded from .meta sidecar)");
          Check (pReload->IsHashed (), "Meta is still hashed");
-         Check (pReload->GetHash () == sSri, "Hash matches after reload");
-         Check (pReload->GetAssetIx () > 0, "Asset index preserved across sessions");
+         Check (pReload->Hash () == sSri, "Hash matches after reload");
+         Check (pReload->AssetIx () > 0, "Asset index preserved across sessions");
 
          std::vector<uint8_t> aData = pReload->ReadData ();
          Check (!aData.empty (), "Data is readable after reload");
@@ -639,10 +639,10 @@ static void TestHttpHeaders ()
       bool bGot = listener.WaitFor (15000);
       if (bGot  &&  listener.Succeeded ())
       {
-         auto& mapHeaders = pFile->GetHeaders ();
+         auto& mapHeaders = pFile->Headers ();
          Check (!mapHeaders.empty (), "Headers map is non-empty");
 
-         std::string sCt = pFile->GetContentType ();
+         std::string sCt = pFile->ContentType ();
          Check (!sCt.empty (), "Content-Type header captured");
          std::printf ("    Content-Type: %s\n", sCt.c_str ());
          std::printf ("    Total headers captured: %zu\n", mapHeaders.size ());
@@ -679,8 +679,8 @@ static void TestFileHandleLifecycle ()
 
    if (pFile)
    {
-      Check (pFile->GetAsset () != nullptr, "Handle wraps a valid ASSET");
-      Check (!pFile->GetUrl ().empty (), "URL accessible from handle");
+      Check (pFile->Asset () != nullptr, "Handle wraps a valid ASSET");
+      Check (!pFile->Url ().empty (), "URL accessible from handle");
 
       listener.WaitFor (15000);
 
@@ -715,10 +715,10 @@ static void TestHistoryAndFileIx ()
 
    if (pFileA  &&  pFileB)
    {
-      Check (pFileA->GetFileIx () < pFileB->GetFileIx (),
+      Check (pFileA->FileIx () < pFileB->FileIx (),
          "File indexes are monotonically increasing");
 
-      auto& aHistory = pNetwork->GetFiles ();
+      auto& aHistory = pNetwork->Files ();
       Check (aHistory.size () >= 2, "History contains at least 2 entries");
 
       listenerA.WaitFor (15000);
@@ -805,7 +805,7 @@ static void TestServedFromCache ()
          if (pSecond)
          {
             Check (pSecond->IsServedFromCache (), "Second fetch IS served from cache");
-            Check (pSecond->GetFileIx () > pFirst->GetFileIx (),
+            Check (pSecond->FileIx () > pFirst->FileIx (),
                "Second file index > first");
             pSecond->Release ();
          }
@@ -844,8 +844,8 @@ static void TestFailedFetchHttpStatus ()
       if (bGot)
       {
          Check (!listener.Succeeded (), "404 correctly failed");
-         Check (pFile->GetHttpStatus () == 404, "HTTP status is 404");
-         Check (pFile->GetFetchDuration () > 0.0, "Fetch duration recorded for failed request");
+         Check (pFile->HttpStatus () == 404, "HTTP status is 404");
+         Check (pFile->FetchDuration () > 0.0, "Fetch duration recorded for failed request");
       }
       else
       {
@@ -912,7 +912,7 @@ static void TestResetFlagToggle ()
    {
       listener.WaitFor (15000);
 
-      std::string sDiskPath = pFile->GetDiskPath ();
+      std::string sDiskPath = pFile->DiskPath ();
       bool bHadDisk = !sDiskPath.empty ()  &&  std::filesystem::exists (sDiskPath);
 
       pFile->Reset ();
@@ -958,7 +958,7 @@ static void TestDeferredReset ()
       listenerA.WaitFor (15000);
       listenerB.WaitFor (15000);
 
-      std::string sDiskPath = pFileA->GetDiskPath ();
+      std::string sDiskPath = pFileA->DiskPath ();
       bool bHadDisk = !sDiskPath.empty ()  &&  std::filesystem::exists (sDiskPath);
 
       pFileA->Reset ();
@@ -970,7 +970,7 @@ static void TestDeferredReset ()
             "Disk file survives while second handle is attached");
       }
 
-      Check (pFileB->GetAsset () != nullptr,
+      Check (pFileB->Asset () != nullptr,
          "Second handle still has a valid ASSET");
 
       pFileB->Release ();
@@ -1020,12 +1020,12 @@ static void TestClear ()
 
       pFileA->Release ();
 
-      size_t nHistoryBefore = pNetwork->GetFiles ().size ();
+      size_t nHistoryBefore = pNetwork->Files ().size ();
       Check (nHistoryBefore >= 2, "History has at least 2 entries before Clear");
 
       pNetwork->Clear ();
 
-      size_t nHistoryAfter = pNetwork->GetFiles ().size ();
+      size_t nHistoryAfter = pNetwork->Files ().size ();
       Check (nHistoryAfter < nHistoryBefore,
          "Clear removed released FILE records");
       Check (nHistoryAfter >= 1,

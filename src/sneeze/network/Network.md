@@ -89,7 +89,7 @@ public:
    void OnFileReady (SNEEZE::NETWORK::FILE* pFile) override
    {
       std::vector<uint8_t> aData = pFile->ReadData ();
-      std::string sMime = pFile->GetContentType ();
+      std::string sMime = pFile->ContentType ();
       // ... use the data
    }
 
@@ -126,12 +126,12 @@ SNEEZE::NETWORK::FILE* pModule = pNetwork->Request (&listener, pName, "https://c
 ```cpp
 void OnFileReady (SNEEZE::NETWORK::FILE* pFile) override
 {
-   uint64_t nSize        = pFile->GetSizeBytes ();
-   std::string sMime     = pFile->GetContentType ();
-   std::string sPath     = pFile->GetDiskPath ();
-   std::string sCreated  = pFile->GetCreatedTime ();
-   uint32_t nAccessCount = pFile->GetAccessCount ();
-   auto& mapHeaders      = pFile->GetHeaders ();
+   uint64_t nSize        = pFile->SizeBytes ();
+   std::string sMime     = pFile->ContentType ();
+   std::string sPath     = pFile->DiskPath ();
+   std::string sCreated  = pFile->CreatedTime ();
+   uint32_t nAccessCount = pFile->AccessCount ();
+   auto& mapHeaders      = pFile->Headers ();
 }
 ```
 
@@ -164,8 +164,8 @@ Every `Request()` call includes a `std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::
 
 ```cpp
 // FILE exposes the container identity
-const SNEEZE::VIEWPORT::CONTAINER::NAME& name = pFile->GetName ();
-std::string sDisplay = pFile->GetContainerName ();  // "Metaversal/Solar System"
+const SNEEZE::VIEWPORT::CONTAINER::NAME& name = pFile->Name ();
+std::string sDisplay = pFile->ContainerName ();  // "Metaversal/Solar System"
 ```
 
 ### Cache Bypass
@@ -233,7 +233,7 @@ if (!bOk)
 }
 ```
 
-Internally, `Request()` calls `NETWORK::ReopenFile()`:
+Internally, `Request()` calls `NETWORK::Reopen()`:
 1. Looks up the ASSET in `m_mapAssets` by the FILE's snapshotted URL.
 2. If not in memory, loads the ASSET from its `.meta` sidecar on disk.
 3. Validates that the ASSET's `nAssetIx` matches the FILE's snapshotted `nAssetIx`.
@@ -299,38 +299,38 @@ Snapshot fields are organized into three lifecycle phases, each with its own met
 
 | Field                | Type       | Source                              |
 |----------------------|------------|-------------------------------------|
-| `m_sUrl`             | `string`   | `ASSET::GetUrl()`                   |
-| `m_nAssetIx`         | `uint32_t` | `ASSET::GetAssetIx()`              |
+| `m_sUrl`             | `string`   | `ASSET::Url()`                      |
+| `m_nAssetIx`         | `uint32_t` | `ASSET::AssetIx()`                  |
 
 ### SnapshotProgress() — Updated During Fetch
 
 | Field                | Type       | Source                              |
 |----------------------|------------|-------------------------------------|
-| `m_bState`           | `STATE`    | `ASSET::GetState()`                 |
-| `m_dFetchQueuedTime` | `double`   | `ASSET::GetFetchQueuedTime()`       |
-| `m_dFetchStartTime`  | `double`   | `ASSET::GetFetchStartTime()`        |
+| `m_bState`           | `STATE`    | `ASSET::State()`                    |
+| `m_dFetchQueuedTime` | `double`   | `ASSET::FetchQueuedTime()`          |
+| `m_dFetchStartTime`  | `double`   | `ASSET::FetchStartTime()`           |
 
 ### SnapshotFinal() — Set When Fetch Resolves
 
 | Field                | Type       | Source                              |
 |----------------------|------------|-------------------------------------|
-| `m_bState`           | `STATE`    | `ASSET::GetState()`                 |
-| `m_sHash`            | `string`   | `ASSET::GetHash()`                  |
-| `m_sContentType`     | `string`   | `ASSET::GetHeader("content-type")`  |
-| `m_nSizeBytes`       | `uint64_t` | `ASSET::GetSizeBytes()`             |
-| `m_nHttpStatus`      | `long`     | `ASSET::GetHttpStatus()`            |
-| `m_dFetchQueuedTime` | `double`   | `ASSET::GetFetchQueuedTime()`       |
-| `m_dFetchStartTime`  | `double`   | `ASSET::GetFetchStartTime()`        |
-| `m_dFetchEndTime`    | `double`   | `ASSET::GetFetchEndTime()`          |
+| `m_bState`           | `STATE`    | `ASSET::State()`                    |
+| `m_sHash`            | `string`   | `ASSET::Hash()`                     |
+| `m_sContentType`     | `string`   | `ASSET::Header("content-type")`     |
+| `m_nSizeBytes`       | `uint64_t` | `ASSET::SizeBytes()`                |
+| `m_nHttpStatus`      | `long`     | `ASSET::HttpStatus()`               |
+| `m_dFetchQueuedTime` | `double`   | `ASSET::FetchQueuedTime()`          |
+| `m_dFetchStartTime`  | `double`   | `ASSET::FetchStartTime()`           |
+| `m_dFetchEndTime`    | `double`   | `ASSET::FetchEndTime()`             |
 | `m_bServedFromCache` | `bool`     | `ASSET::IsServedFromCache()`        |
 
 ### When Each Snapshot Method is Called
 
 - **SnapshotInitial()** — in the FILE constructor.
 - **SnapshotProgress()** — when a fetch is dispatched (after `SetFetching()` and `SetFetchQueuedTime()`).
-- **SnapshotFinal()** — when the fetch resolves (READY/FAILED), on Release, on ReopenFile, and during Enumerate. In `Request()`, a single `SnapshotFinal()` covers all resolved-state branches.
+- **SnapshotFinal()** — when the fetch resolves (READY/FAILED), on Release, on Reopen, and during Enumerate. In `Request()`, a single `SnapshotFinal()` covers all resolved-state branches.
 
-Getters on FILE read from these snapshot members, not from the ASSET. ASSET-dependent accessors (`ReadData()`, `GetHeaders()`, `GetDiskPath()`, etc.) still require an attached ASSET and return empty defaults after Release.
+Getters on FILE read from these snapshot members, not from the ASSET. ASSET-dependent accessors (`ReadData()`, `Headers()`, `DiskPath()`, etc.) still require an attached ASSET and return empty defaults after Release.
 
 ## Network Inspector Data
 
@@ -342,12 +342,12 @@ All timing values are `double` seconds relative to a per-session epoch (`steady_
 
 | Accessor               | Source         | Description                              |
 |------------------------|----------------|------------------------------------------|
-| `GetFetchQueuedTime()` | `ASSET`/`FILE` | Seconds since epoch when asset queued    |
-| `GetFetchStartTime()`  | `ASSET`/`FILE` | Seconds since epoch when fetch began     |
-| `GetFetchEndTime()`    | `ASSET`/`FILE` | Seconds since epoch when fetch ended     |
-| `GetFetchDuration()`   | `ASSET`/`FILE` | Derived: end - start                     |
+| `FetchQueuedTime()`    | `ASSET`/`FILE` | Seconds since epoch when asset queued    |
+| `FetchStartTime()`     | `ASSET`/`FILE` | Seconds since epoch when fetch began     |
+| `FetchEndTime()`       | `ASSET`/`FILE` | Seconds since epoch when fetch ended     |
+| `FetchDuration()`      | `ASSET`/`FILE` | Derived: end - start                     |
 | `GetQueueDuration()`   | `ASSET`/`FILE` | Derived: start - queued                  |
-| `GetEpochAge()`        | `NETWORK`      | Current seconds since epoch              |
+| `EpochAge()`           | `NETWORK`      | Current seconds since epoch              |
 
 `m_dFetchQueuedTime` records when the ASSET enters the fetch queue (set in `Request()` before `DispatchFetch()`). `m_dFetchStartTime` records when the HTTP request actually begins (set at the start of `FetchAsset()`). The difference (`GetQueueDuration()`) measures how long the asset waited in the overflow queue before a thread became available.
 
@@ -358,19 +358,19 @@ Each `FILE` handle receives a monotonically increasing `uint32_t` file index (`n
 `nAssetIx` is persisted in `.meta` sidecar files and in `rules.json` (as `nNextMetaIx`). `m_nNextFileIx` and `m_nNextAssetIx` are maintained on NETWORK.
 
 ```cpp
-uint32_t nFileIx = pFile->GetFileIx ();
-uint32_t nAssetIx = pFile->GetAssetIx ();
+uint32_t nFileIx = pFile->FileIx ();
+uint32_t nAssetIx = pFile->AssetIx ();
 ```
 
 ### History List
 
-`NETWORK::GetFiles()` returns a `const std::vector<FILE*>&` containing all FILE handles, in creation order. `Release()` detaches the FILE from its ASSET (stops notifications) but does **not** remove it from the list unless the FILE has a pending clear flag. This list is the data backing the inspector's request table.
+`NETWORK::Files()` returns a `const std::vector<FILE*>&` containing all FILE handles, in creation order. `Release()` detaches the FILE from its ASSET (stops notifications) but does **not** remove it from the list unless the FILE has a pending clear flag. This list is the data backing the inspector's request table.
 
 ```cpp
-const auto& aHistory = pNetwork->GetFiles ();
+const auto& aHistory = pNetwork->Files ();
 for (auto* pFile : aHistory)
 {
-   // pFile->GetUrl(), GetFileIx(), GetHttpStatus(), ...
+   // pFile->Url(), FileIx(), HttpStatus(), ...
    // All snapshot fields are valid even after Release.
 }
 ```
@@ -383,7 +383,7 @@ FILEs are removed from history via `Clear()` + `Release()`, or bulk via `Clear()
 
 ### HTTP Status Code
 
-`FILE::GetHttpStatus()` returns the HTTP response code (`200`, `404`, etc.) or `0` if the request failed before receiving an HTTP response (DNS failure, timeout, connection refused).
+`FILE::HttpStatus()` returns the HTTP response code (`200`, `404`, etc.) or `0` if the request failed before receiving an HTTP response (DNS failure, timeout, connection refused).
 
 ### Notification Callbacks
 
@@ -407,16 +407,16 @@ The NETWORK routes these through `SNEEZE::OnNetworkFileCreated()`, `SNEEZE::OnNe
 
 | Column       | Accessor                                              |
 |--------------|-------------------------------------------------------|
-| Name (URL)   | `GetUrl()`                                            |
-| Status       | `GetHttpStatus()`                                     |
-| Type         | `GetContentType()`                                    |
-| Size         | `GetSizeBytes()` / `IsServedFromCache()`              |
-| Time         | `GetFetchDuration()`                                  |
+| Name (URL)   | `Url()`                                               |
+| Status       | `HttpStatus()`                                        |
+| Type         | `ContentType()`                                       |
+| Size         | `SizeBytes()` / `IsServedFromCache()`                 |
+| Time         | `FetchDuration()`                                     |
 | Queue        | `GetQueueDuration()`                                  |
-| Waterfall    | `GetFetchQueuedTime()` / `GetFetchStartTime()` / `GetFetchEndTime()` vs epoch |
-| File Index   | `GetFileIx()`                                         |
-| Asset Index  | `GetAssetIx()`                                        |
-| Initiator    | `GetContainerName()`                                  |
+| Waterfall    | `FetchQueuedTime()` / `FetchStartTime()` / `FetchEndTime()` vs epoch |
+| File Index   | `FileIx()`                                            |
+| Asset Index  | `AssetIx()`                                           |
+| Initiator    | `ContainerName()`                                     |
 
 ## Request Deduplication
 
