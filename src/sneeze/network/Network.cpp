@@ -88,7 +88,7 @@ bool NETWORK::Initialize ()
    CURLcode nCurlInit = curl_global_init (CURL_GLOBAL_DEFAULT);
    if (nCurlInit != CURLE_OK)
    {
-      m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Error, "NETWORK",
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "NETWORK",
          "curl_global_init failed (code " + std::to_string (static_cast<int> (nCurlInit)) + ")");
    }
    else
@@ -102,13 +102,13 @@ bool NETWORK::Initialize ()
 
          LoadRules ();
 
-         m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "NETWORK", "Initialized (path: " + m_sCachePath + ", rules: " + std::to_string (m_aRules.size ()) + ", nAssetIx: " + std::to_string (m_nNextAssetIx) + ")");
+         m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "NETWORK", "Initialized (path: " + m_sCachePath + ", rules: " + std::to_string (m_aRules.size ()) + ", nAssetIx: " + std::to_string (m_nNextAssetIx) + ")");
 
          bResult = true;
       }
       else
       {
-         m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Error, "NETWORK", "Failed to determine cache path");
+         m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "NETWORK", "Failed to determine cache path");
       }
    }
 
@@ -746,7 +746,7 @@ void NETWORK::SaveMeta (ASSET* pAsset)
       std::error_code ec;
       std::filesystem::rename (sTmpPath, sMetaPath, ec);
       if (ec)
-         m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to rename meta temp: " + ec.message ());
+         m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to rename meta temp: " + ec.message ());
    }
 }
 
@@ -770,7 +770,7 @@ bool NETWORK::LoadMeta (const std::string& sDiskKey, const std::string& sUrl)
       }
       catch (...)
       {
-         m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to parse sidecar: " + sMetaPath);
+         m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to parse sidecar: " + sMetaPath);
       }
 
       if (bParsed)
@@ -826,7 +826,7 @@ void NETWORK::LoadRules ()
       }
       catch (...)
       {
-         m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to parse rules.json -- defaulting to stale");
+         m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to parse rules.json -- defaulting to stale");
       }
 
       if (bParsed)
@@ -847,7 +847,7 @@ void NETWORK::LoadRules ()
    }
    else
    {
-      m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "NETWORK", "No rules.json -- creating fresh");
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "NETWORK", "No rules.json -- creating fresh");
       SaveRules ();
    }
 }
@@ -964,7 +964,7 @@ void NETWORK::FetchAsset (ASSET* pAsset)
       }
       else
       {
-         m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Error, "NETWORK", "Failed to open temp file: " + sTmpPath);
+         m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "NETWORK", "Failed to open temp file: " + sTmpPath);
          bOk = false;
       }
    }
@@ -996,7 +996,7 @@ void NETWORK::FetchAsset (ASSET* pAsset)
             bOk = false;
          else if (nCode != CURLE_OK  ||  ctx.nHttpCode < 200  ||  ctx.nHttpCode >= 300)
          {
-            m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Warning, "NETWORK", "Fetch failed for " + sUrl + " (HTTP " + std::to_string (ctx.nHttpCode) + ")");
+            m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Fetch failed for " + sUrl + " (HTTP " + std::to_string (ctx.nHttpCode) + ")");
             bOk = false;
          }
       }
@@ -1017,7 +1017,7 @@ void NETWORK::FetchAsset (ASSET* pAsset)
          std::string sActual = ComputeFileHash (sTmpPath, sAlgo);
          if (sActual != sExpected)
          {
-            m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Warning, "NETWORK", "Hash mismatch for " + sUrl + " (expected " + sExpected + ", got " + sActual + ")");
+            m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Hash mismatch for " + sUrl + " (expected " + sExpected + ", got " + sActual + ")");
             bOk = false;
          }
       }
@@ -1032,7 +1032,7 @@ void NETWORK::FetchAsset (ASSET* pAsset)
       std::filesystem::rename (sTmpPath, sFinalPath, ec);
       if (ec)
       {
-         m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to rename " + sTmpPath + " -> " + sFinalPath + ": " + ec.message ());
+         m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to rename " + sTmpPath + " -> " + sFinalPath + ": " + ec.message ());
          bOk = false;
       }
       else
@@ -1077,7 +1077,7 @@ void NETWORK::FetchAsset (ASSET* pAsset)
 
    if (bOk)
    {
-      m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Trace, "NETWORK", "Cached " + sUrl + " (" + std::to_string (nSizeBytes) + " bytes)");
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Trace, "NETWORK", "Cached " + sUrl + " (" + std::to_string (nSizeBytes) + " bytes)");
    }
 
    DispatchNextFromQueue ();

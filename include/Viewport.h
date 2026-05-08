@@ -26,6 +26,8 @@
 
 namespace SNEEZE
 {
+   class ENGINE;
+
    // ---------------------------------------------------------------------------
    // IVIEWPORT -- per-viewport interface between the host and a viewport.
    // Each viewport gets its own IVIEWPORT instance from the application.
@@ -91,8 +93,8 @@ namespace SNEEZE
    public:
       enum eSESSION
       {
-         kPERSISTENT,
-         kTRANSITORY
+         kSESSION_PERSISTENT,
+         kSESSION_TRANSITORY
       };
 
       // --- Camera orbit state ---

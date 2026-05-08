@@ -62,7 +62,7 @@ bool VIEWPORT::Initialize (const std::string& sUrl)
       return false;
    }
 
-   m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "VIEWPORT", "Initialized");
+   m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "VIEWPORT", "Initialized");
    return true;
 }
 
@@ -83,12 +83,12 @@ bool VIEWPORT::InitializeRenderer ()
    if (pRenderer->Initialize (m_nWidth, m_nHeight))
    {
       m_pRenderer = pRenderer;
-      m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "VIEWPORT", "Renderer initialized on compositor thread");
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "VIEWPORT", "Renderer initialized on compositor thread");
    }
    else
    {
       delete pRenderer;
-      m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Warning, "VIEWPORT", "Renderer unavailable -- headless mode");
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "VIEWPORT", "Renderer unavailable -- headless mode");
    }
 
    return m_pRenderer != nullptr;

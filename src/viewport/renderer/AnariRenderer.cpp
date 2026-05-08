@@ -160,7 +160,7 @@ bool RENDERER::ANARI::Initialize (int nWidth, int nHeight)
 #if defined(__ANDROID__)
       ANARI_LOGI ("lib dir: '%s'", sLibDir.c_str ());
 #else
-      m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Trace, "ANARI",
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Trace, "ANARI",
          "lib dir: '" + sLibDir + "'");
 #endif
    }
@@ -169,7 +169,7 @@ bool RENDERER::ANARI::Initialize (int nWidth, int nHeight)
 #if defined(__ANDROID__)
       ANARI_LOGE ("could not resolve local lib dir via dladdr");
 #else
-      m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Warning, "ANARI",
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "ANARI",
          "could not resolve local lib dir via dladdr");
 #endif
    }
@@ -178,7 +178,7 @@ bool RENDERER::ANARI::Initialize (int nWidth, int nHeight)
 #if defined(__ANDROID__)
    ANARI_LOGI ("loading library '%s'", sLibraryArg.c_str ());
 #else
-   m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "ANARI",
+   m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "ANARI",
       "loading library '" + sLibraryArg + "'");
 #endif
    m_pLibrary = anariLoadLibrary (sLibraryArg.c_str (), nullptr, nullptr);
@@ -187,7 +187,7 @@ bool RENDERER::ANARI::Initialize (int nWidth, int nHeight)
 #if defined(__ANDROID__)
       ANARI_LOGE ("failed to load library '%s'", sLibraryArg.c_str ());
 #else
-      m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Error, "ANARI",
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "ANARI",
          "failed to load library '" + sLibraryArg + "'");
 #endif
    }
@@ -196,7 +196,7 @@ bool RENDERER::ANARI::Initialize (int nWidth, int nHeight)
 #if defined(__ANDROID__)
       ANARI_LOGI ("creating device 'default'");
 #else
-      m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "ANARI",
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "ANARI",
          "creating device 'default'");
 #endif
       m_pDevice = anariNewDevice (m_pLibrary, "default");
@@ -205,7 +205,7 @@ bool RENDERER::ANARI::Initialize (int nWidth, int nHeight)
 #if defined(__ANDROID__)
          ANARI_LOGE ("failed to create device from library '%s'", m_sLibrary.c_str ());
 #else
-         m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Error, "ANARI",
+         m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "ANARI",
             "failed to create device from library '" + m_sLibrary + "'");
 #endif
          anariUnloadLibrary (m_pLibrary);

@@ -35,7 +35,7 @@ bool STORAGE::Initialize ()
 {
    bool bResult = false;
 
-   ENGINE::IENGINE* pHost = m_pEngine->Host ();
+   IENGINE* pHost = m_pEngine->Host ();
    std::string sAppDataPath = pHost->sAppDataPath ();
 
    if (!sAppDataPath.empty ())
@@ -46,13 +46,13 @@ bool STORAGE::Initialize ()
       std::filesystem::create_directories (m_sPermanentPath);
       std::filesystem::create_directories (m_sTemporaryPath);
 
-      m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "STORAGE",
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "STORAGE",
          "Initialized (permanent: " + m_sPermanentPath + ", temporary: " + m_sTemporaryPath + ")");
       bResult = true;
    }
    else
    {
-      m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Error, "STORAGE",
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "STORAGE",
          "Failed to determine storage path");
    }
 

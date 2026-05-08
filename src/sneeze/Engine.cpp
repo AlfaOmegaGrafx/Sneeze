@@ -465,7 +465,7 @@ void ENGINE::Shutdown ()
 // Viewport management
 // ---------------------------------------------------------------------------
 
-VIEWPORT* ENGINE::Viewport_Open (IVIEWPORT* pHost, const std::string& sUrl)
+VIEWPORT* ENGINE::Viewport_Open (IVIEWPORT* pHost, const std::string& sUrl, VIEWPORT::eSESSION kSession)
 {
    VIEWPORT* pViewport = new VIEWPORT (this, pHost);
 
@@ -510,7 +510,7 @@ void ENGINE::Viewport_Release ()
    m_pImpl->Release ();
 }
 
-ENGINE::IENGINE*  ENGINE::Host () const       { return m_pImpl->m_pHost;      }
+IENGINE*  ENGINE::Host () const       { return m_pImpl->m_pHost;      }
 NETWORK*  ENGINE::Network () const    { return m_pImpl->m_pNetwork;   }
 STORAGE*  ENGINE::Storage () const    { return m_pImpl->m_pStorage;   }
 persona::PERSONA* ENGINE::Persona () const    { return m_pImpl->m_pPersona;   }

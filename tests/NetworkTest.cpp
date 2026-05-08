@@ -53,7 +53,7 @@ static void Check (bool bCondition, const char* szName)
 // Minimal ISNEEZE for test logging
 // ---------------------------------------------------------------------------
 
-class CACHE_TEST_LISTENER : public SNEEZE::ENGINE::IENGINE
+class CACHE_TEST_LISTENER : public SNEEZE::IENGINE
 {
 public:
    std::string m_sAppDataPath;

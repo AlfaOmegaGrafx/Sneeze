@@ -49,10 +49,10 @@ namespace
          if (!m_pEngine)
             return true;
 
-         SNEEZE::ENGINE::IENGINE::eLOGLEVEL eLevel = SNEEZE::ENGINE::IENGINE::kLOGLEVEL_Info;
-         if (nType == Rml::Log::LT_ERROR)   eLevel = SNEEZE::ENGINE::IENGINE::kLOGLEVEL_Error;
-         if (nType == Rml::Log::LT_WARNING) eLevel = SNEEZE::ENGINE::IENGINE::kLOGLEVEL_Warning;
-         if (nType == Rml::Log::LT_DEBUG)   eLevel = SNEEZE::ENGINE::IENGINE::kLOGLEVEL_Trace;
+         SNEEZE::IENGINE::eLOGLEVEL eLevel = SNEEZE::IENGINE::kLOGLEVEL_Info;
+         if (nType == Rml::Log::LT_ERROR)   eLevel = SNEEZE::IENGINE::kLOGLEVEL_Error;
+         if (nType == Rml::Log::LT_WARNING) eLevel = SNEEZE::IENGINE::kLOGLEVEL_Warning;
+         if (nType == Rml::Log::LT_DEBUG)   eLevel = SNEEZE::IENGINE::kLOGLEVEL_Trace;
 
          m_pEngine->Log (eLevel, "UI_CONTEXT", sMessage);
          return true;
@@ -146,7 +146,7 @@ bool UI_CONTEXT::Initialize (ENGINE* pEngine)
    bool bOk = Rml::Initialise ();
    if (!bOk)
    {
-      m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Error, "UI_CONTEXT",
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "UI_CONTEXT",
          "Rml::Initialise failed");
       bInitialized = false;
    }
@@ -154,7 +154,7 @@ bool UI_CONTEXT::Initialize (ENGINE* pEngine)
    {
       bInitialized = true;
       Rml::String sVersion = Rml::GetVersion ();
-      m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "UI_CONTEXT",
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "UI_CONTEXT",
          "RmlUi " + std::string (sVersion.c_str ()) + " initialized (stub renderer)");
    }
 

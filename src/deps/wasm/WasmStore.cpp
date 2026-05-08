@@ -27,7 +27,7 @@ WASM_STORE::WASM_STORE (ENGINE* pEngine, wasm_engine_t* pWASM_Engine, const STOR
 {
    m_pStore = wasmtime_store_new (pWASM_Engine, nullptr, nullptr);
    if (!m_pStore)
-      m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Error, "WASM_STORE",
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "WASM_STORE",
          "Failed to create native store for [" + pIdentity.sContainer + "]");
 }
 
