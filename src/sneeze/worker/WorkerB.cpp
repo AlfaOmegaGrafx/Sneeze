@@ -14,14 +14,52 @@
 
 #include <Sneeze.h>
 #include "Worker.h"
+#include <filesystem>
+#include <cstdio>
 
 using namespace SNEEZE;
 
-WORKER::B::B (ENGINE* pEngine)
+WORKER::SCRUBBER::SCRUBBER (ENGINE* pEngine)
    : WORKER (pEngine)
 {
 }
 
-void WORKER::B::Tick ()
+void WORKER::SCRUBBER::Tick ()
 {
+}
+
+bool WORKER::SCRUBBER::HasWork ()
+{
+   bool bResult = m_pEngine->HasCleanupWork ();
+   return bResult;
+}
+
+void WORKER::SCRUBBER::DrainQueue ()
+{
+   std::vector<std::string> aPath;
+   m_pEngine->SwapCleanupQueue (aPath);
+
+   for (const auto& sPath : aPath)
+   {
+      std::error_code ec;
+      std::filesystem::remove_all (sPath, ec);
+
+      if (ec)
+         m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Warning, "SCRUBBER", "Failed to remove " + sPath + ": " + ec.message ());
+      else
+         m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Trace, "SCRUBBER", "Removed " + sPath);
+   }
+}
+
+void WORKER::SCRUBBER::ThreadLoop ()
+{
+   SignalReady ();
+
+   while (HasWork ()  ||  !IsShutdown ())
+   {
+      DrainQueue ();
+
+      std::unique_lock<std::mutex> lock (m_mutex);
+      m_condVar.wait (lock, [this] { return m_pEngine->HasCleanupWork ()  ||  IsShutdown (); });
+   }
 }

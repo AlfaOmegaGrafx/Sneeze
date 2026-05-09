@@ -28,7 +28,7 @@ namespace SNEEZE
    {
    public:
       class COMPOSITOR;
-      class B;
+      class SCRUBBER;
       class C;
       class D;
       class E;
@@ -41,6 +41,8 @@ namespace SNEEZE
 
       bool Initialize ();
       void Shutdown ();
+      void SignalShutdown ();
+      void Join ();
       void Signal ();
 
       WORKER (const WORKER&) = delete;
@@ -53,15 +55,15 @@ namespace SNEEZE
       void SignalReady ();
       bool IsShutdown () const;
 
-      ENGINE* m_pEngine;
+      ENGINE*                 m_pEngine;
+      std::mutex              m_mutex;
+      std::condition_variable m_condVar;
 
    private:
       bool Control ();
       void CtlBreak_Thread ();
 
-      std::thread* m_pThread;
-      std::mutex              m_mutex;
-      std::condition_variable m_condVar;
+      std::thread*            m_pThread;
       bool                    m_bShutdown;
       bool                    m_bReady;
 
@@ -106,16 +108,24 @@ namespace SNEEZE
    };
 
    // ---------------------------------------------------------------------------
-   // Placeholder workers (B-H)
+   // SCRUBBER -- disk cleanup (folder deletion, future cache pruning)
    // ---------------------------------------------------------------------------
 
-   class WORKER::B : public WORKER
+   class WORKER::SCRUBBER : public WORKER
    {
    public:
-      explicit B (ENGINE* pEngine);
+      explicit SCRUBBER (ENGINE* pEngine);
    protected:
       void Tick () override;
+      void ThreadLoop () override;
+   private:
+      bool HasWork ();
+      void DrainQueue ();
    };
+
+   // ---------------------------------------------------------------------------
+   // Placeholder workers (C-H)
+   // ---------------------------------------------------------------------------
 
    class WORKER::C : public WORKER
    {

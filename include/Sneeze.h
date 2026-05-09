@@ -103,6 +103,12 @@ namespace SNEEZE
       void Logout ();
       void ChangePersona (const std::string& sFirst, const std::string& sSecond);
 
+      // --- Cleanup queue ---
+
+      void                     QueueCleanup (const std::string& sPath);
+      bool                     HasCleanupWork () const;
+      void                     SwapCleanupQueue (std::vector<std::string>& aOut);
+
       // --- Subsystems ---
 
       NETWORK*                 Network () const;
