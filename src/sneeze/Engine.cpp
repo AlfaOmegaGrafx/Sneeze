@@ -50,7 +50,7 @@ struct WORKER_CONFIG
 static const std::vector<WORKER_CONFIG> aWorkerConfig =
 {
    {   0, [] (SNEEZE::ENGINE* p) -> WORKER* { return new WORKER::COMPOSITOR (p); } },
-   {   1, [] (SNEEZE::ENGINE* p) -> WORKER* { return new WORKER::B          (p); } },
+   {   1, [] (SNEEZE::ENGINE* p) -> WORKER* { return new WORKER::SCRUBBER   (p); } },
    {  30, [] (SNEEZE::ENGINE* p) -> WORKER* { return new WORKER::C          (p); } },
    {  60, [] (SNEEZE::ENGINE* p) -> WORKER* { return new WORKER::D          (p); } },
    {  64, [] (SNEEZE::ENGINE* p) -> WORKER* { return new WORKER::E          (p); } },
@@ -78,13 +78,28 @@ static SNEEZE::DEP::UI_CONTEXT    s_pUiContext;
 class SNEEZE::ENGINE::Impl
 {
 public:
+   enum eINIT_STATE
+   {
+      kINIT_NONE,
+      kINIT_WASM,
+      kINIT_SPV,
+      kINIT_XR,
+      kINIT_UI,
+      kINIT_NETWORK,
+      kINIT_STORAGE,
+      kINIT_SUBSYSTEMS,
+      kINIT_ENGINE_THREAD,
+   };
+
    Impl (IENGINE* pHost, ENGINE* pEngine) :
       m_pHost (pHost),
       m_pEngine (pEngine),
+      m_eInitState (kINIT_NONE),
       m_pThread_Engine (nullptr),
       m_bShutdown (false),
       m_bReady (false),
       m_bEngineInitOk (false),
+      m_bCleanupPending (false),
       m_pNetwork (nullptr),
       m_pStorage (nullptr),
       m_pPersona (nullptr)
@@ -99,115 +114,108 @@ public:
    {
       bool bResult = false;
 
-      if (m_pHost && !m_pHost->sAppDataPath ().empty ())
+      if (m_pHost  &&  !m_pHost->sAppDataPath ().empty ())
       {
          if (s_pWasmRuntime.Initialize (m_pEngine))
          {
+            m_eInitState = kINIT_WASM;
+
             if (s_pSpvPipeline.Initialize (m_pEngine))
             {
+               m_eInitState = kINIT_SPV;
+
 #ifdef SNEEZE_HAS_XR
                if (s_pXrRuntime.Initialize (m_pEngine))
                {
+                  m_eInitState = kINIT_XR;
 #endif
+
                   if (s_pUiContext.Initialize (m_pEngine))
                   {
-                     // --- Initialize shared subsystems ---
+                     m_eInitState = kINIT_UI;
 
                      m_pNetwork = new NETWORK (m_pEngine);
-                     m_pNetwork->Initialize ();
+                     m_eInitState = kINIT_NETWORK;
 
-                     m_pStorage = new STORAGE (m_pEngine);
-                     m_pStorage->Initialize ();
-
-                     m_pPersona = new persona::PERSONA (m_pEngine);
-
-                     // --- Start engine thread (creates workers internally) ---
-
-                     m_pThread_Engine = new std::thread (&ENGINE::Impl::EngineThreadLoop, this);
+                     if (m_pNetwork->Initialize ())
                      {
-                        std::unique_lock<std::mutex> lock (m_mutex);
-                        m_condVar.wait (lock, [this] { return m_bReady; });
+                        m_pStorage = new STORAGE (m_pEngine);
+                        m_eInitState = kINIT_STORAGE;
+
+                        if (m_pStorage->Initialize ())
+                        {
+                           m_pPersona = new persona::PERSONA (m_pEngine);
+
+                           m_eInitState = kINIT_SUBSYSTEMS;
+
+                           m_pThread_Engine = new std::thread (&ENGINE::Impl::EngineThreadLoop, this);
+                           {
+                              std::unique_lock<std::mutex> lock (m_mutex);
+                              m_condVar.wait (lock, [this] { return m_bReady; });
+                           }
+
+                           if (m_bEngineInitOk)
+                           {
+                              m_eInitState = kINIT_ENGINE_THREAD;
+                              bResult = true;
+                              m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SNEEZE", "Initialized (1 engine thread + " + std::to_string (m_apWorker.size ()) + " workers)");
+                           }
+                           else
+                           {
+                              m_pThread_Engine->join ();
+                              delete m_pThread_Engine;
+                              m_pThread_Engine = nullptr;
+                           }
+                        }
+                        else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize storage");
                      }
-
-                     bResult = m_bEngineInitOk;
-
-                     if (bResult)
-                        m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SNEEZE", "Initialized (1 engine thread + " + std::to_string (m_apWorker.size ()) + " workers)");
-
-                     if (!bResult)
-                     {
-                        m_pThread_Engine->join ();
-                        delete m_pThread_Engine;
-                        m_pThread_Engine = nullptr;
-                        m_apWorker.clear ();
-                        m_anWorkerHertz.clear ();
-                        m_anWorkerLastTick.clear ();
-                        m_anWorkerSignalCount.clear ();
-                     }
-
-                     if (!bResult)
-                        s_pUiContext.Shutdown ();
+                     else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize network");
                   }
-                  else
-                  {
-                     m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize UI context");
-                  }
+                  else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize UI context");
 
 #ifdef SNEEZE_HAS_XR
-                  if (!bResult)
-                     s_pXrRuntime.Shutdown ();
                }
-               else
-               {
-                  m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize XR runtime");
-               }
+               else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize XR runtime");
 #endif
-
-               if (!bResult)
-                  s_pSpvPipeline.Shutdown ();
             }
-            else
-            {
-               m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize SPIR-V pipeline");
-            }
-
-            if (!bResult)
-               s_pWasmRuntime.Shutdown ();
+            else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize SPIR-V pipeline");
          }
-         else
-         {
-            m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize WASM runtime");
-         }
+         else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize WASM runtime");
       }
       else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Host configuration incomplete (sAppDataPath required)");
+
+      if (!bResult)
+         Shutdown ();
 
       return bResult;
    }
 
    void Shutdown ()
    {
-      while (true)
+      if (m_eInitState >= kINIT_ENGINE_THREAD)
       {
-         VIEWPORT* pViewport = nullptr;
+         // --- Close any remaining viewports ---
+
+         while (true)
          {
-            std::lock_guard<std::mutex> guard (m_viewportMutex);
-            if (!m_apViewport.empty ())
+            VIEWPORT* pViewport = nullptr;
             {
-               pViewport = m_apViewport.back ();
-               m_apViewport.pop_back ();
+               std::lock_guard<std::mutex> guard (m_viewportMutex);
+               if (!m_apViewport.empty ())
+               {
+                  pViewport = m_apViewport.back ();
+                  m_apViewport.pop_back ();
+               }
             }
+            if (!pViewport)
+               break;
+            pViewport->RequestRendererShutdown ();
+            pViewport->Shutdown ();
+            delete pViewport;
          }
-         if (!pViewport)
-            break;
-         pViewport->RequestRendererShutdown ();
-         pViewport->Shutdown ();
-         delete pViewport;
-      }
 
-      // --- Stop engine thread (shuts down workers internally) ---
+         // --- Stop engine thread (shuts down workers internally) ---
 
-      if (m_pThread_Engine)
-      {
          {
             std::lock_guard<std::mutex> guard (m_mutex);
             m_bShutdown = true;
@@ -217,42 +225,51 @@ public:
          m_pThread_Engine->join ();
          delete m_pThread_Engine;
          m_pThread_Engine = nullptr;
+
+         m_apWorker.clear ();
+         m_anWorkerHertz.clear ();
+         m_anWorkerLastTick.clear ();
+         m_anWorkerSignalCount.clear ();
       }
 
-      m_apWorker.clear ();
-      m_anWorkerHertz.clear ();
-      m_anWorkerLastTick.clear ();
-      m_anWorkerSignalCount.clear ();
+      if (m_eInitState >= kINIT_SUBSYSTEMS)
+      {
+         delete m_pPersona;
+         m_pPersona = nullptr;
+      }
 
-      // --- Destroy shared subsystems ---
-
-      delete m_pPersona;
-      m_pPersona = nullptr;
-
-      if (m_pStorage)
+      if (m_eInitState >= kINIT_STORAGE)
       {
          m_pStorage->Shutdown ();
          delete m_pStorage;
          m_pStorage = nullptr;
       }
 
-      if (m_pNetwork)
+      if (m_eInitState >= kINIT_NETWORK)
       {
          m_pNetwork->Shutdown ();
          delete m_pNetwork;
          m_pNetwork = nullptr;
       }
 
-      // --- Shutdown deps ---
+      if (m_eInitState >= kINIT_UI)
+         s_pUiContext.Shutdown ();
 
-      s_pUiContext.Shutdown ();
 #ifdef SNEEZE_HAS_XR
-      s_pXrRuntime.Shutdown ();
+      if (m_eInitState >= kINIT_XR)
+         s_pXrRuntime.Shutdown ();
 #endif
-      s_pSpvPipeline.Shutdown ();
-      s_pWasmRuntime.Shutdown ();
 
-      m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SNEEZE", "Shutdown complete");
+      if (m_eInitState >= kINIT_SPV)
+         s_pSpvPipeline.Shutdown ();
+
+      if (m_eInitState >= kINIT_WASM)
+         s_pWasmRuntime.Shutdown ();
+
+      if (m_eInitState > kINIT_NONE)
+         m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SNEEZE", "Shutdown complete");
+
+      m_eInitState = kINIT_NONE;
    }
 
    void ViewportAdd (VIEWPORT* pViewport)
@@ -270,6 +287,23 @@ public:
    VIEWPORT* ViewportGet ()
    {
       return m_apViewport.empty () ? nullptr : m_apViewport[0];
+   }
+
+   void ShutdownWorkers ()
+   {
+      for (auto* pWorker : m_apWorker)
+         pWorker->SignalShutdown ();
+
+      for (auto* pWorker : m_apWorker)
+         pWorker->Join ();
+
+      for (auto* pWorker : m_apWorker)
+         delete pWorker;
+
+      m_apWorker.clear ();
+      m_anWorkerHertz.clear ();
+      m_anWorkerLastTick.clear ();
+      m_anWorkerSignalCount.clear ();
    }
 
    void EngineThreadLoop ()
@@ -305,17 +339,7 @@ public:
       }
 
       if (!bOk)
-      {
-         for (int nIz = static_cast<int> (m_apWorker.size ()) - 1; nIz >= 0; nIz--)
-         {
-            m_apWorker[nIz]->Shutdown ();
-            delete m_apWorker[nIz];
-         }
-         m_apWorker.clear ();
-         m_anWorkerHertz.clear ();
-         m_anWorkerLastTick.clear ();
-         m_anWorkerSignalCount.clear ();
-      }
+         ShutdownWorkers ();
 
       m_bEngineInitOk = bOk;
 
@@ -331,64 +355,96 @@ public:
       {
          auto tpOrigin = std::chrono::steady_clock::now ();
          int64_t nLastReport = 0;
+         bool bRun = true;
 
-         while (true)
+         while (bRun)
          {
-            std::this_thread::sleep_for (std::chrono::milliseconds (1));
+            bool bSignalScrubber = false;
 
             {
-               std::lock_guard<std::mutex> guard (m_mutex);
-               if (m_bShutdown)
-                  break;
-            }
-
-            auto tpNow = std::chrono::steady_clock::now ();
-            double dElapsed = std::chrono::duration<double> (tpNow - tpOrigin).count ();
-
-            for (int nIz = 0; nIz < static_cast<int> (m_apWorker.size ()); nIz++)
-            {
-               int nHz = m_anWorkerHertz[nIz];
-               if (nHz <= 0)
-                  continue;
-
-               int64_t nCurrentTick = static_cast<int64_t> (dElapsed * nHz);
-               if (nCurrentTick > m_anWorkerLastTick[nIz])
+               std::unique_lock<std::mutex> lock (m_mutex);
+               m_condVar.wait_for (lock, std::chrono::milliseconds (1));
+               bRun = !m_bShutdown;
+               if (m_bCleanupPending)
                {
-                  m_anWorkerLastTick[nIz] = nCurrentTick;
-                  m_anWorkerSignalCount[nIz]++;
-                  m_apWorker[nIz]->Signal ();
+                  m_bCleanupPending = false;
+                  bSignalScrubber = true;
                }
             }
 
-            int64_t nCurrentSecond = static_cast<int64_t> (dElapsed);
-            if (nCurrentSecond > nLastReport)
+            if (bSignalScrubber)
+               m_apWorker[1]->Signal ();
+
+            if (bRun)
             {
-               std::string sMetronome;
+               auto tpNow = std::chrono::steady_clock::now ();
+               double dElapsed = std::chrono::duration<double> (tpNow - tpOrigin).count ();
+
                for (int nIz = 0; nIz < static_cast<int> (m_apWorker.size ()); nIz++)
                {
                   int nHz = m_anWorkerHertz[nIz];
                   if (nHz <= 0)
                      continue;
-                  sMetronome += "  [" + std::to_string (nIz) + "] " + std::to_string (m_anWorkerSignalCount[nIz]) + "/" + std::to_string (nHz) + " Hz";
-                  m_anWorkerSignalCount[nIz] = 0;
+
+                  int64_t nCurrentTick = static_cast<int64_t> (dElapsed * nHz);
+                  if (nCurrentTick > m_anWorkerLastTick[nIz])
+                  {
+                     m_anWorkerLastTick[nIz] = nCurrentTick;
+                     m_anWorkerSignalCount[nIz]++;
+                     m_apWorker[nIz]->Signal ();
+                  }
                }
-               // Log (IENGINE::kLOGLEVEL_Trace, "METRONOME", sMetronome);
-               nLastReport = nCurrentSecond;
+
+               int64_t nCurrentSecond = static_cast<int64_t> (dElapsed);
+               if (nCurrentSecond > nLastReport)
+               {
+                  std::string sMetronome;
+                  for (int nIz = 0; nIz < static_cast<int> (m_apWorker.size ()); nIz++)
+                  {
+                     int nHz = m_anWorkerHertz[nIz];
+                     if (nHz <= 0)
+                        continue;
+                     sMetronome += "  [" + std::to_string (nIz) + "] " + std::to_string (m_anWorkerSignalCount[nIz]) + "/" + std::to_string (nHz) + " Hz";
+                     m_anWorkerSignalCount[nIz] = 0;
+                  }
+                  // Log (IENGINE::kLOGLEVEL_Trace, "METRONOME", sMetronome);
+                  nLastReport = nCurrentSecond;
+               }
             }
          }
 
-         // --- Shutdown worker threads (reverse order) ---
-
-         for (int nIz = static_cast<int> (m_apWorker.size ()) - 1; nIz >= 0; nIz--)
-         {
-            m_apWorker[nIz]->Shutdown ();
-            delete m_apWorker[nIz];
-         }
+         ShutdownWorkers ();
       }
 
 #ifdef _WIN32
       timeEndPeriod (1);
 #endif
+   }
+
+   void QueueCleanup (const std::string& sPath)
+   {
+      {
+         std::lock_guard<std::mutex> guard (m_cleanupMutex);
+         m_aCleanupPath.push_back (sPath);
+      }
+      {
+         std::lock_guard<std::mutex> guard (m_mutex);
+         m_bCleanupPending = true;
+      }
+      m_condVar.notify_all ();
+   }
+
+   bool HasCleanupWork () const
+   {
+      std::lock_guard<std::mutex> guard (m_cleanupMutex);
+      bool bResult = !m_aCleanupPath.empty ();
+      return bResult;
+   }
+
+   void SwapCleanupQueue (std::vector<std::string>& aOut)
+   {
+      std::lock_guard<std::mutex> guard (m_cleanupMutex);
+      aOut.swap (m_aCleanupPath);
    }
 
    void Capture ()
@@ -415,6 +471,7 @@ public:
 
 private:
    ENGINE*                    m_pEngine;
+   eINIT_STATE                m_eInitState;
 
    // Engine thread
    std::thread*               m_pThread_Engine;
@@ -429,6 +486,11 @@ private:
    std::vector<int>           m_anWorkerHertz;
    std::vector<int64_t>       m_anWorkerLastTick;
    std::vector<int>           m_anWorkerSignalCount;
+
+   // Cleanup queue
+   mutable std::mutex         m_cleanupMutex;
+   std::vector<std::string>   m_aCleanupPath;
+   bool                       m_bCleanupPending;
 
    // Viewports
    std::mutex                 m_viewportMutex;
@@ -513,6 +575,14 @@ IENGINE*  ENGINE::Host () const              { return m_pImpl->m_pHost;      }
 NETWORK*  ENGINE::Network () const           { return m_pImpl->m_pNetwork;   }
 STORAGE*  ENGINE::Storage () const           { return m_pImpl->m_pStorage;   }
 persona::PERSONA* ENGINE::Persona () const   { return m_pImpl->m_pPersona;   }
+
+// ---------------------------------------------------------------------------
+// Cleanup queue
+// ---------------------------------------------------------------------------
+
+void ENGINE::QueueCleanup (const std::string& sPath)          { m_pImpl->QueueCleanup (sPath); }
+bool ENGINE::HasCleanupWork () const                           { return m_pImpl->HasCleanupWork (); }
+void ENGINE::SwapCleanupQueue (std::vector<std::string>& aOut) { m_pImpl->SwapCleanupQueue (aOut); }
 
 // ---------------------------------------------------------------------------
 // Logging and notifications

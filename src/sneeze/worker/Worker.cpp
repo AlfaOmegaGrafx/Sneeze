@@ -49,7 +49,7 @@ bool WORKER::Initialize ()
    return true;
 }
 
-void WORKER::Shutdown ()
+void WORKER::SignalShutdown ()
 {
    if (m_pThread)
    {
@@ -58,11 +58,23 @@ void WORKER::Shutdown ()
          m_bShutdown = true;
       }
       m_condVar.notify_all ();
+   }
+}
 
+void WORKER::Join ()
+{
+   if (m_pThread)
+   {
       m_pThread->join ();
       delete m_pThread;
       m_pThread = nullptr;
    }
+}
+
+void WORKER::Shutdown ()
+{
+   SignalShutdown ();
+   Join ();
 }
 
 void WORKER::Signal ()
