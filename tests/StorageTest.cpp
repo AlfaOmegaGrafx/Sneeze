@@ -46,7 +46,7 @@ static void Check (bool bCondition, const char* szName)
 // Minimal ISNEEZE for tests
 // ---------------------------------------------------------------------------
 
-class STORAGE_TEST_HOST : public SNEEZE::ENGINE::IENGINE
+class STORAGE_TEST_HOST : public SNEEZE::IENGINE
 {
 public:
    std::string m_sAppDataPath;

@@ -105,7 +105,7 @@ bool MSF::Parse (const std::string& sJws)
       catch (const std::exception& ex)
       {
          if (m_pEngine)
-            m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Error, "MSF", std::string ("Parse: ") + ex.what ());
+            m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "MSF", std::string ("Parse: ") + ex.what ());
       }
    }
 
@@ -159,14 +159,14 @@ std::string MSF::Sign (const std::string& sPrivateKeyPem,
          else
          {
             if (m_pEngine)
-               m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Error, "MSF", "Sign: unknown algorithm \"" + sAlgorithm + "\"");
+               m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "MSF", "Sign: unknown algorithm \"" + sAlgorithm + "\"");
          }
       }
    }
    catch (const std::exception& ex)
    {
       if (m_pEngine)
-         m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Error, "MSF", std::string ("Sign: exception: ") + ex.what ());
+         m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "MSF", std::string ("Sign: exception: ") + ex.what ());
 
       sResult.clear ();
    }

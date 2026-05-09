@@ -128,7 +128,7 @@ bool ASTRO_SERVICE::Initialize (VIEWPORT::SCENE::FABRIC* pPrimaryFabric)
       m_apMapObjects.push_back (pMapObj);
    }
 
-   m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "ASTRO_SERVICE", "Populated " + std::to_string (static_cast<int> (m_apNodes.size ())) + " SOM nodes");
+   m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "ASTRO_SERVICE", "Populated " + std::to_string (static_cast<int> (m_apNodes.size ())) + " SOM nodes");
 
    return true;
 }

@@ -27,48 +27,47 @@ namespace SNEEZE
 
    class NETWORK;
    class STORAGE;
-   class VIEWPORT;
-   class IVIEWPORT;
 
-   class WORKER;
+   class NOTIFICATION
+   {
+   public:
+      virtual ~NOTIFICATION () = default;
+   };
+}
 
-   class NOTIFICATION 
-   { 
-   public: 
-      virtual ~NOTIFICATION () = default; 
+#include "Viewport.h"
+
+namespace SNEEZE
+{
+   // ------------------------------------------------------------------------
+   // IENGINE -- interface between the host application and the engine.
+   // Engine-level only: logging, data paths, renderer selection.
+   // ------------------------------------------------------------------------
+
+   class IENGINE
+   {
+   public:
+      enum eLOGLEVEL
+      {
+         kLOGLEVEL_Trace,
+         kLOGLEVEL_Info,
+         kLOGLEVEL_Warning,
+         kLOGLEVEL_Error
+      };
+
+   public:
+      virtual ~IENGINE () = default;
+
+      // Accessors
+      virtual std::string const& sAppDataPath ()       const& = 0;
+      virtual std::string const& sRenderer ()          const& = 0;
+
+      // Methods
+      virtual void Log (eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage) = 0;
    };
 
    class ENGINE
    {
-   public:
-
-      // ------------------------------------------------------------------------
-      // IENGINE -- interface between the host application and the engine.
-      // Engine-level only: logging, data paths, renderer selection.
-      // ------------------------------------------------------------------------
-
-      class IENGINE
-      {
-      public:
-         enum eLOGLEVEL
-         {
-            kLOGLEVEL_Trace,
-            kLOGLEVEL_Info,
-            kLOGLEVEL_Warning,
-            kLOGLEVEL_Error
-         };
-
-      public:
-         virtual ~IENGINE () = default;
-
-         // Accessors
-         virtual std::string const& sAppDataPath ()       const& = 0;
-         virtual std::string const& sRenderer ()          const& = 0;
-
-         // Methods
-         virtual void Log (eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage) = 0;
-      };
-
    public:
       // Constructors, assignments, and destructor
       explicit ENGINE (IENGINE* pHost);
@@ -86,7 +85,7 @@ namespace SNEEZE
 
       // --- Viewport management ---
 
-      VIEWPORT*                      Viewport_Open    (IVIEWPORT* pHost, const std::string& sUrl = "");
+      VIEWPORT*                      Viewport_Open    (IVIEWPORT* pHost, const std::string& sUrl = "", VIEWPORT::eSESSION kSession = VIEWPORT::kSESSION_PERSISTENT);
       void                           Viewport_Close   (VIEWPORT* pViewport);
       void                           Viewport_Capture ();
       const std::vector<VIEWPORT*>&  Viewport_GetList () const;
@@ -121,7 +120,6 @@ namespace SNEEZE
    };
 }
 
-#include "Viewport.h"
 #include "Persona.h"
 #include "Network.h"
 

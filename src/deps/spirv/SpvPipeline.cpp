@@ -34,7 +34,7 @@ bool SPV_PIPELINE::Initialize (ENGINE* pEngine)
 {
    m_pEngine = pEngine;
    bInitialized = true;
-   m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "SPV_PIPELINE",
+   m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SPV_PIPELINE",
       "SPIR-V validation pipeline initialized (SPIRV-Tools)");
    return true;
 }

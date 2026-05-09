@@ -34,13 +34,13 @@ void PERSONA::Login (const std::string& sFirst, const std::string& sSecond)
    m_sHash = ComputeHash (m_sName);
    m_bLoggedIn = true;
 
-   m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "PERSONA",
+   m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "PERSONA",
       "Logged in as \"" + m_sName + "\" (hash: " + m_sHash + ")");
 }
 
 void PERSONA::Logout ()
 {
-   m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "PERSONA",
+   m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "PERSONA",
       "Logged out \"" + m_sName + "\"");
    m_bLoggedIn = false;
    m_sName.clear ();

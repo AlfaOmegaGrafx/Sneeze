@@ -64,7 +64,7 @@ bool SCENE::Initialize (const std::string& sUrl)
    pNode_Attach->Fabric_Set_Attached (m_pFabric_Primary);
    m_pFabric_Root->Fabric_Add (m_pFabric_Primary);
 
-   Sneeze ()->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "SCENE", "Initialized (root fabric + primary fabric)");
+   Sneeze ()->Log (IENGINE::kLOGLEVEL_Info, "SCENE", "Initialized (root fabric + primary fabric)");
 
    return Fabric_Open_Primary (sUrl);
 }
@@ -109,7 +109,7 @@ bool SCENE::Fabric_Open_Primary (const std::string& /*sUrl*/)
    for (auto* pBody : aBodies)
       pBody->ConvertToOutput ();
 
-   Sneeze ()->Log (ENGINE::IENGINE::kLOGLEVEL_Info, "SCENE", "Created " + std::to_string (aBodies.size ()) + " bodies");
+   Sneeze ()->Log (IENGINE::kLOGLEVEL_Info, "SCENE", "Created " + std::to_string (aBodies.size ()) + " bodies");
 
    m_pAstroService = new astro::ASTRO_SERVICE (Sneeze ());
    m_pAstroService->Initialize (m_pFabric_Primary);
