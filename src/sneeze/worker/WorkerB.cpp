@@ -45,9 +45,9 @@ void WORKER::SCRUBBER::DrainQueue ()
       std::filesystem::remove_all (sPath, ec);
 
       if (ec)
-         m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Warning, "SCRUBBER", "Failed to remove " + sPath + ": " + ec.message ());
+         m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "SCRUBBER", "Failed to remove " + sPath + ": " + ec.message ());
       else
-         m_pEngine->Log (ENGINE::IENGINE::kLOGLEVEL_Trace, "SCRUBBER", "Removed " + sPath);
+         m_pEngine->Log (IENGINE::kLOGLEVEL_Trace, "SCRUBBER", "Removed " + sPath);
    }
 }
 
