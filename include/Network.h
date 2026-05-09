@@ -203,7 +203,7 @@ namespace SNEEZE
       // read them after Release.
       // -----------------------------------------------------------------------
 
-      class FILE : public NOTIFICATION
+      class FILE
       {
       public:
          FILE (NETWORK* pNetwork, ASSET* pAsset, std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, VIEWPORT* pViewport, IFILE* pListener, uint32_t nFileIx);

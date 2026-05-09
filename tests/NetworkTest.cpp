@@ -89,9 +89,9 @@ public:
 
    void OnFrameReady (const uint32_t*, int, int) override {}
 
-   void OnNetworkFileCreated (NOTIFICATION*) override { m_nCreatedCount++; }
-   void OnNetworkFileChanged (NOTIFICATION*) override { m_nChangedCount++; }
-   void OnNetworkFileDeleted (NOTIFICATION*) override { m_nDeletedCount++; }
+   void OnNetworkFileCreated (SNEEZE::NETWORK::FILE*) override { m_nCreatedCount++; }
+   void OnNetworkFileChanged (SNEEZE::NETWORK::FILE*) override { m_nChangedCount++; }
+   void OnNetworkFileDeleted (SNEEZE::NETWORK::FILE*) override { m_nDeletedCount++; }
 
    void ResetCounters () { m_nCreatedCount = 0; m_nChangedCount = 0; m_nDeletedCount = 0; }
 };

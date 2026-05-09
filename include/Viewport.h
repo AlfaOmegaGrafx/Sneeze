@@ -26,38 +26,6 @@
 
 namespace SNEEZE
 {
-   class ENGINE;
-
-   // ---------------------------------------------------------------------------
-   // IVIEWPORT -- per-viewport interface between the host and a viewport.
-   // Each viewport gets its own IVIEWPORT instance from the application.
-   // ---------------------------------------------------------------------------
-
-   class IVIEWPORT
-   {
-   public:
-      virtual ~IVIEWPORT () = default;
-
-      // --- Callbacks (host must implement) ---
-
-      virtual void* FrameWindow    ()                                         = 0;
-      virtual void  FrameSize      (int &nWidth, int& nHeight)                = 0;
-
-      virtual void  OnFrameReady   (const uint32_t* pFB, int nFbW, int nFbH)  = 0;
-
-      // --- Inspector callbacks (optional) ---
-
-      virtual void OnNetworkFileCreated (NOTIFICATION*) {}
-      virtual void OnNetworkFileChanged (NOTIFICATION*) {}
-      virtual void OnNetworkFileDeleted (NOTIFICATION*) {}
-
-      virtual void OnStorageUnitCreated (NOTIFICATION*) {}
-      virtual void OnStorageUnitChanged (NOTIFICATION*) {}
-      virtual void OnStorageUnitDeleted (NOTIFICATION*) {}
-   };
-
-   // ---------------------------------------------------------------------------
-
    class VIEWPORT
    {
    public:

@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include <Sneeze.h>
-#include "Storage.h"
 #include <sstream>
 #include <chrono>
 #include <iomanip>

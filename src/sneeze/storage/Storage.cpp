@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include <Sneeze.h>
-#include "Storage.h"
 
 using namespace SNEEZE;
 

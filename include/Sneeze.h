@@ -20,22 +20,14 @@
 
 namespace SNEEZE
 {
-   namespace persona
-   {
-      class PERSONA;
-   }
-
-   class NETWORK;
-   class STORAGE;
-
-   class NOTIFICATION
-   {
-   public:
-      virtual ~NOTIFICATION () = default;
-   };
+   class ENGINE;
+   class IVIEWPORT;
 }
 
 #include "Viewport.h"
+#include "Persona.h"
+#include "Network.h"
+#include "Storage.h"
 
 namespace SNEEZE
 {
@@ -43,6 +35,29 @@ namespace SNEEZE
    // IENGINE -- interface between the host application and the engine.
    // Engine-level only: logging, data paths, renderer selection.
    // ------------------------------------------------------------------------
+
+   class IVIEWPORT
+   {
+   public:
+      virtual ~IVIEWPORT () = default;
+
+      // --- Callbacks (host must implement) ---
+
+      virtual void* FrameWindow () = 0;
+      virtual void  FrameSize (int& nWidth, int& nHeight) = 0;
+
+      virtual void  OnFrameReady (const uint32_t* pFB, int nFbW, int nFbH) = 0;
+
+      // --- Inspector callbacks (optional) ---
+
+      virtual void OnNetworkFileCreated (NETWORK::FILE*) {}
+      virtual void OnNetworkFileChanged (NETWORK::FILE*) {}
+      virtual void OnNetworkFileDeleted (NETWORK::FILE*) {}
+
+      virtual void OnStorageUnitCreated (STORAGE::ASSET*) {}
+      virtual void OnStorageUnitChanged (STORAGE::ASSET*) {}
+      virtual void OnStorageUnitDeleted (STORAGE::ASSET*) {}
+   };
 
    class IENGINE
    {
@@ -113,8 +128,5 @@ namespace SNEEZE
       Impl* m_pImpl;
    };
 }
-
-#include "Persona.h"
-#include "Network.h"
 
 #endif // SNEEZE_SNEEZE_H

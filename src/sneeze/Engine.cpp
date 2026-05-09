@@ -23,7 +23,6 @@
 #include "Types.h"
 #include "worker/Worker.h"
 #include "astro/RMCObject.h"
-#include "storage/Storage.h"
 #include "wasm/WasmRuntime.h"
 #include "spirv/SpvPipeline.h"
 #ifdef SNEEZE_HAS_XR
@@ -510,10 +509,10 @@ void ENGINE::Viewport_Release ()
    m_pImpl->Release ();
 }
 
-IENGINE*  ENGINE::Host () const       { return m_pImpl->m_pHost;      }
-NETWORK*  ENGINE::Network () const    { return m_pImpl->m_pNetwork;   }
-STORAGE*  ENGINE::Storage () const    { return m_pImpl->m_pStorage;   }
-persona::PERSONA* ENGINE::Persona () const    { return m_pImpl->m_pPersona;   }
+IENGINE*  ENGINE::Host () const              { return m_pImpl->m_pHost;      }
+NETWORK*  ENGINE::Network () const           { return m_pImpl->m_pNetwork;   }
+STORAGE*  ENGINE::Storage () const           { return m_pImpl->m_pStorage;   }
+persona::PERSONA* ENGINE::Persona () const   { return m_pImpl->m_pPersona;   }
 
 // ---------------------------------------------------------------------------
 // Logging and notifications

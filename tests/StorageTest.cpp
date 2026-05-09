@@ -13,9 +13,6 @@
 // limitations under the License.
 
 #include <Sneeze.h>
-#include "storage/Storage.h"
-#include <Container.h>
-#include <Viewport.h>
 
 #include <cstdio>
 #include <cstring>
@@ -88,9 +85,9 @@ public:
 
    void OnFrameReady (const uint32_t*, int, int) override {}
 
-   void OnStorageUnitCreated (NOTIFICATION*) override { m_nCreatedCount++; }
-   void OnStorageUnitChanged (NOTIFICATION*) override { m_nChangedCount++; }
-   void OnStorageUnitDeleted (NOTIFICATION*) override { m_nDeletedCount++; }
+   void OnStorageUnitCreated (STORAGE::ASSET*) override { m_nCreatedCount++; }
+   void OnStorageUnitChanged (STORAGE::ASSET*) override { m_nChangedCount++; }
+   void OnStorageUnitDeleted (STORAGE::ASSET*) override { m_nDeletedCount++; }
 };
 
 static STORAGE_TEST_HOST*          s_pHost    = nullptr;
