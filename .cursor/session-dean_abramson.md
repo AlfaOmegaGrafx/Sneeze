@@ -580,3 +580,23 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 - **`m_sPath_Session` renamed to `m_sPath_Transitory_Session`** — Clearer naming.
 - **project.mdc** — Updated ENGINE, WORKER, SCRUBBER, CONTROLLER class descriptions. Updated worker ownership rationale. Updated backlog item #16 with new path naming and InitializePaths error handling.
 
+## 2026-05-10 (Saturday) ~12:11 AM – 12:40 AM PDT
+
+- **Post-refactor validation** — Rebuilt and tested after CONTROLLER extraction. Solar system renders correctly once all textures load from CDN. The "dimness" observed while cache was rebuilding was untextured spheres using solid color fallback — not a regression.
+- **RmlUi dual-context architecture confirmed** — `Rml::CreateContext()` accepts a per-context `RenderInterface`, so Sneeze and Artemis can each create independent contexts with different renderers (ANARI for in-world UI, SDL for browser chrome). Single `Rml::Initialise()` in Sneeze, shared font engine and system interface. No conflict.
+- **Inspector is Artemis's concern** — Clarified that the Inspector, URL bar, menus, and all browser chrome are Artemis UI surfaces rendered with SDL. Sneeze renders metaverse content inside the viewport only. Corrected earlier (wrong) suggestion to use ANARI for Inspector rendering.
+- **FreeType decision** — Decided to rebuild RmlUi with FreeType (`RMLUI_FONT_ENGINE=freetype`). Add FreeType as new Sneeze dependency (`deps/freetype.cmake`). Remove `STUB_FONT_ENGINE` from `UiContext.cpp`. Prerequisite for any text rendering. Implementation deferred to morning.
+- **project.mdc** — Added RmlUi dual-context architecture documentation, FreeType font engine decision, updated UI_CONTEXT class description, updated Phase 4 tasks with Sneeze/Artemis ownership annotations, added FreeType to dependency table.
+
+## 2026-05-10 (Saturday) ~8:00 AM – 8:15 AM PDT
+
+- **FreeType integration implemented** — Five changes to enable FreeType in RmlUi:
+  1. Created `deps/freetype.cmake` — FreeType 2.13.3, static, all optional deps disabled (zlib, bzip2, png, harfbuzz, brotli).
+  2. Updated `deps/rmlui.cmake` — `RMLUI_FONT_ENGINE=freetype`, added `CMAKE_PREFIX_PATH` to FreeType install.
+  3. Updated `deps/CMakeLists.txt` — Added `freetype` to `SNEEZE_DEPS`, added `add_dependencies(rmlui freetype)`.
+  4. Created `src/cmake/FindSneezeFreeType.cmake`, updated `src/CMakeLists.txt` — find, multi-config rewriter, include, link.
+  5. Updated `src/deps/ui/UiContext.cpp` — Removed `STUB_FONT_ENGINE` class, its static instance, and `SetFontEngineInterface` call.
+- **Verification** — `SneezeTest --ui` passes 20/20. "No font face defined" warnings are cosmetic (no fonts loaded in test context).
+- **Both configs built** — Release and Debug rebuilt successfully.
+- **project.mdc** — Updated FreeType dependency from pending to implemented (VER-2-13-3). Updated Phase 4 task #1 to DONE. Updated UI_CONTEXT class description. Updated RmlUi gotcha. Updated FreeType font engine rationale from "pending" to "implemented".
+

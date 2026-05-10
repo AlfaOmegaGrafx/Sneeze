@@ -157,7 +157,7 @@ All C++ code lives in namespace `SNEEZE` with sub-namespaces per module (e.g. `S
 | `deps/wasm/` | `DEP` | WASM sandbox runtime (Wasmtime v43.0.0). WASM_RUNTIME manages engine + multiple WASM_STOREs (identified by persona+fingerprint+container triple). WASM_STORE holds fabric refcount and WASM_INSTANCEs (URL+SHA256 identity, Init/Open/Close/Shutdown lifecycle, refcount). Host functions (SOM_* and Storage_*) are C-linkage stubs. THREAD_POOL provides fixed-size worker pool for parallel WASM execution. | Active |
 | `deps/spirv/` | `DEP` | SPIR-V validation (SPIRV-Tools, vulkan-sdk-1.4.341.0) | 1 |
 | `deps/xr/` | `DEP` | OpenXR device abstraction (OpenXR SDK 1.1.58) | 1 |
-| `deps/ui/` | `DEP` | UI toolkit (RmlUi 6.2, HTML/CSS retained-mode, stub renderer) | 1 |
+| `deps/ui/` | `DEP` | UI toolkit (RmlUi 6.2, HTML/CSS retained-mode, FreeType font engine, stub renderer) | 1 |
 | `deps/compute/` | `DEP` | SPIR-V kernel embedding, retrieval, and dispatch via ANARI (CPU fallback when device lacks compute extension) | 1 |
 | `deps/stb/` | — | stb_image (vendored header-only) | — |
 | `viewport/msf/` | `msf` | MSF file signing and verification (RFC 7515 JWS compact serialization). BoringSSL + jwt-cpp. Part of the Sneeze static library; consumed by `JwsTest`, `SignMsf`, and (eventually) the SMAP driver. | 5 |
@@ -210,7 +210,7 @@ All C++ code lives in namespace `SNEEZE` with sub-namespaces per module (e.g. `S
 | `PERSONA` | `persona` | Local identity proxy. Constructor takes `ENGINE*`. `Login("First", "Second")` combines to "First.Second", hashed via SHA-256 (BoringSSL). Hash used as key for WASM stores and storage scoping. Public header: `include/Persona.h`. |
 | `SPV_PIPELINE` | `deps/spirv` | SPIR-V validation (SPIRV-Tools) |
 | `XR_RUNTIME` | `deps/xr` | OpenXR loader lifecycle, instance creation, runtime discovery. Gracefully handles no-runtime case. |
-| `UI_CONTEXT` | `deps/ui` | RmlUi lifecycle (init/shutdown). Provides stub system, render, and font engine interfaces. Real ANARI rendering deferred to SOM phase. |
+| `UI_CONTEXT` | `deps/ui` | RmlUi lifecycle (init/shutdown). Owns `Rml::Initialise()` / `Rml::Shutdown()` and the global system interface (elapsed time + logging) and FreeType font engine (activated automatically by RmlUi when built with `RMLUI_FONT_ENGINE=freetype`). Stub render interface remains — will be replaced with an ANARI overlay for in-world UI (Phase 4). Artemis creates its own RmlUi contexts with an SDL-backed render interface for browser chrome — Sneeze never sees those contexts. |
 | `GetEmbeddedKernel()` | `deps/compute` | Retrieves SPIR-V bytecode embedded in the executable via Win32 resources. Returns pointer + size. |
 | `COMPUTE_DISPATCH` | `deps/compute` | Dispatches SPIR-V compute kernels via **Vox** (`vox::DEVICE::Create(Backend::Auto)` picks Vulkan / DX12 / Metal at construction). Falls back to registered CPU kernels when no GPU backend is available or Vox rejects the kernel. Built-in CPU fallback for `TEST_PROXIMITY`. The legacy `ANARIDevice` constructor parameter is retained for source compatibility but ignored. |
 | `MSF_FILE` | `viewport/msf` | Single class for the full MSF file lifecycle: parse, sign, verify signature, verify chain, manage certificates, and access typed payload fields. Replaces the former `JWS_BASE` / `JWS_SERVICE` / `JWS_FABRIC` hierarchy. Parse is separated from verification — `Parse()` populates payload, cert info, and fingerprint; `VerifySignature()` and `VerifyChain()` are explicit follow-up calls. Composition path: `SetPayload()` / typed setters + `AddCert()` + `Sign()`. Supports RS256/384/512, ES256/384/512. Non-copyable, non-movable. |
@@ -377,7 +377,8 @@ All dependencies are built from source automatically by the CMake SuperBuild. No
 | SPIRV-Headers | vulkan-sdk-1.4.341.0 | [KhronosGroup/SPIRV-Headers](https://github.com/KhronosGroup/SPIRV-Headers) | SPIR-V specification headers (build dep of SPIRV-Tools) |
 | OpenXR-SDK | release-1.1.58 | [KhronosGroup/OpenXR-SDK](https://github.com/KhronosGroup/OpenXR-SDK) | XR device abstraction |
 | curl | curl-8_9_1 | [curl/curl](https://github.com/curl/curl) | HTTP/HTTPS client (static, Schannel SSL on Windows) |
-| RmlUi | 6.2 | [mikke89/RmlUi](https://github.com/mikke89/RmlUi) | HTML/CSS retained-mode UI toolkit |
+| RmlUi | 6.2 | [mikke89/RmlUi](https://github.com/mikke89/RmlUi) | HTML/CSS retained-mode UI toolkit (currently built with `RMLUI_FONT_ENGINE=none`; pending switch to `freetype`) |
+| FreeType | VER-2-13-3 | [freetype/freetype](https://github.com/freetype/freetype) | Font rasterization library. Static, all optional deps disabled (zlib, bzip2, png, harfbuzz, brotli). Build dep of RmlUi (`RMLUI_FONT_ENGINE=freetype`). Sneeze links FreeType directly because RmlUi links it PRIVATE (unresolved symbols propagate from static lib). |
 | glslang | vulkan-sdk-1.4.341.0 | [KhronosGroup/glslang](https://github.com/KhronosGroup/glslang) | GLSL-to-SPIR-V compiler (build-time only) |
 | nlohmann/json | v3.11.3 | [nlohmann/json](https://github.com/nlohmann/json) | Header-only JSON parsing library (MIT license) |
 | Filament | main | [MetaversalCorp/filament](https://github.com/MetaversalCorp/filament) | PBR rendering engine — Metaversal fork of Google Filament (Apache 2.0) |
@@ -455,7 +456,16 @@ glslang is the Khronos reference SPIR-V compiler. GLSL compute shaders (`#versio
 
 **Why RmlUi (not Dear ImGui)?** Dear ImGui is immediate-mode — every frame, your code rebuilds the entire UI by calling draw functions. RmlUi is retained-mode — you describe the UI in HTML/CSS-like markup, and the library maintains the DOM, handles layout, animations, and event dispatch automatically. For a browser engine with complex, persistent UI (chrome, tabbed interfaces, developer tools, service-provided UI), retained mode is the correct paradigm. RmlUi's HTML/CSS model also aligns with the OMB architecture's intent to let services define UI through standard web-like markup. Single toolkit for all UI surfaces — no mixing of two rendering systems.
 
-**Why build RmlUi from source (not vcpkg)?** RmlUi is available in vcpkg, but building from source (1) maintains the consistent build-from-source pattern, (2) allows disabling the FreeType font engine (we provide our own stub, and will eventually use a custom engine), and (3) gives full control over which optional features are included (no Lua, no Lottie, no SVG).
+**Why build RmlUi from source (not vcpkg)?** RmlUi is available in vcpkg, but building from source (1) maintains the consistent build-from-source pattern, (2) gives full control over the font engine configuration (FreeType enabled, see below), and (3) gives full control over which optional features are included (no Lua, no Lottie, no SVG).
+
+**RmlUi dual-context architecture (Sneeze + Artemis).** RmlUi is initialized once per process by Sneeze (`Rml::Initialise()` in `UI_CONTEXT::Initialize()`), but both Sneeze and Artemis create their own independent `Rml::Context` objects. The key API that makes this work is `Rml::CreateContext(name, dimensions, render_interface, text_input_handler)` — each context can have its **own** `RenderInterface`. Shared globals (system interface, font engine) are set by Sneeze and serve both sides.
+
+- **Artemis contexts** use an SDL-backed `RenderInterface` for browser chrome: the Inspector, URL bar, menus, toolbars, developer tools. These are application-level UI surfaces that Sneeze never sees.
+- **Sneeze contexts** (future) use an ANARI-backed `RenderInterface` for in-world UI: service-provided HTML/CSS overlays composited onto the 3D viewport. This is Phase 4 work.
+
+The Inspector is **entirely Artemis's concern** — it is browser chrome, in the same category as the URL bar and menus. Sneeze renders metaverse content inside the viewport; Artemis renders everything outside it. Sneeze never sees the Inspector's RmlUi context, documents, or rendering.
+
+**FreeType font engine (implemented 2026-05-10).** RmlUi is built with `-DRMLUI_FONT_ENGINE=freetype` and `-DCMAKE_PREFIX_PATH=${LIBS_DIR}/FreeType/install`. FreeType 2.13.3 is a separate Sneeze dependency (`deps/freetype.cmake`), built static with all optional deps disabled. RmlUi links FreeType PRIVATE, so unresolved symbols propagate from the static lib — Sneeze links FreeType directly via `${FREETYPE_LIB}` to resolve them. The former `STUB_FONT_ENGINE` in `UiContext.cpp` has been removed. RmlUi's built-in FreeType font engine activates automatically on `Rml::Initialise()`. Both Sneeze and Artemis benefit from the shared font engine — it's a global RmlUi interface, set once during init.
 
 **Why build curl from source (not vcpkg)?** curl is available as `curl[ssl]:x64-windows` in vcpkg, but building from source (1) maintains the consistent build-from-source pattern established with ANARI, Wasmtime, SPIR-V, and OpenXR, (2) gives full control over the SSL backend (Schannel vs. OpenSSL — we chose Schannel to avoid an OpenSSL dependency), and (3) makes future removal trivial (delete the source directory and remove the CMake references). Built as a static library with no DLLs to manage. The user noted this integration may be temporary.
 
@@ -596,7 +606,7 @@ MSF files are signed JSON wrapped as JWS compact serialization (`<header>.<paylo
 - **Windows Store python alias.** On Windows, `python.exe` may redirect to the Microsoft Store instead of a real Python installation. Disable in **Settings > Apps > Advanced app settings > App execution aliases**.
 - **OpenXR loader stderr diagnostics are suppressed.** The loader writes alarming messages to stderr when no XR runtime is installed. `XrRuntime.cpp` sets `XR_LOADER_DEBUG=none` to suppress these.
 - **Static library compile definitions.** `CURL_STATICLIB` and `RMLUI_STATIC_LIB` must be defined when compiling code that includes curl or RmlUi headers. The CMakeLists.txt handles this automatically.
-- **RmlUi requires a font engine interface.** `UiContext.cpp` registers a `STUB_FONT_ENGINE` with dummy metrics. "No font face defined" warnings are expected and cosmetic.
+- **RmlUi "No font face defined" warnings.** With FreeType enabled, RmlUi warns when a context renders text without any loaded fonts. These warnings are cosmetic and disappear once `Rml::LoadFontFace()` is called with a real TTF/OTF (Artemis does this for browser chrome; Sneeze will do it for in-world UI).
 - **libcurl uses Schannel (Windows native SSL).** No OpenSSL dependency. On Linux/macOS, curl would need OpenSSL or the platform's native SSL.
 - **SDL pixel format must match ANARI byte layout (Artemis-side).** ANARI's `ANARI_UFIXED8_RGBA_SRGB` writes R,G,B,A bytes. On little-endian Windows, `SDL_PIXELFORMAT_ABGR8888` matches. This is Artemis's concern, not Sneeze's — the engine has no SDL3 dependency.
 - **`dwmapi` is linked on Windows.** `WORKER::COMPOSITOR` calls `DwmFlush()` only when at least one viewport uses the readback path (`Renderer()` exists and `!IsRenderingToNativeSurface()`). Native swapchain present skips `DwmFlush` to avoid double vsync wait. `src/CMakeLists.txt` links `dwmapi` as a PUBLIC dependency on Windows. On other platforms, the compositor falls back to `std::this_thread::sleep_for(16ms)` in the same readback-only case.
@@ -829,15 +839,15 @@ Complete the solar system demo to visual parity with the JavaScript original, an
 
 ### Phase 4 — Implement RmlUI Elements
 
-Build out the RmlUI integration from stub interfaces to functional UI components. RmlUI's HTML/CSS retained-mode model will power all browser chrome, developer tools, and service-provided UI surfaces.
+Build out the RmlUI integration from stub interfaces to functional UI components. RmlUI's HTML/CSS retained-mode model powers two independent UI surfaces: **Artemis browser chrome** (Inspector, URL bar, menus — rendered via SDL) and **Sneeze in-world UI** (service-provided overlays — rendered via ANARI). Both share a single `Rml::Initialise()` call, the same FreeType font engine, and the same system interface, but each creates its own `Rml::Context` with a separate `RenderInterface`. See "RmlUi dual-context architecture" in Decision Rationale.
 
 | # | Task | Notes |
 |---|------|-------|
-| 1 | Implement font engine | Replace `STUB_FONT_ENGINE` with a real font engine (FreeType or custom). Required for readable text. |
-| 2 | Implement render interface | Connect RmlUi's render calls to ANARI (or a 2D overlay compositor). Currently stubbed. |
-| 3 | Basic chrome elements | Address bar, tab bar, navigation controls — the minimal browser UI shell. |
-| 4 | Developer tools panel | Inspectable SOM tree, network activity, console output. |
-| 5 | Service-provided UI | Allow WASM services to define UI via RmlUI documents injected into the browser. |
+| 1 | ~~Enable FreeType font engine~~ | **DONE (2026-05-10).** FreeType 2.13.3 added as Sneeze dependency (`deps/freetype.cmake`). `deps/rmlui.cmake` changed to `RMLUI_FONT_ENGINE=freetype` with `CMAKE_PREFIX_PATH` pointing at FreeType install. `STUB_FONT_ENGINE` removed from `UiContext.cpp`. `FindSneezeFreeType.cmake` added, FreeType wired into `src/CMakeLists.txt` (find, multi-config rewriter, include, link). RmlUi's built-in FreeType font engine activates automatically. UI test suite passes 20/20. |
+| 2 | Implement Sneeze render interface | Connect RmlUi's render calls to ANARI (or a 2D overlay compositor) for in-world UI. Currently stubbed. Artemis browser chrome uses its own SDL-backed render interface — that's Artemis's concern, not Sneeze's. |
+| 3 | Basic chrome elements | Address bar, tab bar, navigation controls — the minimal browser UI shell. (Artemis concern — RmlUi contexts with SDL renderer.) |
+| 4 | Developer tools panel | Inspectable SOM tree, network activity, console output. (Artemis concern — Inspector window.) |
+| 5 | Service-provided UI | Allow WASM services to define UI via RmlUI documents injected into the browser. (Sneeze concern — in-world overlay via ANARI render interface.) |
 
 ### Phase 5 — SMAP (C++)
 

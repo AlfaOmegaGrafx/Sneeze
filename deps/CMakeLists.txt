@@ -165,6 +165,7 @@ set (SNEEZE_DEPS
    glslang
    anari-sdk
    curl
+   freetype
    rmlui
    nlohmann-json
    boringssl
@@ -207,6 +208,7 @@ else ()
    add_dependencies (spirv-tools spirv-headers)
    add_dependencies (glslang     spirv-tools)
    add_dependencies (vox         spirv-cross)
+   add_dependencies (rmlui       freetype)
 
    # Halogen links against the regular anari-sdk + filament, both matching
    # the outer SNEEZE_CONFIG.

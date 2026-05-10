@@ -161,6 +161,7 @@ if (USE_LOCAL_DEPS)
       find_package (SneezeOpenXR REQUIRED)
    endif ()
    find_package (SneezeCurl REQUIRED)
+   find_package (SneezeFreeType REQUIRED)
    find_package (SneezeRmlUi REQUIRED)
    find_package (Glslang REQUIRED)
    find_package (NlohmannJson REQUIRED)
@@ -256,6 +257,7 @@ if (USE_LOCAL_DEPS)
    foreach (_v IN ITEMS
       SPIRV_TOOLS_INCLUDE  SPIRV_TOOLS_LIB  SPIRV_TOOLS_OPT_LIB
       CURL_INCLUDE         CURL_LIB
+      FREETYPE_INCLUDE     FREETYPE_LIB
       RMLUI_INCLUDE        RMLUI_CORE_LIB   RMLUI_DEBUGGER_LIB
       NLOHMANN_JSON_INCLUDE
       BORINGSSL_INCLUDE    BORINGSSL_CRYPTO_LIB
@@ -652,6 +654,7 @@ target_include_directories (Sneeze PUBLIC
    ${CMAKE_CURRENT_SOURCE_DIR}/deps
    ${SPIRV_TOOLS_INCLUDE}
    ${CURL_INCLUDE}
+   ${FREETYPE_INCLUDE}
    ${RMLUI_INCLUDE}
    ${NLOHMANN_JSON_INCLUDE}
    ${BORINGSSL_INCLUDE}
@@ -683,6 +686,7 @@ target_link_libraries (Sneeze PUBLIC
    ${CURL_LIB}
    ${RMLUI_CORE_LIB}
    ${RMLUI_DEBUGGER_LIB}
+   ${FREETYPE_LIB}
    ${BORINGSSL_SSL_LIB}
    ${BORINGSSL_CRYPTO_LIB}
    vox::vox

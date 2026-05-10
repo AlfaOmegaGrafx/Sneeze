@@ -19,6 +19,7 @@ ExternalProject_Add (rmlui
       -DCMAKE_BUILD_TYPE=${SNEEZE_CONFIG}
       -DBUILD_SHARED_LIBS=OFF
       -DBUILD_SAMPLES=OFF
-      -DRMLUI_FONT_ENGINE=none
+      -DRMLUI_FONT_ENGINE=freetype
+      -DCMAKE_PREFIX_PATH=${LIBS_DIR}/FreeType/install
       ${CROSS_COMPILE_ARGS}
 )
