@@ -22,6 +22,8 @@ using namespace SNEEZE;
 VIEWPORT::VIEWPORT (ENGINE* pEngine, IVIEWPORT* pHost) :
    m_pEngine                    (pEngine),
    m_pHost                      (pHost),
+   m_eInitState                 (kINIT_NONE),
+   m_bReady                     (false),
    m_pScene                     (nullptr),
    m_pRenderer                  (nullptr),
    m_bRendererPending           (false),
@@ -42,66 +44,87 @@ VIEWPORT::~VIEWPORT ()
    Shutdown ();
 }
 
-bool VIEWPORT::Initialize (const std::string& sUrl)
+bool VIEWPORT::Initialize (const std::string& sUrl, const std::string& sPath_Transitory)
 {
+   bool bResult = false;
+
+   m_sPath_Transitory = sPath_Transitory;
+
    m_pHost->FrameSize (m_nWidth, m_nHeight);
 
-   // Mark renderer as pending -- actual creation deferred to the compositor
-   // thread (Filament requires the rendering thread to be the one that creates
-   // the engine, otherwise it fails with "This thread has not been adopted").
    std::string sLibrary = m_pEngine->Host ()->sRenderer ();
    if (!sLibrary.empty ()  &&  m_pHost->FrameWindow ())
       m_bRendererPending = true;
 
-   // Create scene
    m_pScene = new SCENE (this);
-   if (!m_pScene->Initialize (sUrl))
+
+   if (m_pScene->Initialize (sUrl))
    {
-      delete m_pScene;
-      m_pScene = nullptr;
-      return false;
+      m_eInitState = kINIT_SCENE;
+      m_bReady = true;
+      bResult = true;
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "VIEWPORT", "Initialized");
+   }
+   else
+   {
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "VIEWPORT", "Failed to initialize scene");
    }
 
-   m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "VIEWPORT", "Initialized");
-   return true;
+   return bResult;
 }
 
 bool VIEWPORT::InitializeRenderer ()
 {
-   if (!m_bRendererPending)
-      return m_pRenderer != nullptr;
+   bool bResult = false;
 
-   m_bRendererPending = false;
-
-   std::string sLibrary = m_pEngine->Host ()->sRenderer ();
-   auto* pRenderer = new RENDERER::ANARI (m_pEngine, sLibrary);
-
-   void* pNativeWindow = m_pHost->FrameWindow ();
-   if (pNativeWindow)
-      pRenderer->SetNativeWindow (pNativeWindow);
-
-   if (pRenderer->Initialize (m_nWidth, m_nHeight))
+   if (m_bRendererPending)
    {
-      m_pRenderer = pRenderer;
-      m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "VIEWPORT", "Renderer initialized on compositor thread");
+      m_bRendererPending = false;
+
+      std::string sLibrary = m_pEngine->Host ()->sRenderer ();
+      auto* pRenderer = new RENDERER::ANARI (m_pEngine, sLibrary);
+
+      void* pNativeWindow = m_pHost->FrameWindow ();
+      if (pNativeWindow)
+         pRenderer->SetNativeWindow (pNativeWindow);
+
+      if (pRenderer->Initialize (m_nWidth, m_nHeight))
+      {
+         m_pRenderer = pRenderer;
+         m_eInitState = kINIT_RENDERER;
+         bResult = true;
+         m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "VIEWPORT", "Renderer initialized on compositor thread");
+      }
+      else
+      {
+         delete pRenderer;
+         m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "VIEWPORT", "Renderer unavailable -- headless mode");
+      }
    }
    else
    {
-      delete pRenderer;
-      m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "VIEWPORT", "Renderer unavailable -- headless mode");
+      bResult = (m_pRenderer != nullptr);
    }
 
-   return m_pRenderer != nullptr;
+   return bResult;
 }
 
 void VIEWPORT::Shutdown ()
 {
-   if (m_pScene)
+   if (m_eInitState >= kINIT_SCENE)
    {
+      if (m_eInitState >= kINIT_RENDERER)
+      {
+         RequestRendererShutdown ();
+      }
+
       m_pScene->Shutdown ();
-      delete m_pScene;
-      m_pScene = nullptr;
    }
+
+   delete m_pScene;
+   m_pScene = nullptr;
+
+   m_eInitState = kINIT_NONE;
 }
 
 void VIEWPORT::ShutdownRenderer ()
@@ -139,9 +162,11 @@ bool VIEWPORT::ServiceRendererShutdown ()
    return bResult;
 }
 
-ENGINE*              VIEWPORT::Sneeze () const     { return m_pEngine; }
-IVIEWPORT*           VIEWPORT::Host () const       { return m_pHost; }
-VIEWPORT::SCENE*     VIEWPORT::Scene () const      { return m_pScene; }
+ENGINE*              VIEWPORT::Sneeze () const              { return m_pEngine; }
+IVIEWPORT*           VIEWPORT::Host () const                { return m_pHost; }
+VIEWPORT::SCENE*     VIEWPORT::Scene () const               { return m_pScene; }
+const std::string&   VIEWPORT::sPath_Transitory () const    { return m_sPath_Transitory; }
+bool                 VIEWPORT::IsReady () const             { return m_bReady; }
 int                  VIEWPORT::Width () const      { return m_nWidth; }
 int                  VIEWPORT::Height () const     { return m_nHeight; }
 VIEWPORT::VIEW&      VIEWPORT::View ()             { return m_View; }

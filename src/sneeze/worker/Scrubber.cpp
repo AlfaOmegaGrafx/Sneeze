@@ -39,15 +39,22 @@ void WORKER::SCRUBBER::DrainQueue ()
    std::vector<std::string> aPath;
    m_pEngine->SwapCleanupQueue (aPath);
 
+   std::string sMarker = std::string ("/") + ENGINE::sFOLDER_TRANSITORY + "/";
+
    for (const auto& sPath : aPath)
    {
-      std::error_code ec;
-      std::filesystem::remove_all (sPath, ec);
+      if (sPath.find (sMarker) != std::string::npos)
+      {
+         std::error_code ec;
+         std::filesystem::remove_all (sPath, ec);
 
-      if (ec)
-         m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "SCRUBBER", "Failed to remove " + sPath + ": " + ec.message ());
-      else
-         m_pEngine->Log (IENGINE::kLOGLEVEL_Trace, "SCRUBBER", "Removed " + sPath);
+         if (!ec)
+         {
+            m_pEngine->Log (IENGINE::kLOGLEVEL_Trace, "SCRUBBER", "Removed " + sPath);
+         }
+         else m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "SCRUBBER", "Failed to remove " + sPath + ": " + ec.message ());
+      }
+      else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SCRUBBER", "REJECTED -- path is not under " + std::string (ENGINE::sFOLDER_TRANSITORY) + "/: " + sPath);
    }
 }
 

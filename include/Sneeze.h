@@ -84,6 +84,9 @@ namespace SNEEZE
    class ENGINE
    {
    public:
+      static constexpr const char* sFOLDER_PERSISTENT = "Persistent";
+      static constexpr const char* sFOLDER_TRANSITORY = "Transitory";
+
       // Constructors, assignments, and destructor
       explicit ENGINE (IENGINE* pHost);
 
@@ -101,7 +104,7 @@ namespace SNEEZE
       // --- Viewport management ---
 
       VIEWPORT*                      Viewport_Open    (IVIEWPORT* pHost, const std::string& sUrl = "", VIEWPORT::eSESSION kSession = VIEWPORT::kSESSION_PERSISTENT);
-      void                           Viewport_Close   (VIEWPORT* pViewport);
+      bool                           Viewport_Close   (VIEWPORT* pViewport);
       void                           Viewport_Capture ();
       const std::vector<VIEWPORT*>&  Viewport_GetList () const;
       void                           Viewport_Release ();
@@ -122,6 +125,11 @@ namespace SNEEZE
       void                     QueueCleanup (const std::string& sPath);
       bool                     HasCleanupWork () const;
       void                     SwapCleanupQueue (std::vector<std::string>& aOut);
+
+      // --- Paths ---
+
+      const std::string&       sPath_Persistent () const;
+      const std::string&       sPath_Session () const;
 
       // --- Subsystems ---
 

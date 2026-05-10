@@ -504,7 +504,7 @@ set (CORE_SOURCES
    sneeze/Engine.cpp
    sneeze/worker/Worker.cpp
    sneeze/worker/Compositor.cpp
-   sneeze/worker/WorkerB.cpp
+   sneeze/worker/Scrubber.cpp
    sneeze/worker/WorkerC.cpp
    sneeze/worker/WorkerD.cpp
    sneeze/worker/WorkerE.cpp

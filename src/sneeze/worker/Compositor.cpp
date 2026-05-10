@@ -147,34 +147,23 @@ void WORKER::COMPOSITOR::ThreadLoop ()
 
       m_pEngine->Viewport_Capture ();
       {
-         // --- Consume input per viewport ---
-
          for (VIEWPORT* pViewport : m_pEngine->Viewport_GetList ())
          {
+            if (!pViewport->IsReady ())
+               continue;
+
+            if (pViewport->ServiceRendererShutdown ())
+               continue;
+
             VIEWPORT::INPUT Input = pViewport->ConsumeInput ();
             VIEWPORT::VIEW& View = pViewport->View ();
             View.Update (Input.nMouseDX, Input.nMouseDY, Input.dScrollY, Input.bMouseLeft, Input.bMouseRight);
-         }
 
-         // --- Render each viewport ---
-
-         for (VIEWPORT* pViewport : m_pEngine->Viewport_GetList ())
-         {
-            if (pViewport->ServiceRendererShutdown ())
-               continue;
             RenderViewport (pViewport, tpLoopStart);
-         }
 
-         // --- Check if any viewport needs readback flush ---
-
-         for (VIEWPORT* pViewport : m_pEngine->Viewport_GetList ())
-         {
             VIEWPORT::RENDERER* pRenderer = pViewport->Renderer ();
             if (pRenderer  &&  !pRenderer->IsRenderingToNativeSurface ())
-            {
                bNeedFlush = true;
-               break;
-            }
          }
 
          m_pEngine->Viewport_Release ();

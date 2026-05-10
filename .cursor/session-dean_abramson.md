@@ -543,3 +543,29 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 - **Documentation update** — Comprehensive rewrite of `project.mdc` Key Classes section, module table, coding conventions, architecture notes. Updated `Scene.md`, `Sneeze.md`, `CameraOrbit.md`, `Storage.md` for new API names.
 - **Artemis compatibility** — Identified all breaking API changes and prepared migration guide for Artemis project. Patching in progress (separate session).
 
+---
+
+### 2026-05-09 (Saturday) — 3:44 PM – 5:00 PM PDT
+
+**Dean Abramson** — Engine and viewport init/shutdown symmetry, ownership audit, Impl refactoring.
+
+- **Viewport init/shutdown state tracking** — Added `eINIT_STATE` enum to VIEWPORT (`kINIT_NONE`, `kINIT_SCENE`, `kINIT_RENDERER`). Refactored `Initialize()` to use single-return with state bumps. Refactored `Shutdown()` to use nested `if (m_eInitState >= kINIT_X)` in reverse order. `delete m_pScene` placed outside state gate to handle allocated-but-not-initialized case. Viewport now owns its full teardown including the renderer handshake — `ENGINE::Viewport_Close` no longer calls `RequestRendererShutdown()` directly.
+- **Engine shutdown cleanup** — Removed redundant `m_bCleanupPending`/`notify_all` (already done inside `QueueCleanup`). Removed unnecessary mutex guard around `m_bShutdown = true`. Removed redundant worker vector `.clear()` calls (already done by `ShutdownWorkers()` on the engine thread). Fixed `~ENGINE()` missing `delete m_pImpl` (memory leak).
+- **Ownership audit** — Audited all engine, viewport, and worker code for ownership asymmetry. Found and fixed: `m_pImpl` leak in destructor, missing `m_pStorage = new STORAGE(...)` (null deref). Identified flush-to-margin convention for temporary code (PERSONA).
+- **Impl viewport lifecycle consolidation** — Moved all viewport open/close logic from public `ENGINE` methods into `Impl::Viewport_Open()` and `Impl::Viewport_Close()`. Public `ENGINE::Viewport_Close()` now rejects nullptr and delegates; `Impl::Shutdown()` calls `Viewport_Close(nullptr)` directly. Impl is the sole owner of the viewport list lifecycle.
+- **Viewport transitory folders** — `Impl::Viewport_Open()` creates a transitory folder (`v` + 8 hex) for each viewport and passes the path to `VIEWPORT::Initialize()`. `Impl::Viewport_Close()` queues the folder for scrubber cleanup. Added `m_sPath_Transitory` member and `sPath_Transitory()` accessor to VIEWPORT.
+- **Naming fixes** — Renamed `m_viewportMutex` to `m_mutexViewport`. Renamed Impl methods `Capture`/`Release` to `Viewport_Capture`/`Viewport_Release` and moved adjacent to other viewport methods. Added separator comment for viewport management section in Impl.
+- **project.mdc** — Updated ENGINE and VIEWPORT class descriptions with new state tracking, Impl ownership model, transitory folder lifecycle, and shutdown symmetry.
+
+## 2026-05-09 (Saturday) ~8:18 PM – 9:36 PM PDT
+
+- **Attempted state enum rename** — User requested renaming `eINIT`→`eSTATE_ENGINE` / `kINIT_*`→`kSTATE_ENGINE_*` and `eOPEN_STATE`→`eSTATE_VIEWPORT` / `kOPEN_*`→`kSTATE_VIEWPORT_*`. After discussion, user decided against the rename. All changes reverted — original names (`eINIT`, `kINIT_*`, `eOPEN_STATE`, `kOPEN_*`) retained.
+- **Eliminated `eOPEN_STATE` enum entirely** — User pointed out the viewport knows its own state (via `m_eInitState` and `m_sPath_Transitory`). The two-overload `Viewport_Close` pattern was collapsed into a single function that removes from list, shuts down, queues folder cleanup, and deletes.
+- **Fixed viewport deadlock** — `pViewport->Shutdown()` calls `RequestRendererShutdown()` which blocks until the compositor calls `ServiceRendererShutdown()`. But the viewport was being removed from the list BEFORE shutdown, so the compositor never saw it. Root cause: violating the add-before-init/remove-after-shutdown principle.
+- **Applied "add before init, remove after shutdown" principle** — `Impl::Viewport_Open()` now adds the viewport to the list before calling `Initialize()`. `Impl::Viewport_Close()` now calls `Shutdown()` before removing from the list. This is a universal invariant for the library — documented in Design Principles.
+- **Added `VIEWPORT::IsReady()` gate** — Since viewports are now in the list before initialization completes, added `m_bReady` flag (false until Initialize succeeds) and `IsReady()` accessor. Compositor skips viewports where `!IsReady()`.
+- **Compositor single-loop refactor** — Collapsed three separate per-viewport loops into one loop with `IsReady()` + `ServiceRendererShutdown()` checks at the top.
+- **Fixed use-after-free** — `Viewport_Close` was calling `pViewport->sPath_Transitory()` after `delete pViewport`. Fixed by capturing the path before delete. User corrected ordering: path (born first) should be queued for deletion last — symmetric with creation order.
+- **Identified future refactor** — Engine thread (metronome, worker creation/shutdown) should be extracted into its own class. Worker creation loop also violates add-before-init principle. Both deferred until after commit.
+- **project.mdc** — Added "Symmetry above all else" and "Add before init, remove after shutdown" to Design Principles. Updated ENGINE, VIEWPORT, and COMPOSITOR class descriptions. Updated backlog item #16 (transitory folders fully working). Added backlog item #6 (extract engine thread).
+
