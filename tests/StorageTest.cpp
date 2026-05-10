@@ -85,9 +85,9 @@ public:
 
    void OnFrameReady (const uint32_t*, int, int) override {}
 
-   void OnStorageUnitCreated (STORAGE::ASSET*) override { m_nCreatedCount++; }
-   void OnStorageUnitChanged (STORAGE::ASSET*) override { m_nChangedCount++; }
-   void OnStorageUnitDeleted (STORAGE::ASSET*) override { m_nDeletedCount++; }
+   void OnStorageUnitCreated (STORAGE::SILO*) override { m_nCreatedCount++; }
+   void OnStorageUnitChanged (STORAGE::SILO*) override { m_nChangedCount++; }
+   void OnStorageUnitDeleted (STORAGE::SILO*) override { m_nDeletedCount++; }
 };
 
 static STORAGE_TEST_HOST*          s_pHost    = nullptr;
@@ -125,14 +125,14 @@ static void TestInitializeAndOpenClose ()
    Check (pStorage != nullptr, "Storage exists");
 
    auto pName = MakeTestName ();
-   STORAGE::ASSET* pAsset = pStorage->Open (pName);
-   Check (pAsset != nullptr, "Open returns ASSET");
-   Check (pAsset->Name () == pName, "ASSET holds correct NAME");
-   Check (pAsset->GetRefCount () == 1, "Ref count is 1 after Open");
+   STORAGE::SILO* pSilo = pStorage->Open (pName);
+   Check (pSilo != nullptr, "Open returns SILO");
+   Check (pSilo->Name () == pName, "SILO holds correct NAME");
+   Check (pSilo->GetRefCount () == 1, "Ref count is 1 after Open");
 
    Check (s_pVPHost->m_nCreatedCount == 1, "OnStorageUnitCreated fired");
 
-   pStorage->Close (pAsset);
+   pStorage->Close (pSilo);
 }
 
 // ---------------------------------------------------------------------------
@@ -145,24 +145,24 @@ static void TestBasicOperations ()
 
    STORAGE* pStorage = s_pStorage;
    auto pName = MakeTestName ();
-   STORAGE::ASSET* pAsset = pStorage->Open (pName);
+   STORAGE::SILO* pSilo = pStorage->Open (pName);
 
    s_pVPHost->m_nChangedCount = 0;
 
-   pAsset->Set (STORAGE::CONTAINER_PERMANENT, "player.name", "Dean");
+   pSilo->Set (STORAGE::CONTAINER_PERMANENT, "player.name", "Dean");
    Check (s_pVPHost->m_nChangedCount == 1, "OnStorageUnitChanged fired on Set");
 
-   auto jValue = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "player.name");
+   auto jValue = pSilo->Get (STORAGE::CONTAINER_PERMANENT, "player.name");
    Check (jValue.is_string (), "Get returns string type");
    Check (jValue.get<std::string> () == "Dean", "Get returns correct value");
 
-   Check (pAsset->Has (STORAGE::CONTAINER_PERMANENT, "player.name"), "Has returns true for existing key");
-   Check (!pAsset->Has (STORAGE::CONTAINER_PERMANENT, "player.missing"), "Has returns false for missing key");
+   Check (pSilo->Has (STORAGE::CONTAINER_PERMANENT, "player.name"), "Has returns true for existing key");
+   Check (!pSilo->Has (STORAGE::CONTAINER_PERMANENT, "player.missing"), "Has returns false for missing key");
 
-   pAsset->Remove (STORAGE::CONTAINER_PERMANENT, "player.name");
-   Check (!pAsset->Has (STORAGE::CONTAINER_PERMANENT, "player.name"), "Remove deletes key");
+   pSilo->Remove (STORAGE::CONTAINER_PERMANENT, "player.name");
+   Check (!pSilo->Has (STORAGE::CONTAINER_PERMANENT, "player.name"), "Remove deletes key");
 
-   pStorage->Close (pAsset);
+   pStorage->Close (pSilo);
 }
 
 // ---------------------------------------------------------------------------
@@ -175,21 +175,21 @@ static void TestPathNavigation ()
 
    STORAGE* pStorage = s_pStorage;
    auto pName = MakeTestName ();
-   STORAGE::ASSET* pAsset = pStorage->Open (pName);
+   STORAGE::SILO* pSilo = pStorage->Open (pName);
 
-   pAsset->Set (STORAGE::CONTAINER_PERMANENT, "game.poker.table.color", "green");
-   pAsset->Set (STORAGE::CONTAINER_PERMANENT, "game.poker.table.seats", 8);
+   pSilo->Set (STORAGE::CONTAINER_PERMANENT, "game.poker.table.color", "green");
+   pSilo->Set (STORAGE::CONTAINER_PERMANENT, "game.poker.table.seats", 8);
 
-   auto jColor = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "game.poker.table.color");
+   auto jColor = pSilo->Get (STORAGE::CONTAINER_PERMANENT, "game.poker.table.color");
    Check (jColor.is_string ()  &&  jColor.get<std::string> () == "green", "Deep nested string");
 
-   auto jSeats = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "game.poker.table.seats");
+   auto jSeats = pSilo->Get (STORAGE::CONTAINER_PERMANENT, "game.poker.table.seats");
    Check (jSeats.is_number_integer ()  &&  jSeats.get<int> () == 8, "Deep nested number");
 
-   Check (pAsset->Has (STORAGE::CONTAINER_PERMANENT, "game.poker.table.color"), "Has works for deep path");
-   Check (!pAsset->Has (STORAGE::CONTAINER_PERMANENT, "game.poker.table.missing"), "Has fails for missing deep path");
+   Check (pSilo->Has (STORAGE::CONTAINER_PERMANENT, "game.poker.table.color"), "Has works for deep path");
+   Check (!pSilo->Has (STORAGE::CONTAINER_PERMANENT, "game.poker.table.missing"), "Has fails for missing deep path");
 
-   pStorage->Close (pAsset);
+   pStorage->Close (pSilo);
 }
 
 // ---------------------------------------------------------------------------
@@ -202,30 +202,30 @@ static void TestArrayAccess ()
 
    STORAGE* pStorage = s_pStorage;
    auto pName = MakeTestName ();
-   STORAGE::ASSET* pAsset = pStorage->Open (pName);
+   STORAGE::SILO* pSilo = pStorage->Open (pName);
 
-   pAsset->Set (STORAGE::CONTAINER_PERMANENT, "scores[0]", 100);
-   pAsset->Set (STORAGE::CONTAINER_PERMANENT, "scores[1]", 200);
-   pAsset->Set (STORAGE::CONTAINER_PERMANENT, "scores[2]", 300);
+   pSilo->Set (STORAGE::CONTAINER_PERMANENT, "scores[0]", 100);
+   pSilo->Set (STORAGE::CONTAINER_PERMANENT, "scores[1]", 200);
+   pSilo->Set (STORAGE::CONTAINER_PERMANENT, "scores[2]", 300);
 
-   auto j0 = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "scores[0]");
-   auto j1 = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "scores[1]");
-   auto j2 = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "scores[2]");
+   auto j0 = pSilo->Get (STORAGE::CONTAINER_PERMANENT, "scores[0]");
+   auto j1 = pSilo->Get (STORAGE::CONTAINER_PERMANENT, "scores[1]");
+   auto j2 = pSilo->Get (STORAGE::CONTAINER_PERMANENT, "scores[2]");
 
    Check (j0.is_number ()  &&  j0.get<int> () == 100, "Array index 0");
    Check (j1.is_number ()  &&  j1.get<int> () == 200, "Array index 1");
    Check (j2.is_number ()  &&  j2.get<int> () == 300, "Array index 2");
 
-   pAsset->Set (STORAGE::CONTAINER_PERMANENT, "game.players[0].name", "Alice");
-   pAsset->Set (STORAGE::CONTAINER_PERMANENT, "game.players[1].name", "Bob");
+   pSilo->Set (STORAGE::CONTAINER_PERMANENT, "game.players[0].name", "Alice");
+   pSilo->Set (STORAGE::CONTAINER_PERMANENT, "game.players[1].name", "Bob");
 
-   auto jAlice = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "game.players[0].name");
-   auto jBob   = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "game.players[1].name");
+   auto jAlice = pSilo->Get (STORAGE::CONTAINER_PERMANENT, "game.players[0].name");
+   auto jBob   = pSilo->Get (STORAGE::CONTAINER_PERMANENT, "game.players[1].name");
 
    Check (jAlice.is_string ()  &&  jAlice.get<std::string> () == "Alice", "Nested array object [0]");
    Check (jBob.is_string ()  &&  jBob.get<std::string> () == "Bob", "Nested array object [1]");
 
-   pStorage->Close (pAsset);
+   pStorage->Close (pSilo);
 }
 
 // ---------------------------------------------------------------------------
@@ -240,21 +240,21 @@ static void TestPersistence ()
    auto pName = MakeTestName ("persist-test");
 
    {
-      STORAGE::ASSET* pAsset = pStorage->Open (pName);
-      pAsset->Set (STORAGE::CONTAINER_PERMANENT, "saved.value", 42);
-      pAsset->Set (STORAGE::CONTAINER_PERMANENT, "saved.text", "hello");
-      pStorage->Close (pAsset);
+      STORAGE::SILO* pSilo = pStorage->Open (pName);
+      pSilo->Set (STORAGE::CONTAINER_PERMANENT, "saved.value", 42);
+      pSilo->Set (STORAGE::CONTAINER_PERMANENT, "saved.text", "hello");
+      pStorage->Close (pSilo);
    }
 
    {
-      STORAGE::ASSET* pAsset = pStorage->Open (pName);
-      auto jValue = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "saved.value");
-      auto jText  = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "saved.text");
+      STORAGE::SILO* pSilo = pStorage->Open (pName);
+      auto jValue = pSilo->Get (STORAGE::CONTAINER_PERMANENT, "saved.value");
+      auto jText  = pSilo->Get (STORAGE::CONTAINER_PERMANENT, "saved.text");
 
       Check (jValue.is_number ()  &&  jValue.get<int> () == 42, "Number persisted across Open/Close");
       Check (jText.is_string ()  &&  jText.get<std::string> () == "hello", "String persisted across Open/Close");
 
-      pStorage->Close (pAsset);
+      pStorage->Close (pSilo);
    }
 }
 
@@ -270,21 +270,21 @@ static void TestOrgSharing ()
    auto pNameA = MakeTestName ("container-a");
    auto pNameB = MakeTestName ("container-b");
 
-   STORAGE::ASSET* pAssetA = pStorage->Open (pNameA);
-   pAssetA->Set (STORAGE::ORG_PERMANENT, "org.setting", "shared-value");
+   STORAGE::SILO* pSiloA = pStorage->Open (pNameA);
+   pSiloA->Set (STORAGE::ORG_PERMANENT, "org.setting", "shared-value");
 
-   STORAGE::ASSET* pAssetB = pStorage->Open (pNameB);
-   auto jOrgB = pAssetB->Get (STORAGE::ORG_PERMANENT, "org.setting");
+   STORAGE::SILO* pSiloB = pStorage->Open (pNameB);
+   auto jOrgB = pSiloB->Get (STORAGE::ORG_PERMANENT, "org.setting");
 
    Check (jOrgB.is_string ()  &&  jOrgB.get<std::string> () == "shared-value",
       "Org storage visible to second container");
 
-   Check (pAssetA->GetUnit (STORAGE::ORG_PERMANENT) ==
-          pAssetB->GetUnit (STORAGE::ORG_PERMANENT),
+   Check (pSiloA->GetUnit (STORAGE::ORG_PERMANENT) ==
+          pSiloB->GetUnit (STORAGE::ORG_PERMANENT),
       "Both containers share the same org UNIT");
 
-   pStorage->Close (pAssetA);
-   pStorage->Close (pAssetB);
+   pStorage->Close (pSiloA);
+   pStorage->Close (pSiloB);
 }
 
 // ---------------------------------------------------------------------------
@@ -297,24 +297,24 @@ static void TestScopeIsolation ()
 
    STORAGE* pStorage = s_pStorage;
    auto pName = MakeTestName ("scope-test");
-   STORAGE::ASSET* pAsset = pStorage->Open (pName);
+   STORAGE::SILO* pSilo = pStorage->Open (pName);
 
-   pAsset->Set (STORAGE::CONTAINER_PERMANENT, "key", "permanent");
-   pAsset->Set (STORAGE::CONTAINER_TEMPORARY, "key", "temporary");
-   pAsset->Set (STORAGE::ORG_PERMANENT, "key", "org-permanent");
-   pAsset->Set (STORAGE::ORG_TEMPORARY, "key", "org-temporary");
+   pSilo->Set (STORAGE::CONTAINER_PERMANENT, "key", "permanent");
+   pSilo->Set (STORAGE::CONTAINER_TEMPORARY, "key", "temporary");
+   pSilo->Set (STORAGE::ORG_PERMANENT, "key", "org-permanent");
+   pSilo->Set (STORAGE::ORG_TEMPORARY, "key", "org-temporary");
 
-   auto j1 = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "key");
-   auto j2 = pAsset->Get (STORAGE::CONTAINER_TEMPORARY, "key");
-   auto j3 = pAsset->Get (STORAGE::ORG_PERMANENT, "key");
-   auto j4 = pAsset->Get (STORAGE::ORG_TEMPORARY, "key");
+   auto j1 = pSilo->Get (STORAGE::CONTAINER_PERMANENT, "key");
+   auto j2 = pSilo->Get (STORAGE::CONTAINER_TEMPORARY, "key");
+   auto j3 = pSilo->Get (STORAGE::ORG_PERMANENT, "key");
+   auto j4 = pSilo->Get (STORAGE::ORG_TEMPORARY, "key");
 
    Check (j1.get<std::string> () == "permanent", "CONTAINER_PERMANENT isolated");
    Check (j2.get<std::string> () == "temporary", "CONTAINER_TEMPORARY isolated");
    Check (j3.get<std::string> () == "org-permanent", "ORG_PERMANENT isolated");
    Check (j4.get<std::string> () == "org-temporary", "ORG_TEMPORARY isolated");
 
-   pStorage->Close (pAsset);
+   pStorage->Close (pSilo);
 }
 
 // ---------------------------------------------------------------------------
@@ -352,11 +352,11 @@ static void TestCrashRecovery ()
       f << "[\"Remove\",\"will-remove\"]\n";
    }
 
-   STORAGE::ASSET* pAsset = pStorage->Open (pName);
+   STORAGE::SILO* pSilo = pStorage->Open (pName);
 
-   auto jRecovered = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "recovered");
-   auto jBase      = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "base");
-   auto jRemoved   = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "will-remove");
+   auto jRecovered = pSilo->Get (STORAGE::CONTAINER_PERMANENT, "recovered");
+   auto jBase      = pSilo->Get (STORAGE::CONTAINER_PERMANENT, "base");
+   auto jRemoved   = pSilo->Get (STORAGE::CONTAINER_PERMANENT, "will-remove");
 
    Check (jRecovered.is_string ()  &&  jRecovered.get<std::string> () == "yes",
       "Log Set replayed on recovery");
@@ -367,7 +367,7 @@ static void TestCrashRecovery ()
 
    Check (!std::filesystem::exists (sLogPath), "Log file deleted after recovery");
 
-   pStorage->Close (pAsset);
+   pStorage->Close (pSilo);
 }
 
 // ---------------------------------------------------------------------------
@@ -380,23 +380,23 @@ static void TestBulkJson ()
 
    STORAGE* pStorage = s_pStorage;
    auto pName = MakeTestName ("bulk-test");
-   STORAGE::ASSET* pAsset = pStorage->Open (pName);
+   STORAGE::SILO* pSilo = pStorage->Open (pName);
 
-   pAsset->SetJson (STORAGE::CONTAINER_PERMANENT,
+   pSilo->SetJson (STORAGE::CONTAINER_PERMANENT,
       "{\"bulk\": {\"a\": 1, \"b\": 2}, \"list\": [10, 20, 30]}");
 
-   auto jA = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "bulk.a");
-   auto jB = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "bulk.b");
-   auto jList1 = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "list[1]");
+   auto jA = pSilo->Get (STORAGE::CONTAINER_PERMANENT, "bulk.a");
+   auto jB = pSilo->Get (STORAGE::CONTAINER_PERMANENT, "bulk.b");
+   auto jList1 = pSilo->Get (STORAGE::CONTAINER_PERMANENT, "list[1]");
 
    Check (jA.is_number ()  &&  jA.get<int> () == 1, "Bulk set: nested value a");
    Check (jB.is_number ()  &&  jB.get<int> () == 2, "Bulk set: nested value b");
    Check (jList1.is_number ()  &&  jList1.get<int> () == 20, "Bulk set: array access");
 
-   std::string sJson = pAsset->GetJson (STORAGE::CONTAINER_PERMANENT);
+   std::string sJson = pSilo->GetJson (STORAGE::CONTAINER_PERMANENT);
    Check (sJson.find ("\"bulk\"") != std::string::npos, "GetJson contains data");
 
-   pStorage->Close (pAsset);
+   pStorage->Close (pSilo);
 }
 
 // ---------------------------------------------------------------------------
@@ -410,9 +410,9 @@ static void TestMetaSidecar ()
    STORAGE* pStorage = s_pStorage;
    auto pName = MakeTestName ("meta-test");
 
-   STORAGE::ASSET* pAsset = pStorage->Open (pName);
-   pAsset->Set (STORAGE::CONTAINER_PERMANENT, "data", "value");
-   pStorage->Close (pAsset);
+   STORAGE::SILO* pSilo = pStorage->Open (pName);
+   pSilo->Set (STORAGE::CONTAINER_PERMANENT, "data", "value");
+   pStorage->Close (pSilo);
 
    std::string sFp2  = pName->sFingerprint.substr (0, 2);
    std::string sFp22 = pName->sFingerprint.substr (2);

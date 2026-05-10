@@ -600,3 +600,13 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 - **Both configs built** — Release and Debug rebuilt successfully.
 - **project.mdc** — Updated FreeType dependency from pending to implemented (VER-2-13-3). Updated Phase 4 task #1 to DONE. Updated UI_CONTEXT class description. Updated RmlUi gotcha. Updated FreeType font engine rationale from "pending" to "implemented".
 
+## 2026-05-10 (Saturday) ~9:00 AM – 9:20 AM PDT
+
+- **CONTROLLER → CONTROL rename** — Renamed class `CONTROLLER` to `CONTROL`. Renamed directory `sneeze/worker/` → `sneeze/control/` and header `Worker.h` → `Control.h` via `git mv`. Updated all source files, include paths, and `CMakeLists.txt`.
+- **Controller.cpp → Control.cpp** — Renamed implementation file via `git mv`.
+- **WORKER → AGENT rename** — Renamed abstract base class `WORKER` to `AGENT` and all derived subclasses (`COMPOSITOR`, `SCRUBBER`, `C`–`H`). Updated member variables (`m_pController` → `m_pControl`, `m_nWorkerIndex` → `m_nAgentIndex`, etc.), methods (`WorkerCount()` → `AgentCount()`, `ShutdownWorkers()` → `ShutdownAgents()`), factory config (`WORKER_CONFIG` → `AGENT_CONFIG`), and `Sneeze.md` documentation.
+- **Worker?.cpp → Agent?.cpp** — Renamed implementation files (`Worker.cpp` → `Agent.cpp`, `WorkerC.cpp`–`WorkerH.cpp` → `AgentC.cpp`–`AgentH.cpp`) via `git mv`. Updated `CMakeLists.txt`.
+- **STORAGE::ASSET → STORAGE::SILO** — Renamed nested class and implementation file (`Asset.cpp` → `Silo.cpp` via `git mv`). Updated member variable (`m_aAssets` → `m_aSilo`), enumeration callback (`OnAsset()` → `OnSilo()`), `IVIEWPORT` callbacks, all source/header/test/doc references.
+- **All builds clean** — Release and Debug rebuilt after each rename step. All 87 tests passing.
+- **project.mdc** — Comprehensive update: directory tree, Module Structure table, Key Classes table (CONTROL, AGENT, AGENT::COMPOSITOR/SCRUBBER/C-H, STORAGE), test descriptions, Known Gotchas, Engine-Driven Pipeline, Metronome, Implementation Backlog, MBE Runtime remaining work, Unphased item 6 (marked DONE). Added "Module Renames (2026-05-10)" section documenting all three renames with rationale.
+

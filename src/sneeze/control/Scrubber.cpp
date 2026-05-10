@@ -13,31 +13,31 @@
 // limitations under the License.
 
 #include <Sneeze.h>
-#include "Worker.h"
+#include "Control.h"
 #include <filesystem>
 #include <cstdio>
 
 using namespace SNEEZE;
 
-WORKER::SCRUBBER::SCRUBBER (CONTROLLER* pController)
-   : WORKER (pController)
+AGENT::SCRUBBER::SCRUBBER (CONTROL* pControl)
+   : AGENT (pControl)
 {
 }
 
-void WORKER::SCRUBBER::Tick ()
+void AGENT::SCRUBBER::Tick ()
 {
 }
 
-bool WORKER::SCRUBBER::HasWork ()
+bool AGENT::SCRUBBER::HasWork ()
 {
-   bool bResult = m_pController->HasCleanupWork ();
+   bool bResult = m_pControl->HasCleanupWork ();
    return bResult;
 }
 
-void WORKER::SCRUBBER::DrainQueue ()
+void AGENT::SCRUBBER::DrainQueue ()
 {
    std::vector<std::string> aPath;
-   m_pController->SwapCleanupQueue (aPath);
+   m_pControl->SwapCleanupQueue (aPath);
 
    std::string sMarker = std::string ("/") + ENGINE::sFOLDER_TRANSITORY + "/";
 
@@ -58,7 +58,7 @@ void WORKER::SCRUBBER::DrainQueue ()
    }
 }
 
-void WORKER::SCRUBBER::ThreadLoop ()
+void AGENT::SCRUBBER::ThreadLoop ()
 {
    SignalReady ();
 
@@ -67,6 +67,6 @@ void WORKER::SCRUBBER::ThreadLoop ()
       DrainQueue ();
 
       std::unique_lock<std::mutex> lock (m_mutex);
-      m_condVar.wait (lock, [this] { return m_pController->HasCleanupWork ()  ||  IsShutdown (); });
+      m_condVar.wait (lock, [this] { return m_pControl->HasCleanupWork ()  ||  IsShutdown (); });
    }
 }

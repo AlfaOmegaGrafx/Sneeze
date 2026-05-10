@@ -54,9 +54,9 @@ namespace SNEEZE
       virtual void OnNetworkFileChanged (NETWORK::FILE*) {}
       virtual void OnNetworkFileDeleted (NETWORK::FILE*) {}
 
-      virtual void OnStorageUnitCreated (STORAGE::ASSET*) {}
-      virtual void OnStorageUnitChanged (STORAGE::ASSET*) {}
-      virtual void OnStorageUnitDeleted (STORAGE::ASSET*) {}
+      virtual void OnStorageUnitCreated (STORAGE::SILO*) {}
+      virtual void OnStorageUnitChanged (STORAGE::SILO*) {}
+      virtual void OnStorageUnitDeleted (STORAGE::SILO*) {}
    };
 
    class IENGINE

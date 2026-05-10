@@ -17,10 +17,10 @@
 using namespace SNEEZE;
 
 // ===========================================================================
-// STORAGE::ASSET
+// STORAGE::SILO
 // ===========================================================================
 
-STORAGE::ASSET::ASSET (STORAGE* pStorage, std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, VIEWPORT* pViewport) :
+STORAGE::SILO::SILO (STORAGE* pStorage, std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, VIEWPORT* pViewport) :
    m_pStorage      (pStorage),
    m_pName         (std::move (pName)),
    m_pViewport     (pViewport),
@@ -31,7 +31,7 @@ STORAGE::ASSET::ASSET (STORAGE* pStorage, std::shared_ptr<VIEWPORT::CONTAINER::N
       m_apUnits[i] = nullptr;
 }
 
-nlohmann::json STORAGE::ASSET::Get (SCOPE eScope, const std::string& sPath) const
+nlohmann::json STORAGE::SILO::Get (SCOPE eScope, const std::string& sPath) const
 {
    nlohmann::json jResult;
    if (m_apUnits[eScope])
@@ -39,7 +39,7 @@ nlohmann::json STORAGE::ASSET::Get (SCOPE eScope, const std::string& sPath) cons
    return jResult;
 }
 
-void STORAGE::ASSET::Set (SCOPE eScope, const std::string& sPath, const nlohmann::json& jValue)
+void STORAGE::SILO::Set (SCOPE eScope, const std::string& sPath, const nlohmann::json& jValue)
 {
    if (m_apUnits[eScope])
    {
@@ -49,7 +49,7 @@ void STORAGE::ASSET::Set (SCOPE eScope, const std::string& sPath, const nlohmann
    }
 }
 
-void STORAGE::ASSET::Remove (SCOPE eScope, const std::string& sPath)
+void STORAGE::SILO::Remove (SCOPE eScope, const std::string& sPath)
 {
    if (m_apUnits[eScope])
    {
@@ -59,7 +59,7 @@ void STORAGE::ASSET::Remove (SCOPE eScope, const std::string& sPath)
    }
 }
 
-bool STORAGE::ASSET::Has (SCOPE eScope, const std::string& sPath) const
+bool STORAGE::SILO::Has (SCOPE eScope, const std::string& sPath) const
 {
    bool bHas = false;
    if (m_apUnits[eScope])
@@ -67,7 +67,7 @@ bool STORAGE::ASSET::Has (SCOPE eScope, const std::string& sPath) const
    return bHas;
 }
 
-std::string STORAGE::ASSET::GetJson (SCOPE eScope) const
+std::string STORAGE::SILO::GetJson (SCOPE eScope) const
 {
    std::string sJson = "{}";
    if (m_apUnits[eScope])
@@ -75,7 +75,7 @@ std::string STORAGE::ASSET::GetJson (SCOPE eScope) const
    return sJson;
 }
 
-void STORAGE::ASSET::SetJson (SCOPE eScope, const std::string& sJson)
+void STORAGE::SILO::SetJson (SCOPE eScope, const std::string& sJson)
 {
    if (m_apUnits[eScope])
    {
@@ -85,7 +85,7 @@ void STORAGE::ASSET::SetJson (SCOPE eScope, const std::string& sJson)
    }
 }
 
-void STORAGE::ASSET::Attach ()
+void STORAGE::SILO::Attach ()
 {
    m_nRefCount++;
 
@@ -102,7 +102,7 @@ void STORAGE::ASSET::Attach ()
    }
 }
 
-void STORAGE::ASSET::Detach ()
+void STORAGE::SILO::Detach ()
 {
    if (m_nRefCount > 0)
    {

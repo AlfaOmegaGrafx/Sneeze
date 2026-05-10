@@ -20,7 +20,7 @@
 #include <random>
 
 #include "Types.h"
-#include "worker/Worker.h"
+#include "control/Control.h"
 #include "astro/RMCObject.h"
 #include "wasm/WasmRuntime.h"
 #include "spirv/SpvPipeline.h"
@@ -60,7 +60,7 @@ public:
       kINIT_NETWORK,
       kINIT_STORAGE,
       kINIT_SUBSYSTEMS,
-      kINIT_CONTROLLER,
+      kINIT_CONTROL,
       kINIT_SUCCESS,
    };
 
@@ -68,7 +68,7 @@ public:
       m_pHost (pHost),
       m_pEngine (pEngine),
       m_eInit (kINIT_NONE),
-      m_pController (nullptr),
+      m_pControl (nullptr),
       m_pNetwork (nullptr),
       m_pStorage (nullptr),
       m_pPersona (nullptr)
@@ -174,7 +174,7 @@ public:
                   std::string sEntry = entry.path ().generic_string ();
                   if (IsValidTransitoryPath (sEntry))
                   {
-                     m_pController->QueueCleanup (sEntry);
+                     m_pControl->QueueCleanup (sEntry);
                      nCount++;
                   }
                }
@@ -248,21 +248,21 @@ m_pPersona = new persona::PERSONA (m_pEngine);
 
 m_eInit = kINIT_SUBSYSTEMS;
 
-                           m_pController = new CONTROLLER (m_pEngine);
+                           m_pControl = new CONTROL (m_pEngine);
 
-                           if (m_pController->Initialize ())
+                           if (m_pControl->Initialize ())
                            {
-                              m_eInit = kINIT_CONTROLLER;
+                              m_eInit = kINIT_CONTROL;
 
                               if (InitializePaths ())
                               {
                                  m_eInit = kINIT_SUCCESS;
 
-                                 m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SNEEZE", "Initialized (1 engine thread + " + std::to_string (m_pController->WorkerCount ()) + " workers)");
+                                 m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SNEEZE", "Initialized (1 engine thread + " + std::to_string (m_pControl->AgentCount ()) + " agents)");
                               }
                               else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize paths");
                            }
-                           else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize controller");
+                           else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize control");
                         }
                         else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize storage");
                      }
@@ -306,7 +306,7 @@ m_eInit = kINIT_SUBSYSTEMS;
                         {
                            if (m_eInit >= kINIT_SUBSYSTEMS)
                            {
-                              if (m_eInit >= kINIT_CONTROLLER)
+                              if (m_eInit >= kINIT_CONTROL)
                               {
                                  if (m_eInit >= kINIT_SUCCESS)
                                  {
@@ -316,11 +316,11 @@ m_eInit = kINIT_SUBSYSTEMS;
                                        QueueCleanup (m_sPath_Transitory_Session);
                                  }
 
-                                 m_pController->Shutdown ();
+                                 m_pControl->Shutdown ();
                               }
 
-                              delete m_pController;
-                              m_pController = nullptr;
+                              delete m_pControl;
+                              m_pControl = nullptr;
                            }
 
                            delete m_pPersona;
@@ -443,14 +443,14 @@ m_eInit = kINIT_SUBSYSTEMS;
    }
 
    // -----------------------------------------------------------------------
-   // Cleanup queue (delegates to CONTROLLER)
+   // Cleanup queue (delegates to CONTROL)
    // -----------------------------------------------------------------------
 
    void QueueCleanup (const std::string& sPath)
    {
       if (IsValidTransitoryPath (sPath))
       {
-         m_pController->QueueCleanup (sPath);
+         m_pControl->QueueCleanup (sPath);
       }
       else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "REJECTED cleanup path -- failed validation: " + sPath);
    }
@@ -471,8 +471,8 @@ private:
    ENGINE*                    m_pEngine;
    eINIT                      m_eInit;
 
-   // Controller (owns engine thread, workers, metronome, cleanup queue)
-   CONTROLLER*                m_pController;
+   // Control (owns engine thread, agents, metronome, cleanup queue)
+   CONTROL*                   m_pControl;
 
    // Viewports
    std::mutex                 m_mutexViewport;

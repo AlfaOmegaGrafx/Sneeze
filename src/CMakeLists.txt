@@ -504,19 +504,19 @@ endif ()
 
 set (CORE_SOURCES
    sneeze/Engine.cpp
-   sneeze/worker/Worker.cpp
-   sneeze/worker/Controller.cpp
-   sneeze/worker/Compositor.cpp
-   sneeze/worker/Scrubber.cpp
-   sneeze/worker/WorkerC.cpp
-   sneeze/worker/WorkerD.cpp
-   sneeze/worker/WorkerE.cpp
-   sneeze/worker/WorkerF.cpp
-   sneeze/worker/WorkerG.cpp
-   sneeze/worker/WorkerH.cpp)
+   sneeze/control/Agent.cpp
+   sneeze/control/Control.cpp
+   sneeze/control/Compositor.cpp
+   sneeze/control/Scrubber.cpp
+   sneeze/control/AgentC.cpp
+   sneeze/control/AgentD.cpp
+   sneeze/control/AgentE.cpp
+   sneeze/control/AgentF.cpp
+   sneeze/control/AgentG.cpp
+   sneeze/control/AgentH.cpp)
 set (CORE_HEADERS
    sneeze/Types.h
-   sneeze/worker/Worker.h)
+   sneeze/control/Control.h)
 
 set (ASTRO_SOURCES
    astro/BodyData.cpp
@@ -559,7 +559,7 @@ set (NETWORK_HEADERS)
 
 set (CONTAINER_HEADERS)
 
-set (STORAGE_SOURCES  sneeze/storage/Storage.cpp sneeze/storage/Unit.cpp sneeze/storage/Asset.cpp)
+set (STORAGE_SOURCES  sneeze/storage/Storage.cpp sneeze/storage/Unit.cpp sneeze/storage/Silo.cpp)
 set (STORAGE_HEADERS)
 
 set (PERSONA_SOURCES  persona/Persona.cpp)

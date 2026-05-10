@@ -46,7 +46,7 @@
 // ---------------------------------------------------------------------------
 
 #include <Sneeze.h>
-#include "Worker.h"
+#include "Control.h"
 #include "Types.h"
 #include "renderer/Renderer.h"
 #include "scene/Epoch.h"
@@ -83,8 +83,8 @@ static void ColorFromU32 (uint32_t nColor, float& r, float& g, float& b)
 
 // ---------------------------------------------------------------------------
 
-WORKER::COMPOSITOR::COMPOSITOR (CONTROLLER* pController)
-   : WORKER (pController)
+AGENT::COMPOSITOR::COMPOSITOR (CONTROL* pControl)
+   : AGENT (pControl)
    , m_tmNow (0)
    , m_nFrameCount (0)
    , m_dFpsAccum (0.0)
@@ -101,11 +101,11 @@ WORKER::COMPOSITOR::COMPOSITOR (CONTROLLER* pController)
    m_tmNow = static_cast<int64_t> (dElapsedSec * TICKS_PER_S);
 }
 
-void WORKER::COMPOSITOR::Tick ()
+void AGENT::COMPOSITOR::Tick ()
 {
 }
 
-void WORKER::COMPOSITOR::ThreadLoop ()
+void AGENT::COMPOSITOR::ThreadLoop ()
 {
    m_tpLastFrame = std::chrono::steady_clock::now ();
    SignalReady ();
@@ -188,7 +188,7 @@ void WORKER::COMPOSITOR::ThreadLoop ()
 
 }
 
-void WORKER::COMPOSITOR::RenderViewport (VIEWPORT* pViewport, std::chrono::steady_clock::time_point tpLoopStart)
+void AGENT::COMPOSITOR::RenderViewport (VIEWPORT* pViewport, std::chrono::steady_clock::time_point tpLoopStart)
 {
    // Deferred renderer init -- must happen on the compositor thread because
    // Filament auto-adopts the thread that creates its Engine.

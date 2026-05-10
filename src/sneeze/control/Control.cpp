@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include <Sneeze.h>
-#include "Worker.h"
+#include "Control.h"
 #include <cstdio>
 
 #ifdef _WIN32
@@ -24,33 +24,33 @@
 using namespace SNEEZE;
 
 // ---------------------------------------------------------------------------
-// Worker configuration table
+// Agent configuration table
 // ---------------------------------------------------------------------------
 
-struct WORKER_CONFIG
+struct AGENT_CONFIG
 {
    int                                                  nHertz;
-   std::function<WORKER* (SNEEZE::CONTROLLER*)>         Create;
+   std::function<AGENT* (SNEEZE::CONTROL*)>             Create;
 };
 
-static const std::vector<WORKER_CONFIG> aWorkerConfig =
+static const std::vector<AGENT_CONFIG> aAgentConfig =
 {
-   {   0, [] (SNEEZE::CONTROLLER* p) -> WORKER* { return new WORKER::COMPOSITOR (p); } },
-   {   1, [] (SNEEZE::CONTROLLER* p) -> WORKER* { return new WORKER::SCRUBBER   (p); } },
-   {  30, [] (SNEEZE::CONTROLLER* p) -> WORKER* { return new WORKER::C          (p); } },
-   {  60, [] (SNEEZE::CONTROLLER* p) -> WORKER* { return new WORKER::D          (p); } },
-   {  64, [] (SNEEZE::CONTROLLER* p) -> WORKER* { return new WORKER::E          (p); } },
-   {  90, [] (SNEEZE::CONTROLLER* p) -> WORKER* { return new WORKER::F          (p); } },
-   { 120, [] (SNEEZE::CONTROLLER* p) -> WORKER* { return new WORKER::G          (p); } },
-   { 144, [] (SNEEZE::CONTROLLER* p) -> WORKER* { return new WORKER::H          (p); } },
+   {   0, [] (SNEEZE::CONTROL* p) -> AGENT* { return new AGENT::COMPOSITOR (p); } },
+   {   1, [] (SNEEZE::CONTROL* p) -> AGENT* { return new AGENT::SCRUBBER   (p); } },
+   {  30, [] (SNEEZE::CONTROL* p) -> AGENT* { return new AGENT::C          (p); } },
+   {  60, [] (SNEEZE::CONTROL* p) -> AGENT* { return new AGENT::D          (p); } },
+   {  64, [] (SNEEZE::CONTROL* p) -> AGENT* { return new AGENT::E          (p); } },
+   {  90, [] (SNEEZE::CONTROL* p) -> AGENT* { return new AGENT::F          (p); } },
+   { 120, [] (SNEEZE::CONTROL* p) -> AGENT* { return new AGENT::G          (p); } },
+   { 144, [] (SNEEZE::CONTROL* p) -> AGENT* { return new AGENT::H          (p); } },
 };
 
 /***********************************************************************************************************************************
-**  CONTROLLER
+**  CONTROL
 **
 ***********************************************************************************************************************************/
 
-CONTROLLER::CONTROLLER (ENGINE* pEngine) :
+CONTROL::CONTROL (ENGINE* pEngine) :
    m_pEngine (pEngine),
    m_pThread (nullptr),
    m_bShutdown (false),
@@ -60,16 +60,16 @@ CONTROLLER::CONTROLLER (ENGINE* pEngine) :
 {
 }
 
-CONTROLLER::~CONTROLLER ()
+CONTROL::~CONTROL ()
 {
    Shutdown ();
 }
 
-bool CONTROLLER::Initialize ()
+bool CONTROL::Initialize ()
 {
    bool bResult = false;
 
-   m_pThread = new std::thread (&CONTROLLER::ThreadLoop, this);
+   m_pThread = new std::thread (&CONTROL::ThreadLoop, this);
 
    {
       std::unique_lock<std::mutex> lock (m_mutex);
@@ -90,7 +90,7 @@ bool CONTROLLER::Initialize ()
    return bResult;
 }
 
-void CONTROLLER::Shutdown ()
+void CONTROL::Shutdown ()
 {
    if (m_pThread)
    {
@@ -111,7 +111,7 @@ void CONTROLLER::Shutdown ()
 // Cleanup queue
 // ---------------------------------------------------------------------------
 
-void CONTROLLER::QueueCleanup (const std::string& sPath)
+void CONTROL::QueueCleanup (const std::string& sPath)
 {
    {
       std::lock_guard<std::mutex> guard (m_cleanupMutex);
@@ -121,93 +121,93 @@ void CONTROLLER::QueueCleanup (const std::string& sPath)
    m_condVar.notify_all ();
 }
 
-bool CONTROLLER::HasCleanupWork () const
+bool CONTROL::HasCleanupWork () const
 {
    std::lock_guard<std::mutex> guard (m_cleanupMutex);
    bool bResult = !m_aCleanupPath.empty ();
    return bResult;
 }
 
-void CONTROLLER::SwapCleanupQueue (std::vector<std::string>& aOut)
+void CONTROL::SwapCleanupQueue (std::vector<std::string>& aOut)
 {
    std::lock_guard<std::mutex> guard (m_cleanupMutex);
    aOut.swap (m_aCleanupPath);
 }
 
-int CONTROLLER::WorkerCount () const
+int CONTROL::AgentCount () const
 {
-   int nResult = static_cast<int> (m_apWorker.size ());
+   int nResult = static_cast<int> (m_apAgent.size ());
    return nResult;
 }
 
-ENGINE* CONTROLLER::Engine () const
+ENGINE* CONTROL::Engine () const
 {
    return m_pEngine;
 }
 
 // ---------------------------------------------------------------------------
-// Worker lifecycle
+// Agent lifecycle
 // ---------------------------------------------------------------------------
 
-void CONTROLLER::ShutdownWorkers ()
+void CONTROL::ShutdownAgents ()
 {
-   for (auto* pWorker : m_apWorker)
-      pWorker->SignalShutdown ();
+   for (auto* pAgent : m_apAgent)
+      pAgent->SignalShutdown ();
 
-   for (auto* pWorker : m_apWorker)
-      pWorker->Join ();
+   for (auto* pAgent : m_apAgent)
+      pAgent->Join ();
 
-   for (auto* pWorker : m_apWorker)
-      delete pWorker;
+   for (auto* pAgent : m_apAgent)
+      delete pAgent;
 
-   m_apWorker.clear ();
-   m_anWorkerHertz.clear ();
-   m_anWorkerLastTick.clear ();
-   m_anWorkerSignalCount.clear ();
+   m_apAgent.clear ();
+   m_anAgentHertz.clear ();
+   m_anAgentLastTick.clear ();
+   m_anAgentSignalCount.clear ();
 }
 
 // ---------------------------------------------------------------------------
-// Thread loop (metronome + worker scheduling)
+// Thread loop (metronome + agent scheduling)
 // ---------------------------------------------------------------------------
 
-void CONTROLLER::ThreadLoop ()
+void CONTROL::ThreadLoop ()
 {
 #ifdef _WIN32
    timeBeginPeriod (1);
 #endif
 
-   // --- Create and initialize worker threads (add before init) ---
+   // --- Create and initialize agent threads (add before init) ---
 
    bool bOk = true;
-   for (const auto& config : aWorkerConfig)
+   for (const auto& config : aAgentConfig)
    {
       if (!bOk)
          break;
 
-      WORKER* pWorker = config.Create (this);
-      pWorker->SetWorkerIndex (static_cast<int> (m_apWorker.size ()));
+      AGENT* pAgent = config.Create (this);
+      pAgent->SetAgentIndex (static_cast<int> (m_apAgent.size ()));
 
-      m_apWorker.push_back (pWorker);
-      m_anWorkerHertz.push_back (config.nHertz);
-      m_anWorkerLastTick.push_back (0);
-      m_anWorkerSignalCount.push_back (0);
+      m_apAgent.push_back (pAgent);
+      m_anAgentHertz.push_back (config.nHertz);
+      m_anAgentLastTick.push_back (0);
+      m_anAgentSignalCount.push_back (0);
 
-      if (!pWorker->Initialize ())
+      if (!pAgent->Initialize ())
       {
-         m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "CONTROLLER", "Worker failed to initialize");
+         m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "CONTROL", "Agent failed to initialize");
 
-         m_apWorker.pop_back ();
-         m_anWorkerHertz.pop_back ();
-         m_anWorkerLastTick.pop_back ();
-         m_anWorkerSignalCount.pop_back ();
+         m_apAgent.pop_back ();
+         m_anAgentHertz.pop_back ();
+         m_anAgentLastTick.pop_back ();
+         m_anAgentSignalCount.pop_back ();
 
-         delete pWorker;
+         delete pAgent;
          bOk = false;
       }
    }
 
    if (!bOk)
-      ShutdownWorkers ();
+      ShutdownAgents ();
 
    m_bInitOk = bOk;
 
@@ -241,25 +241,25 @@ void CONTROLLER::ThreadLoop ()
          }
 
          if (bSignalScrubber)
-            m_apWorker[1]->Signal ();
+            m_apAgent[1]->Signal ();
 
          if (bRun)
          {
             auto tpNow = std::chrono::steady_clock::now ();
             double dElapsed = std::chrono::duration<double> (tpNow - tpOrigin).count ();
 
-            for (int nIz = 0; nIz < static_cast<int> (m_apWorker.size ()); nIz++)
+            for (int nIz = 0; nIz < static_cast<int> (m_apAgent.size ()); nIz++)
             {
-               int nHz = m_anWorkerHertz[nIz];
+               int nHz = m_anAgentHertz[nIz];
                if (nHz <= 0)
                   continue;
 
                int64_t nCurrentTick = static_cast<int64_t> (dElapsed * nHz);
-               if (nCurrentTick > m_anWorkerLastTick[nIz])
+               if (nCurrentTick > m_anAgentLastTick[nIz])
                {
-                  m_anWorkerLastTick[nIz] = nCurrentTick;
-                  m_anWorkerSignalCount[nIz]++;
-                  m_apWorker[nIz]->Signal ();
+                  m_anAgentLastTick[nIz] = nCurrentTick;
+                  m_anAgentSignalCount[nIz]++;
+                  m_apAgent[nIz]->Signal ();
                }
             }
 
@@ -267,13 +267,13 @@ void CONTROLLER::ThreadLoop ()
             if (nCurrentSecond > nLastReport)
             {
                std::string sMetronome;
-               for (int nIz = 0; nIz < static_cast<int> (m_apWorker.size ()); nIz++)
+               for (int nIz = 0; nIz < static_cast<int> (m_apAgent.size ()); nIz++)
                {
-                  int nHz = m_anWorkerHertz[nIz];
+                  int nHz = m_anAgentHertz[nIz];
                   if (nHz <= 0)
                      continue;
-                  sMetronome += "  [" + std::to_string (nIz) + "] " + std::to_string (m_anWorkerSignalCount[nIz]) + "/" + std::to_string (nHz) + " Hz";
-                  m_anWorkerSignalCount[nIz] = 0;
+                  sMetronome += "  [" + std::to_string (nIz) + "] " + std::to_string (m_anAgentSignalCount[nIz]) + "/" + std::to_string (nHz) + " Hz";
+                  m_anAgentSignalCount[nIz] = 0;
                }
                // m_pEngine->Log (IENGINE::kLOGLEVEL_Trace, "METRONOME", sMetronome);
                nLastReport = nCurrentSecond;
@@ -281,7 +281,7 @@ void CONTROLLER::ThreadLoop ()
          }
       }
 
-      ShutdownWorkers ();
+      ShutdownAgents ();
    }
 
 #ifdef _WIN32
