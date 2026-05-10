@@ -19,8 +19,8 @@
 
 using namespace SNEEZE;
 
-WORKER::SCRUBBER::SCRUBBER (ENGINE* pEngine)
-   : WORKER (pEngine)
+WORKER::SCRUBBER::SCRUBBER (CONTROLLER* pController)
+   : WORKER (pController)
 {
 }
 
@@ -30,14 +30,14 @@ void WORKER::SCRUBBER::Tick ()
 
 bool WORKER::SCRUBBER::HasWork ()
 {
-   bool bResult = m_pEngine->HasCleanupWork ();
+   bool bResult = m_pController->HasCleanupWork ();
    return bResult;
 }
 
 void WORKER::SCRUBBER::DrainQueue ()
 {
    std::vector<std::string> aPath;
-   m_pEngine->SwapCleanupQueue (aPath);
+   m_pController->SwapCleanupQueue (aPath);
 
    std::string sMarker = std::string ("/") + ENGINE::sFOLDER_TRANSITORY + "/";
 
@@ -67,6 +67,6 @@ void WORKER::SCRUBBER::ThreadLoop ()
       DrainQueue ();
 
       std::unique_lock<std::mutex> lock (m_mutex);
-      m_condVar.wait (lock, [this] { return m_pEngine->HasCleanupWork ()  ||  IsShutdown (); });
+      m_condVar.wait (lock, [this] { return m_pController->HasCleanupWork ()  ||  IsShutdown (); });
    }
 }

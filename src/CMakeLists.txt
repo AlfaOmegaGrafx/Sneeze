@@ -503,6 +503,7 @@ endif ()
 set (CORE_SOURCES
    sneeze/Engine.cpp
    sneeze/worker/Worker.cpp
+   sneeze/worker/Controller.cpp
    sneeze/worker/Compositor.cpp
    sneeze/worker/Scrubber.cpp
    sneeze/worker/WorkerC.cpp

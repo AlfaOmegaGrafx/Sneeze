@@ -21,9 +21,66 @@
 #include <functional>
 #include <chrono>
 #include <cstdint>
+#include <string>
+#include <vector>
 
 namespace SNEEZE
 {
+   class WORKER;
+
+   // ---------------------------------------------------------------------------
+   // CONTROLLER -- owns the engine thread, worker lifecycle, and metronome
+   // ---------------------------------------------------------------------------
+
+   class CONTROLLER
+   {
+   public:
+      explicit CONTROLLER (ENGINE* pEngine);
+      ~CONTROLLER ();
+
+      bool Initialize ();
+      void Shutdown ();
+
+      void QueueCleanup (const std::string& sPath);
+      bool HasCleanupWork () const;
+      void SwapCleanupQueue (std::vector<std::string>& aOut);
+
+      int     WorkerCount () const;
+      ENGINE* Engine () const;
+
+      CONTROLLER (const CONTROLLER&) = delete;
+      CONTROLLER& operator= (const CONTROLLER&) = delete;
+
+   private:
+      void ThreadLoop ();
+      void ShutdownWorkers ();
+
+      ENGINE*                    m_pEngine;
+
+      // Thread
+      std::thread*               m_pThread;
+      std::mutex                 m_mutex;
+      std::condition_variable    m_condVar;
+      bool                       m_bShutdown;
+      bool                       m_bReady;
+      bool                       m_bInitOk;
+
+      // Workers
+      std::vector<WORKER*>       m_apWorker;
+      std::vector<int>           m_anWorkerHertz;
+      std::vector<int64_t>       m_anWorkerLastTick;
+      std::vector<int>           m_anWorkerSignalCount;
+
+      // Cleanup queue
+      mutable std::mutex         m_cleanupMutex;
+      std::vector<std::string>   m_aCleanupPath;
+      bool                       m_bCleanupPending;
+   };
+
+   // ---------------------------------------------------------------------------
+   // WORKER -- abstract base for engine worker threads
+   // ---------------------------------------------------------------------------
+
    class WORKER
    {
    public:
@@ -36,7 +93,7 @@ namespace SNEEZE
       class G;
       class H;
 
-      explicit WORKER (ENGINE* pEngine);
+      explicit WORKER (CONTROLLER* pController);
       virtual ~WORKER ();
 
       bool Initialize ();
@@ -55,6 +112,7 @@ namespace SNEEZE
       void SignalReady ();
       bool IsShutdown () const;
 
+      CONTROLLER*             m_pController;
       ENGINE*                 m_pEngine;
       std::mutex              m_mutex;
       std::condition_variable m_condVar;
@@ -84,7 +142,7 @@ namespace SNEEZE
    class WORKER::COMPOSITOR : public WORKER
    {
    public:
-      explicit COMPOSITOR (ENGINE* pEngine);
+      explicit COMPOSITOR (CONTROLLER* pController);
 
    protected:
       void Tick () override;
@@ -114,7 +172,7 @@ namespace SNEEZE
    class WORKER::SCRUBBER : public WORKER
    {
    public:
-      explicit SCRUBBER (ENGINE* pEngine);
+      explicit SCRUBBER (CONTROLLER* pController);
    protected:
       void Tick () override;
       void ThreadLoop () override;
@@ -130,7 +188,7 @@ namespace SNEEZE
    class WORKER::C : public WORKER
    {
    public:
-      explicit C (ENGINE* pEngine);
+      explicit C (CONTROLLER* pController);
    protected:
       void Tick () override;
    };
@@ -138,7 +196,7 @@ namespace SNEEZE
    class WORKER::D : public WORKER
    {
    public:
-      explicit D (ENGINE* pEngine);
+      explicit D (CONTROLLER* pController);
    protected:
       void Tick () override;
    };
@@ -146,7 +204,7 @@ namespace SNEEZE
    class WORKER::E : public WORKER
    {
    public:
-      explicit E (ENGINE* pEngine);
+      explicit E (CONTROLLER* pController);
    protected:
       void Tick () override;
    };
@@ -154,7 +212,7 @@ namespace SNEEZE
    class WORKER::F : public WORKER
    {
    public:
-      explicit F (ENGINE* pEngine);
+      explicit F (CONTROLLER* pController);
    protected:
       void Tick () override;
    };
@@ -162,7 +220,7 @@ namespace SNEEZE
    class WORKER::G : public WORKER
    {
    public:
-      explicit G (ENGINE* pEngine);
+      explicit G (CONTROLLER* pController);
    protected:
       void Tick () override;
    };
@@ -170,7 +228,7 @@ namespace SNEEZE
    class WORKER::H : public WORKER
    {
    public:
-      explicit H (ENGINE* pEngine);
+      explicit H (CONTROLLER* pController);
    protected:
       void Tick () override;
    };

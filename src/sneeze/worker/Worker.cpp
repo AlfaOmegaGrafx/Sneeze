@@ -18,8 +18,9 @@
 
 using namespace SNEEZE;
 
-WORKER::WORKER (ENGINE* pEngine)
-   : m_pEngine (pEngine)
+WORKER::WORKER (CONTROLLER* pController)
+   : m_pController (pController)
+   , m_pEngine (pController->Engine ())
    , m_pThread (nullptr)
    , m_bShutdown (false)
    , m_bReady (false)

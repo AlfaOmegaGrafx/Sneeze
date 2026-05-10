@@ -569,3 +569,14 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 - **Identified future refactor** — Engine thread (metronome, worker creation/shutdown) should be extracted into its own class. Worker creation loop also violates add-before-init principle. Both deferred until after commit.
 - **project.mdc** — Added "Symmetry above all else" and "Add before init, remove after shutdown" to Design Principles. Updated ENGINE, VIEWPORT, and COMPOSITOR class descriptions. Updated backlog item #16 (transitory folders fully working). Added backlog item #6 (extract engine thread).
 
+## 2026-05-09 (Saturday) ~11:04 PM – 11:52 PM PDT
+
+- **Worker ownership: ENGINE → CONTROLLER** — Changed all worker constructors from `ENGINE*` to `CONTROLLER*`. WORKER base class stores `m_pController` (owner) and caches `m_pEngine` (via `pController->Engine()`) for convenience. Factory table lambdas updated to take `CONTROLLER*`.
+- **CONTROLLER defined first in Worker.h** — Moved CONTROLLER class definition before WORKER (with `class WORKER;` forward declaration). Owner comes first conceptually; eliminates the previous `class CONTROLLER;` forward decl.
+- **Cleanup queue removed from ENGINE public API** — `QueueCleanup`, `HasCleanupWork`, `SwapCleanupQueue` all removed from `Sneeze.h`. Cleanup queue lives exclusively in CONTROLLER. `Impl::QueueCleanup` remains as internal validation gate.
+- **Scrubber calls CONTROLLER directly** — `HasWork()` and `DrainQueue()` now call `m_pController->HasCleanupWork()` / `m_pController->SwapCleanupQueue()` directly.
+- **InitializePaths hardened** — All `create_directories` calls now use `std::error_code` (never throws). Returns false if any directory creation or session folder creation fails. Orphan scan moved before session folder creation (eliminates self-exclusion check).
+- **`m_sPath_Transitory` promoted to member** — Transitory root is now a member alongside `m_sPath_Persistent` and `m_sPath_Transitory_Session`. `Viewport_Open` uses it directly instead of deriving from `m_sPath_Session.parent_path()`.
+- **`m_sPath_Session` renamed to `m_sPath_Transitory_Session`** — Clearer naming.
+- **project.mdc** — Updated ENGINE, WORKER, SCRUBBER, CONTROLLER class descriptions. Updated worker ownership rationale. Updated backlog item #16 with new path naming and InitializePaths error handling.
+

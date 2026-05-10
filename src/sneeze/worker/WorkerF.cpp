@@ -17,8 +17,8 @@
 
 using namespace SNEEZE;
 
-WORKER::F::F (ENGINE* pEngine)
-   : WORKER (pEngine)
+WORKER::F::F (CONTROLLER* pController)
+   : WORKER (pController)
 {
 }
 

@@ -83,8 +83,8 @@ static void ColorFromU32 (uint32_t nColor, float& r, float& g, float& b)
 
 // ---------------------------------------------------------------------------
 
-WORKER::COMPOSITOR::COMPOSITOR (ENGINE* pEngine)
-   : WORKER (pEngine)
+WORKER::COMPOSITOR::COMPOSITOR (CONTROLLER* pController)
+   : WORKER (pController)
    , m_tmNow (0)
    , m_nFrameCount (0)
    , m_dFpsAccum (0.0)
