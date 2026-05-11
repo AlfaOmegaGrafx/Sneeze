@@ -24,11 +24,6 @@ WASM_RUNTIME::WASM_RUNTIME () :
 {
 }
 
-WASM_RUNTIME::~WASM_RUNTIME ()
-{
-   Shutdown ();
-}
-
 bool WASM_RUNTIME::Initialize (SNEEZE::ENGINE* pEngine)
 {
    m_pEngine = pEngine;
@@ -45,7 +40,7 @@ bool WASM_RUNTIME::Initialize (SNEEZE::ENGINE* pEngine)
    return true;
 }
 
-void WASM_RUNTIME::Shutdown ()
+WASM_RUNTIME::~WASM_RUNTIME ()
 {
    DestroyAllStores ();
 

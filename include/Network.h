@@ -313,7 +313,6 @@ namespace SNEEZE
       ~NETWORK ();
 
       bool Initialize ();
-      void Shutdown ();
 
       // --- Primary API ---
 

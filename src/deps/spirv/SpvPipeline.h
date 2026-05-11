@@ -28,7 +28,6 @@ namespace SNEEZE
          ~SPV_PIPELINE ();
 
          bool Initialize (ENGINE* pEngine);
-         void Shutdown ();
 
          bool Validate (const std::vector<uint32_t>& aBinary, std::string& sError);
 

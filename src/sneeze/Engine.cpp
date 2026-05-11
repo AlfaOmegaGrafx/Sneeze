@@ -31,17 +31,6 @@
 
 using namespace SNEEZE;
 
-// ---------------------------------------------------------------------------
-// Engine modules (file-scope, initialized/shutdown by SNEEZE)
-// ---------------------------------------------------------------------------
-
-static SNEEZE::DEP::WASM_RUNTIME  s_pWasmRuntime;
-static SNEEZE::DEP::SPV_PIPELINE  s_pSpvPipeline;
-#ifdef SNEEZE_HAS_XR
-static SNEEZE::DEP::XR_RUNTIME    s_pXrRuntime;
-#endif
-static SNEEZE::DEP::UI_CONTEXT    s_pUiContext;
-
 /***********************************************************************************************************************************
 **  Impl Class
 ***********************************************************************************************************************************/
@@ -49,33 +38,129 @@ static SNEEZE::DEP::UI_CONTEXT    s_pUiContext;
 class SNEEZE::ENGINE::Impl
 {
 public:
-   enum eINIT
-   {
-      kINIT_NONE,
-      kINIT_PARAMS,
-      kINIT_WASM,
-      kINIT_SPV,
-      kINIT_XR,
-      kINIT_UI,
-      kINIT_NETWORK,
-      kINIT_STORAGE,
-      kINIT_SUBSYSTEMS,
-      kINIT_CONTROL,
-      kINIT_SUCCESS,
-   };
 
    Impl (IENGINE* pHost, ENGINE* pEngine) :
-      m_pHost (pHost),
-      m_pEngine (pEngine),
-      m_eInit (kINIT_NONE),
-      m_pControl (nullptr),
-      m_pNetwork (nullptr),
-      m_pStorage (nullptr),
-      m_pPersona (nullptr)
+      m_pHost        (pHost),
+      m_pEngine      (pEngine),
+      m_bInitialized (false),
+      m_pWasmRuntime (nullptr),
+      m_pSpvPipeline (nullptr),
+      m_pXrRuntime   (nullptr),
+      m_pUiContext   (nullptr),
+      m_pControl     (nullptr),
+      m_pNetwork     (nullptr),
+      m_pStorage     (nullptr),
+      m_pPersona     (nullptr)
    {
    }
 
-   // -----------------------------------------------------------------------
+   bool Initialize ()
+   {
+      m_bInitialized = false;
+
+      if (m_pHost  &&  !m_pHost->sAppDataPath ().empty ())
+      {
+         m_pWasmRuntime = new DEP::WASM_RUNTIME ();
+
+         if (m_pWasmRuntime->Initialize (m_pEngine))
+         {
+            m_pSpvPipeline = new DEP::SPV_PIPELINE ();
+
+            if (m_pSpvPipeline->Initialize (m_pEngine))
+            {
+#ifdef SNEEZE_HAS_XR
+               m_pXrRuntime = new DEP::XR_RUNTIME ();
+
+               if (m_pXrRuntime->Initialize (m_pEngine))
+               {
+#endif
+                  m_pUiContext = new DEP::UI_CONTEXT ();
+
+                  if (m_pUiContext->Initialize (m_pEngine))
+                  {
+                     m_pNetwork = new NETWORK (m_pEngine);
+
+                     if (m_pNetwork->Initialize ())
+                     {
+                        m_pStorage = new STORAGE (m_pEngine);
+
+                        if (m_pStorage->Initialize ())
+                        {
+m_pPersona = new persona::PERSONA (m_pEngine);
+
+                           m_pControl = new CONTROL (m_pEngine);
+
+                           int nAgentCount = 0;
+                           if (m_pControl->Initialize (nAgentCount))
+                           {
+                              if (InitializePaths ())
+                              {
+                                 m_bInitialized = true;
+
+                                 m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SNEEZE", "Initialized (1 engine thread + " + std::to_string (nAgentCount) + " agents)");
+                              }
+                              else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize paths");
+                           }
+                           else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize control");
+                        }
+                        else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize storage");
+                     }
+                     else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize network");
+                  }
+                  else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize UI context");
+#ifdef SNEEZE_HAS_XR
+               }
+               else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize XR runtime");
+#endif
+            }
+            else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize SPIR-V pipeline");
+         }
+         else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize WASM runtime");
+      }
+      else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Host configuration incomplete (sAppDataPath required)");
+
+      return m_bInitialized;
+   }
+
+   ~Impl ()
+   {
+      if (m_bInitialized)
+      {
+         while (Viewport_Close (nullptr));
+
+         if (!m_sPath_Transitory_Session.empty ())
+            Cleanup_Queue (m_sPath_Transitory_Session);
+      }
+
+      delete m_pControl;
+      m_pControl = nullptr;
+
+      delete m_pPersona;
+      m_pPersona = nullptr;
+
+      delete m_pStorage;
+      m_pStorage = nullptr;
+
+      delete m_pNetwork;
+      m_pNetwork = nullptr;
+
+      delete m_pUiContext;
+      m_pUiContext = nullptr;
+
+#ifdef SNEEZE_HAS_XR
+      delete m_pXrRuntime;
+      m_pXrRuntime = nullptr;
+#endif
+      delete m_pSpvPipeline;
+      m_pSpvPipeline = nullptr;
+
+      delete m_pWasmRuntime;
+      m_pWasmRuntime = nullptr;
+
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SNEEZE", "Shutdown complete");
+   }
+
+    // -----------------------------------------------------------------------
    // Transitory path management
    // -----------------------------------------------------------------------
 
@@ -200,164 +285,20 @@ public:
       return bResult;
    }
 
-   ~Impl ()
-   {
-   }
-
    // -----------------------------------------------------------------------
-   // Engine management
+   // Cleanup queue (delegates to CONTROL)
    // -----------------------------------------------------------------------
 
-   bool Initialize ()
+   void Cleanup_Queue (const std::string& sPath)
    {
-      m_eInit = kINIT_NONE;
-
-      if (m_pHost  &&  !m_pHost->sAppDataPath ().empty ())
+      if (IsValidTransitoryPath (sPath))
       {
-         m_eInit = kINIT_PARAMS;
-
-         if (s_pWasmRuntime.Initialize (m_pEngine))
-         {
-            m_eInit = kINIT_WASM;
-
-            if (s_pSpvPipeline.Initialize (m_pEngine))
-            {
-               m_eInit = kINIT_SPV;
-#ifdef SNEEZE_HAS_XR
-               if (s_pXrRuntime.Initialize (m_pEngine))
-               {
-                  m_eInit = kINIT_XR;
-#endif
-                  if (s_pUiContext.Initialize (m_pEngine))
-                  {
-                     m_eInit = kINIT_UI;
-
-                     m_pNetwork = new NETWORK (m_pEngine);
-
-                     if (m_pNetwork->Initialize ())
-                     {
-                        m_eInit = kINIT_NETWORK;
-
-                        m_pStorage = new STORAGE (m_pEngine);
-
-                        if (m_pStorage->Initialize ())
-                        {
-                           m_eInit = kINIT_STORAGE;
-
-m_pPersona = new persona::PERSONA (m_pEngine);
-
-m_eInit = kINIT_SUBSYSTEMS;
-
-                           m_pControl = new CONTROL (m_pEngine);
-
-                           int nAgentCount = 0;
-                           if (m_pControl->Initialize (nAgentCount))
-                           {
-                              m_eInit = kINIT_CONTROL;
-
-                              if (InitializePaths ())
-                              {
-                                 m_eInit = kINIT_SUCCESS;
-
-                                 m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SNEEZE", "Initialized (1 engine thread + " + std::to_string (nAgentCount) + " agents)");
-                              }
-                              else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize paths");
-                           }
-                           else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize control");
-                        }
-                        else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize storage");
-                     }
-                     else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize network");
-                  }
-                  else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize UI context");
-#ifdef SNEEZE_HAS_XR
-               }
-               else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize XR runtime");
-#endif
-            }
-            else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize SPIR-V pipeline");
-         }
-         else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize WASM runtime");
+         m_pControl->Cleanup_Queue (sPath);
       }
-      else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Host configuration incomplete (sAppDataPath required)");
-
-      if (m_eInit != kINIT_SUCCESS)
-         Shutdown ();
-
-      return (m_eInit == kINIT_SUCCESS);
+      else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "REJECTED cleanup path -- failed validation: " + sPath);
    }
 
-   void Shutdown ()
-   {
-      if (m_eInit >= kINIT_PARAMS)
-      {
-         if (m_eInit >= kINIT_WASM)
-         {
-            if (m_eInit >= kINIT_SPV)
-            {
-#ifdef SNEEZE_HAS_XR
-               if (m_eInit >= kINIT_XR)
-               {
-#endif
-                  if (m_eInit >= kINIT_UI)
-                  {
-                     if (m_eInit >= kINIT_NETWORK)
-                     {
-                        if (m_eInit >= kINIT_STORAGE)
-                        {
-                           if (m_eInit >= kINIT_SUBSYSTEMS)
-                           {
-                              if (m_eInit >= kINIT_CONTROL)
-                              {
-                                 if (m_eInit >= kINIT_SUCCESS)
-                                 {
-                                    while (Viewport_Close (nullptr));
-
-                                    if (!m_sPath_Transitory_Session.empty ())
-                                       Cleanup_Queue (m_sPath_Transitory_Session);
-                                 }
-
-                                 m_pControl->Shutdown ();
-                              }
-
-                              delete m_pControl;
-                              m_pControl = nullptr;
-                           }
-
-                           delete m_pPersona;
-                           m_pPersona = nullptr;
-
-                           m_pStorage->Shutdown ();
-                        }
-
-                        delete m_pStorage;
-                        m_pStorage = nullptr;
-
-                        m_pNetwork->Shutdown ();
-                     }
-
-                     delete m_pNetwork;
-                     m_pNetwork = nullptr;
-
-                     s_pUiContext.Shutdown ();
-                  }
-#ifdef SNEEZE_HAS_XR
-                  s_pXrRuntime.Shutdown ();
-               }
-#endif
-               s_pSpvPipeline.Shutdown ();
-            }
-
-            s_pWasmRuntime.Shutdown ();
-         }
-      }
-
-      m_eInit = kINIT_NONE;
-
-      m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SNEEZE", "Shutdown complete");
-   }
-
-   // -----------------------------------------------------------------------
+  // -----------------------------------------------------------------------
    // Viewport management
    // -----------------------------------------------------------------------
 
@@ -443,19 +384,6 @@ m_eInit = kINIT_SUBSYSTEMS;
       m_mutexViewport.unlock ();
    }
 
-   // -----------------------------------------------------------------------
-   // Cleanup queue (delegates to CONTROL)
-   // -----------------------------------------------------------------------
-
-   void Cleanup_Queue (const std::string& sPath)
-   {
-      if (IsValidTransitoryPath (sPath))
-      {
-         m_pControl->Cleanup_Queue (sPath);
-      }
-      else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "REJECTED cleanup path -- failed validation: " + sPath);
-   }
-
 public:
    // Subsystems
    IENGINE*                   m_pHost;
@@ -470,8 +398,15 @@ public:
 
 private:
    ENGINE*                    m_pEngine;
-   eINIT                      m_eInit;
+   bool                       m_bInitialized;
 
+   SNEEZE::DEP::WASM_RUNTIME* m_pWasmRuntime;
+   SNEEZE::DEP::SPV_PIPELINE* m_pSpvPipeline;
+   #ifdef SNEEZE_HAS_XR
+   SNEEZE::DEP::XR_RUNTIME*   m_pXrRuntime;
+   #endif
+   SNEEZE::DEP::UI_CONTEXT*   m_pUiContext;
+   
    // Control (owns engine thread, agents, metronome, cleanup queue)
    CONTROL*                   m_pControl;
 
@@ -492,18 +427,12 @@ ENGINE::ENGINE (IENGINE* pHost) :
 
 ENGINE::~ENGINE ()
 {
-   Shutdown ();
    delete m_pImpl;
 }
 
 bool ENGINE::Initialize ()
 {
    return m_pImpl->Initialize ();
-}
-
-void ENGINE::Shutdown ()
-{
-   return m_pImpl->Shutdown ();
 }
 
 // ---------------------------------------------------------------------------
@@ -542,7 +471,7 @@ void ENGINE::Viewport_Release ()
 
 IENGINE*  ENGINE::Host () const              { return m_pImpl->m_pHost;      }
 const std::string& ENGINE::sPath_Persistent () const { return m_pImpl->m_sPath_Persistent; }
-const std::string& ENGINE::sPath_Session () const    { return m_pImpl->m_sPath_Transitory_Session;   }
+const std::string& ENGINE::sPath_Session    () const { return m_pImpl->m_sPath_Transitory_Session; }
 
 NETWORK*  ENGINE::Network () const           { return m_pImpl->m_pNetwork;   }
 STORAGE*  ENGINE::Storage () const           { return m_pImpl->m_pStorage;   }
@@ -587,7 +516,7 @@ void ENGINE::Logout ()
    Log (IENGINE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 1 (signal)");
    Log (IENGINE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 2 (communicate)");
    Log (IENGINE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 3 (shutdown)");
-   s_pWasmRuntime.DestroyAllStores ();
+///   s_pWasmRuntime.DestroyAllStores ();
 
    if (m_pImpl->m_pNetwork)
       m_pImpl->m_pNetwork->Clear ();

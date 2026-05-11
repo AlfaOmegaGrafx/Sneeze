@@ -27,12 +27,6 @@ using namespace SNEEZE;
 // Agent configuration table
 // ---------------------------------------------------------------------------
 
-struct AGENT_INIT
-{
-   int                                                  nHertz;
-   std::function<AGENT* (SNEEZE::CONTROL*)>             fnCreate;
-};
-
 enum eAGENT
 {
    kAGENT_COMPOSITOR = 0,
@@ -40,6 +34,12 @@ enum eAGENT
    kAGENT_C          = 2,
    kAGENT_D          = 3,
    kAGENT_E          = 4,
+};
+
+struct AGENT_INIT
+{
+   int                                                  nHertz;
+   std::function<AGENT* (SNEEZE::CONTROL*)>             fnCreate;
 };
 
 static const std::vector<AGENT_INIT> aAgent_Init =
@@ -57,62 +57,23 @@ static const std::vector<AGENT_INIT> aAgent_Init =
 ***********************************************************************************************************************************/
 
 CONTROL::CONTROL (ENGINE* pEngine) :
+   THREAD (),
    m_pEngine (pEngine),
-   m_pthControl (nullptr),
-   m_bShutdown (false),
-   m_bReady (false),
-   m_bInitOk (false),
    m_bCleanupPending (false)
 {
 }
 
 CONTROL::~CONTROL ()
 {
-   Shutdown ();
 }
 
 bool CONTROL::Initialize (int& nAgentCount)
 {
-   bool bResult = false;
+   bool bResult = THREAD::Initialize ();
 
-   m_pthControl = new std::thread (&CONTROL::Main, this);
-
-   {
-      std::unique_lock<std::mutex> lock (m_mxControl);
-
-      m_cvControl.wait (lock, [this] { return m_bReady; });
-   }
-
-   if (m_bInitOk)
-   {
-      nAgentCount = static_cast<int> (m_aAgent_State.size ());
-      bResult = true;
-   }
-   else
-   {
-      m_pthControl->join ();
-
-      delete m_pthControl;
-      m_pthControl = nullptr;
-   }
+   nAgentCount = static_cast<int> (m_aAgent_State.size ());
 
    return bResult;
-}
-
-void CONTROL::Shutdown ()
-{
-   if (m_bInitOk)
-   {
-      m_bShutdown = true;
-      m_cvControl.notify_all ();
-
-      m_pthControl->join ();
-
-      delete m_pthControl;
-      m_pthControl = nullptr;
-
-      m_bInitOk = false;
-   }
 }
 
 ENGINE* CONTROL::Engine () const
@@ -133,12 +94,12 @@ void CONTROL::Cleanup_Queue (const std::string& sPath)
    }
 
    {
-      std::lock_guard<std::mutex> guard (m_mxControl);
+      std::lock_guard<std::mutex> guard (m_mxThread);
 
       m_bCleanupPending = true;
    }
 
-   m_cvControl.notify_all ();
+   m_cvThread.notify_all ();
 }
 
 void CONTROL::Cleanup_SwapQueue (std::vector<std::string>& aPath)
@@ -183,25 +144,22 @@ void CONTROL::Main ()
       }
    }
 
-   m_bInitOk = bOk;
-
-   m_bReady = true;             // what's the difference between this and m_bInitOk?
-   m_cvControl.notify_all ();
+   Ready (bOk);
 
    // --- Metronome loop ---
 
-   if (m_bInitOk)
+   if (bOk)
    {
       auto tpOrigin = std::chrono::steady_clock::now ();
       int64_t nLastReport = 0;
 
-      while (!m_bShutdown)
+      while (!IsShutdown ())
       {
          bool bSignalScrubber;
 
          {
-            std::unique_lock<std::mutex> lock (m_mxControl);
-            m_cvControl.wait_for (lock, std::chrono::milliseconds (1));
+            std::unique_lock<std::mutex> lock (m_mxThread);
+            m_cvThread.wait_for (lock, std::chrono::milliseconds (1));
 
             bSignalScrubber = m_bCleanupPending;
             m_bCleanupPending = false;
@@ -210,7 +168,7 @@ void CONTROL::Main ()
          if (bSignalScrubber)
             m_aAgent_State[kAGENT_SCRUBBER].pAgent->Signal ();
 
-         if (!m_bShutdown)
+         if (!IsShutdown ())
          {
             auto tpNow = std::chrono::steady_clock::now ();
             double dElapsed = std::chrono::duration<double> (tpNow - tpOrigin).count ();
@@ -252,10 +210,7 @@ void CONTROL::Main ()
    }
 
    for (auto& Agent_State : m_aAgent_State)
-      Agent_State.pAgent->SignalShutdown ();
-
-   for (auto& Agent_State : m_aAgent_State)
-      Agent_State.pAgent->Join ();
+      Agent_State.pAgent->Signal (true);
 
    for (auto& Agent_State : m_aAgent_State)
       delete Agent_State.pAgent;

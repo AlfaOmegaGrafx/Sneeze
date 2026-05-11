@@ -99,7 +99,6 @@ namespace SNEEZE
       IENGINE* Host () const;
 
       bool Initialize ();
-      void Shutdown ();
 
       // --- Viewport management ---
 

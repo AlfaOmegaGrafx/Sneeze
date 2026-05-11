@@ -221,7 +221,6 @@ namespace SNEEZE
       ~STORAGE ();
 
       bool Initialize ();
-      void Shutdown ();
 
       // --- Container lifecycle ---
 

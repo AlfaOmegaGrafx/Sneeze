@@ -186,7 +186,6 @@ static void TestManagerInit ()
    NETWORK* pNetwork = new NETWORK (s_pSneeze);
    bool bInit = pNetwork->Initialize ();
    Check (bInit, "Manager initialized successfully");
-   pNetwork->Shutdown ();
    delete pNetwork;
 }
 
@@ -246,7 +245,6 @@ static void TestUnhashedFetch ()
       }
    }
 
-   pNetwork->Shutdown ();
    delete pNetwork;
 }
 
@@ -295,7 +293,6 @@ static void TestDeduplication ()
    if (pFileA) pFileA->Release ();
    if (pFileB) pFileB->Release ();
 
-   pNetwork->Shutdown ();
    delete pNetwork;
 }
 
@@ -366,7 +363,6 @@ static void TestHashVerifiedFetch ()
       }
    }
 
-   pNetwork->Shutdown ();
    delete pNetwork;
 }
 
@@ -404,7 +400,6 @@ static void TestHashMismatch ()
       pFile->Release ();
    }
 
-   pNetwork->Shutdown ();
    delete pNetwork;
 }
 
@@ -458,7 +453,6 @@ static void TestReset ()
       }
    }
 
-   pNetwork->Shutdown ();
    delete pNetwork;
 }
 
@@ -500,7 +494,6 @@ static void TestResetFlag ()
       }
    }
 
-   pNetwork->Shutdown ();
    delete pNetwork;
 }
 
@@ -536,7 +529,6 @@ static void TestFailedFetch ()
       pFile->Release ();
    }
 
-   pNetwork->Shutdown ();
    delete pNetwork;
 }
 
@@ -582,12 +574,10 @@ static void TestSidecarPersistence ()
          std::printf ("    (Pre-fetch timed out — skipping)\n");
          Check (true, "Sidecar test did not crash (no internet)");
          if (pPre) pPre->Release ();
-         pNetwork->Shutdown ();
          delete pNetwork;
          return;
       }
 
-      pNetwork->Shutdown ();
       delete pNetwork;
    }
 
@@ -614,7 +604,6 @@ static void TestSidecarPersistence ()
       }
 
       pNetwork2->Reset ();
-      pNetwork2->Shutdown ();
       delete pNetwork2;
    }
 }
@@ -656,7 +645,6 @@ static void TestHttpHeaders ()
       pFile->Release ();
    }
 
-   pNetwork->Shutdown ();
    delete pNetwork;
 }
 
@@ -688,7 +676,6 @@ static void TestFileHandleLifecycle ()
       Check (true, "Release completed without crash");
    }
 
-   pNetwork->Shutdown ();
    delete pNetwork;
 }
 
@@ -730,7 +717,6 @@ static void TestHistoryAndFileIx ()
       Check (aHistory.size () >= 2, "Release does not shrink history");
    }
 
-   pNetwork->Shutdown ();
    delete pNetwork;
 }
 
@@ -769,7 +755,6 @@ static void TestNotifications ()
       pFile->Release ();
    }
 
-   pNetwork->Shutdown ();
    delete pNetwork;
 }
 
@@ -819,7 +804,6 @@ static void TestServedFromCache ()
       pFirst->Release ();
    }
 
-   pNetwork->Shutdown ();
    delete pNetwork;
 }
 
@@ -856,7 +840,6 @@ static void TestFailedFetchHttpStatus ()
       pFile->Release ();
    }
 
-   pNetwork->Shutdown ();
    delete pNetwork;
 }
 
@@ -889,7 +872,6 @@ static void TestClearFlag ()
       pFile->Release ();
    }
 
-   pNetwork->Shutdown ();
    delete pNetwork;
 }
 
@@ -930,7 +912,6 @@ static void TestResetFlagToggle ()
       }
    }
 
-   pNetwork->Shutdown ();
    delete pNetwork;
 }
 
@@ -990,7 +971,6 @@ static void TestDeferredReset ()
       Check (true, "Deferred reset did not crash (handles were null)");
    }
 
-   pNetwork->Shutdown ();
    delete pNetwork;
 }
 
@@ -1041,7 +1021,6 @@ static void TestClear ()
 
    Check (true, "Clear completed without crash");
 
-   pNetwork->Shutdown ();
    delete pNetwork;
 }
 
@@ -1077,7 +1056,6 @@ static void TestDeletedNotification ()
       pFile->Release ();
    }
 
-   pNetwork->Shutdown ();
    delete pNetwork;
 }
 
@@ -1107,7 +1085,6 @@ static void TestStalenessRules ()
             std::printf ("    (Timed out — skipping)\n");
             Check (true, "Staleness test did not crash (no internet)");
             pFile->Release ();
-            pNetwork->Shutdown ();
             delete pNetwork;
             return;
          }
@@ -1116,7 +1093,6 @@ static void TestStalenessRules ()
          pFile->Release ();
       }
 
-      pNetwork->Shutdown ();
       delete pNetwork;
    }
 
@@ -1138,7 +1114,6 @@ static void TestStalenessRules ()
       }
 
       pNetwork2->Reset ();
-      pNetwork2->Shutdown ();
       delete pNetwork2;
    }
 }
@@ -1160,7 +1135,6 @@ static void TestNoFetchRequest ()
 
    Check (pFile == nullptr, "bFetch=false returns null for uncached URL");
 
-   pNetwork->Shutdown ();
    delete pNetwork;
 }
 

@@ -76,11 +76,6 @@ NETWORK::NETWORK (ENGINE* pEngine) :
 {
 }
 
-NETWORK::~NETWORK ()
-{
-   Shutdown ();
-}
-
 bool NETWORK::Initialize ()
 {
    bool bResult = false;
@@ -114,7 +109,7 @@ bool NETWORK::Initialize ()
    return bResult;
 }
 
-void NETWORK::Shutdown ()
+NETWORK::~NETWORK ()
 {
    if (!m_sCachePath.empty ())
    {

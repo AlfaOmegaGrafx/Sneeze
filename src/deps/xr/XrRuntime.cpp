@@ -28,7 +28,13 @@ XR_RUNTIME::XR_RUNTIME ()
 
 XR_RUNTIME::~XR_RUNTIME ()
 {
-   Shutdown ();
+   if (hInstance != XR_NULL_HANDLE)
+   {
+      xrDestroyInstance (hInstance);
+      hInstance = XR_NULL_HANDLE;
+   }
+   bHasRuntime = false;
+   sRuntimeName.clear ();
 }
 
 bool XR_RUNTIME::Initialize (ENGINE* pEngine)
@@ -84,17 +90,6 @@ bool XR_RUNTIME::Initialize (ENGINE* pEngine)
    }
 
    return true;
-}
-
-void XR_RUNTIME::Shutdown ()
-{
-   if (hInstance != XR_NULL_HANDLE)
-   {
-      xrDestroyInstance (hInstance);
-      hInstance = XR_NULL_HANDLE;
-   }
-   bHasRuntime = false;
-   sRuntimeName.clear ();
 }
 
 bool XR_RUNTIME::HasRuntime () const

@@ -26,7 +26,6 @@ namespace SNEEZE
          ~UI_CONTEXT ();
 
          bool Initialize (ENGINE* pEngine);
-         void Shutdown ();
 
       private:
          ENGINE* m_pEngine;

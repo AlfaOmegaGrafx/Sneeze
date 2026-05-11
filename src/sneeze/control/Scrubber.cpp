@@ -52,15 +52,15 @@ void AGENT::SCRUBBER::DrainQueue ()
    }
 }
 
-void AGENT::SCRUBBER::ThreadLoop ()
+void AGENT::SCRUBBER::Main ()
 {
-   SignalReady ();
+   Ready ();
 
    while (!IsShutdown ())
    {
       DrainQueue ();
 
-      std::unique_lock<std::mutex> lock (m_mxControl);
-      m_cvControl.wait (lock, [this] { return IsShutdown (); });
+      std::unique_lock<std::mutex> lock (m_mxThread);
+      m_cvThread.wait (lock, [this] { return IsShutdown (); });
    }
 }

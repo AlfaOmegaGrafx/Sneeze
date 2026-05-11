@@ -27,7 +27,7 @@ SPV_PIPELINE::SPV_PIPELINE ()
 
 SPV_PIPELINE::~SPV_PIPELINE ()
 {
-   Shutdown ();
+   bInitialized = false;
 }
 
 bool SPV_PIPELINE::Initialize (ENGINE* pEngine)
@@ -37,11 +37,6 @@ bool SPV_PIPELINE::Initialize (ENGINE* pEngine)
    m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SPV_PIPELINE",
       "SPIR-V validation pipeline initialized (SPIRV-Tools)");
    return true;
-}
-
-void SPV_PIPELINE::Shutdown ()
-{
-   bInitialized = false;
 }
 
 bool SPV_PIPELINE::Validate (const std::vector<uint32_t>& aBinary, std::string& sError)

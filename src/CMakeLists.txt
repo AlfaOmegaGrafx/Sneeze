@@ -504,6 +504,7 @@ endif ()
 
 set (CORE_SOURCES
    sneeze/Engine.cpp
+   sneeze/Thread.cpp
    sneeze/control/Agent.cpp
    sneeze/control/Control.cpp
    sneeze/control/Compositor.cpp
@@ -513,6 +514,7 @@ set (CORE_SOURCES
    sneeze/control/AgentE.cpp)
 set (CORE_HEADERS
    sneeze/Types.h
+   sneeze/Engine.h
    sneeze/control/Control.h)
 
 set (ASTRO_SOURCES

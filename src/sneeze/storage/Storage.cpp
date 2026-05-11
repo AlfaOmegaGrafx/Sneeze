@@ -27,7 +27,12 @@ STORAGE::STORAGE (ENGINE* pEngine) :
 
 STORAGE::~STORAGE ()
 {
-   Shutdown ();
+   std::lock_guard<std::recursive_mutex> guard (m_mutex);
+
+   SaveAllDirty ();
+
+   m_aSilo.clear ();
+   m_mapUnits.clear ();
 }
 
 bool STORAGE::Initialize ()
@@ -56,16 +61,6 @@ bool STORAGE::Initialize ()
    }
 
    return bResult;
-}
-
-void STORAGE::Shutdown ()
-{
-   std::lock_guard<std::recursive_mutex> guard (m_mutex);
-
-   SaveAllDirty ();
-
-   m_aSilo.clear ();
-   m_mapUnits.clear ();
 }
 
 // ---------------------------------------------------------------------------

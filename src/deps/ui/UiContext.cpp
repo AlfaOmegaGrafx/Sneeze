@@ -104,7 +104,11 @@ UI_CONTEXT::UI_CONTEXT ()
 
 UI_CONTEXT::~UI_CONTEXT ()
 {
-   Shutdown ();
+   if (bInitialized)
+   {
+      Rml::Shutdown ();
+      bInitialized = false;
+   }
 }
 
 bool UI_CONTEXT::Initialize (ENGINE* pEngine)
@@ -118,26 +122,15 @@ bool UI_CONTEXT::Initialize (ENGINE* pEngine)
    bool bOk = Rml::Initialise ();
    if (!bOk)
    {
-      m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "UI_CONTEXT",
-         "Rml::Initialise failed");
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "UI_CONTEXT", "Rml::Initialise failed");
       bInitialized = false;
    }
    else
    {
       bInitialized = true;
       Rml::String sVersion = Rml::GetVersion ();
-      m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "UI_CONTEXT",
-         "RmlUi " + std::string (sVersion.c_str ()) + " initialized (stub renderer)");
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "UI_CONTEXT", "RmlUi " + std::string (sVersion.c_str ()) + " initialized (stub renderer)");
    }
 
    return bInitialized;
-}
-
-void UI_CONTEXT::Shutdown ()
-{
-   if (bInitialized)
-   {
-      Rml::Shutdown ();
-      bInitialized = false;
-   }
 }

@@ -28,7 +28,6 @@ namespace SNEEZE
          ~XR_RUNTIME ();
 
          bool Initialize (ENGINE* pEngine);
-         void Shutdown ();
 
          bool        HasRuntime () const;
          std::string GetRuntimeName () const;

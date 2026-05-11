@@ -105,10 +105,10 @@ void AGENT::COMPOSITOR::Tick ()
 {
 }
 
-void AGENT::COMPOSITOR::ThreadLoop ()
+void AGENT::COMPOSITOR::Main ()
 {
    m_tpLastFrame = std::chrono::steady_clock::now ();
-   SignalReady ();
+   Ready ();
 
    while (!IsShutdown ())
    {

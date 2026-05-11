@@ -40,7 +40,6 @@ namespace SNEEZE
          ~WASM_RUNTIME ();
 
          bool Initialize (SNEEZE::ENGINE* pEngine);
-         void Shutdown ();
 
          wasm_engine_t* GetEngine () const { return m_pWsam_Engine; }
 

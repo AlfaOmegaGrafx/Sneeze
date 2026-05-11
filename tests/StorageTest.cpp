@@ -473,7 +473,6 @@ int RunStorageTests (int nArgc, char** aArgv)
       TestMetaSidecar ();
    }
 
-   s_pStorage->Shutdown ();
    delete s_pStorage;
    s_pStorage = nullptr;
    delete s_pSneeze;

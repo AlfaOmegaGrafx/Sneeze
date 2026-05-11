@@ -15,9 +15,7 @@
 #ifndef SNEEZE_CORE_CONTROL_H
 #define SNEEZE_CORE_CONTROL_H
 
-#include <thread>
-#include <mutex>
-#include <condition_variable>
+#include "Engine.h"
 #include <functional>
 #include <chrono>
 #include <cstdint>
@@ -32,14 +30,13 @@ namespace SNEEZE
    // CONTROL -- owns the engine thread, agent lifecycle, and metronome
    // ---------------------------------------------------------------------------
 
-   class CONTROL
+   class CONTROL : public THREAD
    {
    public:
       explicit CONTROL (ENGINE* pEngine);
       ~CONTROL ();
 
       bool Initialize (int& nAgentCount);
-      void Shutdown ();
 
       void Cleanup_Queue (const std::string& sPath);
       void Cleanup_SwapQueue (std::vector<std::string>& aPath);
@@ -49,18 +46,11 @@ namespace SNEEZE
       CONTROL (const CONTROL&) = delete;
       CONTROL& operator= (const CONTROL&) = delete;
 
+   protected:
+      void Main () override;
+
    private:
-      void Main ();
-
       ENGINE*                    m_pEngine;
-
-      // Thread
-      std::thread*               m_pthControl;
-      std::mutex                 m_mxControl;
-      std::condition_variable    m_cvControl;
-      bool                       m_bShutdown;
-      bool                       m_bReady;
-      bool                       m_bInitOk;
 
       // Agents
       struct AGENT_STATE
@@ -82,7 +72,7 @@ namespace SNEEZE
    // AGENT -- abstract base for engine agent threads
    // ---------------------------------------------------------------------------
 
-   class AGENT
+   class AGENT : public THREAD
    {
    public:
       class COMPOSITOR;
@@ -90,46 +80,31 @@ namespace SNEEZE
       class C;
       class D;
       class E;
+
       explicit AGENT (CONTROL* pControl);
       virtual ~AGENT ();
 
-      bool Initialize ();
-      void Shutdown ();
-      void SignalShutdown ();
-      void Join ();
-      void Signal ();
-
-      AGENT (const AGENT&) = delete;
+      AGENT            (const AGENT&) = delete;
       AGENT& operator= (const AGENT&) = delete;
+
+      void AgentIndex (int nAgentIndex);
 
    protected:
       virtual void Tick () = 0;
-      virtual void ThreadLoop ();
+      void Main () override;
 
-      void    SignalReady ();
-      bool    IsShutdown () const;
       ENGINE* Engine () const;
 
       CONTROL*                m_pControl;
-      std::mutex              m_mxControl;
-      std::condition_variable m_cvControl;
 
    private:
-      bool Control ();
-      void CtlBreak_Thread ();
-
-      std::thread*            m_pthAgent;
-      bool                    m_bShutdown;
-      bool                    m_bReady;
+      bool Control (); // what is this for?
 
       // Wake-rate measurement
       std::chrono::steady_clock::time_point m_tpOrigin;
       int                     m_nWakeCount;
       int64_t                 m_nLastReportSec;
       int                     m_nAgentIndex;
-
-   public:
-      void AgentIndex (int nAgentIndex);
    };
 
    // ---------------------------------------------------------------------------
@@ -143,7 +118,7 @@ namespace SNEEZE
 
    protected:
       void Tick () override;
-      void ThreadLoop () override;
+      void Main () override;
 
    private:
       void Viewport_Render (VIEWPORT* pViewport, std::chrono::steady_clock::time_point tpLoopStart);
@@ -172,7 +147,7 @@ namespace SNEEZE
       explicit SCRUBBER (CONTROL* pControl);
    protected:
       void Tick () override;
-      void ThreadLoop () override;
+      void Main () override;
    private:
       void DrainQueue ();
    };

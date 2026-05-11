@@ -19,10 +19,8 @@
 using namespace SNEEZE;
 
 AGENT::AGENT (CONTROL* pControl)
-   : m_pControl (pControl)
-   , m_pthAgent (nullptr)
-   , m_bShutdown (false)
-   , m_bReady (false)
+   : THREAD ()
+   , m_pControl (pControl)
    , m_nWakeCount (0)
    , m_nLastReportSec (0)
    , m_nAgentIndex (-1)
@@ -36,74 +34,17 @@ void AGENT::AgentIndex (int nAgentIndex)
 
 AGENT::~AGENT ()
 {
-   Shutdown ();
 }
 
-bool AGENT::Initialize ()
-{
-   m_pthAgent = new std::thread (&AGENT::ThreadLoop, this);
 
-   std::unique_lock<std::mutex> lock (m_mxControl);
-   m_cvControl.wait (lock, [this] { return m_bReady; });
-
-   return true;
-}
-
-void AGENT::SignalShutdown ()
-{
-   if (m_pthAgent)
-   {
-      {
-         std::lock_guard<std::mutex> guard (m_mxControl);
-         m_bShutdown = true;
-      }
-      m_cvControl.notify_all ();
-   }
-}
-
-void AGENT::Join ()
-{
-   if (m_pthAgent)
-   {
-      m_pthAgent->join ();
-      delete m_pthAgent;
-      m_pthAgent = nullptr;
-   }
-}
-
-void AGENT::Shutdown ()
-{
-   SignalShutdown ();
-   Join ();
-}
-
-void AGENT::Signal ()
-{
-   CtlBreak_Thread ();
-}
-
-void AGENT::ThreadLoop ()
+void AGENT::Main ()
 {
    m_tpOrigin = std::chrono::steady_clock::now ();
 
-   SignalReady ();
+   Ready ();
 
-   std::unique_lock<std::mutex> mlock (m_mxControl);
-   m_cvControl.wait (mlock, std::bind (&AGENT::Control, this));
-}
-
-void AGENT::SignalReady ()
-{
-   {
-      std::lock_guard<std::mutex> guard (m_mxControl);
-      m_bReady = true;
-   }
-   m_cvControl.notify_all ();
-}
-
-bool AGENT::IsShutdown () const
-{
-   return m_bShutdown;
+   std::unique_lock<std::mutex> mlock (m_mxThread);
+   m_cvThread.wait (mlock, std::bind (&AGENT::Control, this));
 }
 
 ENGINE* AGENT::Engine () const
@@ -113,7 +54,9 @@ ENGINE* AGENT::Engine () const
 
 bool AGENT::Control ()
 {
-   if (m_bShutdown == false)
+   bool bShutdown = IsShutdown ();
+
+   if (!bShutdown)
    {
       // m_nWakeCount++;
       //
@@ -131,11 +74,6 @@ bool AGENT::Control ()
       Tick ();
    }
 
-   return m_bShutdown;
+   return bShutdown;
 }
 
-void AGENT::CtlBreak_Thread ()
-{
-   std::lock_guard<std::mutex> guard (m_mxControl);
-   m_cvControl.notify_all ();
-}
