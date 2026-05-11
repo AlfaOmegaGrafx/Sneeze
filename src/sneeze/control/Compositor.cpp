@@ -26,7 +26,7 @@
 // Mitigation:
 //   Both creation and destruction are forced onto the compositor thread.
 //   - Creation: VIEWPORT::InitializeRenderer() is called from
-//     RenderViewport() on the compositor thread (deferred via
+//     Viewport_Render() on the compositor thread (deferred via
 //     m_bRendererPending flag set by the main thread).
 //   - Destruction: After the render loop exits, ShutdownRenderer() is
 //     called for every viewport while still on the compositor thread,
@@ -46,7 +46,7 @@
 // ---------------------------------------------------------------------------
 
 #include <Sneeze.h>
-#include "Worker.h"
+#include "Control.h"
 #include "Types.h"
 #include "renderer/Renderer.h"
 #include "scene/Epoch.h"
@@ -83,8 +83,8 @@ static void ColorFromU32 (uint32_t nColor, float& r, float& g, float& b)
 
 // ---------------------------------------------------------------------------
 
-WORKER::COMPOSITOR::COMPOSITOR (ENGINE* pEngine)
-   : WORKER (pEngine)
+AGENT::COMPOSITOR::COMPOSITOR (CONTROL* pControl)
+   : AGENT (pControl)
    , m_tmNow (0)
    , m_nFrameCount (0)
    , m_dFpsAccum (0.0)
@@ -101,11 +101,11 @@ WORKER::COMPOSITOR::COMPOSITOR (ENGINE* pEngine)
    m_tmNow = static_cast<int64_t> (dElapsedSec * TICKS_PER_S);
 }
 
-void WORKER::COMPOSITOR::Tick ()
+void AGENT::COMPOSITOR::Tick ()
 {
 }
 
-void WORKER::COMPOSITOR::ThreadLoop ()
+void AGENT::COMPOSITOR::ThreadLoop ()
 {
    m_tpLastFrame = std::chrono::steady_clock::now ();
    SignalReady ();
@@ -132,7 +132,7 @@ void WORKER::COMPOSITOR::ThreadLoop ()
          double dAvgFrame   = (m_nFrameCount > 0) ? m_dFpsAccum     / m_nFrameCount * 1000.0 : 0.0;
          char szFps[256];
          std::snprintf (szFps, sizeof (szFps), "%d  (frame %.1f ms | input %.1f ms | scene %.1f ms | submit %.1f ms | render %.1f ms | publish %.1f ms | flush %.1f ms)", m_nFrameCount, dAvgFrame, dAvgInput, dAvgScene, dAvgSubmit, dAvgRender, dAvgPublish, dAvgFlush);
-         m_pEngine->Log (IENGINE::kLOGLEVEL_Trace, "FPS", std::string (szFps));
+         Engine ()->Log (IENGINE::kLOGLEVEL_Trace, "FPS", std::string (szFps));
          m_nFrameCount    = 0;
          m_dFpsAccum     -= 1.0;
          m_dAccumInput    = 0.0;
@@ -145,39 +145,28 @@ void WORKER::COMPOSITOR::ThreadLoop ()
 
       bool bNeedFlush = false;
 
-      m_pEngine->Viewport_Capture ();
+      Engine ()->Viewport_Capture ();
       {
-         // --- Consume input per viewport ---
-
-         for (VIEWPORT* pViewport : m_pEngine->Viewport_GetList ())
+         for (VIEWPORT* pViewport : Engine ()->Viewport_GetList ())
          {
+            if (!pViewport->IsReady ())
+               continue;
+
+            if (pViewport->ServiceRendererShutdown ())
+               continue;
+
             VIEWPORT::INPUT Input = pViewport->ConsumeInput ();
             VIEWPORT::VIEW& View = pViewport->View ();
             View.Update (Input.nMouseDX, Input.nMouseDY, Input.dScrollY, Input.bMouseLeft, Input.bMouseRight);
-         }
 
-         // --- Render each viewport ---
+            Viewport_Render (pViewport, tpLoopStart);
 
-         for (VIEWPORT* pViewport : m_pEngine->Viewport_GetList ())
-         {
-            if (pViewport->ServiceRendererShutdown ())
-               continue;
-            RenderViewport (pViewport, tpLoopStart);
-         }
-
-         // --- Check if any viewport needs readback flush ---
-
-         for (VIEWPORT* pViewport : m_pEngine->Viewport_GetList ())
-         {
             VIEWPORT::RENDERER* pRenderer = pViewport->Renderer ();
             if (pRenderer  &&  !pRenderer->IsRenderingToNativeSurface ())
-            {
                bNeedFlush = true;
-               break;
-            }
          }
 
-         m_pEngine->Viewport_Release ();
+         Engine ()->Viewport_Release ();
       }
 
       // --- Pace to display refresh (outside lock) ---
@@ -199,7 +188,7 @@ void WORKER::COMPOSITOR::ThreadLoop ()
 
 }
 
-void WORKER::COMPOSITOR::RenderViewport (VIEWPORT* pViewport, std::chrono::steady_clock::time_point tpLoopStart)
+void AGENT::COMPOSITOR::Viewport_Render (VIEWPORT* pViewport, std::chrono::steady_clock::time_point tpLoopStart)
 {
    // Deferred renderer init -- must happen on the compositor thread because
    // Filament auto-adopts the thread that creates its Engine.

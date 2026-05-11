@@ -1,7 +1,7 @@
-# Sneeze — Engine Runtime and Worker Infrastructure
+# Sneeze — Engine Runtime and Agent Infrastructure
 
 The `sneeze` module is the heart of the Sneeze engine. It owns the main engine
-object (`SNEEZE`), the worker thread infrastructure, and all shared subsystem
+object (`SNEEZE`), the agent thread infrastructure, and all shared subsystem
 lifecycles. Per-viewport concerns (scene, renderer, input, framebuffer) are
 owned by `VIEWPORT` instances, created and destroyed via `OpenViewport` /
 `CloseViewport`.
@@ -51,7 +51,7 @@ engine.Shutdown ();
 
 1. WASM runtime, SPIR-V pipeline, XR runtime (if enabled)
 2. Network (file cache), storage system, UI context
-3. Worker threads (compositor self-paced, others at configured rates)
+3. Agent threads (compositor self-paced, others at configured rates)
 
 `OpenViewport()` creates per-viewport resources:
 
@@ -139,20 +139,20 @@ public:
 };
 ```
 
-## WORKER
+## AGENT
 
-`WORKER` is the base class for all engine worker threads. Each worker runs in
+`AGENT` is the base class for all engine agent threads. Each agent runs in
 its own thread and is woken by the engine thread at a configured frequency.
 
-| Worker               | Class                 | Frequency | Purpose                          |
+| Agent                | Class                 | Frequency | Purpose                          |
 |----------------------|-----------------------|-----------|----------------------------------|
-| Compositor           | `WORKER::COMPOSITOR`   | Self-paced| Scene traversal, rendering       |
-| B through H          | `WORKER_B` .. `H`     | Varies    | Reserved for future use          |
+| Compositor           | `AGENT::COMPOSITOR`    | Self-paced| Scene traversal, rendering       |
+| C through H          | `AGENT::C` .. `H`     | Varies    | Reserved for future use          |
 
-Workers override `Tick()` to perform their per-frame work. Self-paced workers
+Agents override `Tick()` to perform their per-frame work. Self-paced agents
 (compositor) override `ThreadLoop()` instead.
 
-### WORKER::COMPOSITOR
+### AGENT::COMPOSITOR
 
 The compositor iterates all active viewports each frame. For each viewport it
 traverses the primary fabric's SOM tree, computes orbital positions for
@@ -189,9 +189,9 @@ anomalies.
 
 ## Unimplemented / Future Work
 
-- **WorkerB** is reserved for the animator thread (64 Hz SOM animation
+- **Agent C** is reserved for the animator thread (64 Hz SOM animation
   interpolation). Not yet connected.
-- **Workers C through H** are placeholder slots for future subsystems.
+- **Agents D through H** are placeholder slots for future subsystems.
 - The phased teardown currently logs phases but does not yet await async
   acknowledgements from WASM instances (phase 2 is synchronous).
 - `Resize()` is implemented but hot-resize during rendering is untested.

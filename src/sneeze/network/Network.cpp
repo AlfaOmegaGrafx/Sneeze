@@ -88,8 +88,7 @@ bool NETWORK::Initialize ()
    CURLcode nCurlInit = curl_global_init (CURL_GLOBAL_DEFAULT);
    if (nCurlInit != CURLE_OK)
    {
-      m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "NETWORK",
-         "curl_global_init failed (code " + std::to_string (static_cast<int> (nCurlInit)) + ")");
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "NETWORK", "curl_global_init failed (code " + std::to_string (static_cast<int> (nCurlInit)) + ")");
    }
    else
    {

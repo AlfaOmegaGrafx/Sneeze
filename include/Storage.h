@@ -47,7 +47,7 @@ namespace SNEEZE
    public:
 
       // -----------------------------------------------------------------------
-      // SCOPE — selects one of the four storage units within an ASSET.
+      // SCOPE — selects one of the four storage units within a SILO.
       // -----------------------------------------------------------------------
 
       enum SCOPE
@@ -64,19 +64,19 @@ namespace SNEEZE
       // -----------------------------------------------------------------------
 
       class UNIT;
-      class ASSET;
+      class SILO;
 
       // -----------------------------------------------------------------------
       // IENUM — enumeration callback interface.
       //
-      // Implement to receive ASSET pointers during Enumerate().
+      // Implement to receive SILO pointers during Enumerate().
       // -----------------------------------------------------------------------
 
       class IENUM
       {
       public:
          virtual ~IENUM () {}
-         virtual void OnAsset (ASSET* pAsset) = 0;
+         virtual void OnSilo (SILO* pSilo) = 0;
       };
 
       // -----------------------------------------------------------------------
@@ -153,22 +153,22 @@ namespace SNEEZE
 
          mutable std::recursive_mutex  m_mutex;
 
-         friend class ASSET;
+         friend class SILO;
          friend class STORAGE;
       };
 
       // -----------------------------------------------------------------------
-      // ASSET — groups four UNITs for a specific container.
+      // SILO — groups four UNITs for a specific container.
       //
       // The handle passed to both WASM host functions and the inspector.
       // Created when a WASM container is instantiated or when the inspector
       // enumerates from disk. Destroyed/evicted when last reference releases.
       // -----------------------------------------------------------------------
 
-      class ASSET
+      class SILO
       {
       public:
-         ASSET (STORAGE* pStorage, std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, VIEWPORT* pViewport);
+         SILO (STORAGE* pStorage, std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, VIEWPORT* pViewport);
 
          // --- Identity ---
 
@@ -225,8 +225,8 @@ namespace SNEEZE
 
       // --- Container lifecycle ---
 
-      ASSET*  Open (std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, VIEWPORT* pViewport = nullptr);
-      void    Close (ASSET* pAsset);
+      SILO*   Open (std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, VIEWPORT* pViewport = nullptr);
+      void    Close (SILO* pSilo);
 
       // --- Inspector ---
 
@@ -248,7 +248,7 @@ namespace SNEEZE
       std::string     m_sTemporaryPath;
 
       std::unordered_map<std::string, std::unique_ptr<UNIT>>  m_mapUnits;
-      std::vector<std::unique_ptr<ASSET>>                     m_aAssets;
+      std::vector<std::unique_ptr<SILO>>                      m_aSilo;
       std::recursive_mutex                                    m_mutex;
    };
 }

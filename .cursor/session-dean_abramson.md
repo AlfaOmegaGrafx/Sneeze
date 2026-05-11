@@ -543,3 +543,86 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 - **Documentation update** — Comprehensive rewrite of `project.mdc` Key Classes section, module table, coding conventions, architecture notes. Updated `Scene.md`, `Sneeze.md`, `CameraOrbit.md`, `Storage.md` for new API names.
 - **Artemis compatibility** — Identified all breaking API changes and prepared migration guide for Artemis project. Patching in progress (separate session).
 
+---
+
+### 2026-05-09 (Saturday) — 3:44 PM – 5:00 PM PDT
+
+**Dean Abramson** — Engine and viewport init/shutdown symmetry, ownership audit, Impl refactoring.
+
+- **Viewport init/shutdown state tracking** — Added `eINIT_STATE` enum to VIEWPORT (`kINIT_NONE`, `kINIT_SCENE`, `kINIT_RENDERER`). Refactored `Initialize()` to use single-return with state bumps. Refactored `Shutdown()` to use nested `if (m_eInitState >= kINIT_X)` in reverse order. `delete m_pScene` placed outside state gate to handle allocated-but-not-initialized case. Viewport now owns its full teardown including the renderer handshake — `ENGINE::Viewport_Close` no longer calls `RequestRendererShutdown()` directly.
+- **Engine shutdown cleanup** — Removed redundant `m_bCleanupPending`/`notify_all` (already done inside `QueueCleanup`). Removed unnecessary mutex guard around `m_bShutdown = true`. Removed redundant worker vector `.clear()` calls (already done by `ShutdownWorkers()` on the engine thread). Fixed `~ENGINE()` missing `delete m_pImpl` (memory leak).
+- **Ownership audit** — Audited all engine, viewport, and worker code for ownership asymmetry. Found and fixed: `m_pImpl` leak in destructor, missing `m_pStorage = new STORAGE(...)` (null deref). Identified flush-to-margin convention for temporary code (PERSONA).
+- **Impl viewport lifecycle consolidation** — Moved all viewport open/close logic from public `ENGINE` methods into `Impl::Viewport_Open()` and `Impl::Viewport_Close()`. Public `ENGINE::Viewport_Close()` now rejects nullptr and delegates; `Impl::Shutdown()` calls `Viewport_Close(nullptr)` directly. Impl is the sole owner of the viewport list lifecycle.
+- **Viewport transitory folders** — `Impl::Viewport_Open()` creates a transitory folder (`v` + 8 hex) for each viewport and passes the path to `VIEWPORT::Initialize()`. `Impl::Viewport_Close()` queues the folder for scrubber cleanup. Added `m_sPath_Transitory` member and `sPath_Transitory()` accessor to VIEWPORT.
+- **Naming fixes** — Renamed `m_viewportMutex` to `m_mutexViewport`. Renamed Impl methods `Capture`/`Release` to `Viewport_Capture`/`Viewport_Release` and moved adjacent to other viewport methods. Added separator comment for viewport management section in Impl.
+- **project.mdc** — Updated ENGINE and VIEWPORT class descriptions with new state tracking, Impl ownership model, transitory folder lifecycle, and shutdown symmetry.
+
+## 2026-05-09 (Saturday) ~8:18 PM – 9:36 PM PDT
+
+- **Attempted state enum rename** — User requested renaming `eINIT`→`eSTATE_ENGINE` / `kINIT_*`→`kSTATE_ENGINE_*` and `eOPEN_STATE`→`eSTATE_VIEWPORT` / `kOPEN_*`→`kSTATE_VIEWPORT_*`. After discussion, user decided against the rename. All changes reverted — original names (`eINIT`, `kINIT_*`, `eOPEN_STATE`, `kOPEN_*`) retained.
+- **Eliminated `eOPEN_STATE` enum entirely** — User pointed out the viewport knows its own state (via `m_eInitState` and `m_sPath_Transitory`). The two-overload `Viewport_Close` pattern was collapsed into a single function that removes from list, shuts down, queues folder cleanup, and deletes.
+- **Fixed viewport deadlock** — `pViewport->Shutdown()` calls `RequestRendererShutdown()` which blocks until the compositor calls `ServiceRendererShutdown()`. But the viewport was being removed from the list BEFORE shutdown, so the compositor never saw it. Root cause: violating the add-before-init/remove-after-shutdown principle.
+- **Applied "add before init, remove after shutdown" principle** — `Impl::Viewport_Open()` now adds the viewport to the list before calling `Initialize()`. `Impl::Viewport_Close()` now calls `Shutdown()` before removing from the list. This is a universal invariant for the library — documented in Design Principles.
+- **Added `VIEWPORT::IsReady()` gate** — Since viewports are now in the list before initialization completes, added `m_bReady` flag (false until Initialize succeeds) and `IsReady()` accessor. Compositor skips viewports where `!IsReady()`.
+- **Compositor single-loop refactor** — Collapsed three separate per-viewport loops into one loop with `IsReady()` + `ServiceRendererShutdown()` checks at the top.
+- **Fixed use-after-free** — `Viewport_Close` was calling `pViewport->sPath_Transitory()` after `delete pViewport`. Fixed by capturing the path before delete. User corrected ordering: path (born first) should be queued for deletion last — symmetric with creation order.
+- **Identified future refactor** — Engine thread (metronome, worker creation/shutdown) should be extracted into its own class. Worker creation loop also violates add-before-init principle. Both deferred until after commit.
+- **project.mdc** — Added "Symmetry above all else" and "Add before init, remove after shutdown" to Design Principles. Updated ENGINE, VIEWPORT, and COMPOSITOR class descriptions. Updated backlog item #16 (transitory folders fully working). Added backlog item #6 (extract engine thread).
+
+## 2026-05-09 (Saturday) ~11:04 PM – 11:52 PM PDT
+
+- **Worker ownership: ENGINE → CONTROLLER** — Changed all worker constructors from `ENGINE*` to `CONTROLLER*`. WORKER base class stores `m_pController` (owner) and caches `m_pEngine` (via `pController->Engine()`) for convenience. Factory table lambdas updated to take `CONTROLLER*`.
+- **CONTROLLER defined first in Worker.h** — Moved CONTROLLER class definition before WORKER (with `class WORKER;` forward declaration). Owner comes first conceptually; eliminates the previous `class CONTROLLER;` forward decl.
+- **Cleanup queue removed from ENGINE public API** — `QueueCleanup`, `HasCleanupWork`, `SwapCleanupQueue` all removed from `Sneeze.h`. Cleanup queue lives exclusively in CONTROLLER. `Impl::QueueCleanup` remains as internal validation gate.
+- **Scrubber calls CONTROLLER directly** — `HasWork()` and `DrainQueue()` now call `m_pController->HasCleanupWork()` / `m_pController->SwapCleanupQueue()` directly.
+- **InitializePaths hardened** — All `create_directories` calls now use `std::error_code` (never throws). Returns false if any directory creation or session folder creation fails. Orphan scan moved before session folder creation (eliminates self-exclusion check).
+- **`m_sPath_Transitory` promoted to member** — Transitory root is now a member alongside `m_sPath_Persistent` and `m_sPath_Transitory_Session`. `Viewport_Open` uses it directly instead of deriving from `m_sPath_Session.parent_path()`.
+- **`m_sPath_Session` renamed to `m_sPath_Transitory_Session`** — Clearer naming.
+- **project.mdc** — Updated ENGINE, WORKER, SCRUBBER, CONTROLLER class descriptions. Updated worker ownership rationale. Updated backlog item #16 with new path naming and InitializePaths error handling.
+
+## 2026-05-10 (Saturday) ~12:11 AM – 12:40 AM PDT
+
+- **Post-refactor validation** — Rebuilt and tested after CONTROLLER extraction. Solar system renders correctly once all textures load from CDN. The "dimness" observed while cache was rebuilding was untextured spheres using solid color fallback — not a regression.
+- **RmlUi dual-context architecture confirmed** — `Rml::CreateContext()` accepts a per-context `RenderInterface`, so Sneeze and Artemis can each create independent contexts with different renderers (ANARI for in-world UI, SDL for browser chrome). Single `Rml::Initialise()` in Sneeze, shared font engine and system interface. No conflict.
+- **Inspector is Artemis's concern** — Clarified that the Inspector, URL bar, menus, and all browser chrome are Artemis UI surfaces rendered with SDL. Sneeze renders metaverse content inside the viewport only. Corrected earlier (wrong) suggestion to use ANARI for Inspector rendering.
+- **FreeType decision** — Decided to rebuild RmlUi with FreeType (`RMLUI_FONT_ENGINE=freetype`). Add FreeType as new Sneeze dependency (`deps/freetype.cmake`). Remove `STUB_FONT_ENGINE` from `UiContext.cpp`. Prerequisite for any text rendering. Implementation deferred to morning.
+- **project.mdc** — Added RmlUi dual-context architecture documentation, FreeType font engine decision, updated UI_CONTEXT class description, updated Phase 4 tasks with Sneeze/Artemis ownership annotations, added FreeType to dependency table.
+
+## 2026-05-10 (Saturday) ~8:00 AM – 8:15 AM PDT
+
+- **FreeType integration implemented** — Five changes to enable FreeType in RmlUi:
+  1. Created `deps/freetype.cmake` — FreeType 2.13.3, static, all optional deps disabled (zlib, bzip2, png, harfbuzz, brotli).
+  2. Updated `deps/rmlui.cmake` — `RMLUI_FONT_ENGINE=freetype`, added `CMAKE_PREFIX_PATH` to FreeType install.
+  3. Updated `deps/CMakeLists.txt` — Added `freetype` to `SNEEZE_DEPS`, added `add_dependencies(rmlui freetype)`.
+  4. Created `src/cmake/FindSneezeFreeType.cmake`, updated `src/CMakeLists.txt` — find, multi-config rewriter, include, link.
+  5. Updated `src/deps/ui/UiContext.cpp` — Removed `STUB_FONT_ENGINE` class, its static instance, and `SetFontEngineInterface` call.
+- **Verification** — `SneezeTest --ui` passes 20/20. "No font face defined" warnings are cosmetic (no fonts loaded in test context).
+- **Both configs built** — Release and Debug rebuilt successfully.
+- **project.mdc** — Updated FreeType dependency from pending to implemented (VER-2-13-3). Updated Phase 4 task #1 to DONE. Updated UI_CONTEXT class description. Updated RmlUi gotcha. Updated FreeType font engine rationale from "pending" to "implemented".
+
+## 2026-05-10 (Saturday) ~9:00 AM – 9:20 AM PDT
+
+- **CONTROLLER → CONTROL rename** — Renamed class `CONTROLLER` to `CONTROL`. Renamed directory `sneeze/worker/` → `sneeze/control/` and header `Worker.h` → `Control.h` via `git mv`. Updated all source files, include paths, and `CMakeLists.txt`.
+- **Controller.cpp → Control.cpp** — Renamed implementation file via `git mv`.
+- **WORKER → AGENT rename** — Renamed abstract base class `WORKER` to `AGENT` and all derived subclasses (`COMPOSITOR`, `SCRUBBER`, `C`–`H`). Updated member variables (`m_pController` → `m_pControl`, `m_nWorkerIndex` → `m_nAgentIndex`, etc.), methods (`WorkerCount()` → `AgentCount()`, `ShutdownWorkers()` → `ShutdownAgents()`), factory config (`WORKER_CONFIG` → `AGENT_CONFIG`), and `Sneeze.md` documentation.
+- **Worker?.cpp → Agent?.cpp** — Renamed implementation files (`Worker.cpp` → `Agent.cpp`, `WorkerC.cpp`–`WorkerH.cpp` → `AgentC.cpp`–`AgentH.cpp`) via `git mv`. Updated `CMakeLists.txt`.
+- **STORAGE::ASSET → STORAGE::SILO** — Renamed nested class and implementation file (`Asset.cpp` → `Silo.cpp` via `git mv`). Updated member variable (`m_aAssets` → `m_aSilo`), enumeration callback (`OnAsset()` → `OnSilo()`), `IVIEWPORT` callbacks, all source/header/test/doc references.
+- **All builds clean** — Release and Debug rebuilt after each rename step. All 87 tests passing.
+- **project.mdc** — Comprehensive update: directory tree, Module Structure table, Key Classes table (CONTROL, AGENT, AGENT::COMPOSITOR/SCRUBBER/C-H, STORAGE), test descriptions, Known Gotchas, Engine-Driven Pipeline, Metronome, Implementation Backlog, MBE Runtime remaining work, Unphased item 6 (marked DONE). Added "Module Renames (2026-05-10)" section documenting all three renames with rationale.
+
+## 2026-05-10 (Saturday) ~3:00 PM – 11:00 PM PDT
+
+- **CONTROL/AGENT system refactoring** — Comprehensive naming and structural cleanup:
+  - Replaced four parallel vectors (`m_apAgent`, `m_anAgentHertz`, `m_anAgentLastTick`, `m_anAgentSignalCount`) with `std::vector<AGENT_STATE> m_aAgent_State`.
+  - Renamed mutex/cv: `m_mutex` → `m_mxControl`, `m_condVar` → `m_cvControl`, `m_cleanupMutex` → `m_mxCleanup`.
+  - Renamed threads: `m_pThread` → `m_pthControl` (CONTROL), `m_pthAgent` (AGENT).
+  - Removed `m_pEngine` from AGENT, added `Engine()` accessor delegating to `m_pControl->Engine()`.
+  - Function renames: `RenderViewport` → `Viewport_Render`, `QueueCleanup` → `Cleanup_Queue`, `SwapCleanupQueue` → `Cleanup_SwapQueue`, `SetAgentIndex` → overloaded `AgentIndex`.
+  - Removed `HasCleanupWork` (redundant with `Cleanup_SwapQueue`), `Agent_Count` (replaced by `Initialize` out-parameter), `Agent_Shutdown` (inlined into `Main` for symmetry).
+  - Renamed `ThreadLoop` → `Main`, `AGENT_CONFIG` → `AGENT_INIT`, `aAgentConfig` → `aAgent_Init`.
+  - Added `AGENT_IX` enum (`kAGENT_COMPOSITOR`, `kAGENT_SCRUBBER`, `kAGENT_C`, `kAGENT_D`, `kAGENT_E`).
+  - `Initialize(int& nAgentCount)` now returns agent count via out-parameter; `Shutdown()` gates on `m_bInitOk`.
+  - Deleted agents F, G, H (files + header declarations + CMakeLists references).
+- **Coding standards discussion** — Extensive review of naming conventions, symmetry principles, and why variable names matter for human readability. Created `e:\dev\code-rules.mdc` as a focused pre-flight checklist for the most frequently violated rules.
+- **project.mdc** — Updated CONTROL, AGENT, COMPOSITOR, SCRUBBER, and placeholder agent class descriptions. Updated Hungarian notation (added `mx`, `cv`, `th`, `pth` prefixes). Added coding convention rules: no Get/Set prefixes, parameter names match member names, no convenience copies of owner data, use structs for parallel data, variable names describe purpose. Updated metronome Hz values, implementation backlog entries.
+

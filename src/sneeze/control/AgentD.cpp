@@ -13,15 +13,15 @@
 // limitations under the License.
 
 #include <Sneeze.h>
-#include "Worker.h"
+#include "Control.h"
 
 using namespace SNEEZE;
 
-WORKER::C::C (ENGINE* pEngine)
-   : WORKER (pEngine)
+AGENT::D::D (CONTROL* pControl)
+   : AGENT (pControl)
 {
 }
 
-void WORKER::C::Tick ()
+void AGENT::D::Tick ()
 {
 }

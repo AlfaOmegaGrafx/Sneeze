@@ -13,100 +13,105 @@
 // limitations under the License.
 
 #include <Sneeze.h>
-#include "Worker.h"
+#include "Control.h"
 #include <cstdio>
 
 using namespace SNEEZE;
 
-WORKER::WORKER (ENGINE* pEngine)
-   : m_pEngine (pEngine)
-   , m_pThread (nullptr)
+AGENT::AGENT (CONTROL* pControl)
+   : m_pControl (pControl)
+   , m_pthAgent (nullptr)
    , m_bShutdown (false)
    , m_bReady (false)
    , m_nWakeCount (0)
    , m_nLastReportSec (0)
-   , m_nWorkerIndex (-1)
+   , m_nAgentIndex (-1)
 {
 }
 
-void WORKER::SetWorkerIndex (int nIndex)
+void AGENT::AgentIndex (int nAgentIndex)
 {
-   m_nWorkerIndex = nIndex;
+   m_nAgentIndex = nAgentIndex;
 }
 
-WORKER::~WORKER ()
+AGENT::~AGENT ()
 {
    Shutdown ();
 }
 
-bool WORKER::Initialize ()
+bool AGENT::Initialize ()
 {
-   m_pThread = new std::thread (&WORKER::ThreadLoop, this);
+   m_pthAgent = new std::thread (&AGENT::ThreadLoop, this);
 
-   std::unique_lock<std::mutex> lock (m_mutex);
-   m_condVar.wait (lock, [this] { return m_bReady; });
+   std::unique_lock<std::mutex> lock (m_mxControl);
+   m_cvControl.wait (lock, [this] { return m_bReady; });
 
    return true;
 }
 
-void WORKER::SignalShutdown ()
+void AGENT::SignalShutdown ()
 {
-   if (m_pThread)
+   if (m_pthAgent)
    {
       {
-         std::lock_guard<std::mutex> guard (m_mutex);
+         std::lock_guard<std::mutex> guard (m_mxControl);
          m_bShutdown = true;
       }
-      m_condVar.notify_all ();
+      m_cvControl.notify_all ();
    }
 }
 
-void WORKER::Join ()
+void AGENT::Join ()
 {
-   if (m_pThread)
+   if (m_pthAgent)
    {
-      m_pThread->join ();
-      delete m_pThread;
-      m_pThread = nullptr;
+      m_pthAgent->join ();
+      delete m_pthAgent;
+      m_pthAgent = nullptr;
    }
 }
 
-void WORKER::Shutdown ()
+void AGENT::Shutdown ()
 {
    SignalShutdown ();
    Join ();
 }
 
-void WORKER::Signal ()
+void AGENT::Signal ()
 {
    CtlBreak_Thread ();
 }
 
-void WORKER::ThreadLoop ()
+void AGENT::ThreadLoop ()
 {
    m_tpOrigin = std::chrono::steady_clock::now ();
 
    SignalReady ();
 
-   std::unique_lock<std::mutex> mlock (m_mutex);
-   m_condVar.wait (mlock, std::bind (&WORKER::Control, this));
+   std::unique_lock<std::mutex> mlock (m_mxControl);
+   m_cvControl.wait (mlock, std::bind (&AGENT::Control, this));
 }
 
-void WORKER::SignalReady ()
+void AGENT::SignalReady ()
 {
    {
-      std::lock_guard<std::mutex> guard (m_mutex);
+      std::lock_guard<std::mutex> guard (m_mxControl);
       m_bReady = true;
    }
-   m_condVar.notify_all ();
+   m_cvControl.notify_all ();
 }
 
-bool WORKER::IsShutdown () const
+bool AGENT::IsShutdown () const
 {
    return m_bShutdown;
 }
 
-bool WORKER::Control ()
+ENGINE* AGENT::Engine () const
+{
+   return m_pControl->Engine ();
+}
+
+bool AGENT::Control ()
 {
    if (m_bShutdown == false)
    {
@@ -117,8 +122,8 @@ bool WORKER::Control ()
       // int64_t nCurrentSec = static_cast<int64_t> (dElapsed);
       // if (nCurrentSec > m_nLastReportSec)
       // {
-      //    std::fprintf (stdout, "WORKER[%d]: %d wakes/sec\n",
-      //       m_nWorkerIndex, m_nWakeCount);
+      //    std::fprintf (stdout, "AGENT[%d]: %d wakes/sec\n",
+      //       m_nAgentIndex, m_nWakeCount);
       //    m_nWakeCount    = 0;
       //    m_nLastReportSec = nCurrentSec;
       // }
@@ -129,8 +134,8 @@ bool WORKER::Control ()
    return m_bShutdown;
 }
 
-void WORKER::CtlBreak_Thread ()
+void AGENT::CtlBreak_Thread ()
 {
-   std::lock_guard<std::mutex> guard (m_mutex);
-   m_condVar.notify_all ();
+   std::lock_guard<std::mutex> guard (m_mxControl);
+   m_cvControl.notify_all ();
 }

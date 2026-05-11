@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef SNEEZE_CORE_WORKER_H
-#define SNEEZE_CORE_WORKER_H
+#ifndef SNEEZE_CORE_CONTROL_H
+#define SNEEZE_CORE_CONTROL_H
 
 #include <thread>
 #include <mutex>
@@ -21,10 +21,68 @@
 #include <functional>
 #include <chrono>
 #include <cstdint>
+#include <string>
+#include <vector>
 
 namespace SNEEZE
 {
-   class WORKER
+   class AGENT;
+
+   // ---------------------------------------------------------------------------
+   // CONTROL -- owns the engine thread, agent lifecycle, and metronome
+   // ---------------------------------------------------------------------------
+
+   class CONTROL
+   {
+   public:
+      explicit CONTROL (ENGINE* pEngine);
+      ~CONTROL ();
+
+      bool Initialize (int& nAgentCount);
+      void Shutdown ();
+
+      void Cleanup_Queue (const std::string& sPath);
+      void Cleanup_SwapQueue (std::vector<std::string>& aPath);
+
+      ENGINE* Engine () const;
+
+      CONTROL (const CONTROL&) = delete;
+      CONTROL& operator= (const CONTROL&) = delete;
+
+   private:
+      void Main ();
+
+      ENGINE*                    m_pEngine;
+
+      // Thread
+      std::thread*               m_pthControl;
+      std::mutex                 m_mxControl;
+      std::condition_variable    m_cvControl;
+      bool                       m_bShutdown;
+      bool                       m_bReady;
+      bool                       m_bInitOk;
+
+      // Agents
+      struct AGENT_STATE
+      {
+         AGENT*  pAgent;
+         int     nHertz;
+         int64_t nLastTick;
+         int     nSignalCount;
+      };
+      std::vector<AGENT_STATE>   m_aAgent_State;
+
+      // Cleanup queue
+      mutable std::mutex         m_mxCleanup;
+      std::vector<std::string>   m_aCleanupPath;
+      bool                       m_bCleanupPending;
+   };
+
+   // ---------------------------------------------------------------------------
+   // AGENT -- abstract base for engine agent threads
+   // ---------------------------------------------------------------------------
+
+   class AGENT
    {
    public:
       class COMPOSITOR;
@@ -32,12 +90,8 @@ namespace SNEEZE
       class C;
       class D;
       class E;
-      class F;
-      class G;
-      class H;
-
-      explicit WORKER (ENGINE* pEngine);
-      virtual ~WORKER ();
+      explicit AGENT (CONTROL* pControl);
+      virtual ~AGENT ();
 
       bool Initialize ();
       void Shutdown ();
@@ -45,25 +99,26 @@ namespace SNEEZE
       void Join ();
       void Signal ();
 
-      WORKER (const WORKER&) = delete;
-      WORKER& operator= (const WORKER&) = delete;
+      AGENT (const AGENT&) = delete;
+      AGENT& operator= (const AGENT&) = delete;
 
    protected:
       virtual void Tick () = 0;
       virtual void ThreadLoop ();
 
-      void SignalReady ();
-      bool IsShutdown () const;
+      void    SignalReady ();
+      bool    IsShutdown () const;
+      ENGINE* Engine () const;
 
-      ENGINE*                 m_pEngine;
-      std::mutex              m_mutex;
-      std::condition_variable m_condVar;
+      CONTROL*                m_pControl;
+      std::mutex              m_mxControl;
+      std::condition_variable m_cvControl;
 
    private:
       bool Control ();
       void CtlBreak_Thread ();
 
-      std::thread*            m_pThread;
+      std::thread*            m_pthAgent;
       bool                    m_bShutdown;
       bool                    m_bReady;
 
@@ -71,27 +126,27 @@ namespace SNEEZE
       std::chrono::steady_clock::time_point m_tpOrigin;
       int                     m_nWakeCount;
       int64_t                 m_nLastReportSec;
-      int                     m_nWorkerIndex;
+      int                     m_nAgentIndex;
 
    public:
-      void SetWorkerIndex (int nIndex);
+      void AgentIndex (int nAgentIndex);
    };
 
    // ---------------------------------------------------------------------------
    // COMPOSITOR -- drives the render loop (frame timing, camera, scene submit)
    // ---------------------------------------------------------------------------
 
-   class WORKER::COMPOSITOR : public WORKER
+   class AGENT::COMPOSITOR : public AGENT
    {
    public:
-      explicit COMPOSITOR (ENGINE* pEngine);
+      explicit COMPOSITOR (CONTROL* pControl);
 
    protected:
       void Tick () override;
       void ThreadLoop () override;
 
    private:
-      void RenderViewport (VIEWPORT* pViewport, std::chrono::steady_clock::time_point tpLoopStart);
+      void Viewport_Render (VIEWPORT* pViewport, std::chrono::steady_clock::time_point tpLoopStart);
 
       int64_t m_tmNow;
 
@@ -111,68 +166,43 @@ namespace SNEEZE
    // SCRUBBER -- disk cleanup (folder deletion, future cache pruning)
    // ---------------------------------------------------------------------------
 
-   class WORKER::SCRUBBER : public WORKER
+   class AGENT::SCRUBBER : public AGENT
    {
    public:
-      explicit SCRUBBER (ENGINE* pEngine);
+      explicit SCRUBBER (CONTROL* pControl);
    protected:
       void Tick () override;
       void ThreadLoop () override;
    private:
-      bool HasWork ();
       void DrainQueue ();
    };
 
    // ---------------------------------------------------------------------------
-   // Placeholder workers (C-H)
+   // Placeholder agents (C-E)
    // ---------------------------------------------------------------------------
 
-   class WORKER::C : public WORKER
+   class AGENT::C : public AGENT
    {
    public:
-      explicit C (ENGINE* pEngine);
+      explicit C (CONTROL* pControl);
    protected:
       void Tick () override;
    };
 
-   class WORKER::D : public WORKER
+   class AGENT::D : public AGENT
    {
    public:
-      explicit D (ENGINE* pEngine);
+      explicit D (CONTROL* pControl);
    protected:
       void Tick () override;
    };
 
-   class WORKER::E : public WORKER
+   class AGENT::E : public AGENT
    {
    public:
-      explicit E (ENGINE* pEngine);
-   protected:
-      void Tick () override;
-   };
-
-   class WORKER::F : public WORKER
-   {
-   public:
-      explicit F (ENGINE* pEngine);
-   protected:
-      void Tick () override;
-   };
-
-   class WORKER::G : public WORKER
-   {
-   public:
-      explicit G (ENGINE* pEngine);
-   protected:
-      void Tick () override;
-   };
-
-   class WORKER::H : public WORKER
-   {
-   public:
-      explicit H (ENGINE* pEngine);
+      explicit E (CONTROL* pControl);
    protected:
       void Tick () override;
    };
 }
-#endif // SNEEZE_CORE_WORKER_H
+#endif // SNEEZE_CORE_CONTROL_H

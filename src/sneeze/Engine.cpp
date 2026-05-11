@@ -16,12 +16,11 @@
 #include <filesystem>
 #include <chrono>
 #include <cstdio>
-#include <thread>
 #include <cstring>
-#include <functional>
+#include <random>
 
 #include "Types.h"
-#include "worker/Worker.h"
+#include "control/Control.h"
 #include "astro/RMCObject.h"
 #include "wasm/WasmRuntime.h"
 #include "spirv/SpvPipeline.h"
@@ -30,34 +29,7 @@
 #endif
 #include "ui/UiContext.h"
 
-#ifdef _WIN32
-#include <windows.h>
-#pragma comment (lib, "winmm.lib")
-#endif
-
 using namespace SNEEZE;
-
-// ---------------------------------------------------------------------------
-// Worker configuration table
-// ---------------------------------------------------------------------------
-
-struct WORKER_CONFIG
-{
-   int                                             nHertz;
-   std::function<WORKER* (SNEEZE::ENGINE*)>        Create;
-};
-
-static const std::vector<WORKER_CONFIG> aWorkerConfig =
-{
-   {   0, [] (SNEEZE::ENGINE* p) -> WORKER* { return new WORKER::COMPOSITOR (p); } },
-   {   1, [] (SNEEZE::ENGINE* p) -> WORKER* { return new WORKER::SCRUBBER   (p); } },
-   {  30, [] (SNEEZE::ENGINE* p) -> WORKER* { return new WORKER::C          (p); } },
-   {  60, [] (SNEEZE::ENGINE* p) -> WORKER* { return new WORKER::D          (p); } },
-   {  64, [] (SNEEZE::ENGINE* p) -> WORKER* { return new WORKER::E          (p); } },
-   {  90, [] (SNEEZE::ENGINE* p) -> WORKER* { return new WORKER::F          (p); } },
-   { 120, [] (SNEEZE::ENGINE* p) -> WORKER* { return new WORKER::G          (p); } },
-   { 144, [] (SNEEZE::ENGINE* p) -> WORKER* { return new WORKER::H          (p); } },
-};
 
 // ---------------------------------------------------------------------------
 // Engine modules (file-scope, initialized/shutdown by SNEEZE)
@@ -72,15 +44,15 @@ static SNEEZE::DEP::UI_CONTEXT    s_pUiContext;
 
 /***********************************************************************************************************************************
 **  Impl Class
-**
 ***********************************************************************************************************************************/
 
 class SNEEZE::ENGINE::Impl
 {
 public:
-   enum eINIT_STATE
+   enum eINIT
    {
       kINIT_NONE,
+      kINIT_PARAMS,
       kINIT_WASM,
       kINIT_SPV,
       kINIT_XR,
@@ -88,91 +60,216 @@ public:
       kINIT_NETWORK,
       kINIT_STORAGE,
       kINIT_SUBSYSTEMS,
-      kINIT_ENGINE_THREAD,
+      kINIT_CONTROL,
+      kINIT_SUCCESS,
    };
 
    Impl (IENGINE* pHost, ENGINE* pEngine) :
       m_pHost (pHost),
       m_pEngine (pEngine),
-      m_eInitState (kINIT_NONE),
-      m_pThread_Engine (nullptr),
-      m_bShutdown (false),
-      m_bReady (false),
-      m_bEngineInitOk (false),
-      m_bCleanupPending (false),
+      m_eInit (kINIT_NONE),
+      m_pControl (nullptr),
       m_pNetwork (nullptr),
       m_pStorage (nullptr),
       m_pPersona (nullptr)
    {
    }
 
+   // -----------------------------------------------------------------------
+   // Transitory path management
+   // -----------------------------------------------------------------------
+
+   static constexpr char kTRANSITORY_SESSION  = 's';
+   static constexpr char kTRANSITORY_VIEWPORT = 'v';
+
+   bool IsHexString (const std::string& s, size_t nStart, size_t nLen)
+   {
+      bool bResult = true;
+
+      if (s.size () < nStart + nLen)
+         bResult = false;
+      else
+      {
+         for (size_t i = nStart; i < nStart + nLen  &&  bResult; ++i)
+         {
+            char c = s[i];
+            if (!((c >= '0'  &&  c <= '9')  ||  (c >= 'a'  &&  c <= 'f')))
+               bResult = false;
+         }
+      }
+
+      return bResult;
+   }
+
+   bool IsValidTransitoryPath (const std::string& sPath)
+   {
+      bool bResult = false;
+
+      std::filesystem::path fsPath (sPath);
+      std::filesystem::path fsParent = fsPath.parent_path ();
+      std::string sGeneric = fsPath.generic_string ();
+      std::string sLeaf    = fsPath.filename ().generic_string ();
+
+      bool bParentIsTransitory = (fsParent.filename ().generic_string () == ENGINE::sFOLDER_TRANSITORY);
+      std::string sMarker      = std::string (ENGINE::sFOLDER_TRANSITORY) + "/";
+      size_t nPos              = sGeneric.find (sMarker);
+      bool bContainsTransitory = (nPos != std::string::npos);
+      bool bOneLevel           = bContainsTransitory  &&  sGeneric.substr (nPos + sMarker.size ()).find ('/') == std::string::npos;
+      bool bCorrectLength      = (sLeaf.size () == 9);
+      bool bValidPrefix        = bCorrectLength  &&  (sLeaf[0] == kTRANSITORY_SESSION  ||  sLeaf[0] == kTRANSITORY_VIEWPORT);
+      bool bValidHex           = bCorrectLength  &&  IsHexString (sLeaf, 1, 8);
+
+      if (bParentIsTransitory  &&  bOneLevel  &&  bValidPrefix  &&  bValidHex)
+         bResult = true;
+
+      return bResult;
+   }
+
+   std::string CreateTransitoryFolder (const std::string& sTransitoryRoot, char cPrefix)
+   {
+      std::string sResult;
+      std::error_code ec;
+      std::random_device rd;
+
+      uint32_t nRandom = rd ();
+
+      char aId[10];
+      snprintf (aId, sizeof (aId), "%c%08x", cPrefix, nRandom);
+
+      std::string sPath = (std::filesystem::path (sTransitoryRoot) / aId).generic_string ();
+
+      std::filesystem::create_directories (sPath, ec);
+
+      if (!ec)
+         sResult = sPath;
+      else
+         m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to create transitory folder " + sPath + ": " + ec.message ());
+
+      return sResult;
+   }
+
+   bool InitializePaths ()
+   {
+      bool bResult = false;
+      std::error_code ec;
+
+      std::string sRoot = (std::filesystem::path (m_pHost->sAppDataPath ()) / "Sneeze" / "Cache").generic_string ();
+
+      m_sPath_Persistent  = (std::filesystem::path (sRoot) / ENGINE::sFOLDER_PERSISTENT).generic_string ();
+      m_sPath_Transitory  = (std::filesystem::path (sRoot) / ENGINE::sFOLDER_TRANSITORY).generic_string ();
+
+      std::filesystem::create_directories (m_sPath_Persistent, ec);
+
+      if (!ec)
+      {
+         std::filesystem::create_directories (m_sPath_Transitory, ec);
+
+         if (!ec)
+         {
+            int nCount = 0;
+            for (auto& entry : std::filesystem::directory_iterator (m_sPath_Transitory, ec))
+            {
+               if (entry.is_directory ())
+               {
+                  std::string sEntry = entry.path ().generic_string ();
+                  if (IsValidTransitoryPath (sEntry))
+                  {
+                     m_pControl->Cleanup_Queue (sEntry);
+                     nCount++;
+                  }
+               }
+            }
+
+            if (nCount > 0)
+               m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SNEEZE", "Queued " + std::to_string (nCount) + " orphaned transitory folder(s) for cleanup");
+
+            m_sPath_Transitory_Session = CreateTransitoryFolder (m_sPath_Transitory, kTRANSITORY_SESSION);
+
+            if (!m_sPath_Transitory_Session.empty ())
+            {
+               bResult = true;
+
+               m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SNEEZE", "Paths initialized (persistent: " + m_sPath_Persistent + ", session: " + m_sPath_Transitory_Session + ")");
+            }
+            else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to create transitory session folder");
+         }
+         else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to create transitory folder: " + ec.message ());
+      }
+      else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to create persistent folder: " + ec.message ());
+
+      return bResult;
+   }
+
    ~Impl ()
    {
    }
 
+   // -----------------------------------------------------------------------
+   // Engine management
+   // -----------------------------------------------------------------------
+
    bool Initialize ()
    {
-      bool bResult = false;
+      m_eInit = kINIT_NONE;
 
       if (m_pHost  &&  !m_pHost->sAppDataPath ().empty ())
       {
+         m_eInit = kINIT_PARAMS;
+
          if (s_pWasmRuntime.Initialize (m_pEngine))
          {
-            m_eInitState = kINIT_WASM;
+            m_eInit = kINIT_WASM;
 
             if (s_pSpvPipeline.Initialize (m_pEngine))
             {
-               m_eInitState = kINIT_SPV;
-
+               m_eInit = kINIT_SPV;
 #ifdef SNEEZE_HAS_XR
                if (s_pXrRuntime.Initialize (m_pEngine))
                {
-                  m_eInitState = kINIT_XR;
+                  m_eInit = kINIT_XR;
 #endif
-
                   if (s_pUiContext.Initialize (m_pEngine))
                   {
-                     m_eInitState = kINIT_UI;
+                     m_eInit = kINIT_UI;
 
                      m_pNetwork = new NETWORK (m_pEngine);
-                     m_eInitState = kINIT_NETWORK;
 
                      if (m_pNetwork->Initialize ())
                      {
+                        m_eInit = kINIT_NETWORK;
+
                         m_pStorage = new STORAGE (m_pEngine);
-                        m_eInitState = kINIT_STORAGE;
 
                         if (m_pStorage->Initialize ())
                         {
-                           m_pPersona = new persona::PERSONA (m_pEngine);
+                           m_eInit = kINIT_STORAGE;
 
-                           m_eInitState = kINIT_SUBSYSTEMS;
+m_pPersona = new persona::PERSONA (m_pEngine);
 
-                           m_pThread_Engine = new std::thread (&ENGINE::Impl::EngineThreadLoop, this);
-                           {
-                              std::unique_lock<std::mutex> lock (m_mutex);
-                              m_condVar.wait (lock, [this] { return m_bReady; });
-                           }
+m_eInit = kINIT_SUBSYSTEMS;
 
-                           if (m_bEngineInitOk)
+                           m_pControl = new CONTROL (m_pEngine);
+
+                           int nAgentCount = 0;
+                           if (m_pControl->Initialize (nAgentCount))
                            {
-                              m_eInitState = kINIT_ENGINE_THREAD;
-                              bResult = true;
-                              m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SNEEZE", "Initialized (1 engine thread + " + std::to_string (m_apWorker.size ()) + " workers)");
+                              m_eInit = kINIT_CONTROL;
+
+                              if (InitializePaths ())
+                              {
+                                 m_eInit = kINIT_SUCCESS;
+
+                                 m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SNEEZE", "Initialized (1 engine thread + " + std::to_string (nAgentCount) + " agents)");
+                              }
+                              else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize paths");
                            }
-                           else
-                           {
-                              m_pThread_Engine->join ();
-                              delete m_pThread_Engine;
-                              m_pThread_Engine = nullptr;
-                           }
+                           else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize control");
                         }
                         else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize storage");
                      }
                      else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize network");
                   }
                   else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize UI context");
-
 #ifdef SNEEZE_HAS_XR
                }
                else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize XR runtime");
@@ -184,282 +281,179 @@ public:
       }
       else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Host configuration incomplete (sAppDataPath required)");
 
-      if (!bResult)
+      if (m_eInit != kINIT_SUCCESS)
          Shutdown ();
 
-      return bResult;
+      return (m_eInit == kINIT_SUCCESS);
    }
 
    void Shutdown ()
    {
-      if (m_eInitState >= kINIT_ENGINE_THREAD)
+      if (m_eInit >= kINIT_PARAMS)
       {
-         // --- Close any remaining viewports ---
-
-         while (true)
+         if (m_eInit >= kINIT_WASM)
          {
-            VIEWPORT* pViewport = nullptr;
+            if (m_eInit >= kINIT_SPV)
             {
-               std::lock_guard<std::mutex> guard (m_viewportMutex);
-               if (!m_apViewport.empty ())
-               {
-                  pViewport = m_apViewport.back ();
-                  m_apViewport.pop_back ();
-               }
-            }
-            if (!pViewport)
-               break;
-            pViewport->RequestRendererShutdown ();
-            pViewport->Shutdown ();
-            delete pViewport;
-         }
-
-         // --- Stop engine thread (shuts down workers internally) ---
-
-         {
-            std::lock_guard<std::mutex> guard (m_mutex);
-            m_bShutdown = true;
-         }
-         m_condVar.notify_all ();
-
-         m_pThread_Engine->join ();
-         delete m_pThread_Engine;
-         m_pThread_Engine = nullptr;
-
-         m_apWorker.clear ();
-         m_anWorkerHertz.clear ();
-         m_anWorkerLastTick.clear ();
-         m_anWorkerSignalCount.clear ();
-      }
-
-      if (m_eInitState >= kINIT_SUBSYSTEMS)
-      {
-         delete m_pPersona;
-         m_pPersona = nullptr;
-      }
-
-      if (m_eInitState >= kINIT_STORAGE)
-      {
-         m_pStorage->Shutdown ();
-         delete m_pStorage;
-         m_pStorage = nullptr;
-      }
-
-      if (m_eInitState >= kINIT_NETWORK)
-      {
-         m_pNetwork->Shutdown ();
-         delete m_pNetwork;
-         m_pNetwork = nullptr;
-      }
-
-      if (m_eInitState >= kINIT_UI)
-         s_pUiContext.Shutdown ();
-
 #ifdef SNEEZE_HAS_XR
-      if (m_eInitState >= kINIT_XR)
-         s_pXrRuntime.Shutdown ();
-#endif
-
-      if (m_eInitState >= kINIT_SPV)
-         s_pSpvPipeline.Shutdown ();
-
-      if (m_eInitState >= kINIT_WASM)
-         s_pWasmRuntime.Shutdown ();
-
-      if (m_eInitState > kINIT_NONE)
-         m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SNEEZE", "Shutdown complete");
-
-      m_eInitState = kINIT_NONE;
-   }
-
-   void ViewportAdd (VIEWPORT* pViewport)
-   {
-      std::lock_guard<std::mutex> guard (m_viewportMutex);
-      m_apViewport.push_back (pViewport);
-   }
-
-   void ViewportRemove (VIEWPORT* pViewport)
-   {
-      std::lock_guard<std::mutex> guard (m_viewportMutex);
-      m_apViewport.erase (std::find (m_apViewport.begin (), m_apViewport.end (), pViewport));
-   }
-
-   VIEWPORT* ViewportGet ()
-   {
-      return m_apViewport.empty () ? nullptr : m_apViewport[0];
-   }
-
-   void ShutdownWorkers ()
-   {
-      for (auto* pWorker : m_apWorker)
-         pWorker->SignalShutdown ();
-
-      for (auto* pWorker : m_apWorker)
-         pWorker->Join ();
-
-      for (auto* pWorker : m_apWorker)
-         delete pWorker;
-
-      m_apWorker.clear ();
-      m_anWorkerHertz.clear ();
-      m_anWorkerLastTick.clear ();
-      m_anWorkerSignalCount.clear ();
-   }
-
-   void EngineThreadLoop ()
-   {
-#ifdef _WIN32
-      timeBeginPeriod (1);
-#endif
-
-      // --- Create and initialize worker threads ---
-
-      bool bOk = true;
-      for (const auto& config : aWorkerConfig)
-      {
-         if (!bOk)
-            break;
-
-         WORKER* pWorker = config.Create (m_pEngine);
-         pWorker->SetWorkerIndex (static_cast<int> (m_apWorker.size ()));
-
-         if (pWorker->Initialize ())
-         {
-            m_apWorker.push_back (pWorker);
-            m_anWorkerHertz.push_back (config.nHertz);
-            m_anWorkerLastTick.push_back (0);
-            m_anWorkerSignalCount.push_back (0);
-         }
-         else
-         {
-            m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "ENGINE", "Worker failed to initialize");
-            delete pWorker;
-            bOk = false;
-         }
-      }
-
-      if (!bOk)
-         ShutdownWorkers ();
-
-      m_bEngineInitOk = bOk;
-
-      {
-         std::lock_guard<std::mutex> guard (m_mutex);
-         m_bReady = true;
-      }
-      m_condVar.notify_all ();
-
-      // --- Metronome loop ---
-
-      if (bOk)
-      {
-         auto tpOrigin = std::chrono::steady_clock::now ();
-         int64_t nLastReport = 0;
-         bool bRun = true;
-
-         while (bRun)
-         {
-            bool bSignalScrubber = false;
-
-            {
-               std::unique_lock<std::mutex> lock (m_mutex);
-               m_condVar.wait_for (lock, std::chrono::milliseconds (1));
-               bRun = !m_bShutdown;
-               if (m_bCleanupPending)
+               if (m_eInit >= kINIT_XR)
                {
-                  m_bCleanupPending = false;
-                  bSignalScrubber = true;
+#endif
+                  if (m_eInit >= kINIT_UI)
+                  {
+                     if (m_eInit >= kINIT_NETWORK)
+                     {
+                        if (m_eInit >= kINIT_STORAGE)
+                        {
+                           if (m_eInit >= kINIT_SUBSYSTEMS)
+                           {
+                              if (m_eInit >= kINIT_CONTROL)
+                              {
+                                 if (m_eInit >= kINIT_SUCCESS)
+                                 {
+                                    while (Viewport_Close (nullptr));
+
+                                    if (!m_sPath_Transitory_Session.empty ())
+                                       Cleanup_Queue (m_sPath_Transitory_Session);
+                                 }
+
+                                 m_pControl->Shutdown ();
+                              }
+
+                              delete m_pControl;
+                              m_pControl = nullptr;
+                           }
+
+                           delete m_pPersona;
+                           m_pPersona = nullptr;
+
+                           m_pStorage->Shutdown ();
+                        }
+
+                        delete m_pStorage;
+                        m_pStorage = nullptr;
+
+                        m_pNetwork->Shutdown ();
+                     }
+
+                     delete m_pNetwork;
+                     m_pNetwork = nullptr;
+
+                     s_pUiContext.Shutdown ();
+                  }
+#ifdef SNEEZE_HAS_XR
+                  s_pXrRuntime.Shutdown ();
                }
+#endif
+               s_pSpvPipeline.Shutdown ();
             }
 
-            if (bSignalScrubber)
-               m_apWorker[1]->Signal ();
+            s_pWasmRuntime.Shutdown ();
+         }
+      }
 
-            if (bRun)
-            {
-               auto tpNow = std::chrono::steady_clock::now ();
-               double dElapsed = std::chrono::duration<double> (tpNow - tpOrigin).count ();
+      m_eInit = kINIT_NONE;
 
-               for (int nIz = 0; nIz < static_cast<int> (m_apWorker.size ()); nIz++)
-               {
-                  int nHz = m_anWorkerHertz[nIz];
-                  if (nHz <= 0)
-                     continue;
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SNEEZE", "Shutdown complete");
+   }
 
-                  int64_t nCurrentTick = static_cast<int64_t> (dElapsed * nHz);
-                  if (nCurrentTick > m_anWorkerLastTick[nIz])
-                  {
-                     m_anWorkerLastTick[nIz] = nCurrentTick;
-                     m_anWorkerSignalCount[nIz]++;
-                     m_apWorker[nIz]->Signal ();
-                  }
-               }
+   // -----------------------------------------------------------------------
+   // Viewport management
+   // -----------------------------------------------------------------------
 
-               int64_t nCurrentSecond = static_cast<int64_t> (dElapsed);
-               if (nCurrentSecond > nLastReport)
-               {
-                  std::string sMetronome;
-                  for (int nIz = 0; nIz < static_cast<int> (m_apWorker.size ()); nIz++)
-                  {
-                     int nHz = m_anWorkerHertz[nIz];
-                     if (nHz <= 0)
-                        continue;
-                     sMetronome += "  [" + std::to_string (nIz) + "] " + std::to_string (m_anWorkerSignalCount[nIz]) + "/" + std::to_string (nHz) + " Hz";
-                     m_anWorkerSignalCount[nIz] = 0;
-                  }
-                  // Log (IENGINE::kLOGLEVEL_Trace, "METRONOME", sMetronome);
-                  nLastReport = nCurrentSecond;
-               }
-            }
+   VIEWPORT* Viewport_Open (IVIEWPORT* pHost, const std::string& sUrl, VIEWPORT::eSESSION kSession)
+   {
+      VIEWPORT* pViewport = nullptr;
+      std::string sPath_Transitory;
+
+      sPath_Transitory = CreateTransitoryFolder (m_sPath_Transitory, kTRANSITORY_VIEWPORT);
+
+      if (!sPath_Transitory.empty ())
+      {
+         pViewport = new VIEWPORT (m_pEngine, pHost);
+
+         {
+            std::lock_guard<std::mutex> guard (m_mutexViewport);
+            m_apViewport.push_back (pViewport);
          }
 
-         ShutdownWorkers ();
+         if (!pViewport->Initialize (sUrl, sPath_Transitory))
+         {
+            m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize viewport");
+
+            {
+               std::lock_guard<std::mutex> guard (m_mutexViewport);
+               m_apViewport.erase (std::find (m_apViewport.begin (), m_apViewport.end (), pViewport));
+            }
+
+            delete pViewport;
+            pViewport = nullptr;
+
+            Cleanup_Queue (sPath_Transitory);
+         }
       }
 
-#ifdef _WIN32
-      timeEndPeriod (1);
-#endif
+      return pViewport;
    }
 
-   void QueueCleanup (const std::string& sPath)
+   bool Viewport_Close (VIEWPORT* pViewport)
    {
-      {
-         std::lock_guard<std::mutex> guard (m_cleanupMutex);
-         m_aCleanupPath.push_back (sPath);
-      }
-      {
-         std::lock_guard<std::mutex> guard (m_mutex);
-         m_bCleanupPending = true;
-      }
-      m_condVar.notify_all ();
-   }
+      bool bResult = false;
+      std::string sPath_Transitory;
 
-   bool HasCleanupWork () const
-   {
-      std::lock_guard<std::mutex> guard (m_cleanupMutex);
-      bool bResult = !m_aCleanupPath.empty ();
+      {
+         std::lock_guard<std::mutex> guard (m_mutexViewport);
+
+         if (!pViewport  &&  !m_apViewport.empty ())
+            pViewport = m_apViewport.back ();
+      }
+
+      if (pViewport)
+      {
+         sPath_Transitory = pViewport->sPath_Transitory ();
+
+         pViewport->Shutdown ();
+
+         {
+            std::lock_guard<std::mutex> guard (m_mutexViewport);
+            m_apViewport.erase (std::find (m_apViewport.begin (), m_apViewport.end (), pViewport));
+         }
+
+         delete pViewport;
+         bResult = true;
+
+         Cleanup_Queue (sPath_Transitory);
+      }
+
       return bResult;
    }
 
-   void SwapCleanupQueue (std::vector<std::string>& aOut)
+   void Viewport_Capture ()
    {
-      std::lock_guard<std::mutex> guard (m_cleanupMutex);
-      aOut.swap (m_aCleanupPath);
-   }
-
-   void Capture ()
-   {
-      m_viewportMutex.lock ();
+      m_mutexViewport.lock ();
    }
 
    const std::vector<VIEWPORT*>& Viewport_GetList () const
-   { 
-      return m_apViewport; 
+   {
+      return m_apViewport;
    }
 
-   void Release ()
+   void Viewport_Release ()
    {
-      m_viewportMutex.unlock ();
+      m_mutexViewport.unlock ();
+   }
+
+   // -----------------------------------------------------------------------
+   // Cleanup queue (delegates to CONTROL)
+   // -----------------------------------------------------------------------
+
+   void Cleanup_Queue (const std::string& sPath)
+   {
+      if (IsValidTransitoryPath (sPath))
+      {
+         m_pControl->Cleanup_Queue (sPath);
+      }
+      else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "REJECTED cleanup path -- failed validation: " + sPath);
    }
 
 public:
@@ -469,31 +463,20 @@ public:
    STORAGE*                   m_pStorage;
    persona::PERSONA*          m_pPersona;
 
+   // Paths
+   std::string                m_sPath_Persistent;
+   std::string                m_sPath_Transitory;
+   std::string                m_sPath_Transitory_Session;
+
 private:
    ENGINE*                    m_pEngine;
-   eINIT_STATE                m_eInitState;
+   eINIT                      m_eInit;
 
-   // Engine thread
-   std::thread*               m_pThread_Engine;
-   std::mutex                 m_mutex;
-   std::condition_variable    m_condVar;
-   bool                       m_bShutdown;
-   bool                       m_bReady;
-   bool                       m_bEngineInitOk;
-
-   // Workers
-   std::vector<WORKER*>       m_apWorker;
-   std::vector<int>           m_anWorkerHertz;
-   std::vector<int64_t>       m_anWorkerLastTick;
-   std::vector<int>           m_anWorkerSignalCount;
-
-   // Cleanup queue
-   mutable std::mutex         m_cleanupMutex;
-   std::vector<std::string>   m_aCleanupPath;
-   bool                       m_bCleanupPending;
+   // Control (owns engine thread, agents, metronome, cleanup queue)
+   CONTROL*                   m_pControl;
 
    // Viewports
-   std::mutex                 m_viewportMutex;
+   std::mutex                 m_mutexViewport;
    std::vector<VIEWPORT*>     m_apViewport;
 };
 
@@ -510,6 +493,7 @@ ENGINE::ENGINE (IENGINE* pHost) :
 ENGINE::~ENGINE ()
 {
    Shutdown ();
+   delete m_pImpl;
 }
 
 bool ENGINE::Initialize ()
@@ -528,37 +512,22 @@ void ENGINE::Shutdown ()
 
 VIEWPORT* ENGINE::Viewport_Open (IVIEWPORT* pHost, const std::string& sUrl, VIEWPORT::eSESSION kSession)
 {
-   VIEWPORT* pViewport = new VIEWPORT (this, pHost);
-
-   if (!pViewport->Initialize (sUrl))
-   {
-      delete pViewport;
-      pViewport = nullptr;
-   }
-   else
-   {
-      m_pImpl->ViewportAdd (pViewport);
-   }
-
-   return pViewport;
+   return m_pImpl->Viewport_Open (pHost, sUrl, kSession);
 }
 
-void ENGINE::Viewport_Close (VIEWPORT* pViewport)
+bool ENGINE::Viewport_Close (VIEWPORT* pViewport)
 {
+   bool bResult = false;
+
    if (pViewport)
-   {
-      pViewport->RequestRendererShutdown ();
-      pViewport->Shutdown ();
+      bResult = m_pImpl->Viewport_Close (pViewport);
 
-      m_pImpl->ViewportRemove (pViewport);
-
-      delete pViewport;
-   }
+   return bResult;
 }
 
-void ENGINE::Viewport_Capture () 
-{ 
-   m_pImpl->Capture (); 
+void ENGINE::Viewport_Capture ()
+{
+   m_pImpl->Viewport_Capture ();
 }
 
 const std::vector<VIEWPORT*>& ENGINE::Viewport_GetList () const
@@ -568,21 +537,16 @@ const std::vector<VIEWPORT*>& ENGINE::Viewport_GetList () const
 
 void ENGINE::Viewport_Release ()
 {
-   m_pImpl->Release ();
+   m_pImpl->Viewport_Release ();
 }
 
 IENGINE*  ENGINE::Host () const              { return m_pImpl->m_pHost;      }
+const std::string& ENGINE::sPath_Persistent () const { return m_pImpl->m_sPath_Persistent; }
+const std::string& ENGINE::sPath_Session () const    { return m_pImpl->m_sPath_Transitory_Session;   }
+
 NETWORK*  ENGINE::Network () const           { return m_pImpl->m_pNetwork;   }
 STORAGE*  ENGINE::Storage () const           { return m_pImpl->m_pStorage;   }
 persona::PERSONA* ENGINE::Persona () const   { return m_pImpl->m_pPersona;   }
-
-// ---------------------------------------------------------------------------
-// Cleanup queue
-// ---------------------------------------------------------------------------
-
-void ENGINE::QueueCleanup (const std::string& sPath)          { m_pImpl->QueueCleanup (sPath); }
-bool ENGINE::HasCleanupWork () const                           { return m_pImpl->HasCleanupWork (); }
-void ENGINE::SwapCleanupQueue (std::vector<std::string>& aOut) { m_pImpl->SwapCleanupQueue (aOut); }
 
 // ---------------------------------------------------------------------------
 // Logging and notifications

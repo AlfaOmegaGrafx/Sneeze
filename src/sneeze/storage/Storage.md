@@ -7,7 +7,7 @@ The `storage` module (`SNEEZE::STORAGE`) provides persistent, per-persona, per-o
 ```
 STORAGE (singleton)
  ├── UNIT map: path -> unique_ptr<UNIT>   (one per JSON file on disk)
- ├── ASSET list: all active ASSETs       (one per container)
+ ├── SILO list: all active SILOs       (one per container)
  ├── Permanent path + Temporary path
  └── recursive_mutex
 
@@ -19,7 +19,7 @@ UNIT (one per JSON file on disk)
  ├── Load/Save/Evict lifecycle
  └── mutex
 
-ASSET (groups four UNITs for a specific container)
+SILO (groups four UNITs for a specific container)
  ├── shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME>
  ├── UNIT* m_apUnits[4] indexed by SCOPE
  ├── Ref count (attach/detach)
@@ -34,7 +34,7 @@ All types are nested inside `SNEEZE::STORAGE`:
 | Type    | Parent    | Purpose                                          |
 |---------|-----------|--------------------------------------------------|
 | `UNIT`  | `STORAGE` | Core data wrapper for one JSON file              |
-| `ASSET` | `STORAGE` | Groups four UNITs for a container                |
+| `SILO` | `STORAGE` | Groups four UNITs for a container                |
 | `SCOPE` | `STORAGE` | Enum selecting which of the four UNITs           |
 | `IENUM` | `STORAGE` | Enumeration callback interface                   |
 
@@ -109,28 +109,28 @@ pName->sContainerName = "poker";
 pName->sPersonaHash   = "def456...";
 pName->bValidated     = true;
 
-STORAGE::ASSET* pAsset = pSneeze->Storage ()->Open (pName);
+STORAGE::SILO* pSilo = pSneeze->Storage ()->Open (pName);
 
 // Path-based JSON access
-pAsset->Set (STORAGE::CONTAINER_PERMANENT, "player.name", "Dean");
-pAsset->Set (STORAGE::CONTAINER_PERMANENT, "player.chips", 5000);
-pAsset->Set (STORAGE::CONTAINER_PERMANENT, "game.poker.table[0].color", "green");
+pSilo->Set (STORAGE::CONTAINER_PERMANENT, "player.name", "Dean");
+pSilo->Set (STORAGE::CONTAINER_PERMANENT, "player.chips", 5000);
+pSilo->Set (STORAGE::CONTAINER_PERMANENT, "game.poker.table[0].color", "green");
 
-auto jName  = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "player.name");   // "Dean"
-auto jChips = pAsset->Get (STORAGE::CONTAINER_PERMANENT, "player.chips");  // 5000
-bool bHas   = pAsset->Has (STORAGE::CONTAINER_PERMANENT, "player.chips");  // true
+auto jName  = pSilo->Get (STORAGE::CONTAINER_PERMANENT, "player.name");   // "Dean"
+auto jChips = pSilo->Get (STORAGE::CONTAINER_PERMANENT, "player.chips");  // 5000
+bool bHas   = pSilo->Has (STORAGE::CONTAINER_PERMANENT, "player.chips");  // true
 
-pAsset->Remove (STORAGE::CONTAINER_PERMANENT, "player.chips");
+pSilo->Remove (STORAGE::CONTAINER_PERMANENT, "player.chips");
 
 // Organization storage (shared with other containers from same org)
-pAsset->Set (STORAGE::ORG_PERMANENT, "org.theme", "dark");
+pSilo->Set (STORAGE::ORG_PERMANENT, "org.theme", "dark");
 
 // Bulk JSON (for programs with their own JSON library)
-std::string sJson = pAsset->GetJson (STORAGE::CONTAINER_PERMANENT);
-pAsset->SetJson (STORAGE::CONTAINER_TEMPORARY, "{\"session\": {\"start\": 12345}}");
+std::string sJson = pSilo->GetJson (STORAGE::CONTAINER_PERMANENT);
+pSilo->SetJson (STORAGE::CONTAINER_TEMPORARY, "{\"session\": {\"start\": 12345}}");
 
 // Close when container is destroyed
-pSneeze->Storage ()->Close (pAsset);
+pSneeze->Storage ()->Close (pSilo);
 ```
 
 ## Data Model
@@ -162,25 +162,25 @@ Container instantiated:
    STORAGE::Open(pName)
    → find or create 4 UNITs (2 org shared, 2 container private)
    → Load() each from disk if not already cached
-   → create ASSET grouping the 4 UNITs
+   → create SILO grouping the 4 UNITs
    → fire OnStorageUnitCreated
-   → return ASSET*
+   → return SILO*
 
 WASM calls storage_set_string(CONTAINER_PERMANENT, "player.name", "Dean"):
-   → host function resolves ASSET from WASM store identity
-   → ASSET::Set(CONTAINER_PERMANENT, "player.name", "Dean")
+   → host function resolves SILO from WASM store identity
+   → SILO::Set(CONTAINER_PERMANENT, "player.name", "Dean")
    → navigates nlohmann::json via path, sets value, marks dirty
    → appends JSONL line to .log file
    → fires OnStorageUnitChanged notification
 
 Container destroyed:
-   STORAGE::Close(pAsset)
+   STORAGE::Close(pSilo)
    → save any dirty UNITs (full .json write + delete .log)
    → decrement ref counts on all 4 UNITs
    → evict UNITs with zero refs (org UNITs may still be held by other containers)
 ```
 
-Organization UNITs are shared — multiple ASSETs from the same publisher point
+Organization UNITs are shared — multiple SILOs from the same publisher point
 to the same org UNITs. Ref counting ensures org UNITs stay cached as long as
 any container from that org is active.
 
@@ -234,7 +234,7 @@ use bulk `GetJson`/`SetJson`.
 ### 2. Inspector — Omniscient, Browsable
 
 - `Enumerate(IENUM*)` walks .meta files from both session folders and calls
-  `OnAsset()` for each discovered storage unit
+  `OnSilo()` for each discovered storage unit
 - Follows request/release pattern (attach/detach) for data access — JSON data
   is only loaded into memory when the inspector drills in
 - Real-time notifications via `OnStorageUnitCreated/Changed/Deleted`
@@ -248,7 +248,7 @@ virtual void OnStorageUnitChanged (SNEEZE::NOTIFICATION* pNotification);
 virtual void OnStorageUnitDeleted (SNEEZE::NOTIFICATION* pNotification);
 ```
 
-The host casts `SNEEZE::NOTIFICATION*` to `SNEEZE::STORAGE::ASSET*`.
+The host casts `SNEEZE::NOTIFICATION*` to `SNEEZE::STORAGE::SILO*`.
 
 These fire from STORAGE through `SNEEZE` up to the host (Artemis).
 
@@ -265,7 +265,7 @@ Each storage unit has a companion `.meta` sidecar — same pattern as NETWORK:
 
 ## Thread Safety
 
-- `STORAGE` — one recursive_mutex protecting the unit map and asset list
+- `STORAGE` — one recursive_mutex protecting the unit map and silo list
 - `UNIT` — one mutex per unit protecting its JSON document and metadata
 
 ## Files
@@ -273,13 +273,13 @@ Each storage unit has a companion `.meta` sidecar — same pattern as NETWORK:
 - `Storage.h` — single header with all nested types
 - `Storage.cpp` — top-level STORAGE methods (Initialize, Shutdown, Open, Close, Enumerate)
 - `Unit.cpp` — STORAGE::UNIT implementation (JSON access, changelog, lifecycle, meta)
-- `Asset.cpp` — STORAGE::ASSET implementation (path-based API, attach/detach)
+- `Silo.cpp` — STORAGE::SILO implementation (path-based API, attach/detach)
 
 ## WASM Interface (Current State)
 
 The WASM host functions (`Storage_Get`, `Storage_Set`, `Storage_Remove`,
 `Storage_Has`) are currently stubs that return nullptr. They will be wired
-to resolve the calling WASM store's ASSET and dispatch to the path-based API.
+to resolve the calling WASM store's SILO and dispatch to the path-based API.
 
 ## Not Yet Implemented
 
@@ -288,8 +288,8 @@ The following features from the design plan are not yet implemented:
 ### Host-Decides Pattern
 
 `OnStorageUnitCreated` should return `bool` instead of `void`. If the host
-returns `true`, the ASSET is kept in the history list (inspector wants it).
-If `false`, the clear bit is set and the ASSET is cleaned up silently.
+returns `true`, the SILO is kept in the history list (inspector wants it).
+If `false`, the clear bit is set and the SILO is cleaned up silently.
 
 This same pattern needs to be retrofitted to NETWORK:
 `OnNetworkFileCreated(FILE*)` changes from `void` to `bool`.
@@ -326,8 +326,8 @@ directory from it. Stubbed — no functionality yet.
 
 The `Storage_Get/Set/Remove/Has` host functions need to:
 1. Resolve the calling WASM store's identity (persona, fingerprint, container)
-2. Look up or open the corresponding STORAGE::ASSET
-3. Dispatch to the ASSET's path-based API
+2. Look up or open the corresponding STORAGE::SILO
+3. Dispatch to the SILO's path-based API
 4. Marshal results back across the WASM boundary
 
 ### Fine-Grained WASM Host Functions

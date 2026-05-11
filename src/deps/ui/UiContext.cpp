@@ -16,7 +16,6 @@
 #include "ui/UiContext.h"
 
 #include <RmlUi/Core.h>
-#include <RmlUi/Core/FontEngineInterface.h>
 #include <RmlUi/Core/RenderInterface.h>
 #include <RmlUi/Core/SystemInterface.h>
 
@@ -93,34 +92,8 @@ namespace
       void SetScissorRegion (Rml::Rectanglei) override {}
    };
 
-   // Minimal font engine - all methods use the base class defaults (no-ops).
-   // Real font rendering comes when we integrate FreeType or a custom engine.
-   class STUB_FONT_ENGINE : public Rml::FontEngineInterface
-   {
-   public:
-      Rml::FontFaceHandle GetFontFaceHandle (const Rml::String&, Rml::Style::FontStyle, Rml::Style::FontWeight, int) override
-      {
-         return Rml::FontFaceHandle (1);
-      }
-
-      const Rml::FontMetrics& GetFontMetrics (Rml::FontFaceHandle) override
-      {
-         static Rml::FontMetrics pMetrics = {};
-         pMetrics.ascent      = 12.0f;
-         pMetrics.descent     = 3.0f;
-         pMetrics.line_spacing = 16.0f;
-         return pMetrics;
-      }
-
-      int GetStringWidth (Rml::FontFaceHandle, Rml::StringView sString, const Rml::TextShapingContext&, Rml::Character) override
-      {
-         return static_cast<int> (sString.size ()) * 8;
-      }
-   };
-
    static STUB_SYSTEM      pStubSystem;
    static STUB_RENDER      pStubRender;
-   static STUB_FONT_ENGINE pStubFontEngine;
 } // anonymous namespace
 
 UI_CONTEXT::UI_CONTEXT ()
@@ -141,7 +114,6 @@ bool UI_CONTEXT::Initialize (ENGINE* pEngine)
 
    Rml::SetSystemInterface (&pStubSystem);
    Rml::SetRenderInterface (&pStubRender);
-   Rml::SetFontEngineInterface (&pStubFontEngine);
 
    bool bOk = Rml::Initialise ();
    if (!bOk)

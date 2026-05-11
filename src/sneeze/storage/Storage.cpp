@@ -64,7 +64,7 @@ void STORAGE::Shutdown ()
 
    SaveAllDirty ();
 
-   m_aAssets.clear ();
+   m_aSilo.clear ();
    m_mapUnits.clear ();
 }
 
@@ -72,9 +72,9 @@ void STORAGE::Shutdown ()
 // Container lifecycle
 // ---------------------------------------------------------------------------
 
-STORAGE::ASSET* STORAGE::Open (std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, VIEWPORT* pViewport)
+STORAGE::SILO* STORAGE::Open (std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, VIEWPORT* pViewport)
 {
-   ASSET* pRaw = nullptr;
+   SILO* pRaw = nullptr;
 
    if (pName)
    {
@@ -91,18 +91,18 @@ STORAGE::ASSET* STORAGE::Open (std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName,
       aJsonPaths[CONTAINER_PERMANENT] = ComputeUnitPath (m_sPermanentPath, pName->sPersonaHash, sFp2 + "/" + sFp22, "container-" + pName->sContainerName + ".json");
       aJsonPaths[CONTAINER_TEMPORARY] = ComputeUnitPath (m_sTemporaryPath, pName->sPersonaHash, sFp2 + "/" + sFp22, "container-" + pName->sContainerName + ".json");
 
-      auto pAsset = std::make_unique<ASSET> (this, pName, pViewport);
+      auto pSilo = std::make_unique<SILO> (this, pName, pViewport);
 
       for (int i = 0; i < SCOPE_COUNT; i++)
       {
          UNIT* pUnit = FindOrCreateUnit (aJsonPaths[i]);
-         pAsset->SetUnit (static_cast<SCOPE> (i), pUnit);
+         pSilo->SetUnit (static_cast<SCOPE> (i), pUnit);
       }
 
-      pAsset->Attach ();
+      pSilo->Attach ();
 
-      pRaw = pAsset.get ();
-      m_aAssets.push_back (std::move (pAsset));
+      pRaw = pSilo.get ();
+      m_aSilo.push_back (std::move (pSilo));
 
       pRaw->Viewport ()->Host ()->OnStorageUnitCreated (pRaw);
    }
@@ -110,31 +110,31 @@ STORAGE::ASSET* STORAGE::Open (std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName,
    return pRaw;
 }
 
-void STORAGE::Close (ASSET* pAsset)
+void STORAGE::Close (SILO* pSilo)
 {
-   if (pAsset)
+   if (pSilo)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
       // Save dirty units and meta before detaching
       for (int i = 0; i < SCOPE_COUNT; i++)
       {
-         UNIT* pUnit = pAsset->GetUnit (static_cast<SCOPE> (i));
+         UNIT* pUnit = pSilo->GetUnit (static_cast<SCOPE> (i));
          if (pUnit)
          {
             if (pUnit->IsDirty ())
                pUnit->Save ();
-            pUnit->SaveMeta (pAsset->Name ());
+            pUnit->SaveMeta (pSilo->Name ());
          }
       }
 
-      pAsset->Detach ();
+      pSilo->Detach ();
 
-      auto it = std::find_if (m_aAssets.begin (), m_aAssets.end (),
-         [pAsset] (const std::unique_ptr<ASSET>& p) { return p.get () == pAsset; });
+      auto it = std::find_if (m_aSilo.begin (), m_aSilo.end (),
+         [pSilo] (const std::unique_ptr<SILO>& p) { return p.get () == pSilo; });
 
-      if (it != m_aAssets.end ())
-         m_aAssets.erase (it);
+      if (it != m_aSilo.end ())
+         m_aSilo.erase (it);
    }
 }
 
@@ -148,10 +148,10 @@ void STORAGE::Enumerate (IENUM* pEnum, VIEWPORT* pViewport)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-      for (auto& pAsset : m_aAssets)
+      for (auto& pSilo : m_aSilo)
       {
-         if (pAsset->Viewport () == pViewport)
-            pEnum->OnAsset (pAsset.get ());
+         if (pSilo->Viewport () == pViewport)
+            pEnum->OnSilo (pSilo.get ());
       }
    }
 }

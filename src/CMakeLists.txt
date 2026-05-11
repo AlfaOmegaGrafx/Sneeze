@@ -161,6 +161,7 @@ if (USE_LOCAL_DEPS)
       find_package (SneezeOpenXR REQUIRED)
    endif ()
    find_package (SneezeCurl REQUIRED)
+   find_package (SneezeFreeType REQUIRED)
    find_package (SneezeRmlUi REQUIRED)
    find_package (Glslang REQUIRED)
    find_package (NlohmannJson REQUIRED)
@@ -256,6 +257,7 @@ if (USE_LOCAL_DEPS)
    foreach (_v IN ITEMS
       SPIRV_TOOLS_INCLUDE  SPIRV_TOOLS_LIB  SPIRV_TOOLS_OPT_LIB
       CURL_INCLUDE         CURL_LIB
+      FREETYPE_INCLUDE     FREETYPE_LIB
       RMLUI_INCLUDE        RMLUI_CORE_LIB   RMLUI_DEBUGGER_LIB
       NLOHMANN_JSON_INCLUDE
       BORINGSSL_INCLUDE    BORINGSSL_CRYPTO_LIB
@@ -502,18 +504,16 @@ endif ()
 
 set (CORE_SOURCES
    sneeze/Engine.cpp
-   sneeze/worker/Worker.cpp
-   sneeze/worker/Compositor.cpp
-   sneeze/worker/WorkerB.cpp
-   sneeze/worker/WorkerC.cpp
-   sneeze/worker/WorkerD.cpp
-   sneeze/worker/WorkerE.cpp
-   sneeze/worker/WorkerF.cpp
-   sneeze/worker/WorkerG.cpp
-   sneeze/worker/WorkerH.cpp)
+   sneeze/control/Agent.cpp
+   sneeze/control/Control.cpp
+   sneeze/control/Compositor.cpp
+   sneeze/control/Scrubber.cpp
+   sneeze/control/AgentC.cpp
+   sneeze/control/AgentD.cpp
+   sneeze/control/AgentE.cpp)
 set (CORE_HEADERS
    sneeze/Types.h
-   sneeze/worker/Worker.h)
+   sneeze/control/Control.h)
 
 set (ASTRO_SOURCES
    astro/BodyData.cpp
@@ -556,7 +556,7 @@ set (NETWORK_HEADERS)
 
 set (CONTAINER_HEADERS)
 
-set (STORAGE_SOURCES  sneeze/storage/Storage.cpp sneeze/storage/Unit.cpp sneeze/storage/Asset.cpp)
+set (STORAGE_SOURCES  sneeze/storage/Storage.cpp sneeze/storage/Unit.cpp sneeze/storage/Silo.cpp)
 set (STORAGE_HEADERS)
 
 set (PERSONA_SOURCES  persona/Persona.cpp)
@@ -651,6 +651,7 @@ target_include_directories (Sneeze PUBLIC
    ${CMAKE_CURRENT_SOURCE_DIR}/deps
    ${SPIRV_TOOLS_INCLUDE}
    ${CURL_INCLUDE}
+   ${FREETYPE_INCLUDE}
    ${RMLUI_INCLUDE}
    ${NLOHMANN_JSON_INCLUDE}
    ${BORINGSSL_INCLUDE}
@@ -682,6 +683,7 @@ target_link_libraries (Sneeze PUBLIC
    ${CURL_LIB}
    ${RMLUI_CORE_LIB}
    ${RMLUI_DEBUGGER_LIB}
+   ${FREETYPE_LIB}
    ${BORINGSSL_SSL_LIB}
    ${BORINGSSL_CRYPTO_LIB}
    vox::vox

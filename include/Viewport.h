@@ -65,6 +65,13 @@ namespace SNEEZE
          kSESSION_TRANSITORY
       };
 
+      enum eINIT_STATE
+      {
+         kINIT_NONE,
+         kINIT_SCENE,
+         kINIT_RENDERER,
+      };
+
       // --- Camera orbit state ---
 
       struct VIEW
@@ -99,16 +106,18 @@ namespace SNEEZE
       explicit VIEWPORT (ENGINE* pEngine, IVIEWPORT* pHost);
       ~VIEWPORT ();
 
-      bool Initialize (const std::string& sUrl);
+      bool Initialize (const std::string& sUrl, const std::string& sPath_Transitory);
       bool InitializeRenderer ();
       void Shutdown ();
       void ShutdownRenderer ();
       void RequestRendererShutdown ();
       bool ServiceRendererShutdown ();
 
-      ENGINE*    Sneeze () const;
-      IVIEWPORT* Host () const;
-      SCENE*     Scene () const;
+      ENGINE*              Sneeze () const;
+      IVIEWPORT*           Host () const;
+      SCENE*               Scene () const;
+      const std::string&   sPath_Transitory () const;
+      bool                 IsReady () const;
 
       // --- Input (called by application) ---
 
@@ -140,6 +149,8 @@ namespace SNEEZE
    private:
       ENGINE*              m_pEngine;
       IVIEWPORT*           m_pHost;
+      eINIT_STATE          m_eInitState;
+      bool                 m_bReady;
       SCENE*               m_pScene;
       RENDERER*            m_pRenderer;
       bool                 m_bRendererPending;
@@ -167,6 +178,9 @@ namespace SNEEZE
       bool                 m_bResizePending;
       int                  m_nResizeWidth;
       int                  m_nResizeHeight;
+
+      // Paths
+      std::string          m_sPath_Transitory;
 
       // Camera
       VIEW                 m_View;
