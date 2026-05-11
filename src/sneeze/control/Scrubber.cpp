@@ -28,16 +28,10 @@ void AGENT::SCRUBBER::Tick ()
 {
 }
 
-bool AGENT::SCRUBBER::HasWork ()
-{
-   bool bResult = m_pControl->HasCleanupWork ();
-   return bResult;
-}
-
 void AGENT::SCRUBBER::DrainQueue ()
 {
    std::vector<std::string> aPath;
-   m_pControl->SwapCleanupQueue (aPath);
+   m_pControl->Cleanup_SwapQueue (aPath);
 
    std::string sMarker = std::string ("/") + ENGINE::sFOLDER_TRANSITORY + "/";
 
@@ -50,11 +44,11 @@ void AGENT::SCRUBBER::DrainQueue ()
 
          if (!ec)
          {
-            m_pEngine->Log (IENGINE::kLOGLEVEL_Trace, "SCRUBBER", "Removed " + sPath);
+            Engine ()->Log (IENGINE::kLOGLEVEL_Trace, "SCRUBBER", "Removed " + sPath);
          }
-         else m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "SCRUBBER", "Failed to remove " + sPath + ": " + ec.message ());
+         else Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "SCRUBBER", "Failed to remove " + sPath + ": " + ec.message ());
       }
-      else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SCRUBBER", "REJECTED -- path is not under " + std::string (ENGINE::sFOLDER_TRANSITORY) + "/: " + sPath);
+      else Engine ()->Log (IENGINE::kLOGLEVEL_Error, "SCRUBBER", "REJECTED -- path is not under " + std::string (ENGINE::sFOLDER_TRANSITORY) + "/: " + sPath);
    }
 }
 
@@ -62,11 +56,11 @@ void AGENT::SCRUBBER::ThreadLoop ()
 {
    SignalReady ();
 
-   while (HasWork ()  ||  !IsShutdown ())
+   while (!IsShutdown ())
    {
       DrainQueue ();
 
-      std::unique_lock<std::mutex> lock (m_mutex);
-      m_condVar.wait (lock, [this] { return m_pControl->HasCleanupWork ()  ||  IsShutdown (); });
+      std::unique_lock<std::mutex> lock (m_mxControl);
+      m_cvControl.wait (lock, [this] { return IsShutdown (); });
    }
 }

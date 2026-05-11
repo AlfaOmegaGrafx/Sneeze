@@ -510,10 +510,7 @@ set (CORE_SOURCES
    sneeze/control/Scrubber.cpp
    sneeze/control/AgentC.cpp
    sneeze/control/AgentD.cpp
-   sneeze/control/AgentE.cpp
-   sneeze/control/AgentF.cpp
-   sneeze/control/AgentG.cpp
-   sneeze/control/AgentH.cpp)
+   sneeze/control/AgentE.cpp)
 set (CORE_HEADERS
    sneeze/Types.h
    sneeze/control/Control.h)

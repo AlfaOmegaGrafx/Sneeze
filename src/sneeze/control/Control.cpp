@@ -27,22 +27,28 @@ using namespace SNEEZE;
 // Agent configuration table
 // ---------------------------------------------------------------------------
 
-struct AGENT_CONFIG
+struct AGENT_INIT
 {
    int                                                  nHertz;
-   std::function<AGENT* (SNEEZE::CONTROL*)>             Create;
+   std::function<AGENT* (SNEEZE::CONTROL*)>             fnCreate;
 };
 
-static const std::vector<AGENT_CONFIG> aAgentConfig =
+enum eAGENT
 {
-   {   0, [] (SNEEZE::CONTROL* p) -> AGENT* { return new AGENT::COMPOSITOR (p); } },
-   {   1, [] (SNEEZE::CONTROL* p) -> AGENT* { return new AGENT::SCRUBBER   (p); } },
-   {  30, [] (SNEEZE::CONTROL* p) -> AGENT* { return new AGENT::C          (p); } },
-   {  60, [] (SNEEZE::CONTROL* p) -> AGENT* { return new AGENT::D          (p); } },
-   {  64, [] (SNEEZE::CONTROL* p) -> AGENT* { return new AGENT::E          (p); } },
-   {  90, [] (SNEEZE::CONTROL* p) -> AGENT* { return new AGENT::F          (p); } },
-   { 120, [] (SNEEZE::CONTROL* p) -> AGENT* { return new AGENT::G          (p); } },
-   { 144, [] (SNEEZE::CONTROL* p) -> AGENT* { return new AGENT::H          (p); } },
+   kAGENT_COMPOSITOR = 0,
+   kAGENT_SCRUBBER   = 1,
+   kAGENT_C          = 2,
+   kAGENT_D          = 3,
+   kAGENT_E          = 4,
+};
+
+static const std::vector<AGENT_INIT> aAgent_Init =
+{
+   {   0, [] (SNEEZE::CONTROL* pControl) -> AGENT* { return new AGENT::COMPOSITOR (pControl); } },
+   {   1, [] (SNEEZE::CONTROL* pControl) -> AGENT* { return new AGENT::SCRUBBER   (pControl); } },
+   {  30, [] (SNEEZE::CONTROL* pControl) -> AGENT* { return new AGENT::C          (pControl); } },
+   {  60, [] (SNEEZE::CONTROL* pControl) -> AGENT* { return new AGENT::D          (pControl); } },
+   {  64, [] (SNEEZE::CONTROL* pControl) -> AGENT* { return new AGENT::E          (pControl); } },
 };
 
 /***********************************************************************************************************************************
@@ -52,7 +58,7 @@ static const std::vector<AGENT_CONFIG> aAgentConfig =
 
 CONTROL::CONTROL (ENGINE* pEngine) :
    m_pEngine (pEngine),
-   m_pThread (nullptr),
+   m_pthControl (nullptr),
    m_bShutdown (false),
    m_bReady (false),
    m_bInitOk (false),
@@ -65,26 +71,29 @@ CONTROL::~CONTROL ()
    Shutdown ();
 }
 
-bool CONTROL::Initialize ()
+bool CONTROL::Initialize (int& nAgentCount)
 {
    bool bResult = false;
 
-   m_pThread = new std::thread (&CONTROL::ThreadLoop, this);
+   m_pthControl = new std::thread (&CONTROL::Main, this);
 
    {
-      std::unique_lock<std::mutex> lock (m_mutex);
-      m_condVar.wait (lock, [this] { return m_bReady; });
+      std::unique_lock<std::mutex> lock (m_mxControl);
+
+      m_cvControl.wait (lock, [this] { return m_bReady; });
    }
 
    if (m_bInitOk)
    {
+      nAgentCount = static_cast<int> (m_aAgent_State.size ());
       bResult = true;
    }
    else
    {
-      m_pThread->join ();
-      delete m_pThread;
-      m_pThread = nullptr;
+      m_pthControl->join ();
+
+      delete m_pthControl;
+      m_pthControl = nullptr;
    }
 
    return bResult;
@@ -92,52 +101,18 @@ bool CONTROL::Initialize ()
 
 void CONTROL::Shutdown ()
 {
-   if (m_pThread)
+   if (m_bInitOk)
    {
-      {
-         std::lock_guard<std::mutex> guard (m_mutex);
-         m_bShutdown = true;
-      }
-      m_condVar.notify_all ();
+      m_bShutdown = true;
+      m_cvControl.notify_all ();
 
-      m_pThread->join ();
+      m_pthControl->join ();
 
-      delete m_pThread;
-      m_pThread = nullptr;
+      delete m_pthControl;
+      m_pthControl = nullptr;
+
+      m_bInitOk = false;
    }
-}
-
-// ---------------------------------------------------------------------------
-// Cleanup queue
-// ---------------------------------------------------------------------------
-
-void CONTROL::QueueCleanup (const std::string& sPath)
-{
-   {
-      std::lock_guard<std::mutex> guard (m_cleanupMutex);
-      m_aCleanupPath.push_back (sPath);
-   }
-   m_bCleanupPending = true;
-   m_condVar.notify_all ();
-}
-
-bool CONTROL::HasCleanupWork () const
-{
-   std::lock_guard<std::mutex> guard (m_cleanupMutex);
-   bool bResult = !m_aCleanupPath.empty ();
-   return bResult;
-}
-
-void CONTROL::SwapCleanupQueue (std::vector<std::string>& aOut)
-{
-   std::lock_guard<std::mutex> guard (m_cleanupMutex);
-   aOut.swap (m_aCleanupPath);
-}
-
-int CONTROL::AgentCount () const
-{
-   int nResult = static_cast<int> (m_apAgent.size ());
-   return nResult;
 }
 
 ENGINE* CONTROL::Engine () const
@@ -146,31 +121,38 @@ ENGINE* CONTROL::Engine () const
 }
 
 // ---------------------------------------------------------------------------
-// Agent lifecycle
+// Cleanup queue
 // ---------------------------------------------------------------------------
 
-void CONTROL::ShutdownAgents ()
+void CONTROL::Cleanup_Queue (const std::string& sPath)
 {
-   for (auto* pAgent : m_apAgent)
-      pAgent->SignalShutdown ();
+   {
+      std::lock_guard<std::mutex> guard (m_mxCleanup);
 
-   for (auto* pAgent : m_apAgent)
-      pAgent->Join ();
+      m_aCleanupPath.push_back (sPath);
+   }
 
-   for (auto* pAgent : m_apAgent)
-      delete pAgent;
+   {
+      std::lock_guard<std::mutex> guard (m_mxControl);
 
-   m_apAgent.clear ();
-   m_anAgentHertz.clear ();
-   m_anAgentLastTick.clear ();
-   m_anAgentSignalCount.clear ();
+      m_bCleanupPending = true;
+   }
+
+   m_cvControl.notify_all ();
+}
+
+void CONTROL::Cleanup_SwapQueue (std::vector<std::string>& aPath)
+{
+   std::lock_guard<std::mutex> guard (m_mxCleanup);
+   
+   aPath.swap (m_aCleanupPath);
 }
 
 // ---------------------------------------------------------------------------
 // Thread loop (metronome + agent scheduling)
 // ---------------------------------------------------------------------------
 
-void CONTROL::ThreadLoop ()
+void CONTROL::Main ()
 {
 #ifdef _WIN32
    timeBeginPeriod (1);
@@ -179,87 +161,72 @@ void CONTROL::ThreadLoop ()
    // --- Create and initialize agent threads (add before init) ---
 
    bool bOk = true;
-   for (const auto& config : aAgentConfig)
+   for (const auto& Agent_Init  : aAgent_Init)
    {
       if (!bOk)
          break;
 
-      AGENT* pAgent = config.Create (this);
-      pAgent->SetAgentIndex (static_cast<int> (m_apAgent.size ()));
+      AGENT* pAgent = Agent_Init.fnCreate (this);
+      pAgent->AgentIndex (static_cast<int> (m_aAgent_State.size ()));
 
-      m_apAgent.push_back (pAgent);
-      m_anAgentHertz.push_back (config.nHertz);
-      m_anAgentLastTick.push_back (0);
-      m_anAgentSignalCount.push_back (0);
+      AGENT_STATE Agent_State = { pAgent, Agent_Init.nHertz, 0, 0 };
+      m_aAgent_State.push_back (Agent_State);
 
       if (!pAgent->Initialize ())
       {
-         m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "CONTROL", "Agent failed to initialize");
-
-         m_apAgent.pop_back ();
-         m_anAgentHertz.pop_back ();
-         m_anAgentLastTick.pop_back ();
-         m_anAgentSignalCount.pop_back ();
-
+         m_aAgent_State.pop_back ();
          delete pAgent;
+
          bOk = false;
+
+         m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "CONTROL", "Agent failed to initialize");
       }
    }
 
-   if (!bOk)
-      ShutdownAgents ();
-
    m_bInitOk = bOk;
 
-   {
-      std::lock_guard<std::mutex> guard (m_mutex);
-      m_bReady = true;
-   }
-   m_condVar.notify_all ();
+   m_bReady = true;             // what's the difference between this and m_bInitOk?
+   m_cvControl.notify_all ();
 
    // --- Metronome loop ---
 
-   if (bOk)
+   if (m_bInitOk)
    {
       auto tpOrigin = std::chrono::steady_clock::now ();
       int64_t nLastReport = 0;
-      bool bRun = true;
 
-      while (bRun)
+      while (!m_bShutdown)
       {
-         bool bSignalScrubber = false;
+         bool bSignalScrubber;
 
          {
-            std::unique_lock<std::mutex> lock (m_mutex);
-            m_condVar.wait_for (lock, std::chrono::milliseconds (1));
-            bRun = !m_bShutdown;
-            if (m_bCleanupPending)
-            {
-               m_bCleanupPending = false;
-               bSignalScrubber = true;
-            }
+            std::unique_lock<std::mutex> lock (m_mxControl);
+            m_cvControl.wait_for (lock, std::chrono::milliseconds (1));
+
+            bSignalScrubber = m_bCleanupPending;
+            m_bCleanupPending = false;
          }
 
          if (bSignalScrubber)
-            m_apAgent[1]->Signal ();
+            m_aAgent_State[kAGENT_SCRUBBER].pAgent->Signal ();
 
-         if (bRun)
+         if (!m_bShutdown)
          {
             auto tpNow = std::chrono::steady_clock::now ();
             double dElapsed = std::chrono::duration<double> (tpNow - tpOrigin).count ();
 
-            for (int nIz = 0; nIz < static_cast<int> (m_apAgent.size ()); nIz++)
+            for (int nAgent = 0; nAgent < static_cast<int> (m_aAgent_State.size ()); nAgent++)
             {
-               int nHz = m_anAgentHertz[nIz];
-               if (nHz <= 0)
+               AGENT_STATE& Agent_State = m_aAgent_State[nAgent];
+               if (Agent_State.nHertz <= 0)
                   continue;
 
-               int64_t nCurrentTick = static_cast<int64_t> (dElapsed * nHz);
-               if (nCurrentTick > m_anAgentLastTick[nIz])
+               int64_t nCurrentTick = static_cast<int64_t> (dElapsed * Agent_State.nHertz);
+               if (nCurrentTick > Agent_State.nLastTick)
                {
-                  m_anAgentLastTick[nIz] = nCurrentTick;
-                  m_anAgentSignalCount[nIz]++;
-                  m_apAgent[nIz]->Signal ();
+                  Agent_State.nLastTick = nCurrentTick;
+                  Agent_State.nSignalCount++;
+                  Agent_State.pAgent->Signal ();
                }
             }
 
@@ -267,22 +234,33 @@ void CONTROL::ThreadLoop ()
             if (nCurrentSecond > nLastReport)
             {
                std::string sMetronome;
-               for (int nIz = 0; nIz < static_cast<int> (m_apAgent.size ()); nIz++)
+               for (int nAgent = 0; nAgent < static_cast<int> (m_aAgent_State.size ()); nAgent++)
                {
-                  int nHz = m_anAgentHertz[nIz];
-                  if (nHz <= 0)
+                  AGENT_STATE& Agent_State = m_aAgent_State[nAgent];
+                  if (Agent_State.nHertz <= 0)
                      continue;
-                  sMetronome += "  [" + std::to_string (nIz) + "] " + std::to_string (m_anAgentSignalCount[nIz]) + "/" + std::to_string (nHz) + " Hz";
-                  m_anAgentSignalCount[nIz] = 0;
+                  sMetronome += "  [" + std::to_string (nAgent) + "] " + std::to_string (Agent_State.nSignalCount) + "/" + std::to_string (Agent_State.nHertz) + " Hz";
+                  Agent_State.nSignalCount = 0;
                }
-               // m_pEngine->Log (IENGINE::kLOGLEVEL_Trace, "METRONOME", sMetronome);
+
                nLastReport = nCurrentSecond;
+
+            // m_pEngine->Log (IENGINE::kLOGLEVEL_Trace, "METRONOME", sMetronome);
             }
          }
       }
-
-      ShutdownAgents ();
    }
+
+   for (auto& Agent_State : m_aAgent_State)
+      Agent_State.pAgent->SignalShutdown ();
+
+   for (auto& Agent_State : m_aAgent_State)
+      Agent_State.pAgent->Join ();
+
+   for (auto& Agent_State : m_aAgent_State)
+      delete Agent_State.pAgent;
+
+   m_aAgent_State.clear ();
 
 #ifdef _WIN32
    timeEndPeriod (1);

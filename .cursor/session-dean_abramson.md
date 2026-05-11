@@ -610,3 +610,19 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 - **All builds clean** — Release and Debug rebuilt after each rename step. All 87 tests passing.
 - **project.mdc** — Comprehensive update: directory tree, Module Structure table, Key Classes table (CONTROL, AGENT, AGENT::COMPOSITOR/SCRUBBER/C-H, STORAGE), test descriptions, Known Gotchas, Engine-Driven Pipeline, Metronome, Implementation Backlog, MBE Runtime remaining work, Unphased item 6 (marked DONE). Added "Module Renames (2026-05-10)" section documenting all three renames with rationale.
 
+## 2026-05-10 (Saturday) ~3:00 PM – 11:00 PM PDT
+
+- **CONTROL/AGENT system refactoring** — Comprehensive naming and structural cleanup:
+  - Replaced four parallel vectors (`m_apAgent`, `m_anAgentHertz`, `m_anAgentLastTick`, `m_anAgentSignalCount`) with `std::vector<AGENT_STATE> m_aAgent_State`.
+  - Renamed mutex/cv: `m_mutex` → `m_mxControl`, `m_condVar` → `m_cvControl`, `m_cleanupMutex` → `m_mxCleanup`.
+  - Renamed threads: `m_pThread` → `m_pthControl` (CONTROL), `m_pthAgent` (AGENT).
+  - Removed `m_pEngine` from AGENT, added `Engine()` accessor delegating to `m_pControl->Engine()`.
+  - Function renames: `RenderViewport` → `Viewport_Render`, `QueueCleanup` → `Cleanup_Queue`, `SwapCleanupQueue` → `Cleanup_SwapQueue`, `SetAgentIndex` → overloaded `AgentIndex`.
+  - Removed `HasCleanupWork` (redundant with `Cleanup_SwapQueue`), `Agent_Count` (replaced by `Initialize` out-parameter), `Agent_Shutdown` (inlined into `Main` for symmetry).
+  - Renamed `ThreadLoop` → `Main`, `AGENT_CONFIG` → `AGENT_INIT`, `aAgentConfig` → `aAgent_Init`.
+  - Added `AGENT_IX` enum (`kAGENT_COMPOSITOR`, `kAGENT_SCRUBBER`, `kAGENT_C`, `kAGENT_D`, `kAGENT_E`).
+  - `Initialize(int& nAgentCount)` now returns agent count via out-parameter; `Shutdown()` gates on `m_bInitOk`.
+  - Deleted agents F, G, H (files + header declarations + CMakeLists references).
+- **Coding standards discussion** — Extensive review of naming conventions, symmetry principles, and why variable names matter for human readability. Created `e:\dev\code-rules.mdc` as a focused pre-flight checklist for the most frequently violated rules.
+- **project.mdc** — Updated CONTROL, AGENT, COMPOSITOR, SCRUBBER, and placeholder agent class descriptions. Updated Hungarian notation (added `mx`, `cv`, `th`, `pth` prefixes). Added coding convention rules: no Get/Set prefixes, parameter names match member names, no convenience copies of owner data, use structs for parallel data, variable names describe purpose. Updated metronome Hz values, implementation backlog entries.
+

@@ -174,7 +174,7 @@ public:
                   std::string sEntry = entry.path ().generic_string ();
                   if (IsValidTransitoryPath (sEntry))
                   {
-                     m_pControl->QueueCleanup (sEntry);
+                     m_pControl->Cleanup_Queue (sEntry);
                      nCount++;
                   }
                }
@@ -250,7 +250,8 @@ m_eInit = kINIT_SUBSYSTEMS;
 
                            m_pControl = new CONTROL (m_pEngine);
 
-                           if (m_pControl->Initialize ())
+                           int nAgentCount = 0;
+                           if (m_pControl->Initialize (nAgentCount))
                            {
                               m_eInit = kINIT_CONTROL;
 
@@ -258,7 +259,7 @@ m_eInit = kINIT_SUBSYSTEMS;
                               {
                                  m_eInit = kINIT_SUCCESS;
 
-                                 m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SNEEZE", "Initialized (1 engine thread + " + std::to_string (m_pControl->AgentCount ()) + " agents)");
+                                 m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SNEEZE", "Initialized (1 engine thread + " + std::to_string (nAgentCount) + " agents)");
                               }
                               else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize paths");
                            }
@@ -313,7 +314,7 @@ m_eInit = kINIT_SUBSYSTEMS;
                                     while (Viewport_Close (nullptr));
 
                                     if (!m_sPath_Transitory_Session.empty ())
-                                       QueueCleanup (m_sPath_Transitory_Session);
+                                       Cleanup_Queue (m_sPath_Transitory_Session);
                                  }
 
                                  m_pControl->Shutdown ();
@@ -388,7 +389,7 @@ m_eInit = kINIT_SUBSYSTEMS;
             delete pViewport;
             pViewport = nullptr;
 
-            QueueCleanup (sPath_Transitory);
+            Cleanup_Queue (sPath_Transitory);
          }
       }
 
@@ -421,7 +422,7 @@ m_eInit = kINIT_SUBSYSTEMS;
          delete pViewport;
          bResult = true;
 
-         QueueCleanup (sPath_Transitory);
+         Cleanup_Queue (sPath_Transitory);
       }
 
       return bResult;
@@ -446,11 +447,11 @@ m_eInit = kINIT_SUBSYSTEMS;
    // Cleanup queue (delegates to CONTROL)
    // -----------------------------------------------------------------------
 
-   void QueueCleanup (const std::string& sPath)
+   void Cleanup_Queue (const std::string& sPath)
    {
       if (IsValidTransitoryPath (sPath))
       {
-         m_pControl->QueueCleanup (sPath);
+         m_pControl->Cleanup_Queue (sPath);
       }
       else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "REJECTED cleanup path -- failed validation: " + sPath);
    }

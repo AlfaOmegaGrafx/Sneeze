@@ -26,7 +26,7 @@
 // Mitigation:
 //   Both creation and destruction are forced onto the compositor thread.
 //   - Creation: VIEWPORT::InitializeRenderer() is called from
-//     RenderViewport() on the compositor thread (deferred via
+//     Viewport_Render() on the compositor thread (deferred via
 //     m_bRendererPending flag set by the main thread).
 //   - Destruction: After the render loop exits, ShutdownRenderer() is
 //     called for every viewport while still on the compositor thread,
@@ -132,7 +132,7 @@ void AGENT::COMPOSITOR::ThreadLoop ()
          double dAvgFrame   = (m_nFrameCount > 0) ? m_dFpsAccum     / m_nFrameCount * 1000.0 : 0.0;
          char szFps[256];
          std::snprintf (szFps, sizeof (szFps), "%d  (frame %.1f ms | input %.1f ms | scene %.1f ms | submit %.1f ms | render %.1f ms | publish %.1f ms | flush %.1f ms)", m_nFrameCount, dAvgFrame, dAvgInput, dAvgScene, dAvgSubmit, dAvgRender, dAvgPublish, dAvgFlush);
-         m_pEngine->Log (IENGINE::kLOGLEVEL_Trace, "FPS", std::string (szFps));
+         Engine ()->Log (IENGINE::kLOGLEVEL_Trace, "FPS", std::string (szFps));
          m_nFrameCount    = 0;
          m_dFpsAccum     -= 1.0;
          m_dAccumInput    = 0.0;
@@ -145,9 +145,9 @@ void AGENT::COMPOSITOR::ThreadLoop ()
 
       bool bNeedFlush = false;
 
-      m_pEngine->Viewport_Capture ();
+      Engine ()->Viewport_Capture ();
       {
-         for (VIEWPORT* pViewport : m_pEngine->Viewport_GetList ())
+         for (VIEWPORT* pViewport : Engine ()->Viewport_GetList ())
          {
             if (!pViewport->IsReady ())
                continue;
@@ -159,14 +159,14 @@ void AGENT::COMPOSITOR::ThreadLoop ()
             VIEWPORT::VIEW& View = pViewport->View ();
             View.Update (Input.nMouseDX, Input.nMouseDY, Input.dScrollY, Input.bMouseLeft, Input.bMouseRight);
 
-            RenderViewport (pViewport, tpLoopStart);
+            Viewport_Render (pViewport, tpLoopStart);
 
             VIEWPORT::RENDERER* pRenderer = pViewport->Renderer ();
             if (pRenderer  &&  !pRenderer->IsRenderingToNativeSurface ())
                bNeedFlush = true;
          }
 
-         m_pEngine->Viewport_Release ();
+         Engine ()->Viewport_Release ();
       }
 
       // --- Pace to display refresh (outside lock) ---
@@ -188,7 +188,7 @@ void AGENT::COMPOSITOR::ThreadLoop ()
 
 }
 
-void AGENT::COMPOSITOR::RenderViewport (VIEWPORT* pViewport, std::chrono::steady_clock::time_point tpLoopStart)
+void AGENT::COMPOSITOR::Viewport_Render (VIEWPORT* pViewport, std::chrono::steady_clock::time_point tpLoopStart)
 {
    // Deferred renderer init -- must happen on the compositor thread because
    // Filament auto-adopts the thread that creates its Engine.

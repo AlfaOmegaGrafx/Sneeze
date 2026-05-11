@@ -20,8 +20,7 @@ using namespace SNEEZE;
 
 AGENT::AGENT (CONTROL* pControl)
    : m_pControl (pControl)
-   , m_pEngine (pControl->Engine ())
-   , m_pThread (nullptr)
+   , m_pthAgent (nullptr)
    , m_bShutdown (false)
    , m_bReady (false)
    , m_nWakeCount (0)
@@ -30,9 +29,9 @@ AGENT::AGENT (CONTROL* pControl)
 {
 }
 
-void AGENT::SetAgentIndex (int nIndex)
+void AGENT::AgentIndex (int nAgentIndex)
 {
-   m_nAgentIndex = nIndex;
+   m_nAgentIndex = nAgentIndex;
 }
 
 AGENT::~AGENT ()
@@ -42,33 +41,33 @@ AGENT::~AGENT ()
 
 bool AGENT::Initialize ()
 {
-   m_pThread = new std::thread (&AGENT::ThreadLoop, this);
+   m_pthAgent = new std::thread (&AGENT::ThreadLoop, this);
 
-   std::unique_lock<std::mutex> lock (m_mutex);
-   m_condVar.wait (lock, [this] { return m_bReady; });
+   std::unique_lock<std::mutex> lock (m_mxControl);
+   m_cvControl.wait (lock, [this] { return m_bReady; });
 
    return true;
 }
 
 void AGENT::SignalShutdown ()
 {
-   if (m_pThread)
+   if (m_pthAgent)
    {
       {
-         std::lock_guard<std::mutex> guard (m_mutex);
+         std::lock_guard<std::mutex> guard (m_mxControl);
          m_bShutdown = true;
       }
-      m_condVar.notify_all ();
+      m_cvControl.notify_all ();
    }
 }
 
 void AGENT::Join ()
 {
-   if (m_pThread)
+   if (m_pthAgent)
    {
-      m_pThread->join ();
-      delete m_pThread;
-      m_pThread = nullptr;
+      m_pthAgent->join ();
+      delete m_pthAgent;
+      m_pthAgent = nullptr;
    }
 }
 
@@ -89,22 +88,27 @@ void AGENT::ThreadLoop ()
 
    SignalReady ();
 
-   std::unique_lock<std::mutex> mlock (m_mutex);
-   m_condVar.wait (mlock, std::bind (&AGENT::Control, this));
+   std::unique_lock<std::mutex> mlock (m_mxControl);
+   m_cvControl.wait (mlock, std::bind (&AGENT::Control, this));
 }
 
 void AGENT::SignalReady ()
 {
    {
-      std::lock_guard<std::mutex> guard (m_mutex);
+      std::lock_guard<std::mutex> guard (m_mxControl);
       m_bReady = true;
    }
-   m_condVar.notify_all ();
+   m_cvControl.notify_all ();
 }
 
 bool AGENT::IsShutdown () const
 {
    return m_bShutdown;
+}
+
+ENGINE* AGENT::Engine () const
+{
+   return m_pControl->Engine ();
 }
 
 bool AGENT::Control ()
@@ -132,6 +136,6 @@ bool AGENT::Control ()
 
 void AGENT::CtlBreak_Thread ()
 {
-   std::lock_guard<std::mutex> guard (m_mutex);
-   m_condVar.notify_all ();
+   std::lock_guard<std::mutex> guard (m_mxControl);
+   m_cvControl.notify_all ();
 }
