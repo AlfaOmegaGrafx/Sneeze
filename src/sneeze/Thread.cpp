@@ -60,10 +60,10 @@ void THREAD::Signal (bool bShutdown)
 
 void THREAD::Ready (bool bResult)
 {
+   m_bResult_Initialize = bResult;
+
    {
       std::lock_guard<std::mutex> guard (m_mxThread);
-
-      m_bResult_Initialize = bResult;
 
       m_bReady = true;
    }
