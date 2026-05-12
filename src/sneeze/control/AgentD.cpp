@@ -17,11 +17,23 @@
 
 using namespace SNEEZE;
 
-AGENT::D::D (CONTROL* pControl)
-   : AGENT (pControl)
+AGENT::D::D (CONTROL* pControl, int nAgentIndex)
+   : AGENT (pControl, nAgentIndex)
 {
 }
 
-void AGENT::D::Tick ()
+AGENT::D::~D ()
 {
+}
+
+void AGENT::D::Main ()
+{
+   Ready ();
+   
+   Wait ([this] { return Tick (); });
+}
+
+bool AGENT::D::Tick ()
+{
+   return IsShutdown ();
 }

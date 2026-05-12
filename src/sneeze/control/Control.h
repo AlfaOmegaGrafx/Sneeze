@@ -81,29 +81,18 @@ namespace SNEEZE
       class D;
       class E;
 
-      explicit AGENT (CONTROL* pControl);
+      AGENT (CONTROL* pControl, int nAgentIndex);
       virtual ~AGENT ();
 
       AGENT            (const AGENT&) = delete;
       AGENT& operator= (const AGENT&) = delete;
 
-      void AgentIndex (int nAgentIndex);
-
    protected:
-      virtual void Tick () = 0;
-      void Main () override;
+      void Main () override = 0;
 
       ENGINE* Engine () const;
 
       CONTROL*                m_pControl;
-
-   private:
-      bool Control (); // what is this for?
-
-      // Wake-rate measurement
-      std::chrono::steady_clock::time_point m_tpOrigin;
-      int                     m_nWakeCount;
-      int64_t                 m_nLastReportSec;
       int                     m_nAgentIndex;
    };
 
@@ -114,10 +103,10 @@ namespace SNEEZE
    class AGENT::COMPOSITOR : public AGENT
    {
    public:
-      explicit COMPOSITOR (CONTROL* pControl);
+      COMPOSITOR (CONTROL* pControl, int nAgentIndex);
+      ~COMPOSITOR ();
 
    protected:
-      void Tick () override;
       void Main () override;
 
    private:
@@ -144,12 +133,14 @@ namespace SNEEZE
    class AGENT::SCRUBBER : public AGENT
    {
    public:
-      explicit SCRUBBER (CONTROL* pControl);
+      SCRUBBER (CONTROL* pControl, int nAgentIndex);
+      ~SCRUBBER ();
+   
    protected:
-      void Tick () override;
       void Main () override;
+   
    private:
-      void DrainQueue ();
+      bool DrainQueue ();
    };
 
    // ---------------------------------------------------------------------------
@@ -159,25 +150,40 @@ namespace SNEEZE
    class AGENT::C : public AGENT
    {
    public:
-      explicit C (CONTROL* pControl);
+      C (CONTROL* pControl, int nAgentIndex);
+      ~C ();
+   
    protected:
-      void Tick () override;
+      void Main () override;
+   
+   private:
+      bool Tick ();
    };
 
    class AGENT::D : public AGENT
    {
    public:
-      explicit D (CONTROL* pControl);
+      D (CONTROL* pControl, int nAgentIndex);
+      ~D ();
+   
    protected:
-      void Tick () override;
+      void Main () override;
+   
+   private:
+      bool Tick ();
    };
 
    class AGENT::E : public AGENT
    {
    public:
-      explicit E (CONTROL* pControl);
+      E (CONTROL* pControl, int nAgentIndex);
+      ~E ();
+   
    protected:
-      void Tick () override;
+      void Main () override;
+   
+   private:
+      bool Tick ();
    };
 }
 #endif // SNEEZE_CORE_CONTROL_H

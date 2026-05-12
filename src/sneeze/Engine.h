@@ -18,6 +18,8 @@
 #include <thread>
 #include <mutex>
 #include <condition_variable>
+#include <chrono>
+#include <functional>
 
 namespace SNEEZE
 {
@@ -42,15 +44,17 @@ namespace SNEEZE
 
       void Ready        (bool bResult = true);
       bool IsShutdown   () const;
-
-      std::mutex              m_mxThread;
-      std::condition_variable m_cvThread;
+      void Wait         (std::function<bool ()> fnWork);
+      void Wait         (std::chrono::milliseconds duration);
 
    private:
       std::thread*            m_pthThread;
-      bool                    m_bShutdown;
+      std::mutex              m_mxThread;
+      std::condition_variable m_cvThread;
+
       bool                    m_bReady;
       bool                    m_bResult_Initialize;
+      bool                    m_bShutdown;
    };
 }
 

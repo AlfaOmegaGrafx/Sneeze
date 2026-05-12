@@ -19,16 +19,22 @@
 
 using namespace SNEEZE;
 
-AGENT::SCRUBBER::SCRUBBER (CONTROL* pControl)
-   : AGENT (pControl)
+AGENT::SCRUBBER::SCRUBBER (CONTROL* pControl, int nAgentIndex)
+   : AGENT (pControl, nAgentIndex)
 {
 }
 
-void AGENT::SCRUBBER::Tick ()
+AGENT::SCRUBBER::~SCRUBBER ()
 {
 }
 
-void AGENT::SCRUBBER::DrainQueue ()
+void AGENT::SCRUBBER::Main ()
+{
+   Ready ();
+   Wait ([this] { return DrainQueue (); });
+}
+
+bool AGENT::SCRUBBER::DrainQueue ()
 {
    std::vector<std::string> aPath;
    m_pControl->Cleanup_SwapQueue (aPath);
@@ -50,17 +56,6 @@ void AGENT::SCRUBBER::DrainQueue ()
       }
       else Engine ()->Log (IENGINE::kLOGLEVEL_Error, "SCRUBBER", "REJECTED -- path is not under " + std::string (ENGINE::sFOLDER_TRANSITORY) + "/: " + sPath);
    }
-}
 
-void AGENT::SCRUBBER::Main ()
-{
-   Ready ();
-
-   while (!IsShutdown ())
-   {
-      DrainQueue ();
-
-      std::unique_lock<std::mutex> lock (m_mxThread);
-      m_cvThread.wait (lock, [this] { return IsShutdown (); });
-   }
+   return IsShutdown ();
 }

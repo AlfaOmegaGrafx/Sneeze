@@ -56,7 +56,11 @@ public:
 
    bool Initialize ()
    {
+      int nAgentCount = 0;
+
       m_bInitialized = false;
+
+m_pPersona = new persona::PERSONA (m_pEngine);
 
       if (m_pHost  &&  !m_pHost->sAppDataPath ().empty ())
       {
@@ -86,11 +90,8 @@ public:
 
                         if (m_pStorage->Initialize ())
                         {
-m_pPersona = new persona::PERSONA (m_pEngine);
-
                            m_pControl = new CONTROL (m_pEngine);
 
-                           int nAgentCount = 0;
                            if (m_pControl->Initialize (nAgentCount))
                            {
                               if (InitializePaths ())
@@ -135,9 +136,6 @@ m_pPersona = new persona::PERSONA (m_pEngine);
       delete m_pControl;
       m_pControl = nullptr;
 
-      delete m_pPersona;
-      m_pPersona = nullptr;
-
       delete m_pStorage;
       m_pStorage = nullptr;
 
@@ -156,6 +154,9 @@ m_pPersona = new persona::PERSONA (m_pEngine);
 
       delete m_pWasmRuntime;
       m_pWasmRuntime = nullptr;
+
+      delete m_pPersona;
+      m_pPersona = nullptr;
 
       m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SNEEZE", "Shutdown complete");
    }
@@ -417,7 +418,6 @@ private:
 
 /***********************************************************************************************************************************
 **  ENGINE Class
-**
 ***********************************************************************************************************************************/
 
 ENGINE::ENGINE (IENGINE* pHost) :
@@ -485,20 +485,6 @@ void ENGINE::Log (IENGINE::eLOGLEVEL Level, const std::string& sModule, const st
 {
    if (m_pImpl->m_pHost)
       m_pImpl->m_pHost->Log (Level, sModule, sMessage);
-}
-
-// ---------------------------------------------------------------------------
-// Bodies (accessed by compositor)
-// ---------------------------------------------------------------------------
-
-std::vector<void*>& ENGINE::Bodies ()
-{
-   static std::vector<void*> aBodies;
-   aBodies.clear ();
-   auto& aAll = astro::RMCOBJECT::All ();
-   for (auto* pBody : aAll)
-      aBodies.push_back (static_cast<void*> (pBody));
-   return aBodies;
 }
 
 // ---------------------------------------------------------------------------

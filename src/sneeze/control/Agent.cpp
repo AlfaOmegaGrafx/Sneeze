@@ -14,66 +14,21 @@
 
 #include <Sneeze.h>
 #include "Control.h"
-#include <cstdio>
 
 using namespace SNEEZE;
 
-AGENT::AGENT (CONTROL* pControl)
+AGENT::AGENT (CONTROL* pControl, int nAgentIndex)
    : THREAD ()
    , m_pControl (pControl)
-   , m_nWakeCount (0)
-   , m_nLastReportSec (0)
-   , m_nAgentIndex (-1)
+   , m_nAgentIndex (nAgentIndex)
 {
-}
-
-void AGENT::AgentIndex (int nAgentIndex)
-{
-   m_nAgentIndex = nAgentIndex;
 }
 
 AGENT::~AGENT ()
 {
 }
 
-
-void AGENT::Main ()
-{
-   m_tpOrigin = std::chrono::steady_clock::now ();
-
-   Ready ();
-
-   std::unique_lock<std::mutex> mlock (m_mxThread);
-   m_cvThread.wait (mlock, std::bind (&AGENT::Control, this));
-}
-
 ENGINE* AGENT::Engine () const
 {
    return m_pControl->Engine ();
 }
-
-bool AGENT::Control ()
-{
-   bool bShutdown = IsShutdown ();
-
-   if (!bShutdown)
-   {
-      // m_nWakeCount++;
-      //
-      // double dElapsed = std::chrono::duration<double> (
-      //    std::chrono::steady_clock::now () - m_tpOrigin).count ();
-      // int64_t nCurrentSec = static_cast<int64_t> (dElapsed);
-      // if (nCurrentSec > m_nLastReportSec)
-      // {
-      //    std::fprintf (stdout, "AGENT[%d]: %d wakes/sec\n",
-      //       m_nAgentIndex, m_nWakeCount);
-      //    m_nWakeCount    = 0;
-      //    m_nLastReportSec = nCurrentSec;
-      // }
-
-      Tick ();
-   }
-
-   return bShutdown;
-}
-

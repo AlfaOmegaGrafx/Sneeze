@@ -111,7 +111,6 @@ namespace SNEEZE
       // --- Shared services ---
 
       void                     Log (IENGINE::eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage);
-      std::vector<void*>&      Bodies ();
 
       // --- Persona ---
 

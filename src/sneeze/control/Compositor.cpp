@@ -83,8 +83,8 @@ static void ColorFromU32 (uint32_t nColor, float& r, float& g, float& b)
 
 // ---------------------------------------------------------------------------
 
-AGENT::COMPOSITOR::COMPOSITOR (CONTROL* pControl)
-   : AGENT (pControl)
+AGENT::COMPOSITOR::COMPOSITOR (CONTROL* pControl, int nAgentIndex)
+   : AGENT (pControl, nAgentIndex)
    , m_tmNow (0)
    , m_nFrameCount (0)
    , m_dFpsAccum (0.0)
@@ -101,7 +101,7 @@ AGENT::COMPOSITOR::COMPOSITOR (CONTROL* pControl)
    m_tmNow = static_cast<int64_t> (dElapsedSec * TICKS_PER_S);
 }
 
-void AGENT::COMPOSITOR::Tick ()
+AGENT::COMPOSITOR::~COMPOSITOR ()
 {
 }
 

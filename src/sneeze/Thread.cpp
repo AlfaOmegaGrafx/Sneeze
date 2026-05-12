@@ -74,3 +74,17 @@ bool THREAD::IsShutdown () const
 {
    return m_bShutdown;
 }
+
+void THREAD::Wait (std::function<bool ()> fnWork)
+{
+   std::unique_lock<std::mutex> lock (m_mxThread);
+
+   m_cvThread.wait (lock, fnWork);
+}
+
+void THREAD::Wait (std::chrono::milliseconds duration)
+{
+   std::unique_lock<std::mutex> lock (m_mxThread);
+
+   m_cvThread.wait_for (lock, duration);
+}
