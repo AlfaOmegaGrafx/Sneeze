@@ -200,29 +200,29 @@ namespace SNEEZE
       class FILE
       {
       public:
-         FILE (NETWORK* pNetwork, ASSET* pAsset, std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, VIEWPORT* pViewport, IFILE* pListener, uint32_t nFileIx);
+         FILE (NETWORK* pNetwork, ASSET* pAsset, VIEWPORT::CONTAINER::NAME* pName, VIEWPORT* pViewport, IFILE* pListener, uint32_t nFileIx);
          ~FILE ();
 
          // --- Snapshot fields (always available, even after Release) ---
 
-         STATE                State             () const    { return m_bState; }
-         bool                 IsReady           () const    { return m_bState == STATE_READY; }
+         STATE                State             () const;
+         bool                 IsReady           () const;
 
-         std::string          Url               () const    { return m_sUrl; }
-         std::string          Hash              () const    { return m_sHash; }
-         bool                 IsHashed          () const    { return !m_sHash.empty (); }
+         std::string          Url               () const;
+         std::string          Hash              () const;
+         bool                 IsHashed          () const;
 
-         uint32_t             FileIx            () const    { return m_nFileIx; }
-         uint32_t             AssetIx           () const    { return m_nAssetIx; }
-         long                 HttpStatus        () const    { return m_nHttpStatus; }
-         double               FetchQueuedTime   () const    { return m_dFetchQueuedTime; }
-         double               FetchStartTime    () const    { return m_dFetchStartTime; }
-         double               FetchEndTime      () const    { return m_dFetchEndTime; }
-         double               FetchDuration     () const    { return m_dFetchEndTime - m_dFetchStartTime; }
-         bool                 IsServedFromCache () const    { return m_bServedFromCache; }
+         uint32_t             FileIx            () const;
+         uint32_t             AssetIx           () const;
+         long                 HttpStatus        () const;
+         double               FetchQueuedTime   () const;
+         double               FetchStartTime    () const;
+         double               FetchEndTime      () const;
+         double               FetchDuration     () const;
+         bool                 IsServedFromCache () const;
 
-         std::string          ContentType       () const    { return m_sContentType; }
-         uint64_t             SizeBytes         () const    { return m_nSizeBytes; }
+         std::string          ContentType       () const;
+         uint64_t             SizeBytes         () const;
 
          // --- ASSET-dependent (require attached ASSET, empty/default after Release) ---
 
@@ -232,7 +232,7 @@ namespace SNEEZE
          std::string          CreatedTime       () const;
          std::string          LastAccessTime    () const;
          uint32_t             AccessCount       () const;
-         const std::unordered_map<std::string, std::string>& Headers () const;
+         const std::unordered_map<std::string, std::string> Headers () const;
 
          // --- Actions ---
 
@@ -243,7 +243,7 @@ namespace SNEEZE
 
          // --- Container ---
 
-         const VIEWPORT::CONTAINER::NAME& Name () const   { return *m_pName; }
+//         const VIEWPORT::CONTAINER::NAME& Name () const   { return *m_pName; }
          std::string ContainerName () const;
 
          VIEWPORT* Viewport () const { return m_pViewport; }
@@ -270,7 +270,7 @@ namespace SNEEZE
       private:
          NETWORK*    m_pNetwork;
          ASSET*      m_pAsset;
-         std::shared_ptr<VIEWPORT::CONTAINER::NAME> m_pName;
+         VIEWPORT::CONTAINER::NAME m_Name;
          VIEWPORT* m_pViewport;
          IFILE*      m_pListener;
 
@@ -310,8 +310,8 @@ namespace SNEEZE
 
       // --- Primary API ---
 
-      FILE* Request (IFILE* pListener, VIEWPORT* pViewport, std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, const std::string& sUrl);
-      FILE* Request (IFILE* pListener, VIEWPORT* pViewport, std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, const std::string& sUrl, const std::string& sHash, uint32_t bFlags = kREQUEST_DEFAULT, uint32_t nMetaIx = 0);
+      FILE* Request (IFILE* pListener, VIEWPORT* pViewport, VIEWPORT::CONTAINER::NAME* pName, const std::string& sUrl);
+      FILE* Request (IFILE* pListener, VIEWPORT* pViewport, VIEWPORT::CONTAINER::NAME* pName, const std::string& sUrl, const std::string& sHash, uint32_t bFlags = kREQUEST_DEFAULT, uint32_t nMetaIx = 0);
       void  Release (FILE* pFile);
       bool  Reopen  (FILE* pFile);
       void  Clear   (FILE* pFile, bool b = true);

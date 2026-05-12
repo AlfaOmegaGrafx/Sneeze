@@ -166,14 +166,14 @@ static CACHE_TEST_VIEWPORT_HOST*  s_pVPHost       = nullptr;
 static SNEEZE::ENGINE*            s_pSneeze       = nullptr;
 static VIEWPORT*                  s_pViewport     = nullptr;
 
-static auto s_pTestName = std::make_shared<VIEWPORT::CONTAINER::NAME> (VIEWPORT::CONTAINER::NAME {
+static auto s_pTestName = VIEWPORT::CONTAINER::NAME {
    "TestFingerprint_0123456789abcdef",
    "TestOrg",
    "TestCommon",
    "TestStore",
    "TestPersona",
    true
-});
+};
 
 // ---------------------------------------------------------------------------
 // Test 1: Manager initialization
@@ -204,8 +204,7 @@ static void TestUnhashedFetch ()
    if (bInit)
    {
       TEST_FILE_LISTENER listener;
-      NETWORK::FILE* pFile = pNetwork->Request (
-         &listener, s_pViewport, s_pTestName, "https://httpbin.org/bytes/128");
+      NETWORK::FILE* pFile = pNetwork->Request (&listener, s_pViewport, &s_pTestName, "https://httpbin.org/bytes/128");
 
       Check (pFile != nullptr, "Request returned a handle");
 
@@ -262,10 +261,8 @@ static void TestDeduplication ()
    TEST_FILE_LISTENER listenerA;
    TEST_FILE_LISTENER listenerB;
 
-   NETWORK::FILE* pFileA = pNetwork->Request (
-      &listenerA, s_pViewport, s_pTestName, "https://httpbin.org/bytes/64");
-   NETWORK::FILE* pFileB = pNetwork->Request (
-      &listenerB, s_pViewport, s_pTestName, "https://httpbin.org/bytes/64");
+   NETWORK::FILE* pFileA = pNetwork->Request (&listenerA, s_pViewport, &s_pTestName, "https://httpbin.org/bytes/64");
+   NETWORK::FILE* pFileB = pNetwork->Request (&listenerB, s_pViewport, &s_pTestName, "https://httpbin.org/bytes/64");
 
    Check (pFileA != nullptr, "First handle is valid");
    Check (pFileB != nullptr, "Second handle is valid");
@@ -308,8 +305,7 @@ static void TestHashVerifiedFetch ()
    pNetwork->Initialize ();
 
    TEST_FILE_LISTENER listenerPreFetch;
-   NETWORK::FILE* pPreFile = pNetwork->Request (
-      &listenerPreFetch, s_pViewport, s_pTestName, "https://httpbin.org/base64/SGVsbG9Xb3JsZA==");
+   NETWORK::FILE* pPreFile = pNetwork->Request (&listenerPreFetch, s_pViewport, &s_pTestName, "https://httpbin.org/base64/SGVsbG9Xb3JsZA==");
 
    if (pPreFile)
    {
@@ -332,8 +328,7 @@ static void TestHashVerifiedFetch ()
          pPreFile = nullptr;
 
          TEST_FILE_LISTENER listenerVerified;
-         NETWORK::FILE* pVerFile = pNetwork->Request (
-            &listenerVerified, s_pViewport, s_pTestName, "https://httpbin.org/base64/SGVsbG9Xb3JsZA==", sSri);
+         NETWORK::FILE* pVerFile = pNetwork->Request (&listenerVerified, s_pViewport, &s_pTestName, "https://httpbin.org/base64/SGVsbG9Xb3JsZA==", sSri);
 
          if (pVerFile)
          {
@@ -380,8 +375,7 @@ static void TestHashMismatch ()
    TEST_FILE_LISTENER listener;
    std::string sBadHash = "sha256-0000000000000000000000000000000000000000000000000000000000000000";
 
-   NETWORK::FILE* pFile = pNetwork->Request (
-      &listener, s_pViewport, s_pTestName, "https://httpbin.org/base64/SGVsbG9Xb3JsZA==", sBadHash);
+   NETWORK::FILE* pFile = pNetwork->Request (&listener, s_pViewport, &s_pTestName, "https://httpbin.org/base64/SGVsbG9Xb3JsZA==", sBadHash);
 
    if (pFile)
    {
@@ -415,8 +409,7 @@ static void TestReset ()
    pNetwork->Initialize ();
 
    TEST_FILE_LISTENER listenerSession;
-   NETWORK::FILE* pSession = pNetwork->Request (
-      &listenerSession, s_pViewport, s_pTestName, "https://httpbin.org/bytes/32");
+   NETWORK::FILE* pSession = pNetwork->Request (&listenerSession, s_pViewport, &s_pTestName, "https://httpbin.org/bytes/32");
 
    if (pSession)
    {
@@ -429,8 +422,7 @@ static void TestReset ()
          pNetwork->Reset ();
 
          TEST_FILE_LISTENER listenerAfter;
-         NETWORK::FILE* pAfter = pNetwork->Request (
-            &listenerAfter, s_pViewport, s_pTestName, "https://httpbin.org/bytes/32");
+         NETWORK::FILE* pAfter = pNetwork->Request (&listenerAfter, s_pViewport, &s_pTestName, "https://httpbin.org/bytes/32");
 
          if (pAfter)
          {
@@ -468,8 +460,7 @@ static void TestResetFlag ()
    pNetwork->Initialize ();
 
    TEST_FILE_LISTENER listener;
-   NETWORK::FILE* pFile = pNetwork->Request (
-      &listener, s_pViewport, s_pTestName, "https://httpbin.org/bytes/16");
+   NETWORK::FILE* pFile = pNetwork->Request (&listener, s_pViewport, &s_pTestName, "https://httpbin.org/bytes/16");
 
    if (pFile)
    {
@@ -509,8 +500,7 @@ static void TestFailedFetch ()
    pNetwork->Initialize ();
 
    TEST_FILE_LISTENER listener;
-   NETWORK::FILE* pFile = pNetwork->Request (
-      &listener, s_pViewport, s_pTestName, "https://this-domain-does-not-exist-999.invalid/file.bin");
+   NETWORK::FILE* pFile = pNetwork->Request (&listener, s_pViewport, &s_pTestName, "https://this-domain-does-not-exist-999.invalid/file.bin");
 
    if (pFile)
    {
@@ -549,7 +539,7 @@ static void TestSidecarPersistence ()
       pNetwork->Initialize ();
 
       TEST_FILE_LISTENER listenerPre;
-      NETWORK::FILE* pPre = pNetwork->Request (&listenerPre, s_pViewport, s_pTestName, sUrl);
+      NETWORK::FILE* pPre = pNetwork->Request (&listenerPre, s_pViewport, &s_pTestName, sUrl);
       if (pPre  &&  listenerPre.WaitFor (15000)  &&  listenerPre.Succeeded ())
       {
          std::vector<uint8_t> aData = pPre->ReadData ();
@@ -560,7 +550,7 @@ static void TestSidecarPersistence ()
          pPre = nullptr;
 
          TEST_FILE_LISTENER listenerHash;
-         NETWORK::FILE* pHash = pNetwork->Request (&listenerHash, s_pViewport, s_pTestName, sUrl, sSri);
+         NETWORK::FILE* pHash = pNetwork->Request (&listenerHash, s_pViewport, &s_pTestName, sUrl, sSri);
          if (pHash)
          {
             listenerHash.WaitFor (15000);
@@ -588,7 +578,7 @@ static void TestSidecarPersistence ()
       pNetwork2->Initialize ();
 
       TEST_FILE_LISTENER listenerReload;
-      NETWORK::FILE* pReload = pNetwork2->Request (&listenerReload, s_pViewport, s_pTestName, sUrl, sSri);
+      NETWORK::FILE* pReload = pNetwork2->Request (&listenerReload, s_pViewport, &s_pTestName, sUrl, sSri);
 
       if (pReload)
       {
@@ -620,8 +610,7 @@ static void TestHttpHeaders ()
    pNetwork->Initialize ();
 
    TEST_FILE_LISTENER listener;
-   NETWORK::FILE* pFile = pNetwork->Request (
-      &listener, s_pViewport, s_pTestName, "https://httpbin.org/response-headers?Content-Type=application/json");
+   NETWORK::FILE* pFile = pNetwork->Request (&listener, s_pViewport, &s_pTestName, "https://httpbin.org/response-headers?Content-Type=application/json");
 
    if (pFile)
    {
@@ -660,8 +649,7 @@ static void TestFileHandleLifecycle ()
    pNetwork->Initialize ();
 
    TEST_FILE_LISTENER listener;
-   NETWORK::FILE* pFile = pNetwork->Request (
-      &listener, s_pViewport, s_pTestName, "https://httpbin.org/bytes/8");
+   NETWORK::FILE* pFile = pNetwork->Request (&listener, s_pViewport, &s_pTestName, "https://httpbin.org/bytes/8");
 
       Check (pFile != nullptr, "Handle allocated");
 
@@ -693,10 +681,8 @@ static void TestHistoryAndFileIx ()
    TEST_FILE_LISTENER listenerA;
    TEST_FILE_LISTENER listenerB;
 
-   NETWORK::FILE* pFileA = pNetwork->Request (
-      &listenerA, s_pViewport, s_pTestName, "https://httpbin.org/bytes/16");
-   NETWORK::FILE* pFileB = pNetwork->Request (
-      &listenerB, s_pViewport, s_pTestName, "https://httpbin.org/bytes/32");
+   NETWORK::FILE* pFileA = pNetwork->Request (&listenerA, s_pViewport, &s_pTestName, "https://httpbin.org/bytes/16");
+   NETWORK::FILE* pFileB = pNetwork->Request (&listenerB, s_pViewport, &s_pTestName, "https://httpbin.org/bytes/32");
 
    Check (pFileA != nullptr  &&  pFileB != nullptr, "Both handles allocated");
 
@@ -734,8 +720,7 @@ static void TestNotifications ()
    pNetwork->Initialize ();
 
    TEST_FILE_LISTENER listener;
-   NETWORK::FILE* pFile = pNetwork->Request (
-      &listener, s_pViewport, s_pTestName, "https://httpbin.org/bytes/8?test=notifications");
+   NETWORK::FILE* pFile = pNetwork->Request (&listener, s_pViewport, &s_pTestName, "https://httpbin.org/bytes/8?test=notifications");
 
    Check (s_pVPHost->m_nCreatedCount > 0, "OnNetworkFileCreated fired");
 
@@ -774,7 +759,7 @@ static void TestServedFromCache ()
 
    // First fetch — should NOT be served from cache
    TEST_FILE_LISTENER listenerFirst;
-   NETWORK::FILE* pFirst = pNetwork->Request (&listenerFirst, s_pViewport, s_pTestName, sUrl);
+   NETWORK::FILE* pFirst = pNetwork->Request (&listenerFirst, s_pViewport, &s_pTestName, sUrl);
 
    if (pFirst)
    {
@@ -785,7 +770,7 @@ static void TestServedFromCache ()
 
          // Second request for the same URL — should be served from cache
          TEST_FILE_LISTENER listenerSecond;
-         NETWORK::FILE* pSecond = pNetwork->Request (&listenerSecond, s_pViewport, s_pTestName, sUrl);
+         NETWORK::FILE* pSecond = pNetwork->Request (&listenerSecond, s_pViewport, &s_pTestName, sUrl);
 
          if (pSecond)
          {
@@ -819,8 +804,7 @@ static void TestFailedFetchHttpStatus ()
    pNetwork->Initialize ();
 
    TEST_FILE_LISTENER listener;
-   NETWORK::FILE* pFile = pNetwork->Request (
-      &listener, s_pViewport, s_pTestName, "https://httpbin.org/status/404");
+   NETWORK::FILE* pFile = pNetwork->Request (&listener, s_pViewport, &s_pTestName, "https://httpbin.org/status/404");
 
    if (pFile)
    {
@@ -855,8 +839,7 @@ static void TestClearFlag ()
    pNetwork->Initialize ();
 
    TEST_FILE_LISTENER listener;
-   NETWORK::FILE* pFile = pNetwork->Request (
-      &listener, s_pViewport, s_pTestName, "https://httpbin.org/bytes/8");
+   NETWORK::FILE* pFile = pNetwork->Request (&listener, s_pViewport, &s_pTestName, "https://httpbin.org/bytes/8");
 
    if (pFile)
    {
@@ -887,8 +870,7 @@ static void TestResetFlagToggle ()
    pNetwork->Initialize ();
 
    TEST_FILE_LISTENER listener;
-   NETWORK::FILE* pFile = pNetwork->Request (
-      &listener, s_pViewport, s_pTestName, "https://httpbin.org/bytes/8");
+   NETWORK::FILE* pFile = pNetwork->Request (&listener, s_pViewport, &s_pTestName, "https://httpbin.org/bytes/8");
 
    if (pFile)
    {
@@ -929,10 +911,8 @@ static void TestDeferredReset ()
    TEST_FILE_LISTENER listenerA;
    TEST_FILE_LISTENER listenerB;
 
-   NETWORK::FILE* pFileA = pNetwork->Request (
-      &listenerA, s_pViewport, s_pTestName, "https://httpbin.org/bytes/16");
-   NETWORK::FILE* pFileB = pNetwork->Request (
-      &listenerB, s_pViewport, s_pTestName, "https://httpbin.org/bytes/16");
+   NETWORK::FILE* pFileA = pNetwork->Request (&listenerA, s_pViewport, &s_pTestName, "https://httpbin.org/bytes/16");
+   NETWORK::FILE* pFileB = pNetwork->Request (&listenerB, s_pViewport, &s_pTestName, "https://httpbin.org/bytes/16");
 
    if (pFileA  &&  pFileB)
    {
@@ -988,10 +968,8 @@ static void TestClear ()
    TEST_FILE_LISTENER listenerA;
    TEST_FILE_LISTENER listenerB;
 
-   NETWORK::FILE* pFileA = pNetwork->Request (
-      &listenerA, s_pViewport, s_pTestName, "https://httpbin.org/bytes/8");
-   NETWORK::FILE* pFileB = pNetwork->Request (
-      &listenerB, s_pViewport, s_pTestName, "https://httpbin.org/bytes/16");
+   NETWORK::FILE* pFileA = pNetwork->Request (&listenerA, s_pViewport, &s_pTestName, "https://httpbin.org/bytes/8");
+   NETWORK::FILE* pFileB = pNetwork->Request (&listenerB, s_pViewport, &s_pTestName, "https://httpbin.org/bytes/16");
 
    if (pFileA  &&  pFileB)
    {
@@ -1036,8 +1014,7 @@ static void TestDeletedNotification ()
    pNetwork->Initialize ();
 
    TEST_FILE_LISTENER listener;
-   NETWORK::FILE* pFile = pNetwork->Request (
-      &listener, s_pViewport, s_pTestName, "https://httpbin.org/bytes/8");
+   NETWORK::FILE* pFile = pNetwork->Request (&listener, s_pViewport, &s_pTestName, "https://httpbin.org/bytes/8");
 
    if (pFile)
    {
@@ -1073,7 +1050,7 @@ static void TestStalenessRules ()
       pNetwork->Initialize ();
 
       TEST_FILE_LISTENER listener;
-      NETWORK::FILE* pFile = pNetwork->Request (&listener, s_pViewport, s_pTestName, sUrl);
+      NETWORK::FILE* pFile = pNetwork->Request (&listener, s_pViewport, &s_pTestName, sUrl);
 
       if (pFile)
       {
@@ -1102,7 +1079,7 @@ static void TestStalenessRules ()
       pNetwork2->AddRule ("", "9999-12-31T23:59:59Z");
 
       TEST_FILE_LISTENER listener2;
-      NETWORK::FILE* pFile2 = pNetwork2->Request (&listener2, s_pViewport, s_pTestName, sUrl);
+      NETWORK::FILE* pFile2 = pNetwork2->Request (&listener2, s_pViewport, &s_pTestName, sUrl);
 
       if (pFile2)
       {
@@ -1127,8 +1104,7 @@ static void TestNoFetchRequest ()
    NETWORK* pNetwork = new NETWORK (s_pSneeze);
    pNetwork->Initialize ();
 
-   NETWORK::FILE* pFile = pNetwork->Request (
-      nullptr, s_pViewport, s_pTestName, "https://this-url-does-not-exist-in-cache.invalid/none",
+   NETWORK::FILE* pFile = pNetwork->Request (nullptr, s_pViewport, &s_pTestName, "https://this-url-does-not-exist-in-cache.invalid/none",
       std::string (), NETWORK::REQUEST_CREATE);
 
    Check (pFile == nullptr, "bFetch=false returns null for uncached URL");

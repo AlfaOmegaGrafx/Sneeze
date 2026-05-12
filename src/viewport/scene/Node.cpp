@@ -206,17 +206,17 @@ void NODE::Texture_Request ()
 {
    if (m_pMapObject  &&  !m_pMapObject->m_sTextureUrl.empty ())
    {
-      auto pName = std::make_shared<CONTAINER::NAME> ();
-      pName->sFingerprint   = "5YTB6YjNQWnpBTkJna3Foa2lHOXcwQkFRc0ZBQU9DQVFFQWxrVFR0Z0pTWXRoMDJ";
-      pName->sOrganization  = "Metaversal Corporation";
-      pName->sCommonName    = "Metaversal";
-      pName->sContainerName = "Solar System";
-      pName->sPersonaHash   = "ZklkNVZTY0cxb2ZqUmtTWGpMVHE2bHkyQT09IiwiTUlJRFBUQ0NBaVdnQXdJQkFn";
-      pName->bValidated     = true;
+      CONTAINER::NAME Name;
+      Name.sFingerprint   = "5YTB6YjNQWnpBTkJna3Foa2lHOXcwQkFRc0ZBQU9DQVFFQWxrVFR0Z0pTWXRoMDJ";
+      Name.sOrganization  = "Metaversal Corporation";
+      Name.sCommonName    = "Metaversal";
+      Name.sContainerName = "Solar System";
+      Name.sPersonaHash   = "ZklkNVZTY0cxb2ZqUmtTWGpMVHE2bHkyQT09IiwiTUlJRFBUQ0NBaVdnQXdJQkFn";
+      Name.bValidated     = true;
 
       NETWORK* pNetwork = m_pFabric->Scene ()->Sneeze ()->Network ();
       if (pNetwork)
-         m_pFile = pNetwork->Request (this, m_pFabric->Scene ()->Viewport (), pName, m_pMapObject->m_sTextureUrl);
+         m_pFile = pNetwork->Request (this, m_pFabric->Scene ()->Viewport (), &Name, m_pMapObject->m_sTextureUrl);
    }
 }
 

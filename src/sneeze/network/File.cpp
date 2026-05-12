@@ -18,10 +18,10 @@ using namespace SNEEZE;
 
 const std::unordered_map<std::string, std::string> NETWORK::FILE::s_mapEmpty;
 
-NETWORK::FILE::FILE (NETWORK* pNetwork, ASSET* pAsset, std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, VIEWPORT* pViewport, IFILE* pListener, uint32_t nFileIx) :
+NETWORK::FILE::FILE (NETWORK* pNetwork, ASSET* pAsset, VIEWPORT::CONTAINER::NAME* pName, VIEWPORT* pViewport, IFILE* pListener, uint32_t nFileIx) :
    m_pNetwork         (pNetwork),
    m_pAsset           (pAsset),
-   m_pName            (std::move (pName)),
+   m_Name             (*pName),
    m_pViewport        (pViewport),
    m_pListener        (pListener),
    m_nFileIx          (nFileIx),
@@ -113,60 +113,115 @@ void NETWORK::FILE::Reset (bool b)
 
 std::vector<uint8_t> NETWORK::FILE::ReadData () const
 {
-   std::vector<uint8_t> aResult;
-   if (m_pAsset)
-      aResult = m_pAsset->ReadData ();
-   return aResult;
+   return m_pAsset->ReadData ();
 }
 
 std::string NETWORK::FILE::Header (const std::string& sName) const
 {
-   std::string sResult;
-   if (m_pAsset)
-      sResult = m_pAsset->Header (sName);
-   return sResult;
+   return m_pAsset->Header (sName);
 }
 
 std::string NETWORK::FILE::DiskPath () const
 {
-   std::string sResult;
-   if (m_pAsset)
-      sResult = m_pAsset->DiskPath ();
-   return sResult;
+   return m_pAsset->DiskPath ();
 }
 
 std::string NETWORK::FILE::CreatedTime () const
 {
-   std::string sResult;
-   if (m_pAsset)
-      sResult = m_pAsset->CreatedTime ();
-   return sResult;
+   return m_pAsset->CreatedTime ();
 }
 
 std::string NETWORK::FILE::LastAccessTime () const
 {
-   std::string sResult;
-   if (m_pAsset)
-      sResult = m_pAsset->LastAccessTime ();
-   return sResult;
+   return m_pAsset->LastAccessTime ();
 }
 
 uint32_t NETWORK::FILE::AccessCount () const
 {
-   uint32_t nResult = 0;
-   if (m_pAsset)
-      nResult = m_pAsset->AccessCount ();
-   return nResult;
+   return m_pAsset->AccessCount ();
 }
 
-const std::unordered_map<std::string, std::string>& NETWORK::FILE::Headers () const
+const std::unordered_map<std::string, std::string> NETWORK::FILE::Headers () const
 {
-   const std::unordered_map<std::string, std::string>& mapResult =
-      m_pAsset ? m_pAsset->Headers () : s_mapEmpty;
-   return mapResult;
+   return m_pAsset->Headers ();
 }
 
 std::string NETWORK::FILE::ContainerName () const
 {
-   return m_pName->DisplayName ();
+   return m_Name.DisplayName ();
+}
+
+NETWORK::STATE NETWORK::FILE::State () const
+{ 
+   return m_bState; 
+}
+
+bool NETWORK::FILE::IsReady () const 
+{ 
+   return m_bState == STATE_READY; 
+}
+
+std::string NETWORK::FILE::Url () const 
+{ 
+   return m_sUrl; 
+}
+
+std::string NETWORK::FILE::Hash () const 
+{ 
+   return m_sHash; 
+}
+
+bool NETWORK::FILE::IsHashed () const 
+{ 
+   return !m_sHash.empty (); 
+}
+
+uint32_t NETWORK::FILE::FileIx () const 
+{ 
+   return m_nFileIx; 
+}
+
+uint32_t NETWORK::FILE::AssetIx () const 
+{ 
+   return m_nAssetIx; 
+}
+
+long NETWORK::FILE::HttpStatus () const 
+{ 
+   return m_nHttpStatus; 
+}
+
+double NETWORK::FILE::FetchQueuedTime () const 
+{ 
+   return m_dFetchQueuedTime; 
+}
+
+double NETWORK::FILE::FetchStartTime () const 
+{ 
+   return m_dFetchStartTime; 
+}
+
+double NETWORK::FILE::FetchEndTime () const 
+{ 
+   return m_dFetchEndTime; 
+}
+
+double NETWORK::FILE::FetchDuration () const 
+{ 
+   return m_dFetchEndTime - m_dFetchStartTime; 
+}
+
+bool NETWORK::FILE::IsServedFromCache () const 
+{ 
+   return m_bServedFromCache; 
+}
+
+std::string NETWORK::FILE::ContentType () const
+{ 
+   return m_sContentType; 
+}
+
+uint64_t NETWORK::FILE::SizeBytes () const
+{ 
+   return m_nSizeBytes; 
 }

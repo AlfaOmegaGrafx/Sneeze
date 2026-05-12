@@ -22,8 +22,6 @@
 #include <fstream>
 #include <filesystem>
 #include <sstream>
-#include <cstdio>
-#include <cstring>
 #include <algorithm>
 
 using namespace SNEEZE;
@@ -35,24 +33,19 @@ static constexpr int kMAX_CONCURRENT_FETCHES = 16;
 **  Curl Callbacks
 ***********************************************************************************************************************************/
 
-typedef struct tagFETCH_CONTEXT
+size_t FetchWriteCallback (char* pData, size_t nSize, size_t nMembers, void* pUserData)
 {
-   std::FILE*                                   pFile;
-   std::unordered_map<std::string, std::string> mapHeaders;
-   long                                         nHttpCode;
-}
-FETCH_CONTEXT, *PFETCH_CONTEXT;
+   std::ofstream* stream = static_cast<std::ofstream*>(pUserData);
 
-size_t FetchWriteCallback (char* pData, size_t nSize, size_t nMembers, void* pUser)
-{
-   FETCH_CONTEXT* pCtx = static_cast<FETCH_CONTEXT*> (pUser);
+   stream->write (pData, nSize * nMembers);
 
-   return std::fwrite (pData, nSize, nMembers, pCtx->pFile);
+   return nSize * nMembers;
 }
 
-size_t FetchHeaderCallback (char* pData, size_t nSize, size_t nMembers, void* pUser)
+size_t FetchHeaderCallback (char* pData, size_t nSize, size_t nMembers, void* pUserData)
 {
-   FETCH_CONTEXT* pCtx = static_cast<FETCH_CONTEXT*> (pUser);
+   auto* pmapHeaders = static_cast<std::unordered_map<std::string, std::string>*> (pUserData);
+
    size_t nTotal = nSize * nMembers;
    std::string sLine (pData, nTotal);
 
@@ -70,7 +63,7 @@ size_t FetchHeaderCallback (char* pData, size_t nSize, size_t nMembers, void* pU
          sValue.clear ();
 
       std::transform (sKey.begin (), sKey.end (), sKey.begin (), ::tolower);
-      pCtx->mapHeaders[sKey] = sValue;
+      (*pmapHeaders)[sKey] = sValue;
    }
 
    return nTotal;
@@ -87,18 +80,6 @@ public:
    {
       std::string                                  sContentType;
       std::string                                  sOlderThan;
-   };
-
-   class FETCH_SLOT
-   {
-   public:
-      FETCH_SLOT () :
-         bDone (false)
-      {
-      }
-
-      std::thread             thread;
-      std::atomic<bool>       bDone;
    };
 
 public:
@@ -118,15 +99,14 @@ public:
    {
       if (!m_sCachePath.empty ())
       {
-         m_bShuttingDown.store (true);
+         m_bShuttingDown = true;
 
-         for (auto* pSlot : m_apFetchSlots)
+         for (auto& t : m_aSlots)
          {
-            if (pSlot->thread.joinable ())
-               pSlot->thread.join ();
-            delete pSlot;
+            if (t.joinable ())
+               t.join ();
          }
-         m_apFetchSlots.clear ();
+         m_aSlots.clear ();
 
          while (!m_aFetchQueue.empty ())
             m_aFetchQueue.pop ();
@@ -613,6 +593,7 @@ public:
 
    void FetchAsset (ASSET* pAsset)
    {
+      bool bResult = false;
       std::string sUrl;
       std::string sHash;
       {
@@ -626,142 +607,114 @@ public:
       std::string sTmpPath = DiskKeyToPath (sDiskKey, DISKFILE_TEMP);
       std::string sFinalPath;
       uint64_t    nSizeBytes = 0;
-      bool        bOk = !m_bShuttingDown.load ();
-      bool        bHaveTmp = false;
-      FETCH_CONTEXT ctx = {};
-      ctx.nHttpCode = 0;
+      int         nHttpCode = 0;
+      std::unordered_map<std::string, std::string> mapHeaders;
 
-      // Stage 1: Open temp file
-      if (bOk)
+      if (m_bShuttingDown == false)
       {
          std::filesystem::create_directories (std::filesystem::path (sTmpPath).parent_path ());
 
-         std::FILE* pTmpFile = nullptr;
-#ifdef _WIN32
-         fopen_s (&pTmpFile, sTmpPath.c_str (), "wb");
-#else
-         pTmpFile = std::fopen (sTmpPath.c_str (), "wb");
-#endif
-
-         if (pTmpFile)
-         {
-            bHaveTmp = true;
-            ctx.pFile = pTmpFile;
-         }
-         else
-         {
-            m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "NETWORK", "Failed to open temp file: " + sTmpPath);
-            bOk = false;
-         }
-      }
-
-      // Stage 2: Perform HTTP fetch
-      if (bOk)
-      {
          CURL* pCurl = curl_easy_init ();
+
          if (pCurl)
          {
-            curl_easy_setopt (pCurl, CURLOPT_URL, sUrl.c_str ());
-            curl_easy_setopt (pCurl, CURLOPT_WRITEFUNCTION, FetchWriteCallback);
-            curl_easy_setopt (pCurl, CURLOPT_WRITEDATA, &ctx);
-            curl_easy_setopt (pCurl, CURLOPT_HEADERFUNCTION, FetchHeaderCallback);
-            curl_easy_setopt (pCurl, CURLOPT_HEADERDATA, &ctx);
-            curl_easy_setopt (pCurl, CURLOPT_FOLLOWLOCATION, 1L);
-            curl_easy_setopt (pCurl, CURLOPT_TIMEOUT, 300L);
+            std::ofstream out (sTmpPath, std::ios::binary);
 
-            CURLcode nCode = curl_easy_perform (pCurl);
-
-            if (nCode == CURLE_OK)
-               curl_easy_getinfo (pCurl, CURLINFO_RESPONSE_CODE, &ctx.nHttpCode);
-
-            curl_easy_cleanup (pCurl);
-            std::fclose (ctx.pFile);
-            ctx.pFile = nullptr;
-
-            if (m_bShuttingDown.load ())
-               bOk = false;
-            else if (nCode != CURLE_OK || ctx.nHttpCode < 200 || ctx.nHttpCode >= 300)
+            if (out.is_open ())
             {
-               m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Fetch failed for " + sUrl + " (HTTP " + std::to_string (ctx.nHttpCode) + ")");
-               bOk = false;
+               curl_easy_setopt (pCurl, CURLOPT_URL, sUrl.c_str ());
+               curl_easy_setopt (pCurl, CURLOPT_WRITEFUNCTION, FetchWriteCallback);
+               curl_easy_setopt (pCurl, CURLOPT_WRITEDATA, &out);
+
+               curl_easy_setopt (pCurl, CURLOPT_HEADERFUNCTION, FetchHeaderCallback);
+               curl_easy_setopt (pCurl, CURLOPT_HEADERDATA, &mapHeaders);
+
+               curl_easy_setopt (pCurl, CURLOPT_FOLLOWLOCATION, 1L);
+               curl_easy_setopt (pCurl, CURLOPT_TIMEOUT, 300L);
+
+               CURLcode nCode = curl_easy_perform (pCurl);
+
+               out.close ();
+
+               if (nCode == CURLE_OK)
+                  curl_easy_getinfo (pCurl, CURLINFO_RESPONSE_CODE, &nHttpCode);
+
+               if (m_bShuttingDown)
+                  bResult = false;
+               else if (nCode != CURLE_OK || nHttpCode < 200 || nHttpCode >= 300)
+                  m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Fetch failed for " + sUrl + " (HTTP " + std::to_string (nHttpCode) + ")");
+               else
+               {
+                  std::string sAlgo, sExpected, sActual;
+
+                  if (!sHash.empty ())
+                  {
+                     if (ParseSriHash (sHash, sAlgo, sExpected))
+                     {
+                        sActual = ComputeFileHash (sTmpPath, sAlgo);
+                     }
+                  }
+
+                  if (sActual == sExpected)
+                  {
+                     sFinalPath = DiskKeyToPath (sDiskKey, DISKFILE_DATA);
+
+                     std::error_code ec;
+                     std::filesystem::rename (sTmpPath, sFinalPath, ec);
+                     if (!ec)
+                     {
+                        auto nFsSize = std::filesystem::file_size (sFinalPath, ec);
+                        if (!ec)
+                        {
+                           nSizeBytes = static_cast<uint64_t> (nFsSize);
+
+                           bResult = true;
+                        }
+                     }
+                     else
+                     {
+                        m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to rename " + sTmpPath + " -> " + sFinalPath + ": " + ec.message ());
+                     }
+                  }
+                  else m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Hash mismatch for " + sUrl + " (expected " + sExpected + ", got " + sActual + ")");
+               }
+
+               if (bResult == false)
+               {
+                  std::error_code ec;
+                  std::filesystem::remove (sTmpPath, ec);
+               }
             }
+            else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "NETWORK", "Failed to open temp file: " + sTmpPath);
          }
-         else
-         {
-            std::fclose (ctx.pFile);
-            ctx.pFile = nullptr;
-            bOk = false;
-         }
-      }
+         else m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Curl failed to initialize");
 
-      // Stage 3: Hash verification
-      if (bOk && !sHash.empty ())
-      {
-         std::string sAlgo, sExpected;
-         if (ParseSriHash (sHash, sAlgo, sExpected))
-         {
-            std::string sActual = ComputeFileHash (sTmpPath, sAlgo);
-            if (sActual != sExpected)
-            {
-               m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Hash mismatch for " + sUrl + " (expected " + sExpected + ", got " + sActual + ")");
-               bOk = false;
-            }
-         }
-      }
-
-      // Stage 4: Rename .temp to .data
-      if (bOk)
-      {
-         sFinalPath = DiskKeyToPath (sDiskKey, DISKFILE_DATA);
-
-         std::error_code ec;
-         std::filesystem::rename (sTmpPath, sFinalPath, ec);
-         if (ec)
-         {
-            m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to rename " + sTmpPath + " -> " + sFinalPath + ": " + ec.message ());
-            bOk = false;
-         }
-         else
-         {
-            bHaveTmp = false;
-
-            std::error_code ecSize;
-            auto nFsSize = std::filesystem::file_size (sFinalPath, ecSize);
-            if (!ecSize)
-               nSizeBytes = static_cast<uint64_t> (nFsSize);
-         }
-      }
-
-      // Cleanup temp file on failure
-      if (bHaveTmp)
-      {
-         std::error_code ec;
-         std::filesystem::remove (sTmpPath, ec);
+         curl_easy_cleanup (pCurl);
       }
 
       // Notify
       {
          std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-         pAsset->SetHttpStatus (ctx.nHttpCode);
+         pAsset->SetHttpStatus (nHttpCode);
          pAsset->SetFetchEndTime (SecondsSinceEpoch ());
 
-         if (bOk)
+         if (bResult)
          {
-            pAsset->SetHeaders (ctx.mapHeaders);
+            pAsset->SetHeaders (mapHeaders);
             pAsset->Complete (sFinalPath, nSizeBytes);
             NotifyFiles (pAsset->CollectFiles (), STATE_READY);
          }
          else
          {
-            if (!ctx.mapHeaders.empty ())
-               pAsset->SetHeaders (ctx.mapHeaders);
+            if (!mapHeaders.empty ())
+               pAsset->SetHeaders (mapHeaders);
             pAsset->Fail ();
             NotifyFiles (pAsset->CollectFiles (), STATE_FAILED);
          }
       }
 
-      if (bOk)
+      if (bResult)
       {
          m_pEngine->Log (IENGINE::kLOGLEVEL_Trace, "NETWORK", "Cached " + sUrl + " (" + std::to_string (nSizeBytes) + " bytes)");
       }
@@ -769,12 +722,11 @@ public:
       DispatchNextFromQueue ();
    }
 
-   NETWORK::FILE* Request (IFILE* pListener, VIEWPORT* pViewport, std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, const std::string& sUrl, const std::string& sHash, uint32_t bFlags, uint32_t nAssetIx)
+   NETWORK::FILE* Request (IFILE* pListener, VIEWPORT* pViewport, VIEWPORT::CONTAINER::NAME* pName, const std::string& sUrl, const std::string& sHash, uint32_t bFlags, uint32_t nAssetIx)
    {
-      bool bCreate = (bFlags & REQUEST_CREATE) != 0;
-      bool bFetch = (bFlags & REQUEST_FETCH) != 0;
-
       FILE* pFile = nullptr;
+      bool bCreate = (bFlags & REQUEST_CREATE) != 0;
+      bool bFetch  = (bFlags & REQUEST_FETCH) != 0;
 
       {
          std::lock_guard<std::recursive_mutex> guard (m_mutex);
@@ -1047,16 +999,12 @@ public:
 
    void SweepCompletedThreads ()
    {
-      auto it = m_apFetchSlots.begin ();
-      while (it != m_apFetchSlots.end ())
+      auto it = m_aSlots.begin ();
+      while (it != m_aSlots.end ())
       {
-         FETCH_SLOT* pSlot = *it;
-         if (pSlot->bDone.load ())
+         if (!(*it).joinable ())
          {
-            if (pSlot->thread.joinable ())
-               pSlot->thread.join ();
-            delete pSlot;
-            it = m_apFetchSlots.erase (it);
+            it = m_aSlots.erase (it);
          }
          else
          {
@@ -1065,19 +1013,18 @@ public:
       }
    }
 
+   void Worker (ASSET* pAsset)
+   {
+      FetchAsset (pAsset);
+   }
+
    void DispatchFetch (ASSET* pAsset)
    {
       SweepCompletedThreads ();
 
-      if (static_cast<int> (m_apFetchSlots.size ()) < kMAX_CONCURRENT_FETCHES)
+      if (static_cast<int> (m_aSlots.size ()) < kMAX_CONCURRENT_FETCHES)
       {
-         FETCH_SLOT* pSlot = new FETCH_SLOT ();
-         pSlot->thread = std::thread ([this, pAsset, pSlot]()
-            {
-               FetchAsset (pAsset);
-               pSlot->bDone.store (true);
-            });
-         m_apFetchSlots.push_back (pSlot);
+         m_aSlots.emplace_back (&Impl::Worker, this, pAsset);
       }
       else
       {
@@ -1095,18 +1042,12 @@ public:
 
       SweepCompletedThreads ();
 
-      if (!m_aFetchQueue.empty () && static_cast<int> (m_apFetchSlots.size ()) < kMAX_CONCURRENT_FETCHES)
+      if (!m_aFetchQueue.empty () && static_cast<int> (m_aSlots.size ()) < kMAX_CONCURRENT_FETCHES)
       {
          ASSET* pNext = m_aFetchQueue.front ();
          m_aFetchQueue.pop ();
 
-         FETCH_SLOT* pSlot = new FETCH_SLOT ();
-         pSlot->thread = std::thread ([this, pNext, pSlot]()
-            {
-               FetchAsset (pNext);
-               pSlot->bDone.store (true);
-            });
-         m_apFetchSlots.push_back (pSlot);
+         m_aSlots.emplace_back (&Impl::Worker, this, pNext);
       }
    }
 
@@ -1174,10 +1115,10 @@ private:
 
    mutable std::recursive_mutex           m_mutex;
 
-   std::vector<FETCH_SLOT*>               m_apFetchSlots;
+   std::vector<std::thread>               m_aSlots;
    std::queue<ASSET*>                     m_aFetchQueue;
 
-   std::atomic<bool>                      m_bShuttingDown;
+   bool                                   m_bShuttingDown;
    bool                                   m_bCacheEnabled;
    bool                                   m_bDisplayEnabled;
 
@@ -1214,12 +1155,12 @@ NETWORK::~NETWORK ()
 // Request / Release
 // ---------------------------------------------------------------------------
 
-NETWORK::FILE* NETWORK::Request (IFILE* pListener, VIEWPORT* pViewport, std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, const std::string& sUrl)
+NETWORK::FILE* NETWORK::Request (IFILE* pListener, VIEWPORT* pViewport, VIEWPORT::CONTAINER::NAME* pName, const std::string& sUrl)
 {
    return Request (pListener, pViewport, pName, sUrl, std::string (), kREQUEST_DEFAULT, 0);
 }
 
-NETWORK::FILE* NETWORK::Request (IFILE* pListener, VIEWPORT* pViewport, std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, const std::string& sUrl, const std::string& sHash, uint32_t bFlags, uint32_t nAssetIx)
+NETWORK::FILE* NETWORK::Request (IFILE* pListener, VIEWPORT* pViewport, VIEWPORT::CONTAINER::NAME* pName, const std::string& sUrl, const std::string& sHash, uint32_t bFlags, uint32_t nAssetIx)
 {
    return m_pImpl->Request (pListener, pViewport, pName, sUrl, sHash, bFlags, nAssetIx);
 }
