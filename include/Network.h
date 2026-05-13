@@ -91,12 +91,6 @@ namespace SNEEZE
          virtual void OnAsset (FILE* pFile) = 0;
       };
 
-      struct RULE
-      {
-         std::string sContentType;
-         std::string sOlderThan;
-      };
-
       // -----------------------------------------------------------------------
       // ASSET — internal shared state for a single cached URL.
       //
@@ -206,29 +200,29 @@ namespace SNEEZE
       class FILE
       {
       public:
-         FILE (NETWORK* pNetwork, ASSET* pAsset, std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, VIEWPORT* pViewport, IFILE* pListener, uint32_t nFileIx);
+         FILE (NETWORK* pNetwork, ASSET* pAsset, VIEWPORT::CONTAINER::NAME* pName, VIEWPORT* pViewport, IFILE* pListener, uint32_t nFileIx);
          ~FILE ();
 
          // --- Snapshot fields (always available, even after Release) ---
 
-         STATE                State             () const    { return m_bState; }
-         bool                 IsReady           () const    { return m_bState == STATE_READY; }
+         STATE                State             () const;
+         bool                 IsReady           () const;
 
-         std::string          Url               () const    { return m_sUrl; }
-         std::string          Hash              () const    { return m_sHash; }
-         bool                 IsHashed          () const    { return !m_sHash.empty (); }
+         std::string          Url               () const;
+         std::string          Hash              () const;
+         bool                 IsHashed          () const;
 
-         uint32_t             FileIx            () const    { return m_nFileIx; }
-         uint32_t             AssetIx           () const    { return m_nAssetIx; }
-         long                 HttpStatus        () const    { return m_nHttpStatus; }
-         double               FetchQueuedTime   () const    { return m_dFetchQueuedTime; }
-         double               FetchStartTime    () const    { return m_dFetchStartTime; }
-         double               FetchEndTime      () const    { return m_dFetchEndTime; }
-         double               FetchDuration     () const    { return m_dFetchEndTime - m_dFetchStartTime; }
-         bool                 IsServedFromCache () const    { return m_bServedFromCache; }
+         uint32_t             FileIx            () const;
+         uint32_t             AssetIx           () const;
+         long                 HttpStatus        () const;
+         double               FetchQueuedTime   () const;
+         double               FetchStartTime    () const;
+         double               FetchEndTime      () const;
+         double               FetchDuration     () const;
+         bool                 IsServedFromCache () const;
 
-         std::string          ContentType       () const    { return m_sContentType; }
-         uint64_t             SizeBytes         () const    { return m_nSizeBytes; }
+         std::string          ContentType       () const;
+         uint64_t             SizeBytes         () const;
 
          // --- ASSET-dependent (require attached ASSET, empty/default after Release) ---
 
@@ -238,7 +232,7 @@ namespace SNEEZE
          std::string          CreatedTime       () const;
          std::string          LastAccessTime    () const;
          uint32_t             AccessCount       () const;
-         const std::unordered_map<std::string, std::string>& Headers () const;
+         const std::unordered_map<std::string, std::string> Headers () const;
 
          // --- Actions ---
 
@@ -249,7 +243,7 @@ namespace SNEEZE
 
          // --- Container ---
 
-         const VIEWPORT::CONTAINER::NAME& Name () const   { return *m_pName; }
+//         const VIEWPORT::CONTAINER::NAME& Name () const   { return *m_pName; }
          std::string ContainerName () const;
 
          VIEWPORT* Viewport () const { return m_pViewport; }
@@ -276,7 +270,7 @@ namespace SNEEZE
       private:
          NETWORK*    m_pNetwork;
          ASSET*      m_pAsset;
-         std::shared_ptr<VIEWPORT::CONTAINER::NAME> m_pName;
+         VIEWPORT::CONTAINER::NAME m_Name;
          VIEWPORT* m_pViewport;
          IFILE*      m_pListener;
 
@@ -316,9 +310,8 @@ namespace SNEEZE
 
       // --- Primary API ---
 
-      FILE* Request (IFILE* pListener, VIEWPORT* pViewport, std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, const std::string& sUrl);
-      FILE* Request (IFILE* pListener, VIEWPORT* pViewport, std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, const std::string& sUrl,
-                     const std::string& sHash, uint32_t bFlags = kREQUEST_DEFAULT, uint32_t nMetaIx = 0);
+      FILE* Request (IFILE* pListener, VIEWPORT* pViewport, VIEWPORT::CONTAINER::NAME* pName, const std::string& sUrl);
+      FILE* Request (IFILE* pListener, VIEWPORT* pViewport, VIEWPORT::CONTAINER::NAME* pName, const std::string& sUrl, const std::string& sHash, uint32_t bFlags = kREQUEST_DEFAULT, uint32_t nMetaIx = 0);
       void  Release (FILE* pFile);
       bool  Reopen  (FILE* pFile);
       void  Clear   (FILE* pFile, bool b = true);
@@ -326,11 +319,11 @@ namespace SNEEZE
 
       // --- Cache management ---
 
-      void SetCacheEnabled   (bool b) { m_bCacheEnabled = b; }
-      bool IsCacheEnabled    () const { return m_bCacheEnabled; }
+      void SetCacheEnabled (bool b);
+      bool IsCacheEnabled () const;
 
-      void SetDisplayEnabled (bool b) { m_bDisplayEnabled = b; }
-      bool IsDisplayEnabled  () const { return m_bDisplayEnabled; }
+      void SetDisplayEnabled (bool b);
+      bool IsDisplayEnabled () const;
 
       void Clear ();
       void Reset ();
@@ -338,79 +331,9 @@ namespace SNEEZE
 
       void AddRule (const std::string& sContentType, const std::string& sOlderThan);
 
-      // --- Network inspector ---
-
-      const std::vector<FILE*>& Files () const { return m_apFile; }
-      double                    EpochAge () const;
-
    private:
-      std::string CachePath () const;
-      std::string ComputeDiskKey (const std::string& sUrl) const;
-      std::string DiskKeyToPath (const std::string& sDiskKey, DISKFILE eType) const;
-
-      bool ParseSriHash (const std::string& sSri, std::string& sAlgo, std::string& sDigest) const;
-      std::string ComputeFileHash (const std::string& sFilePath, const std::string& sAlgo) const;
-      std::string ComputeDataHash (const uint8_t* pData, size_t nLen, const std::string& sAlgo) const;
-
-      void SaveMeta (ASSET* pAsset);
-      bool LoadMeta (const std::string& sDiskKey, const std::string& sUrl);
-
-      void LoadRules ();
-      void SaveRules ();
-      bool IsAssetStale (ASSET* pAsset) const;
-
-      void FetchAsset (ASSET* pAsset);
-      void SweepCompletedThreads ();
-      void DispatchFetch (ASSET* pAsset);
-      void DispatchNextFromQueue ();
-      void NotifyFiles (const std::vector<FILE*>& apFiles, STATE bState);
-      double SecondsSinceEpoch () const;
-
-      void DeleteFiles ();
-      void ResetAsset (ASSET* pAsset);
-
-      struct FETCH_CONTEXT
-      {
-         std::FILE*   pFile;
-         std::unordered_map<std::string, std::string> mapHeaders;
-         long         nHttpCode;
-      };
-      static size_t FetchWriteCallback (char* pData, size_t nSize, size_t nMembers, void* pUser);
-      static size_t FetchHeaderCallback (char* pData, size_t nSize, size_t nMembers, void* pUser);
-
-      ENGINE*             m_pEngine;
-      std::string               m_sCachePath;
-
-      using ASSET_MAP = std::unordered_map<std::string, std::unique_ptr<ASSET>>;
-      ASSET_MAP                  m_mapAssets;
-
-      mutable std::recursive_mutex m_mutex;
-
-      // Fetch thread pool (capped at kMAX_CONCURRENT_FETCHES)
-      static const int          kMAX_CONCURRENT_FETCHES = 16;
-
-      struct FETCH_SLOT
-      {
-         std::thread             thread;
-         std::atomic<bool>       bDone;
-         FETCH_SLOT () : bDone (false) {}
-      };
-
-      std::vector<FETCH_SLOT*>  m_apFetchSlots;
-      std::queue<ASSET*>        m_aFetchQueue;
-
-      std::atomic<bool>         m_bShuttingDown;
-      bool                      m_bCacheEnabled;
-      bool                      m_bDisplayEnabled;
-
-      // Staleness rules + asset index counter
-      std::vector<RULE>         m_aRules;
-      uint32_t                  m_nNextAssetIx;
-
-      // Network inspector
-      std::vector<FILE*>        m_apFile;
-      uint32_t                  m_nNextFileIx;
-      std::chrono::steady_clock::time_point m_tpEpoch;
+      class Impl;
+      Impl* m_pImpl;
    };
 }
 #endif // SNEEZE_NETWORK_H
