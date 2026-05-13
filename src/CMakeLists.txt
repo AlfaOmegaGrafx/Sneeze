@@ -576,11 +576,33 @@ if (NOT EXISTS "${SNEEZE_CACERT_PEM}")
       message (FATAL_ERROR "Failed to download cacert.pem: ${_cacert_status}")
    endif ()
 endif ()
-file (READ "${SNEEZE_CACERT_PEM}" SNEEZE_CACERT_CONTENT)
-configure_file (
-   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/cacert_data.cpp.in"
-   "${CMAKE_CURRENT_BINARY_DIR}/cacert_data.cpp"
-   @ONLY)
+file (READ "${SNEEZE_CACERT_PEM}" _cacert_raw)
+string (LENGTH "${_cacert_raw}" _cacert_len)
+
+set (_cacert_cpp "${CMAKE_CURRENT_BINARY_DIR}/cacert_data.cpp")
+set (_chunk_size 8000)
+file (WRITE "${_cacert_cpp}"
+   "// Auto-generated — do not edit. Mozilla NSS CA bundle for CURLOPT_CAINFO_BLOB.\n"
+   "namespace SNEEZE {\n"
+   "   extern const char* const g_szCaCertPem;\n"
+   "   extern const unsigned long g_nCaCertPemLen;\n"
+   "}\n"
+   "namespace SNEEZE {\n"
+   "   static const char s_data[] =\n")
+set (_off 0)
+while (_off LESS _cacert_len)
+   string (SUBSTRING "${_cacert_raw}" ${_off} ${_chunk_size} _chunk)
+   string (REPLACE "\\" "\\\\" _chunk "${_chunk}")
+   string (REPLACE "\"" "\\\"" _chunk "${_chunk}")
+   string (REPLACE "\n" "\\n\"\n      \"" _chunk "${_chunk}")
+   file (APPEND "${_cacert_cpp}" "      \"${_chunk}\"\n")
+   math (EXPR _off "${_off} + ${_chunk_size}")
+endwhile ()
+file (APPEND "${_cacert_cpp}"
+   "      ;\n"
+   "   const char* const g_szCaCertPem = s_data;\n"
+   "   const unsigned long g_nCaCertPemLen = sizeof(s_data) - 1;\n"
+   "}\n")
 # Kept out of NETWORK_SOURCES because that list also feeds source_group(TREE),
 # which requires every file to live under CMAKE_CURRENT_SOURCE_DIR. The
 # generated source is added directly to the Sneeze target below instead.
