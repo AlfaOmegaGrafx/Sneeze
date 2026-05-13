@@ -20,9 +20,6 @@ using namespace SNEEZE;
 // STORAGE
 // ===========================================================================
 
-const std::string&   STORAGE::sPath_Permanent () const { return m_sPath_Permanent; }
-const std::string&   STORAGE::sPath_Temporary () const { return m_sPath_Temporary; }
-
 STORAGE::STORAGE (ENGINE* pEngine) :
    m_pEngine (pEngine)
 {
@@ -61,7 +58,7 @@ STORAGE::~STORAGE ()
 // Container lifecycle
 // ---------------------------------------------------------------------------
 
-STORAGE::SILO* STORAGE::Silo_Open (VIEWPORT* pViewport, std::shared_ptr<VIEWPORT::CONTAINER::CID> pCID)
+STORAGE::SILO* STORAGE::Silo_Open (VIEWPORT* pViewport, const VIEWPORT::CONTAINER::CID* pCID)
 {
    SILO* pSilo = nullptr;
 

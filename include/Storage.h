@@ -20,7 +20,6 @@
 #include <vector>
 #include <unordered_map>
 #include <mutex>
-#include <memory>
 #include <cstdint>
 #include <fstream>
 #include <filesystem>
@@ -129,7 +128,7 @@ namespace SNEEZE
          uint32_t            AccessCount    () const;
 
          void  TouchAccess ();
-         void  SaveMeta (std::shared_ptr<VIEWPORT::CONTAINER::CID> pCID);
+         void  SaveMeta (const VIEWPORT::CONTAINER::CID& CID);
          void  LoadMeta ();
 
       private:
@@ -173,14 +172,14 @@ namespace SNEEZE
       class SILO
       {
       public:
-         SILO (STORAGE* pStorage, std::shared_ptr<VIEWPORT::CONTAINER::CID> pCID, VIEWPORT* pViewport);
+         SILO (STORAGE* pStorage, const VIEWPORT::CONTAINER::CID* pCID, VIEWPORT* pViewport);
         ~SILO ();
 
          void Initialize ();
 
          // --- Identity ---
 
-         std::shared_ptr<VIEWPORT::CONTAINER::CID>  CID () const;
+         const VIEWPORT::CONTAINER::CID&  CID () const;
          std::string  DisplayName () const;
          VIEWPORT* Viewport () const;
          const std::string& sPath_Permanent () const;
@@ -222,11 +221,11 @@ namespace SNEEZE
 
       private:
          STORAGE*                                    m_pStorage;
-         std::shared_ptr<VIEWPORT::CONTAINER::CID>  m_pCID;
          VIEWPORT*                                   m_pViewport;
+         VIEWPORT::CONTAINER::CID                    m_CID;
          std::string                                 m_sPath_Permanent;
          std::string                                 m_sPath_Temporary;
-         UNIT*                                       m_apUnits[kSCOPE_COUNT];
+         UNIT*                                       m_apUnit[kSCOPE_COUNT];
          uint32_t                                    m_nCount_Load;
          bool                                        m_bPendingClear;
       };
@@ -242,26 +241,19 @@ namespace SNEEZE
 
       // --- Container lifecycle ---
 
-      SILO*   Silo_Open  (VIEWPORT* pViewport, std::shared_ptr<VIEWPORT::CONTAINER::CID> pCID);
+      SILO*   Silo_Open  (VIEWPORT* pViewport, const VIEWPORT::CONTAINER::CID* pCID);
       void    Silo_Close (VIEWPORT* pViewport, SILO* pSilo);
       void    Silo_Enum  (VIEWPORT* pViewport, IENUM* pEnum);
-
-      // --- Paths ---
-
-      const std::string& sPath_Permanent () const;
-      const std::string& sPath_Temporary () const;
 
    private:
       UNIT*   Unit_Open  (eSCOPE eScope, const std::string& sPathname);
       void    Unit_Close (UNIT* pUnit);
 
       ENGINE*                                 m_pEngine;
-      std::string                             m_sPath_Permanent;
-      std::string                             m_sPath_Temporary;
 
-      std::unordered_map<std::string, UNIT*>  m_umpUnit;
-      std::vector<SILO*>                      m_apSilo;
       std::recursive_mutex                    m_mxStorage;
+      std::vector<SILO*>                      m_apSilo;
+      std::unordered_map<std::string, UNIT*>  m_umpUnit;
    };
 }
 #endif // SNEEZE_STORAGE_STORAGE_H

@@ -42,15 +42,6 @@ std::string STORAGE::UNIT::NowIso8601 ()
 // STORAGE::UNIT
 // ===========================================================================
 
-bool                 STORAGE::UNIT::IsLoaded () const        { return m_bLoaded; }
-bool                 STORAGE::UNIT::IsDirty () const         { return m_bDirty; }
-STORAGE::eSCOPE      STORAGE::UNIT::GetScope () const        { return m_eScope; }
-const std::string&   STORAGE::UNIT::Pathname () const        { return m_sPathname; }
-uint64_t             STORAGE::UNIT::SizeBytes () const       { return m_nSizeBytes; }
-const std::string&   STORAGE::UNIT::CreatedTime () const     { return m_sCreatedAt; }
-const std::string&   STORAGE::UNIT::LastAccessTime () const  { return m_sLastAccessedAt; }
-uint32_t             STORAGE::UNIT::AccessCount () const     { return m_nAccessCount; }
-
 STORAGE::UNIT::UNIT (STORAGE* pStorage, eSCOPE eScope, const std::string& sPathname) :
    m_pStorage       (pStorage),
    m_eScope         (eScope),
@@ -64,6 +55,19 @@ STORAGE::UNIT::UNIT (STORAGE* pStorage, eSCOPE eScope, const std::string& sPathn
 {
    LoadMeta ();
 }
+
+// ---------------------------------------------------------------------------
+// Accessors
+// ---------------------------------------------------------------------------
+
+bool                 STORAGE::UNIT::IsLoaded       () const { return m_bLoaded; }
+bool                 STORAGE::UNIT::IsDirty        () const { return m_bDirty; }
+STORAGE::eSCOPE      STORAGE::UNIT::GetScope       () const { return m_eScope; }
+const std::string&   STORAGE::UNIT::Pathname       () const { return m_sPathname; }
+uint64_t             STORAGE::UNIT::SizeBytes      () const { return m_nSizeBytes; }
+const std::string&   STORAGE::UNIT::CreatedTime    () const { return m_sCreatedAt; }
+const std::string&   STORAGE::UNIT::LastAccessTime () const { return m_sLastAccessedAt; }
+uint32_t             STORAGE::UNIT::AccessCount    () const { return m_nAccessCount; }
 
 // ---------------------------------------------------------------------------
 // JSON path navigation
@@ -478,21 +482,18 @@ void STORAGE::UNIT::TouchAccess ()
    m_nAccessCount++;
 }
 
-void STORAGE::UNIT::SaveMeta (std::shared_ptr<VIEWPORT::CONTAINER::CID> pCID)
+void STORAGE::UNIT::SaveMeta (const VIEWPORT::CONTAINER::CID& CID)
 {
    std::string sMetaPath = m_sPathname + ".meta";
 
    nlohmann::json jMeta;
 
-   if (pCID)
-   {
-      jMeta["fingerprint"]   = pCID->sFingerprint;
-      jMeta["organization"]  = pCID->sOrganization;
-      jMeta["commonName"]    = pCID->sCommonName;
-      jMeta["containerName"] = pCID->sContainerName;
-      jMeta["personaHash"]   = pCID->sPersonaHash;
-      jMeta["validated"]     = pCID->bValidated;
-   }
+   jMeta["fingerprint"]   = CID.sFingerprint;
+   jMeta["organization"]  = CID.sOrganization;
+   jMeta["commonName"]    = CID.sCommonName;
+   jMeta["containerName"] = CID.sContainerName;
+   jMeta["personaHash"]   = CID.sPersonaHash;
+   jMeta["validated"]     = CID.bValidated;
 
    jMeta["scope"]          = static_cast<int> (m_eScope);
    jMeta["sizeBytes"]      = m_nSizeBytes;
