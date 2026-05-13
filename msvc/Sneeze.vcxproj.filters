@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="sneeze">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000001}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="sneeze\control">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000002}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="sneeze\network">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000003}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="sneeze\storage">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000004}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="astro">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000005}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="viewport">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000006}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="viewport\scene">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000007}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="viewport\renderer">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000008}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="viewport\msf">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000009}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="persona">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-00000000000A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="deps\wasm">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-00000000000B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="deps\spirv">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-00000000000C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="deps\xr">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-00000000000D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="deps\ui">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-00000000000E}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="deps\compute">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-00000000000F}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="deps\stb">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000010}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="deps">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000020}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000011}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\src\sneeze\Pch.cpp">
+      <Filter>sneeze</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\sneeze\Engine.cpp">
+      <Filter>sneeze</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\sneeze\Thread.cpp">
+      <Filter>sneeze</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\sneeze\control\Agent.cpp">
+      <Filter>sneeze\control</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\sneeze\control\Control.cpp">
+      <Filter>sneeze\control</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\sneeze\control\Compositor.cpp">
+      <Filter>sneeze\control</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\sneeze\control\Scrubber.cpp">
+      <Filter>sneeze\control</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\sneeze\control\AgentC.cpp">
+      <Filter>sneeze\control</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\sneeze\control\AgentD.cpp">
+      <Filter>sneeze\control</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\sneeze\control\AgentE.cpp">
+      <Filter>sneeze\control</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\astro\BodyData.cpp">
+      <Filter>astro</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\astro\Celestial.cpp">
+      <Filter>astro</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\astro\Orbit.cpp">
+      <Filter>astro</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\astro\RMCObject.cpp">
+      <Filter>astro</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\astro\AstroService.cpp">
+      <Filter>astro</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\viewport\Viewport.cpp">
+      <Filter>viewport</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\viewport\scene\Epoch.cpp">
+      <Filter>viewport\scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\viewport\scene\Node.cpp">
+      <Filter>viewport\scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\viewport\scene\Fabric.cpp">
+      <Filter>viewport\scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\viewport\scene\Scene.cpp">
+      <Filter>viewport\scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\viewport\scene\MapObject.cpp">
+      <Filter>viewport\scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\viewport\scene\AccessControl.cpp">
+      <Filter>viewport\scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\viewport\scene\Events.cpp">
+      <Filter>viewport\scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\viewport\scene\SpatialIndex.cpp">
+      <Filter>viewport\scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\sneeze\network\Asset.cpp">
+      <Filter>sneeze\network</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\sneeze\network\File.cpp">
+      <Filter>sneeze\network</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\sneeze\network\Network.cpp">
+      <Filter>sneeze\network</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\sneeze\storage\Storage.cpp">
+      <Filter>sneeze\storage</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\sneeze\storage\Unit.cpp">
+      <Filter>sneeze\storage</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\sneeze\storage\Silo.cpp">
+      <Filter>sneeze\storage</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\persona\Persona.cpp">
+      <Filter>persona</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\viewport\renderer\AnariRenderer.cpp">
+      <Filter>viewport\renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\viewport\renderer\UVSphere.cpp">
+      <Filter>viewport\renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\deps\wasm\WasmRuntime.cpp">
+      <Filter>deps\wasm</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\deps\wasm\WasmStore.cpp">
+      <Filter>deps\wasm</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\deps\wasm\WasmInstance.cpp">
+      <Filter>deps\wasm</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\deps\wasm\HostFunctions.cpp">
+      <Filter>deps\wasm</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\deps\wasm\ThreadPool.cpp">
+      <Filter>deps\wasm</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\deps\spirv\SpvPipeline.cpp">
+      <Filter>deps\spirv</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\deps\xr\XrRuntime.cpp">
+      <Filter>deps\xr</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\deps\ui\UiContext.cpp">
+      <Filter>deps\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\deps\compute\EmbeddedKernels.cpp">
+      <Filter>deps\compute</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\deps\compute\ComputeDispatch.cpp">
+      <Filter>deps\compute</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\viewport\msf\MsfFile.cpp">
+      <Filter>viewport\msf</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\viewport\msf\CertChain.cpp">
+      <Filter>viewport\msf</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\deps\stb\stb_image_impl.cpp">
+      <Filter>deps\stb</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\src\sneeze\Pch.h">
+      <Filter>sneeze</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\sneeze\Types.h">
+      <Filter>sneeze</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\sneeze\Engine.h">
+      <Filter>sneeze</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\sneeze\control\Control.h">
+      <Filter>sneeze\control</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\astro\BodyData.h">
+      <Filter>astro</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\astro\Celestial.h">
+      <Filter>astro</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\astro\Orbit.h">
+      <Filter>astro</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\astro\RMCObject.h">
+      <Filter>astro</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\astro\AstroService.h">
+      <Filter>astro</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\viewport\scene\Epoch.h">
+      <Filter>viewport\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\viewport\scene\Node.h">
+      <Filter>viewport\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\viewport\scene\Fabric.h">
+      <Filter>viewport\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\viewport\scene\Scene.h">
+      <Filter>viewport\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\viewport\scene\MapObject.h">
+      <Filter>viewport\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\viewport\scene\AccessControl.h">
+      <Filter>viewport\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\viewport\scene\Events.h">
+      <Filter>viewport\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\viewport\scene\SpatialIndex.h">
+      <Filter>viewport\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\viewport\renderer\Renderer.h">
+      <Filter>viewport\renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\viewport\renderer\AnariRenderer.h">
+      <Filter>viewport\renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\viewport\renderer\UVSphere.h">
+      <Filter>viewport\renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\deps\wasm\WasmRuntime.h">
+      <Filter>deps\wasm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\deps\wasm\WasmStore.h">
+      <Filter>deps\wasm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\deps\wasm\WasmInstance.h">
+      <Filter>deps\wasm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\deps\wasm\HostFunctions.h">
+      <Filter>deps\wasm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\deps\wasm\ThreadPool.h">
+      <Filter>deps\wasm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\deps\spirv\SpvPipeline.h">
+      <Filter>deps\spirv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\deps\xr\XrRuntime.h">
+      <Filter>deps\xr</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\deps\ui\UiContext.h">
+      <Filter>deps\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\deps\compute\EmbeddedKernels.h">
+      <Filter>deps\compute</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\deps\compute\ComputeDispatch.h">
+      <Filter>deps\compute</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\viewport\msf\Msf.h">
+      <Filter>viewport\msf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\deps\stb\stb_image.h">
+      <Filter>deps\stb</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Sneeze.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Persona.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Network.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Container.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Viewport.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Storage.h">
+      <Filter>include</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
