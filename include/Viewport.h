@@ -15,15 +15,6 @@
 #ifndef SNEEZE_VIEWPORT_H
 #define SNEEZE_VIEWPORT_H
 
-#include <atomic>
-#include <mutex>
-#include <condition_variable>
-#include <vector>
-#include <cstdint>
-#include <cmath>
-#include <algorithm>
-#include <string>
-
 namespace SNEEZE
 {
    class VIEWPORT
@@ -74,8 +65,9 @@ namespace SNEEZE
 
       // --- Camera orbit state ---
 
-      struct VIEW
+      class VIEW
       {
+      public:
          float dTheta    = 0.3f;
          float dPhi      = 0.4f;
          float dDistance = 10.0f;
@@ -150,45 +142,8 @@ namespace SNEEZE
       RENDERER* Renderer () const;
 
    private:
-      ENGINE*                 m_pEngine;
-      IVIEWPORT*              m_pHost;
-      eINIT_STATE             m_eInitState;
-      bool                    m_bReady;
-      SCENE*                  m_pScene;
-      RENDERER*               m_pRenderer;
-      bool                    m_bRendererPending;
-      std::atomic<bool>       m_bRendererShutdownRequested;
-      bool                    m_bRendererShutdownComplete;
-      std::mutex              m_rendererMutex;
-      std::condition_variable m_rendererCondVar;
-
-      // Input
-      std::mutex              m_inputMutex;
-      INPUT                   m_Input;
-
-      // Framebuffer
-      std::mutex              m_fbMutex;
-      std::vector<uint32_t>   m_aFrameBuffer;
-      int                     m_nFbWidth;
-      int                     m_nFbHeight;
-
-      // Dimensions
-      int                     m_nWidth;
-      int                     m_nHeight;
-
-      // Resize request
-      std::mutex              m_resizeMutex;
-      bool                    m_bResizePending;
-      int                     m_nResizeWidth;
-      int                     m_nResizeHeight;
-
-      // Paths
-      eSESSION                m_eSession;
-      std::string             m_sPath_Permanent;
-      std::string             m_sPath_Temporary;
-
-      // Camera
-      VIEW                    m_View;
+      class Impl;
+      Impl* m_pImpl;
    };
 }
 #endif // SNEEZE_VIEWPORT_H

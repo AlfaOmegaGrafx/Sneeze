@@ -14,15 +14,9 @@
 
 #include <Sneeze.h>
 
-#include <nlohmann/json.hpp>
 #include <openssl/evp.h>
 #include <openssl/sha.h>
 #include <curl/curl.h>
-
-#include <fstream>
-#include <filesystem>
-#include <sstream>
-#include <algorithm>
 
 using namespace SNEEZE;
 
@@ -730,7 +724,7 @@ public:
          {
             if (!mapHeaders.empty ())
                pAsset->SetHeaders (mapHeaders);
-            pAsset->Fail ();
+            pAsset->SetState (STATE_FAILED);
             NotifyFiles (pAsset->CollectFiles (), STATE_FAILED);
          }
 
@@ -862,7 +856,7 @@ public:
 
             if (bNeedsFetch && bFetch)
             {
-               pAsset->SetFetching ();
+               pAsset->SetState (STATE_FETCHING);
                pAsset->SetFetchQueuedTime (SecondsSinceEpoch ());
                pFile->SnapshotProgress ();
                DispatchFetch (pAsset);
