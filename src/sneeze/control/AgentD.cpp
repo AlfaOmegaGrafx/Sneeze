@@ -24,6 +24,7 @@ AGENT::D::D (CONTROL* pControl, int nAgentIndex)
 
 AGENT::D::~D ()
 {
+   Join ();
 }
 
 void AGENT::D::Main ()

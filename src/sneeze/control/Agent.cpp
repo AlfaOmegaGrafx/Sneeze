@@ -26,6 +26,7 @@ AGENT::AGENT (CONTROL* pControl, int nAgentIndex)
 
 AGENT::~AGENT ()
 {
+   Join ();
 }
 
 ENGINE* AGENT::Engine () const

@@ -651,4 +651,23 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
   - Updated `src/sneeze/storage/Storage.md` (two-counter model, ownership, path changes)
   - Updated `project.mdc` (STORAGE module, STORAGE class, JWS known issue, control module ref)
 
+## 2026-05-12 (Tuesday, late) — THREAD Join() fix + Storage compartmentalization
+
+- **THREAD::Join() — C++ destructor ordering fix:**
+  - Diagnosed crash in `CONTROL::Main()` accessing `m_aAgent_State` (size 0) during shutdown — root cause: C++ destructor order destroys derived members before base destructor runs, so `~THREAD()`'s join was too late.
+  - Extracted `Join()` as a protected, idempotent method on THREAD (Signal(true), join, delete, nullptr).
+  - `~THREAD()` calls `Join()` as safety net; all derived classes (`~CONTROL`, `~AGENT`, `~COMPOSITOR`, `~SCRUBBER`, `~C`, `~D`, `~E`) now call `Join()` in their own destructors.
+  - Files: `Engine.h`, `Thread.cpp`, `Control.cpp`, `Agent.cpp`, `Compositor.cpp`, `Scrubber.cpp`, `AgentC.cpp`, `AgentD.cpp`, `AgentE.cpp`.
+- **Storage compartmentalization — pushing responsibilities down:**
+  - `Silo_Open` no longer auto-attaches — caller explicitly calls `pSilo->Attach()` / `pSilo->Detach()`.
+  - Private helpers `Unit_Open`/`Unit_Close` on STORAGE manage the cross-silo UNIT map (called under `m_mxStorage`).
+  - `UNIT` constructor now initializes `m_nCount_Open` to 0 (symmetric — `Open()` always called).
+  - `LoadMeta()` moved into UNIT constructor (was in SILO::Initialize and STORAGE::Unit_Open — two levels out of place).
+  - `Save()` if dirty moved into `UNIT::Detach()` (was in SILO::Detach — one level out).
+  - `Unit_Open` refactored for single return point.
+  - StorageTest.cpp updated: explicit Attach/Detach in all test cases, teardown order fixed (Viewport_Close before delete engine).
+  - Files: `Storage.cpp`, `Silo.cpp`, `Unit.cpp`, `Storage.h`, `StorageTest.cpp`.
+  - Storage.cpp is now ~143 lines — thin orchestrator, no reach-ins.
+- **Remaining:** Silo.cpp review (small, should be quick), Unit.cpp review (mechanics are fine, compartmentalization already pushed down).
+
 

@@ -50,13 +50,13 @@ namespace SNEEZE
       // SCOPE — selects one of the four storage units within a SILO.
       // -----------------------------------------------------------------------
 
-      enum SCOPE
+      enum eSCOPE
       {
-         ORG_PERMANENT       = 0,
-         ORG_TEMPORARY       = 1,
-         CONTAINER_PERMANENT = 2,
-         CONTAINER_TEMPORARY = 3,
-         SCOPE_COUNT         = 4,
+         kSCOPE_PERMANENT_ORG     = 0,
+         kSCOPE_PERMANENT_COMPANY = 1,
+         kSCOPE_TEMPORARY_ORG     = 2,
+         kSCOPE_TEMPORARY_COMPANY = 3,
+         kSCOPE_COUNT             = 4,
       };
 
       // -----------------------------------------------------------------------
@@ -69,7 +69,7 @@ namespace SNEEZE
       // -----------------------------------------------------------------------
       // IENUM — enumeration callback interface.
       //
-      // Implement to receive SILO pointers during Enumerate().
+      // Implement to receive SILO pointers during Silo_Enum().
       // -----------------------------------------------------------------------
 
       class IENUM
@@ -90,35 +90,39 @@ namespace SNEEZE
       class UNIT
       {
       public:
-         UNIT (STORAGE* pStorage, SCOPE eScope, const std::string& sJsonPath);
+         UNIT (STORAGE* pStorage, eSCOPE eScope, const std::string& sPathname);
 
          // --- State ---
 
-         bool     IsLoaded () const;
-         bool     IsDirty () const;
-         SCOPE    GetScope () const;
+         bool                IsLoaded       () const;
+         bool                IsDirty        () const;
+         eSCOPE              GetScope       () const;
 
          // --- JSON access ---
 
-         nlohmann::json  Get (const std::string& sPath) const;
-         void            Set (const std::string& sPath, const nlohmann::json& jValue);
-         void            Remove (const std::string& sPath);
-         bool            Has (const std::string& sPath) const;
+         nlohmann::json      Get            (const std::string& sPath) const;
+         void                Set            (const std::string& sPath, const nlohmann::json& jValue);
+         void                Remove         (const std::string& sPath);
+         bool                Has            (const std::string& sPath) const;
 
          // --- Bulk ---
 
-         std::string     Json () const;
-         void            Json (const std::string& sJson);
+         std::string         Json           () const;
+         void                Json           (const std::string& sJson);
 
          // --- Lifecycle ---
 
-         void            Load ();
-         void            Save ();
-         void            Evict ();
+         uint32_t            Open           ();
+         uint32_t            Close          ();
+         void                Attach         ();
+         void                Detach         ();
+         void                Load           ();
+         void                Save           ();
+         void                Evict          ();
 
          // --- Meta sidecar ---
 
-         const std::string&  JsonPath       () const;
+         const std::string&  Pathname       () const;
          uint64_t            SizeBytes      () const;
          const std::string&  CreatedTime    () const;
          const std::string&  LastAccessTime () const;
@@ -137,8 +141,8 @@ namespace SNEEZE
          static std::string NowIso8601 ();
 
          STORAGE*             m_pStorage;
-         SCOPE                m_eScope;
-         std::string          m_sJsonPath;
+         eSCOPE               m_eScope;
+         std::string          m_sPathname;
 
          nlohmann::json       m_jData;
          bool                 m_bLoaded;
@@ -170,6 +174,9 @@ namespace SNEEZE
       {
       public:
          SILO (STORAGE* pStorage, std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, VIEWPORT* pViewport);
+        ~SILO ();
+
+         void Initialize ();
 
          // --- Identity ---
 
@@ -181,15 +188,15 @@ namespace SNEEZE
 
          // --- Path-based API ---
 
-         nlohmann::json  Get    (SCOPE eScope, const std::string& sPath) const;
-         void            Set    (SCOPE eScope, const std::string& sPath, const nlohmann::json& jValue);
-         void            Remove (SCOPE eScope, const std::string& sPath);
-         bool            Has    (SCOPE eScope, const std::string& sPath) const;
+         nlohmann::json  Get    (eSCOPE eScope, const std::string& sPath) const;
+         void            Set    (eSCOPE eScope, const std::string& sPath, const nlohmann::json& jValue);
+         void            Remove (eSCOPE eScope, const std::string& sPath);
+         bool            Has    (eSCOPE eScope, const std::string& sPath) const;
 
          // --- Bulk ---
 
-         std::string     Json (SCOPE eScope) const;
-         void            Json (SCOPE eScope, const std::string& sJson);
+         std::string     Json (eSCOPE eScope) const;
+         void            Json (eSCOPE eScope, const std::string& sJson);
 
          // --- Reference counting (WASM + inspector attachments) ---
 
@@ -202,20 +209,26 @@ namespace SNEEZE
          bool     IsPendingClear () const;
          void     SetPendingClear (bool b);
 
+         // --- Paths ---
+
+         std::string sPath     (eSCOPE eScope) const;
+         std::string sFilename (eSCOPE eScope, const std::string& sExt = "") const;
+         std::string sPathname (eSCOPE eScope, const std::string& sExt = "") const;
+
          // --- Internal ---
 
-         UNIT*    Unit (SCOPE eScope) const;
-         void     Unit (SCOPE eScope, UNIT* pUnit);
+         UNIT*    Unit (eSCOPE eScope) const;
+         void     Unit (eSCOPE eScope, UNIT* pUnit);
 
       private:
-         STORAGE*    m_pStorage;
+         STORAGE*                                    m_pStorage;
          std::shared_ptr<VIEWPORT::CONTAINER::NAME>  m_pName;
-         VIEWPORT* m_pViewport;
-         std::string m_sPath_Permanent;
-         std::string m_sPath_Temporary;
-         UNIT*       m_apUnits[SCOPE_COUNT];
-         uint32_t    m_nCount_Load;
-         bool        m_bPendingClear;
+         VIEWPORT*                                   m_pViewport;
+         std::string                                 m_sPath_Permanent;
+         std::string                                 m_sPath_Temporary;
+         UNIT*                                       m_apUnits[kSCOPE_COUNT];
+         uint32_t                                    m_nCount_Load;
+         bool                                        m_bPendingClear;
       };
 
       // -----------------------------------------------------------------------
@@ -229,12 +242,9 @@ namespace SNEEZE
 
       // --- Container lifecycle ---
 
-      SILO*   Silo_Open (std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, VIEWPORT* pViewport);
-      void    Silo_Close (SILO* pSilo);
-
-      // --- Inspector ---
-
-      void    Enumerate (IENUM* pEnum, VIEWPORT* pViewport);
+      SILO*   Silo_Open  (VIEWPORT* pViewport, std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName);
+      void    Silo_Close (VIEWPORT* pViewport, SILO* pSilo);
+      void    Silo_Enum  (VIEWPORT* pViewport, IENUM* pEnum);
 
       // --- Paths ---
 
@@ -242,12 +252,15 @@ namespace SNEEZE
       const std::string& sPath_Temporary () const;
 
    private:
-      ENGINE*   m_pEngine;
-      std::string     m_sPath_Permanent;
-      std::string     m_sPath_Temporary;
+      UNIT*   Unit_Open  (eSCOPE eScope, const std::string& sPathname);
+      void    Unit_Close (UNIT* pUnit);
+
+      ENGINE*                                 m_pEngine;
+      std::string                             m_sPath_Permanent;
+      std::string                             m_sPath_Temporary;
 
       std::unordered_map<std::string, UNIT*>  m_umpUnit;
-      std::vector<SILO*>                       m_apSilo;
+      std::vector<SILO*>                      m_apSilo;
       std::recursive_mutex                    m_mxStorage;
    };
 }

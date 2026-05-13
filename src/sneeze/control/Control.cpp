@@ -74,6 +74,7 @@ bool CONTROL::Initialize (int& nAgentCount)
 
 CONTROL::~CONTROL ()
 {
+   Join ();
 }
 
 ENGINE* CONTROL::Engine () const

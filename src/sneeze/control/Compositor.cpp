@@ -103,6 +103,7 @@ AGENT::COMPOSITOR::COMPOSITOR (CONTROL* pControl, int nAgentIndex)
 
 AGENT::COMPOSITOR::~COMPOSITOR ()
 {
+   Join ();
 }
 
 void AGENT::COMPOSITOR::Main ()

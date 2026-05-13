@@ -46,6 +46,7 @@ namespace SNEEZE
       bool IsShutdown   () const;
       void Wait         (std::function<bool ()> fnWork);
       void Wait         (std::chrono::milliseconds duration);
+      void Join         ();
 
    private:
       std::thread*            m_pthThread;

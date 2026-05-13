@@ -44,24 +44,25 @@ std::string STORAGE::UNIT::NowIso8601 ()
 
 bool                 STORAGE::UNIT::IsLoaded () const        { return m_bLoaded; }
 bool                 STORAGE::UNIT::IsDirty () const         { return m_bDirty; }
-STORAGE::SCOPE       STORAGE::UNIT::GetScope () const        { return m_eScope; }
-const std::string&   STORAGE::UNIT::JsonPath () const        { return m_sJsonPath; }
+STORAGE::eSCOPE      STORAGE::UNIT::GetScope () const        { return m_eScope; }
+const std::string&   STORAGE::UNIT::Pathname () const        { return m_sPathname; }
 uint64_t             STORAGE::UNIT::SizeBytes () const       { return m_nSizeBytes; }
 const std::string&   STORAGE::UNIT::CreatedTime () const     { return m_sCreatedAt; }
 const std::string&   STORAGE::UNIT::LastAccessTime () const  { return m_sLastAccessedAt; }
 uint32_t             STORAGE::UNIT::AccessCount () const     { return m_nAccessCount; }
 
-STORAGE::UNIT::UNIT (STORAGE* pStorage, SCOPE eScope, const std::string& sJsonPath) :
+STORAGE::UNIT::UNIT (STORAGE* pStorage, eSCOPE eScope, const std::string& sPathname) :
    m_pStorage       (pStorage),
    m_eScope         (eScope),
-   m_sJsonPath      (sJsonPath),
+   m_sPathname      (sPathname),
    m_bLoaded        (false),
    m_bDirty         (false),
-   m_nCount_Open    (1),
+   m_nCount_Open    (0),
    m_nCount_Load    (0),
    m_nSizeBytes     (0),
    m_nAccessCount   (0)
 {
+   LoadMeta ();
 }
 
 // ---------------------------------------------------------------------------
@@ -279,7 +280,7 @@ void STORAGE::UNIT::Json (const std::string& sJson)
 
 void STORAGE::UNIT::Log_Append (const std::string& sOp, const std::string& sPath, const nlohmann::json& jValue)
 {
-   std::string sLogPath = m_sJsonPath + ".log";
+   std::string sLogPath = m_sPathname + ".log";
 
    std::ofstream file (sLogPath, std::ios::app);
    if (file.is_open ())
@@ -295,7 +296,7 @@ void STORAGE::UNIT::Log_Append (const std::string& sOp, const std::string& sPath
 
 void STORAGE::UNIT::Log_Replay ()
 {
-   std::string sLogPath = m_sJsonPath + ".log";
+   std::string sLogPath = m_sPathname + ".log";
 
    std::ifstream file (sLogPath);
    if (file.is_open ())
@@ -371,7 +372,7 @@ void STORAGE::UNIT::Log_Replay ()
 
 void STORAGE::UNIT::Log_Delete ()
 {
-   std::string sLogPath = m_sJsonPath + ".log";
+   std::string sLogPath = m_sPathname + ".log";
    std::error_code ec;
    std::filesystem::remove (sLogPath, ec);
 }
@@ -380,6 +381,12 @@ void STORAGE::UNIT::Log_Delete ()
 // Lifecycle
 // ---------------------------------------------------------------------------
 
+uint32_t STORAGE::UNIT::Open ()  { return ++m_nCount_Open; }
+uint32_t STORAGE::UNIT::Close () { return --m_nCount_Open; }
+
+void STORAGE::UNIT::Attach () { if (++m_nCount_Load == 1) Load (); }
+void STORAGE::UNIT::Detach () { if (m_nCount_Load > 0  &&  --m_nCount_Load == 0) { if (m_bDirty) Save (); Evict (); } }
+
 void STORAGE::UNIT::Load ()
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
@@ -387,13 +394,14 @@ void STORAGE::UNIT::Load ()
    if (!m_bLoaded)
    {
       std::error_code ec;
-      std::filesystem::create_directories (std::filesystem::path (m_sJsonPath).parent_path (), ec);
+      std::filesystem::create_directories (std::filesystem::path (m_sPathname).parent_path (), ec);
 
       m_jData = nlohmann::json::object ();
 
-      if (std::filesystem::exists (m_sJsonPath))
+      std::string sJsonFile = m_sPathname + ".json";
+      if (std::filesystem::exists (sJsonFile))
       {
-         std::ifstream file (m_sJsonPath);
+         std::ifstream file (sJsonFile);
          if (file.is_open ())
          {
             try
@@ -425,7 +433,8 @@ void STORAGE::UNIT::Save ()
 
    if (m_bLoaded)
    {
-      std::string sTmpPath = m_sJsonPath + ".temp";
+      std::string sJsonFile = m_sPathname + ".json";
+      std::string sTmpPath  = sJsonFile + ".temp";
       std::ofstream file (sTmpPath, std::ios::trunc);
       if (file.is_open ())
       {
@@ -433,11 +442,11 @@ void STORAGE::UNIT::Save ()
          file.close ();
 
          std::error_code ec;
-         std::filesystem::rename (sTmpPath, m_sJsonPath, ec);
+         std::filesystem::rename (sTmpPath, sJsonFile, ec);
 
          if (!ec)
          {
-            auto nSize = std::filesystem::file_size (m_sJsonPath, ec);
+            auto nSize = std::filesystem::file_size (sJsonFile, ec);
             if (!ec)
                m_nSizeBytes = static_cast<uint64_t> (nSize);
          }
@@ -471,7 +480,7 @@ void STORAGE::UNIT::TouchAccess ()
 
 void STORAGE::UNIT::SaveMeta (std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName)
 {
-   std::string sMetaPath = m_sJsonPath + ".meta";
+   std::string sMetaPath = m_sPathname + ".meta";
 
    nlohmann::json jMeta;
 
@@ -505,7 +514,7 @@ void STORAGE::UNIT::SaveMeta (std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName)
 
 void STORAGE::UNIT::LoadMeta ()
 {
-   std::string sMetaPath = m_sJsonPath + ".meta";
+   std::string sMetaPath = m_sPathname + ".meta";
 
    std::ifstream file (sMetaPath);
    if (file.is_open ())

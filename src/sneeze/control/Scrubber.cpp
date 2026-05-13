@@ -26,6 +26,7 @@ AGENT::SCRUBBER::SCRUBBER (CONTROL* pControl, int nAgentIndex)
 
 AGENT::SCRUBBER::~SCRUBBER ()
 {
+   Join ();
 }
 
 void AGENT::SCRUBBER::Main ()

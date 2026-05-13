@@ -28,8 +28,30 @@ const std::string&   STORAGE::SILO::sPath_Temporary () const { return m_sPath_Te
 uint32_t             STORAGE::SILO::Count_Load () const { return m_nCount_Load; }
 bool                 STORAGE::SILO::IsPendingClear () const { return m_bPendingClear; }
 void                 STORAGE::SILO::SetPendingClear (bool b) { m_bPendingClear = b; }
-STORAGE::UNIT*       STORAGE::SILO::Unit (SCOPE eScope) const { return m_apUnits[eScope]; }
-void                 STORAGE::SILO::Unit (SCOPE eScope, UNIT* pUnit) { m_apUnits[eScope] = pUnit; }
+STORAGE::UNIT*       STORAGE::SILO::Unit (eSCOPE eScope) const { return m_apUnits[eScope]; }
+void                 STORAGE::SILO::Unit (eSCOPE eScope, UNIT* pUnit) { m_apUnits[eScope] = pUnit; }
+
+std::string STORAGE::SILO::sPath (eSCOPE eScope) const
+{
+   const std::string& sBasePath = (eScope == kSCOPE_TEMPORARY_ORG  ||  eScope == kSCOPE_TEMPORARY_COMPANY) ? m_sPath_Temporary : m_sPath_Permanent;
+
+   return (std::filesystem::path (sBasePath) / m_pName->sPersonaHash / m_pName->sFingerprint.substr (0, 2) / m_pName->sFingerprint.substr (2, 22)).string ();
+}
+
+std::string STORAGE::SILO::sFilename (eSCOPE eScope, const std::string& sExt) const
+{
+   std::string sName = (eScope == kSCOPE_PERMANENT_ORG  ||  eScope == kSCOPE_TEMPORARY_ORG) ? "organization" : "container-" + m_pName->sContainerName;
+
+   if (!sExt.empty ())
+      sName += "." + sExt;
+
+   return sName;
+}
+
+std::string STORAGE::SILO::sPathname (eSCOPE eScope, const std::string& sExt) const
+{
+   return (std::filesystem::path (sPath (eScope)) / sFilename (eScope, sExt)).string ();
+}
 
 STORAGE::SILO::SILO (STORAGE* pStorage, std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, VIEWPORT* pViewport) :
    m_pStorage        (pStorage),
@@ -40,11 +62,32 @@ STORAGE::SILO::SILO (STORAGE* pStorage, std::shared_ptr<VIEWPORT::CONTAINER::NAM
    m_nCount_Load     (0),
    m_bPendingClear   (false)
 {
-   for (int i = 0; i < SCOPE_COUNT; i++)
+   for (int i = 0; i < kSCOPE_COUNT; i++)
       m_apUnits[i] = nullptr;
 }
 
-nlohmann::json STORAGE::SILO::Get (SCOPE eScope, const std::string& sPath) const
+STORAGE::SILO::~SILO ()
+{
+   if (m_nCount_Load > 0)
+      Detach ();
+
+   for (int i = 0; i < kSCOPE_COUNT; i++)
+   {
+      if (m_apUnits[i])
+         m_pStorage->Unit_Close (m_apUnits[i]);
+   }
+}
+
+void STORAGE::SILO::Initialize ()
+{
+   for (int i = 0; i < kSCOPE_COUNT; i++)
+   {
+      eSCOPE eScope = static_cast<eSCOPE> (i);
+      m_apUnits[i] = m_pStorage->Unit_Open (eScope, sPathname (eScope));
+   }
+}
+
+nlohmann::json STORAGE::SILO::Get (eSCOPE eScope, const std::string& sPath) const
 {
    nlohmann::json jResult;
    if (m_apUnits[eScope])
@@ -52,7 +95,7 @@ nlohmann::json STORAGE::SILO::Get (SCOPE eScope, const std::string& sPath) const
    return jResult;
 }
 
-void STORAGE::SILO::Set (SCOPE eScope, const std::string& sPath, const nlohmann::json& jValue)
+void STORAGE::SILO::Set (eSCOPE eScope, const std::string& sPath, const nlohmann::json& jValue)
 {
    if (m_apUnits[eScope])
    {
@@ -62,7 +105,7 @@ void STORAGE::SILO::Set (SCOPE eScope, const std::string& sPath, const nlohmann:
    }
 }
 
-void STORAGE::SILO::Remove (SCOPE eScope, const std::string& sPath)
+void STORAGE::SILO::Remove (eSCOPE eScope, const std::string& sPath)
 {
    if (m_apUnits[eScope])
    {
@@ -72,7 +115,7 @@ void STORAGE::SILO::Remove (SCOPE eScope, const std::string& sPath)
    }
 }
 
-bool STORAGE::SILO::Has (SCOPE eScope, const std::string& sPath) const
+bool STORAGE::SILO::Has (eSCOPE eScope, const std::string& sPath) const
 {
    bool bHas = false;
    if (m_apUnits[eScope])
@@ -80,7 +123,7 @@ bool STORAGE::SILO::Has (SCOPE eScope, const std::string& sPath) const
    return bHas;
 }
 
-std::string STORAGE::SILO::Json (SCOPE eScope) const
+std::string STORAGE::SILO::Json (eSCOPE eScope) const
 {
    std::string sJson = "{}";
    if (m_apUnits[eScope])
@@ -88,7 +131,7 @@ std::string STORAGE::SILO::Json (SCOPE eScope) const
    return sJson;
 }
 
-void STORAGE::SILO::Json (SCOPE eScope, const std::string& sJson)
+void STORAGE::SILO::Json (eSCOPE eScope, const std::string& sJson)
 {
    if (m_apUnits[eScope])
    {
@@ -104,13 +147,10 @@ void STORAGE::SILO::Attach ()
 
    if (m_nCount_Load == 1)
    {
-      for (int i = 0; i < SCOPE_COUNT; i++)
+      for (int i = 0; i < kSCOPE_COUNT; i++)
       {
          if (m_apUnits[i])
-         {
-            m_apUnits[i]->m_nCount_Load++;
-            m_apUnits[i]->Load ();
-         }
+            m_apUnits[i]->Attach ();
       }
    }
 }
@@ -123,13 +163,12 @@ void STORAGE::SILO::Detach ()
 
       if (m_nCount_Load == 0)
       {
-         for (int i = 0; i < SCOPE_COUNT; i++)
+         for (int i = 0; i < kSCOPE_COUNT; i++)
          {
             if (m_apUnits[i])
             {
-               m_apUnits[i]->m_nCount_Load--;
-               if (m_apUnits[i]->m_nCount_Load == 0)
-                  m_apUnits[i]->Evict ();
+               m_apUnits[i]->SaveMeta (m_pName);
+               m_apUnits[i]->Detach ();
             }
          }
       }

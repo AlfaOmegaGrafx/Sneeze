@@ -50,7 +50,7 @@ STORAGE::~STORAGE ()
    std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
 
    while (!m_apSilo.empty ())
-      Silo_Close (m_apSilo.front ());
+      Silo_Close (m_apSilo.front ()->Viewport (), m_apSilo.front ());
 
    for (auto& pair : m_umpUnit)
       delete pair.second;
@@ -61,7 +61,7 @@ STORAGE::~STORAGE ()
 // Container lifecycle
 // ---------------------------------------------------------------------------
 
-STORAGE::SILO* STORAGE::Silo_Open (std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, VIEWPORT* pViewport)
+STORAGE::SILO* STORAGE::Silo_Open (VIEWPORT* pViewport, std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName)
 {
    SILO* pSilo = nullptr;
 
@@ -71,91 +71,31 @@ STORAGE::SILO* STORAGE::Silo_Open (std::shared_ptr<VIEWPORT::CONTAINER::NAME> pN
 
       pSilo = new SILO (this, pName, pViewport);
 
-      std::string sFingerprint_2      = pName->sFingerprint.substr (0, 2);
-      std::string sFingerprint_22     = pName->sFingerprint.substr (2, 22);
-      std::string sFileName_Org       = "organization.json";
-      std::string sFileName_Container = "container-" + pName->sContainerName + ".json";
-
-      for (int i = 0; i < SCOPE_COUNT; i++)
-      {
-         SCOPE eScope = static_cast<SCOPE> (i);
-         const std::string& sBasePath = (eScope == ORG_TEMPORARY  ||  eScope == CONTAINER_TEMPORARY) ? pSilo->sPath_Temporary () : pSilo->sPath_Permanent ();
-         const std::string& sFileName = (eScope == ORG_PERMANENT  ||  eScope ==       ORG_TEMPORARY) ? sFileName_Org : sFileName_Container;
-         std::string sPath_Json = (std::filesystem::path (sBasePath) / pName->sPersonaHash / sFingerprint_2 / sFingerprint_22 / sFileName).string ();
-
-         auto it = m_umpUnit.find (sPath_Json);
-         if (it != m_umpUnit.end ())
-         {
-            it->second->m_nCount_Open++;
-            pSilo->Unit (eScope, it->second);
-         }
-         else
-         {
-            UNIT* pUnit = new UNIT (this, eScope, sPath_Json);
-            pUnit->LoadMeta ();
-            m_umpUnit[sPath_Json] = pUnit;
-            pSilo->Unit (eScope, pUnit);
-         }
-      }
-
-      pSilo->Attach ();
-
       m_apSilo.push_back (pSilo);
 
-      pSilo->Viewport ()->Host ()->OnStorageUnitCreated (pSilo);
+      pSilo->Initialize ();
+
+      pViewport->Host ()->OnStorageUnitCreated (pSilo);
    }
 
    return pSilo;
 }
 
-void STORAGE::Silo_Close (SILO* pSilo)
+void STORAGE::Silo_Close (VIEWPORT* pViewport, SILO* pSilo)
 {
    if (pSilo)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
 
-      for (int i = 0; i < SCOPE_COUNT; i++)
-      {
-         UNIT* pUnit = pSilo->Unit (static_cast<SCOPE> (i));
-         if (pUnit)
-         {
-            if (pUnit->IsDirty ())
-               pUnit->Save ();
-            pUnit->SaveMeta (pSilo->Name ());
-         }
-      }
-
-      pSilo->Detach ();
-
-      for (int i = 0; i < SCOPE_COUNT; i++)
-      {
-         UNIT* pUnit = pSilo->Unit (static_cast<SCOPE> (i));
-         if (pUnit)
-         {
-            pUnit->m_nCount_Open--;
-            if (pUnit->m_nCount_Open == 0)
-            {
-               m_umpUnit.erase (pUnit->JsonPath ());
-               delete pUnit;
-            }
-         }
-      }
-
       auto it = std::find (m_apSilo.begin (), m_apSilo.end (), pSilo);
-
       if (it != m_apSilo.end ())
-      {
-         delete *it;
          m_apSilo.erase (it);
-      }
+
+      delete pSilo;
    }
 }
 
-// ---------------------------------------------------------------------------
-// Inspector enumeration
-// ---------------------------------------------------------------------------
-
-void STORAGE::Enumerate (IENUM* pEnum, VIEWPORT* pViewport)
+void STORAGE::Silo_Enum (VIEWPORT* pViewport, IENUM* pEnum)
 {
    if (pEnum)
    {
@@ -166,5 +106,37 @@ void STORAGE::Enumerate (IENUM* pEnum, VIEWPORT* pViewport)
          if (pSilo->Viewport () == pViewport)
             pEnum->OnSilo (pSilo);
       }
+   }
+}
+
+// ---------------------------------------------------------------------------
+// Unit helpers -- called by SILO (Initialize, ~SILO) which is always invoked
+// under m_mxStorage via Silo_Open/Silo_Close. Not independently thread-safe.
+// ---------------------------------------------------------------------------
+
+STORAGE::UNIT* STORAGE::Unit_Open (eSCOPE eScope, const std::string& sPathname)
+{
+   UNIT* pUnit = nullptr;
+
+   auto it = m_umpUnit.find (sPathname);
+   if (it == m_umpUnit.end ())
+   {
+      pUnit = new UNIT (this, eScope, sPathname);
+      m_umpUnit[sPathname] = pUnit;
+   }
+   else pUnit = it->second;
+
+   pUnit->Open ();
+
+   return pUnit;
+}
+
+void STORAGE::Unit_Close (UNIT* pUnit)
+{
+   if (pUnit  &&  pUnit->Close () == 0)
+   {
+      m_umpUnit.erase (pUnit->Pathname ());
+      
+      delete pUnit;
    }
 }

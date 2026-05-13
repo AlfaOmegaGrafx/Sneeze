@@ -38,13 +38,18 @@ bool THREAD::Initialize ()
 
 THREAD::~THREAD ()
 {
-   Signal (true);
-
-   if (m_pthThread)
-      m_pthThread->join ();
+   Join ();
 
    delete m_pthThread;
    m_pthThread = nullptr;
+}
+
+void THREAD::Join ()
+{
+   Signal (true);
+
+   if (m_pthThread->joinable ())
+      m_pthThread->join ();
 }
 
 void THREAD::Signal (bool bShutdown)

@@ -101,15 +101,18 @@ public:
       {
          m_bShuttingDown = true;
 
+         {
+            std::lock_guard<std::recursive_mutex> guard (m_mutex);
+            while (!m_aFetchQueue.empty ())
+               m_aFetchQueue.pop ();
+         }
+
          for (auto& t : m_aSlots)
          {
             if (t.joinable ())
                t.join ();
          }
          m_aSlots.clear ();
-
-         while (!m_aFetchQueue.empty ())
-            m_aFetchQueue.pop ();
 
          {
             std::lock_guard<std::recursive_mutex> guard (m_mutex);
@@ -180,7 +183,7 @@ public:
             pAsset->DetachFile (pFile);
             pFile->SetAsset (nullptr);
 
-            if (pAsset->GetFileCount () == 0)
+            if (pAsset->GetFileCount () == 0  &&  pAsset->State () != STATE_FETCHING)
             {
                if (pAsset->IsPendingReset ())
                   ResetAsset (pAsset);
@@ -712,6 +715,13 @@ public:
             pAsset->Fail ();
             NotifyFiles (pAsset->CollectFiles (), STATE_FAILED);
          }
+
+         if (pAsset->GetFileCount () == 0)
+         {
+            if (pAsset->State () == STATE_READY)
+               SaveMeta (pAsset);
+            m_mapAssets.erase (sUrl);
+         }
       }
 
       if (bResult)
@@ -1039,6 +1049,9 @@ public:
    void DispatchNextFromQueue ()
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
+
+      if (m_bShuttingDown)
+         return;
 
       SweepCompletedThreads ();
 
