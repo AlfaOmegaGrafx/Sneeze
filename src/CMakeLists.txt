@@ -513,6 +513,7 @@ set (CORE_SOURCES
    sneeze/control/AgentD.cpp
    sneeze/control/AgentE.cpp)
 set (CORE_HEADERS
+   sneeze/Pch.h
    sneeze/Types.h
    sneeze/Engine.h
    sneeze/control/Control.h)
@@ -643,6 +644,15 @@ add_library (Sneeze STATIC
    ${KERNEL_EMBED_FILES}
 )
 add_dependencies (Sneeze CompileKernels)
+
+# ---------------------------------------------------------------------------
+# Precompiled header (MSVC: speeds up rebuilds by ~3-5x; same gain on
+# Clang/GCC via -include). CMake synthesizes cmake_pch.cxx and force-includes
+# Pch.h ahead of every Sneeze .cpp -- no per-file edits required. Guard on
+# CXX so the C embed file and Windows .rc resource skip the PCH.
+# ---------------------------------------------------------------------------
+target_precompile_headers (Sneeze PRIVATE
+   "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/sneeze/Pch.h>")
 
 # On Windows, .res objects inside static libraries don't get pulled into the
 # final executable by the linker. Expose the .rc as an INTERFACE source so
