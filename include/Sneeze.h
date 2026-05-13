@@ -15,6 +15,7 @@
 #ifndef SNEEZE_SNEEZE_H
 #define SNEEZE_SNEEZE_H
 
+#include <nlohmann/json.hpp>
 #include <vector>
 #include <string>
 

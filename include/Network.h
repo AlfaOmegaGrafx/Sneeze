@@ -15,13 +15,6 @@
 #ifndef SNEEZE_NETWORK_H
 #define SNEEZE_NETWORK_H
 
-#include <unordered_map>
-#include <mutex>
-#include <memory>
-#include <queue>
-#include <atomic>
-#include <chrono>
-
 namespace SNEEZE
 {
    // ---------------------------------------------------------------------------
@@ -100,89 +93,61 @@ namespace SNEEZE
       {
       public:
          ASSET (NETWORK* pNetwork, const std::string& sUrl, const std::string& sHash);
+         virtual ~ASSET ();
 
-         const std::string& Url               () const;
-         const std::string& Hash              () const;
-         bool               IsHashed          () const;
-
-         STATE              State             () const;
-         const std::string& DiskPath          () const;
-
-         long               HttpStatus        () const;
-         double             FetchStartTime    () const;
-         double             FetchEndTime      () const;
-         double             FetchDuration     () const;
-         double             FetchQueuedTime   () const;
-         double             GetQueueDuration  () const;
-         bool               IsServedFromCache () const;
-
-         void               SetHttpStatus        (long nStatus);
-         void               SetFetchStartTime    (double dTime);
-         void               SetFetchEndTime      (double dTime);
-         void               SetFetchQueuedTime   (double dTime);
-         void               SetServedFromCache   (bool bServed);
-
-         const std::unordered_map<std::string, std::string>& Headers () const;
          std::string Header (const std::string& sName) const;
 
-         uint64_t    SizeBytes      () const;
-         std::string CreatedTime    () const;
-         std::string LastAccessTime () const;
-         uint32_t    AccessCount    () const;
-         uint32_t    AssetIx        () const;
-
-         void        SetDiskPath (const std::string& sPath);
-         void        SetHash (const std::string& sHash);
-         void        SetHeaders (const std::unordered_map<std::string, std::string>& mapHeaders);
-         void        SetSizeBytes (uint64_t nBytes);
-         void        SetCreatedTime (const std::string& sTime);
-         void        SetAssetIx (uint32_t nAssetIx);
          void        TouchAccess ();
 
          void        AttachFile (FILE* pFile);
          void        DetachFile (FILE* pFile);
 
-         void        SetFetching ();
-         void        SetValidating ();
          void        Complete (const std::string& sDiskPath, uint64_t nSizeBytes);
-         void        Fail ();
-
          void        ResetState ();
-
-         void        SetPendingReset (bool b);
-         bool        IsPendingReset () const;
-         size_t      GetFileCount () const;
-
-         std::vector<FILE*> CollectFiles () const;
 
          std::vector<uint8_t> ReadData () const;
 
+         // Accessors
+         STATE                State             () const;
+         bool                 IsPendingReset    () const;
+         size_t               GetFileCount      () const;
+         const std::string&   Url               () const;
+         uint64_t             SizeBytes         () const;
+         std::string          CreatedTime       () const;
+         std::string          LastAccessTime    () const;
+         uint32_t             AccessCount       () const;
+         uint32_t             AssetIx           () const;
+         const std::string&   Hash              () const;
+         bool                 IsHashed          () const;
+         const std::string&   DiskPath          () const;
+         long                 HttpStatus        () const;
+         double               FetchStartTime    () const;
+         double               FetchEndTime      () const;
+         double               FetchDuration     () const;
+         double               FetchQueuedTime   () const;
+         double               GetQueueDuration  () const;
+         bool                 IsServedFromCache () const;
+         std::vector<FILE*>   CollectFiles      () const;
+         const std::unordered_map<std::string, std::string>& Headers () const;
+
+         // Modifiers
+         void SetHttpStatus      (long nStatus);
+         void SetFetchStartTime  (double dTime);
+         void SetFetchEndTime    (double dTime);
+         void SetFetchQueuedTime (double dTime);
+         void SetServedFromCache (bool bServed);
+         void SetDiskPath        (const std::string& sPath);
+         void SetHash            (const std::string& sHash);
+         void SetSizeBytes       (uint64_t nBytes);
+         void SetCreatedTime     (const std::string& sTime);
+         void SetAssetIx         (uint32_t nAssetIx);
+         void SetPendingReset    (bool b);
+         void SetState           (STATE eState);
+         void SetHeaders         (const std::unordered_map<std::string, std::string>& mapHeaders);
+
       private:
-         static std::string NowIso8601 ();
-
-         NETWORK*                 m_pNetwork;
-         std::string              m_sUrl;
-         std::string              m_sHash;
-         std::atomic<STATE>       m_bState;
-         std::string              m_sDiskPath;
-
-         std::unordered_map<std::string, std::string> m_mapHeaders;
-
-         uint64_t                 m_nSizeBytes;
-         std::string              m_sCreatedAt;
-         std::string              m_sLastAccessedAt;
-         uint32_t                 m_nAccessCount;
-         uint32_t                 m_nAssetIx;
-
-         long                     m_nHttpStatus;
-         double                   m_dFetchQueuedTime;
-         double                   m_dFetchStartTime;
-         double                   m_dFetchEndTime;
-         bool                     m_bServedFromCache;
-         bool                     m_bPendingReset;
-
-         std::vector<FILE*>       m_apFiles;
-         mutable std::mutex       m_mutex;
+         class Impl;
+         Impl* m_pImpl;
       };
 
       // -----------------------------------------------------------------------

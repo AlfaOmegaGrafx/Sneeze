@@ -29,6 +29,23 @@
 
 using namespace SNEEZE;
 
+std::string NowIso8601 ()
+{
+   auto tpNow = std::chrono::system_clock::now ();
+   auto tmTime = std::chrono::system_clock::to_time_t (tpNow);
+
+   struct tm tmBuf = {};
+#ifdef _WIN32
+   gmtime_s (&tmBuf, &tmTime);
+#else
+   gmtime_r (&tmTime, &tmBuf);
+#endif
+
+   char szBuf[32];
+   std::strftime (szBuf, sizeof (szBuf), "%Y-%m-%dT%H:%M:%SZ", &tmBuf);
+   return std::string (szBuf);
+}
+
 /***********************************************************************************************************************************
 **  Impl Class
 ***********************************************************************************************************************************/

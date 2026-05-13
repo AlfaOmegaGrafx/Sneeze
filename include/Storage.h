@@ -15,15 +15,6 @@
 #ifndef SNEEZE_STORAGE_STORAGE_H
 #define SNEEZE_STORAGE_STORAGE_H
 
-#include <nlohmann/json.hpp>
-#include <string>
-#include <vector>
-#include <unordered_map>
-#include <mutex>
-#include <cstdint>
-#include <fstream>
-#include <filesystem>
-
 namespace SNEEZE
 {
    // ---------------------------------------------------------------------------
@@ -90,6 +81,7 @@ namespace SNEEZE
       {
       public:
          UNIT (STORAGE* pStorage, eSCOPE eScope, const std::string& sPathname);
+         virtual ~UNIT ();
 
          // --- State ---
 
@@ -132,33 +124,8 @@ namespace SNEEZE
          void  LoadMeta ();
 
       private:
-         void  NavigatePath (const std::string& sPath, nlohmann::json*& pParent, std::string& sFinalKey) const;
-         void  Log_Append (const std::string& sOp, const std::string& sPath, const nlohmann::json& jValue);
-         void  Log_Replay ();
-         void  Log_Delete ();
-
-         static std::string NowIso8601 ();
-
-         STORAGE*             m_pStorage;
-         eSCOPE               m_eScope;
-         std::string          m_sPathname;
-
-         nlohmann::json       m_jData;
-         bool                 m_bLoaded;
-         bool                 m_bDirty;
-         uint32_t             m_nCount_Open;
-         uint32_t             m_nCount_Load;
-
-         // Meta sidecar fields
-         uint64_t             m_nSizeBytes;
-         std::string          m_sCreatedAt;
-         std::string          m_sLastAccessedAt;
-         uint32_t             m_nAccessCount;
-
-         mutable std::recursive_mutex  m_mutex;
-
-         friend class SILO;
-         friend class STORAGE;
+         class Impl;
+         Impl* m_pImpl;
       };
 
       // -----------------------------------------------------------------------
@@ -246,14 +213,11 @@ namespace SNEEZE
       void    Silo_Enum  (VIEWPORT* pViewport, IENUM* pEnum);
 
    private:
-      UNIT*   Unit_Open  (eSCOPE eScope, const std::string& sPathname);
-      void    Unit_Close (UNIT* pUnit);
+      class Impl;
+      Impl* m_pImpl;
 
-      ENGINE*                                 m_pEngine;
-
-      std::recursive_mutex                    m_mxStorage;
-      std::vector<SILO*>                      m_apSilo;
-      std::unordered_map<std::string, UNIT*>  m_umpUnit;
+      UNIT* Unit_Open  (eSCOPE eScope, const std::string& sPathname);
+      void  Unit_Close (UNIT* pUnit);
    };
 }
 #endif // SNEEZE_STORAGE_STORAGE_H
