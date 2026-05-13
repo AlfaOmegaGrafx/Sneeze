@@ -37,6 +37,46 @@ size_t FetchWriteCallback (char* pData, size_t nSize, size_t nMembers, void* pUs
    return nSize * nMembers;
 }
 
+#if 1
+size_t FetchHeaderCallback (char* pData, size_t nSize, size_t nMembers, void* pUserData)
+{
+   const size_t bytes = nSize * nMembers;
+   auto* pmHeaders = static_cast<std::unordered_map<std::string, std::string>*> (pUserData);
+
+   std::string sLine (pData, bytes);
+
+   // Strip CRLF
+   while (!sLine.empty () && (sLine.back () == '\r' || sLine.back () == '\n'))
+   {
+      sLine.pop_back ();
+   }
+
+   const auto pos = sLine.find (':');
+   if (pos != std::string::npos) 
+   {
+      std::string sName = sLine.substr (0, pos);
+      std::string sValue = sLine.substr (pos + 1);
+
+      std::transform (sName.begin (), sName.end (), sName.begin (), [](unsigned char c) { return std::tolower (c); });
+
+      size_t nStart  = sValue.find_first_not_of (" \t");
+      size_t nEnd    = sValue.find_last_not_of (" \t");
+
+      if (nStart == std::string::npos)
+      {
+         sValue.clear ();
+      }
+      else
+      {
+         sValue = sValue.substr (nStart, nEnd - nStart + 1);
+      }
+
+      (*pmHeaders)[sName] = sValue;
+   }
+
+   return bytes; // must match provided size or libcurl treats it as error [1]
+}
+#else
 size_t FetchHeaderCallback (char* pData, size_t nSize, size_t nMembers, void* pUserData)
 {
    auto* pmapHeaders = static_cast<std::unordered_map<std::string, std::string>*> (pUserData);
@@ -60,7 +100,7 @@ size_t FetchHeaderCallback (char* pData, size_t nSize, size_t nMembers, void* pU
       // Sanitize both name and value: header names are supposed to be ASCII
       // per RFC 7230 but some servers cheat. ::tolower on a signed char is UB
       // for bytes >= 0x80, so cast through unsigned char.
-      sKey   = SNEEZE::ToUtf8 (sKey);
+      sKey = SNEEZE::ToUtf8 (sKey);
       sValue = SNEEZE::ToUtf8 (sValue);
       std::transform (sKey.begin (), sKey.end (), sKey.begin (),
          [](unsigned char c) { return static_cast<char> (std::tolower (c)); });
@@ -69,6 +109,7 @@ size_t FetchHeaderCallback (char* pData, size_t nSize, size_t nMembers, void* pU
 
    return nTotal;
 }
+#endif
 
 /***********************************************************************************************************************************
 **  Impl Class
