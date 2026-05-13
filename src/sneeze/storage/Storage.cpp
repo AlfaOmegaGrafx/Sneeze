@@ -61,15 +61,15 @@ STORAGE::~STORAGE ()
 // Container lifecycle
 // ---------------------------------------------------------------------------
 
-STORAGE::SILO* STORAGE::Silo_Open (VIEWPORT* pViewport, std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName)
+STORAGE::SILO* STORAGE::Silo_Open (VIEWPORT* pViewport, std::shared_ptr<VIEWPORT::CONTAINER::CID> pCID)
 {
    SILO* pSilo = nullptr;
 
-   if (pName  &&  pViewport)
+   if (pCID  &&  pViewport)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
 
-      pSilo = new SILO (this, pName, pViewport);
+      pSilo = new SILO (this, pCID, pViewport);
 
       m_apSilo.push_back (pSilo);
 

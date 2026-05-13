@@ -732,7 +732,7 @@ public:
       DispatchNextFromQueue ();
    }
 
-   NETWORK::FILE* Request (IFILE* pListener, VIEWPORT* pViewport, VIEWPORT::CONTAINER::NAME* pName, const std::string& sUrl, const std::string& sHash, uint32_t bFlags, uint32_t nAssetIx)
+   NETWORK::FILE* Request (IFILE* pListener, VIEWPORT* pViewport, VIEWPORT::CONTAINER::CID* pCID, const std::string& sUrl, const std::string& sHash, uint32_t bFlags, uint32_t nAssetIx)
    {
       FILE* pFile = nullptr;
       bool bCreate = (bFlags & REQUEST_CREATE) != 0;
@@ -787,7 +787,7 @@ public:
          {
             ASSET* pAsset = it->second.get ();
 
-            pFile = new NETWORK::FILE (m_pNetwork, pAsset, pName, pViewport, pListener, m_nNextFileIx++);
+            pFile = new NETWORK::FILE (m_pNetwork, pAsset, pCID, pViewport, pListener, m_nNextFileIx++);
             pAsset->AttachFile (pFile);
             m_apFile.push_back (pFile);
 
@@ -1168,14 +1168,14 @@ NETWORK::~NETWORK ()
 // Request / Release
 // ---------------------------------------------------------------------------
 
-NETWORK::FILE* NETWORK::Request (IFILE* pListener, VIEWPORT* pViewport, VIEWPORT::CONTAINER::NAME* pName, const std::string& sUrl)
+NETWORK::FILE* NETWORK::Request (IFILE* pListener, VIEWPORT* pViewport, VIEWPORT::CONTAINER::CID* pCID, const std::string& sUrl)
 {
-   return Request (pListener, pViewport, pName, sUrl, std::string (), kREQUEST_DEFAULT, 0);
+   return Request (pListener, pViewport, pCID, sUrl, std::string (), kREQUEST_DEFAULT, 0);
 }
 
-NETWORK::FILE* NETWORK::Request (IFILE* pListener, VIEWPORT* pViewport, VIEWPORT::CONTAINER::NAME* pName, const std::string& sUrl, const std::string& sHash, uint32_t bFlags, uint32_t nAssetIx)
+NETWORK::FILE* NETWORK::Request (IFILE* pListener, VIEWPORT* pViewport, VIEWPORT::CONTAINER::CID* pCID, const std::string& sUrl, const std::string& sHash, uint32_t bFlags, uint32_t nAssetIx)
 {
-   return m_pImpl->Request (pListener, pViewport, pName, sUrl, sHash, bFlags, nAssetIx);
+   return m_pImpl->Request (pListener, pViewport, pCID, sUrl, sHash, bFlags, nAssetIx);
 }
 
 void NETWORK::Release (FILE* pFile)

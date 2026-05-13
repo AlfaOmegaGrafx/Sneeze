@@ -20,8 +20,8 @@ using namespace SNEEZE;
 // STORAGE::SILO
 // ===========================================================================
 
-std::shared_ptr<VIEWPORT::CONTAINER::NAME>  STORAGE::SILO::Name () const { return m_pName; }
-std::string          STORAGE::SILO::DisplayName () const { return m_pName ? m_pName->DisplayName () : ""; }
+std::shared_ptr<VIEWPORT::CONTAINER::CID>  STORAGE::SILO::CID () const { return m_pCID; }
+std::string          STORAGE::SILO::DisplayName () const { return m_pCID ? m_pCID->DisplayName () : ""; }
 VIEWPORT*            STORAGE::SILO::Viewport () const { return m_pViewport; }
 const std::string&   STORAGE::SILO::sPath_Permanent () const { return m_sPath_Permanent; }
 const std::string&   STORAGE::SILO::sPath_Temporary () const { return m_sPath_Temporary; }
@@ -35,12 +35,12 @@ std::string STORAGE::SILO::sPath (eSCOPE eScope) const
 {
    const std::string& sBasePath = (eScope == kSCOPE_TEMPORARY_ORG  ||  eScope == kSCOPE_TEMPORARY_COMPANY) ? m_sPath_Temporary : m_sPath_Permanent;
 
-   return (std::filesystem::path (sBasePath) / m_pName->sPersonaHash / m_pName->sFingerprint.substr (0, 2) / m_pName->sFingerprint.substr (2, 22)).string ();
+   return (std::filesystem::path (sBasePath) / m_pCID->sPersonaHash / m_pCID->sFingerprint.substr (0, 2) / m_pCID->sFingerprint.substr (2, 22)).string ();
 }
 
 std::string STORAGE::SILO::sFilename (eSCOPE eScope, const std::string& sExt) const
 {
-   std::string sName = (eScope == kSCOPE_PERMANENT_ORG  ||  eScope == kSCOPE_TEMPORARY_ORG) ? "organization" : "container-" + m_pName->sContainerName;
+   std::string sName = (eScope == kSCOPE_PERMANENT_ORG  ||  eScope == kSCOPE_TEMPORARY_ORG) ? "organization" : "container-" + m_pCID->sContainerName;
 
    if (!sExt.empty ())
       sName += "." + sExt;
@@ -53,9 +53,9 @@ std::string STORAGE::SILO::sPathname (eSCOPE eScope, const std::string& sExt) co
    return (std::filesystem::path (sPath (eScope)) / sFilename (eScope, sExt)).string ();
 }
 
-STORAGE::SILO::SILO (STORAGE* pStorage, std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, VIEWPORT* pViewport) :
+STORAGE::SILO::SILO (STORAGE* pStorage, std::shared_ptr<VIEWPORT::CONTAINER::CID> pCID, VIEWPORT* pViewport) :
    m_pStorage        (pStorage),
-   m_pName           (std::move (pName)),
+   m_pCID            (std::move (pCID)),
    m_pViewport       (pViewport),
    m_sPath_Permanent ((std::filesystem::path (pViewport->sPath_Permanent ()) / "Storage").string ()),
    m_sPath_Temporary ((std::filesystem::path (pViewport->sPath_Temporary ()) / "Storage").string ()),
@@ -167,7 +167,7 @@ void STORAGE::SILO::Detach ()
          {
             if (m_apUnits[i])
             {
-               m_apUnits[i]->SaveMeta (m_pName);
+               m_apUnits[i]->SaveMeta (m_pCID);
                m_apUnits[i]->Detach ();
             }
          }

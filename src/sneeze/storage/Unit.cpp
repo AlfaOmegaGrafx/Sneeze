@@ -478,20 +478,20 @@ void STORAGE::UNIT::TouchAccess ()
    m_nAccessCount++;
 }
 
-void STORAGE::UNIT::SaveMeta (std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName)
+void STORAGE::UNIT::SaveMeta (std::shared_ptr<VIEWPORT::CONTAINER::CID> pCID)
 {
    std::string sMetaPath = m_sPathname + ".meta";
 
    nlohmann::json jMeta;
 
-   if (pName)
+   if (pCID)
    {
-      jMeta["fingerprint"]   = pName->sFingerprint;
-      jMeta["organization"]  = pName->sOrganization;
-      jMeta["commonName"]    = pName->sCommonName;
-      jMeta["containerName"] = pName->sContainerName;
-      jMeta["personaHash"]   = pName->sPersonaHash;
-      jMeta["validated"]     = pName->bValidated;
+      jMeta["fingerprint"]   = pCID->sFingerprint;
+      jMeta["organization"]  = pCID->sOrganization;
+      jMeta["commonName"]    = pCID->sCommonName;
+      jMeta["containerName"] = pCID->sContainerName;
+      jMeta["personaHash"]   = pCID->sPersonaHash;
+      jMeta["validated"]     = pCID->bValidated;
    }
 
    jMeta["scope"]          = static_cast<int> (m_eScope);

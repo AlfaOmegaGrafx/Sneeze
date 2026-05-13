@@ -129,7 +129,7 @@ namespace SNEEZE
          uint32_t            AccessCount    () const;
 
          void  TouchAccess ();
-         void  SaveMeta (std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName);
+         void  SaveMeta (std::shared_ptr<VIEWPORT::CONTAINER::CID> pCID);
          void  LoadMeta ();
 
       private:
@@ -173,14 +173,14 @@ namespace SNEEZE
       class SILO
       {
       public:
-         SILO (STORAGE* pStorage, std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, VIEWPORT* pViewport);
+         SILO (STORAGE* pStorage, std::shared_ptr<VIEWPORT::CONTAINER::CID> pCID, VIEWPORT* pViewport);
         ~SILO ();
 
          void Initialize ();
 
          // --- Identity ---
 
-         std::shared_ptr<VIEWPORT::CONTAINER::NAME>  Name () const;
+         std::shared_ptr<VIEWPORT::CONTAINER::CID>  CID () const;
          std::string  DisplayName () const;
          VIEWPORT* Viewport () const;
          const std::string& sPath_Permanent () const;
@@ -222,7 +222,7 @@ namespace SNEEZE
 
       private:
          STORAGE*                                    m_pStorage;
-         std::shared_ptr<VIEWPORT::CONTAINER::NAME>  m_pName;
+         std::shared_ptr<VIEWPORT::CONTAINER::CID>  m_pCID;
          VIEWPORT*                                   m_pViewport;
          std::string                                 m_sPath_Permanent;
          std::string                                 m_sPath_Temporary;
@@ -242,7 +242,7 @@ namespace SNEEZE
 
       // --- Container lifecycle ---
 
-      SILO*   Silo_Open  (VIEWPORT* pViewport, std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName);
+      SILO*   Silo_Open  (VIEWPORT* pViewport, std::shared_ptr<VIEWPORT::CONTAINER::CID> pCID);
       void    Silo_Close (VIEWPORT* pViewport, SILO* pSilo);
       void    Silo_Enum  (VIEWPORT* pViewport, IENUM* pEnum);
 

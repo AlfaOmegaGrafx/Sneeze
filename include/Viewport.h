@@ -37,14 +37,14 @@ namespace SNEEZE
       // ---------------------------------------------------------------------------
       // VIEWPORT::CONTAINER - the runtime manifestation of an MSF file.
       //
-      // NAME is the identity record for a container. Uniqueness is determined by
+      // CID is the identity record for a container. Uniqueness is determined by
       // the tuple (persona hash, fingerprint, container name).
       // ---------------------------------------------------------------------------
 
       class CONTAINER
       {
       public:
-         class NAME
+         class CID
          {
          public:
             std::string sFingerprint;

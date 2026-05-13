@@ -18,10 +18,10 @@ using namespace SNEEZE;
 
 const std::unordered_map<std::string, std::string> NETWORK::FILE::s_mapEmpty;
 
-NETWORK::FILE::FILE (NETWORK* pNetwork, ASSET* pAsset, VIEWPORT::CONTAINER::NAME* pName, VIEWPORT* pViewport, IFILE* pListener, uint32_t nFileIx) :
+NETWORK::FILE::FILE (NETWORK* pNetwork, ASSET* pAsset, VIEWPORT::CONTAINER::CID* pCID, VIEWPORT* pViewport, IFILE* pListener, uint32_t nFileIx) :
    m_pNetwork         (pNetwork),
    m_pAsset           (pAsset),
-   m_Name             (*pName),
+   m_CID              (*pCID),
    m_pViewport        (pViewport),
    m_pListener        (pListener),
    m_nFileIx          (nFileIx),
@@ -89,6 +89,7 @@ void NETWORK::FILE::SnapshotFinal ()
 bool NETWORK::FILE::Request (IFILE* pListener)
 {
    m_pListener = pListener;
+   
    return m_pNetwork->Reopen (this);
 }
 
@@ -148,7 +149,7 @@ const std::unordered_map<std::string, std::string> NETWORK::FILE::Headers () con
 
 std::string NETWORK::FILE::ContainerName () const
 {
-   return m_Name.DisplayName ();
+   return m_CID.DisplayName ();
 }
 
 NETWORK::STATE NETWORK::FILE::State () const

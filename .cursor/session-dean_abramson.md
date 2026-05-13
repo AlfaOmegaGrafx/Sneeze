@@ -669,5 +669,6 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
   - Files: `Storage.cpp`, `Silo.cpp`, `Unit.cpp`, `Storage.h`, `StorageTest.cpp`.
   - Storage.cpp is now ~143 lines — thin orchestrator, no reach-ins.
 - **Remaining:** Silo.cpp review (small, should be quick), Unit.cpp review (mechanics are fine, compartmentalization already pushed down).
-
+- **Thread.cpp refinement:** Moved `delete m_pthThread; m_pthThread = nullptr;` from `Join()` into `~THREAD()` for constructor/destructor symmetry. `Join()` now uses `joinable()` guard instead of null check — safe for multiple calls since a joined thread is no longer joinable.
+- **VIEWPORT::CONTAINER::NAME -> CID rename:** Renamed the container identity class and all corresponding variables (`m_pName`->`m_pCID`, `m_Name`->`m_CID`, `pName`->`pCID`, `Name()`->`CID()`, `MakeTestName`->`MakeTestCID`, `s_pTestName`->`s_pTestCID`). 11 files touched, zero stale references.
 

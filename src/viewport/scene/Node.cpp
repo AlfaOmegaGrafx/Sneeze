@@ -206,17 +206,17 @@ void NODE::Texture_Request ()
 {
    if (m_pMapObject  &&  !m_pMapObject->m_sTextureUrl.empty ())
    {
-      CONTAINER::NAME Name;
-      Name.sFingerprint   = "5YTB6YjNQWnpBTkJna3Foa2lHOXcwQkFRc0ZBQU9DQVFFQWxrVFR0Z0pTWXRoMDJ";
-      Name.sOrganization  = "Metaversal Corporation";
-      Name.sCommonName    = "Metaversal";
-      Name.sContainerName = "Solar System";
-      Name.sPersonaHash   = "ZklkNVZTY0cxb2ZqUmtTWGpMVHE2bHkyQT09IiwiTUlJRFBUQ0NBaVdnQXdJQkFn";
-      Name.bValidated     = true;
+      CONTAINER::CID CID;
+      CID.sFingerprint   = "5YTB6YjNQWnpBTkJna3Foa2lHOXcwQkFRc0ZBQU9DQVFFQWxrVFR0Z0pTWXRoMDJ";
+      CID.sOrganization  = "Metaversal Corporation";
+      CID.sCommonName    = "Metaversal";
+      CID.sContainerName = "Solar System";
+      CID.sPersonaHash   = "ZklkNVZTY0cxb2ZqUmtTWGpMVHE2bHkyQT09IiwiTUlJRFBUQ0NBaVdnQXdJQkFn";
+      CID.bValidated     = true;
 
       NETWORK* pNetwork = m_pFabric->Scene ()->Sneeze ()->Network ();
       if (pNetwork)
-         m_pFile = pNetwork->Request (this, m_pFabric->Scene ()->Viewport (), &Name, m_pMapObject->m_sTextureUrl);
+         m_pFile = pNetwork->Request (this, m_pFabric->Scene ()->Viewport (), &CID, m_pMapObject->m_sTextureUrl);
    }
 }
 

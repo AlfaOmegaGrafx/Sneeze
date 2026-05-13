@@ -196,7 +196,7 @@ namespace SNEEZE
       class FILE
       {
       public:
-         FILE (NETWORK* pNetwork, ASSET* pAsset, VIEWPORT::CONTAINER::NAME* pName, VIEWPORT* pViewport, IFILE* pListener, uint32_t nFileIx);
+         FILE (NETWORK* pNetwork, ASSET* pAsset, VIEWPORT::CONTAINER::CID* pCID, VIEWPORT* pViewport, IFILE* pListener, uint32_t nFileIx);
          ~FILE ();
 
          // --- Snapshot fields (always available, even after Release) ---
@@ -264,7 +264,7 @@ namespace SNEEZE
       private:
          NETWORK*    m_pNetwork;
          ASSET*      m_pAsset;
-         VIEWPORT::CONTAINER::NAME m_Name;
+         VIEWPORT::CONTAINER::CID m_CID;
          VIEWPORT* m_pViewport;
          IFILE*      m_pListener;
 
@@ -304,8 +304,8 @@ namespace SNEEZE
 
       // --- Primary API ---
 
-      FILE* Request (IFILE* pListener, VIEWPORT* pViewport, VIEWPORT::CONTAINER::NAME* pName, const std::string& sUrl);
-      FILE* Request (IFILE* pListener, VIEWPORT* pViewport, VIEWPORT::CONTAINER::NAME* pName, const std::string& sUrl, const std::string& sHash, uint32_t bFlags = kREQUEST_DEFAULT, uint32_t nMetaIx = 0);
+      FILE* Request (IFILE* pListener, VIEWPORT* pViewport, VIEWPORT::CONTAINER::CID* pCID, const std::string& sUrl);
+      FILE* Request (IFILE* pListener, VIEWPORT* pViewport, VIEWPORT::CONTAINER::CID* pCID, const std::string& sUrl, const std::string& sHash, uint32_t bFlags = kREQUEST_DEFAULT, uint32_t nMetaIx = 0);
       void  Release (FILE* pFile);
       bool  Reopen  (FILE* pFile);
       void  Clear   (FILE* pFile, bool b = true);
