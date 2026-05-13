@@ -179,15 +179,21 @@ int RunJwsTests (int nArgc, char** aArgv)
 
    auto aServices = svc.GetServices ();
    ASSERT (aServices.size () == 1, "One service declared");
-   ASSERT (aServices[0].sName == "game-server", "Service name correct");
-   ASSERT (aServices[0].sType == "websocket", "Service type correct");
-   ASSERT (aServices[0].sEndpoint == "wss://rt.pokerstars.com/game", "Service endpoint correct");
-   ASSERT (aServices[0].aModules.size () == 1, "Service has one module");
+   if (!aServices.empty ())
+   {
+      ASSERT (aServices[0].sName == "game-server", "Service name correct");
+      ASSERT (aServices[0].sType == "websocket", "Service type correct");
+      ASSERT (aServices[0].sEndpoint == "wss://rt.pokerstars.com/game", "Service endpoint correct");
+      ASSERT (aServices[0].aModules.size () == 1, "Service has one module");
+   }
 
    auto aModules = svc.GetModules ();
    ASSERT (aModules.size () == 1, "One module declared");
-   ASSERT (aModules.count ("game-client.wasm") == 1, "Module key found");
-   ASSERT (aModules["game-client.wasm"].sSha256 == "a1b2c3d4e5f6", "Module sha256 correct");
+   if (!aModules.empty ())
+   {
+      ASSERT (aModules.count ("game-client.wasm") == 1, "Module key found");
+      ASSERT (aModules["game-client.wasm"].sSha256 == "a1b2c3d4e5f6", "Module sha256 correct");
+   }
 
    // -----------------------------------------------------------------------
    // Test 3: Tampered payload rejected

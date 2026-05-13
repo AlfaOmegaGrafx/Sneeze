@@ -5,27 +5,48 @@ The `storage` module (`SNEEZE::STORAGE`) provides persistent, per-persona, per-o
 ## Architecture
 
 ```
-STORAGE (singleton)
- ├── UNIT map: path -> unique_ptr<UNIT>   (one per JSON file on disk)
- ├── SILO list: all active SILOs       (one per container)
- ├── Permanent path + Temporary path
- └── recursive_mutex
+STORAGE (singleton, constructor takes ENGINE*)
+ ├── m_umpUnit: path -> UNIT*           (one per JSON file on disk)
+ ├── m_apSilo: all active SILOs         (one per Silo_Open call)
+ ├── m_sPath_Permanent + m_sPath_Temporary
+ └── m_mxStorage (recursive_mutex)
 
-UNIT (one per JSON file on disk)
+UNIT (one per JSON file on disk, keyed by full path)
  ├── nlohmann::json document (in-memory cache)
  ├── .meta sidecar (SNEEZE::VIEWPORT::CONTAINER::NAME, statistics)
  ├── .log changelog (JSONL write-ahead log for crash durability)
- ├── Dirty flag + ref count
+ ├── m_nCount_Open (lifetime: how many SILOs reference this UNIT)
+ ├── m_nCount_Load (cache: how many consumers have data loaded)
+ ├── m_bDirty flag
  ├── Load/Save/Evict lifecycle
- └── mutex
+ └── m_mutex (recursive_mutex, per-UNIT)
 
 SILO (groups four UNITs for a specific container)
  ├── shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME>
  ├── UNIT* m_apUnits[4] indexed by SCOPE
- ├── Ref count (attach/detach)
- ├── Clear flag (deferred history removal)
- └── Path-based API: Get/Set/Remove/Has
+ ├── m_nCount_Load (tracks active attachments)
+ ├── m_bPendingClear (deferred history removal)
+ ├── Permanent + Temporary paths (appends "/Storage" to viewport paths)
+ └── Path-based API: Get/Set/Remove/Has/Json
 ```
+
+## Ownership Model — Two Counters
+
+UNITs use two separate counters to decouple object lifetime from cache state:
+
+### m_nCount_Open (UNIT lifetime)
+
+Tracks how many SILOs reference a UNIT. Initialized to 1 on construction. Incremented when `Silo_Open` finds an existing UNIT in `m_umpUnit` (shared org UNITs). Decremented in `Silo_Close`. When it reaches zero, the UNIT is erased from `m_umpUnit` and deleted.
+
+### m_nCount_Load (cache state)
+
+Tracks how many consumers require the JSON data to be loaded in memory. Initialized to 0. Incremented by `SILO::Attach()` (which also calls `UNIT::Load()` on the first attach). Decremented by `SILO::Detach()`. When it reaches zero, the UNIT is evicted (`UNIT::Evict()`).
+
+This separation allows the inspector to browse SILOs/UNITs without loading their JSON data. The inspector holds references (increments `m_nCount_Open`) but only loads data (`Attach()`) when drilling into a specific UNIT's contents.
+
+### SILO ownership
+
+SILOs are stored as raw `SILO*` in `m_apSilo`. Each `Silo_Open` creates a new SILO instance — SILOs are not shared across callers. They maintain their own `m_nCount_Load` to track active attachments. SILOs are deleted in `Silo_Close` after decrementing `m_nCount_Open` on their UNITs.
 
 ## Nested Types
 
@@ -34,7 +55,7 @@ All types are nested inside `SNEEZE::STORAGE`:
 | Type    | Parent    | Purpose                                          |
 |---------|-----------|--------------------------------------------------|
 | `UNIT`  | `STORAGE` | Core data wrapper for one JSON file              |
-| `SILO` | `STORAGE` | Groups four UNITs for a container                |
+| `SILO`  | `STORAGE` | Groups four UNITs for a container                |
 | `SCOPE` | `STORAGE` | Enum selecting which of the four UNITs           |
 | `IENUM` | `STORAGE` | Enumeration callback interface                   |
 
@@ -61,15 +82,13 @@ both paths are ephemeral so everything is wiped on session end.
 
 ## Session Paths
 
-Artemis provides two paths to the engine at initialization:
+The SILO constructor appends `Storage/` to the viewport's permanent and temporary base paths, ensuring that storage files live in a dedicated `Storage/` subdirectory — separate from the network cache at the same level.
 
-- **Permanent path** — `Persistent/` in persistent mode, or `Ephemeral/<id>/` in ephemeral mode
-- **Temporary path** — always `Ephemeral/<session_id>/`, unique per launch
-
-All temporary storage is wiped upon session termination.
-
-Currently, `Initialize()` derives a single path from `SNEEZE::ISNEEZE::SessionPath()`.
-Once Artemis provides dual paths, the permanent and temporary paths will diverge.
+```
+SILO::SILO (...) :
+   m_sPath_Permanent ((std::filesystem::path (pViewport->sPath_Permanent ()) / "Storage").string ()),
+   m_sPath_Temporary ((std::filesystem::path (pViewport->sPath_Temporary ()) / "Storage").string ()),
+```
 
 ## Disk Layout
 
@@ -95,6 +114,10 @@ Once Artemis provides dual paths, the permanent and temporary paths will diverge
    │    └── container-chat.json
 ```
 
+The fingerprint path segment uses a 2-character fan-out prefix (`fp-2`) followed by a 22-character remainder (`fp-22`), totaling 24 characters from the 64-character SHA-256 fingerprint.
+
+Directory creation happens in `UNIT::Load()` — when a UNIT's JSON data is first loaded from disk, `std::filesystem::create_directories` ensures the full directory path exists. This runs once per UNIT, not on every Save or SaveMeta.
+
 ## Usage
 
 ```cpp
@@ -109,7 +132,7 @@ pName->sContainerName = "poker";
 pName->sPersonaHash   = "def456...";
 pName->bValidated     = true;
 
-STORAGE::SILO* pSilo = pSneeze->Storage ()->Open (pName);
+STORAGE::SILO* pSilo = pSneeze->Storage ()->Silo_Open (pName, pViewport);
 
 // Path-based JSON access
 pSilo->Set (STORAGE::CONTAINER_PERMANENT, "player.name", "Dean");
@@ -126,11 +149,11 @@ pSilo->Remove (STORAGE::CONTAINER_PERMANENT, "player.chips");
 pSilo->Set (STORAGE::ORG_PERMANENT, "org.theme", "dark");
 
 // Bulk JSON (for programs with their own JSON library)
-std::string sJson = pSilo->GetJson (STORAGE::CONTAINER_PERMANENT);
-pSilo->SetJson (STORAGE::CONTAINER_TEMPORARY, "{\"session\": {\"start\": 12345}}");
+std::string sJson = pSilo->Json (STORAGE::CONTAINER_PERMANENT);
+pSilo->Json (STORAGE::CONTAINER_TEMPORARY, "{\"session\": {\"start\": 12345}}");
 
 // Close when container is destroyed
-pSneeze->Storage ()->Close (pSilo);
+pSneeze->Storage ()->Silo_Close (pSilo);
 ```
 
 ## Data Model
@@ -159,10 +182,10 @@ the array with null values if the index exceeds the current size.
 
 ```
 Container instantiated:
-   STORAGE::Open(pName)
-   → find or create 4 UNITs (2 org shared, 2 container private)
-   → Load() each from disk if not already cached
-   → create SILO grouping the 4 UNITs
+   STORAGE::Silo_Open(pName, pViewport)
+   → create SILO (appends Storage/ to viewport paths)
+   → for each of 4 scopes: find or create UNIT (increment m_nCount_Open if shared)
+   → SILO::Attach() → increment m_nCount_Load on each UNIT → UNIT::Load()
    → fire OnStorageUnitCreated
    → return SILO*
 
@@ -174,15 +197,17 @@ WASM calls storage_set_string(CONTAINER_PERMANENT, "player.name", "Dean"):
    → fires OnStorageUnitChanged notification
 
 Container destroyed:
-   STORAGE::Close(pSilo)
+   STORAGE::Silo_Close(pSilo)
    → save any dirty UNITs (full .json write + delete .log)
-   → decrement ref counts on all 4 UNITs
-   → evict UNITs with zero refs (org UNITs may still be held by other containers)
+   → save .meta sidecar for all UNITs
+   → SILO::Detach() → decrement m_nCount_Load → evict at zero
+   → decrement m_nCount_Open on all 4 UNITs → delete UNIT at zero
+   → delete SILO, remove from m_apSilo
 ```
 
 Organization UNITs are shared — multiple SILOs from the same publisher point
-to the same org UNITs. Ref counting ensures org UNITs stay cached as long as
-any container from that org is active.
+to the same org UNITs. `m_nCount_Open` ensures org UNITs stay alive as long as
+any container from that org has an open SILO.
 
 ## Crash Durability — JSONL Changelog
 
@@ -233,24 +258,24 @@ use bulk `GetJson`/`SetJson`.
 
 ### 2. Inspector — Omniscient, Browsable
 
-- `Enumerate(IENUM*)` walks .meta files from both session folders and calls
-  `OnSilo()` for each discovered storage unit
-- Follows request/release pattern (attach/detach) for data access — JSON data
-  is only loaded into memory when the inspector drills in
+- `Enumerate(IENUM*, VIEWPORT*)` walks active SILOs for a specific viewport
+  and calls `OnSilo()` for each
+- Inspector gains access to UNITs via SILOs — when drilling into a UNIT's
+  contents, the inspector calls `Attach()` to load the JSON data into memory
 - Real-time notifications via `OnStorageUnitCreated/Changed/Deleted`
 - Storage units not held by WASM or inspector don't need to live in memory
+  (separated by the `m_nCount_Open` / `m_nCount_Load` two-counter model)
 
-## Notifications (SNEEZE::ISNEEZE callbacks)
+## Notifications (IVIEWPORT callbacks)
 
 ```cpp
-virtual void OnStorageUnitCreated (SNEEZE::NOTIFICATION* pNotification);
-virtual void OnStorageUnitChanged (SNEEZE::NOTIFICATION* pNotification);
-virtual void OnStorageUnitDeleted (SNEEZE::NOTIFICATION* pNotification);
+virtual void OnStorageUnitCreated (NOTIFICATION* pNotification);
+virtual void OnStorageUnitChanged (NOTIFICATION* pNotification);
+virtual void OnStorageUnitDeleted (NOTIFICATION* pNotification);
 ```
 
-The host casts `SNEEZE::NOTIFICATION*` to `SNEEZE::STORAGE::SILO*`.
-
-These fire from STORAGE through `SNEEZE` up to the host (Artemis).
+Notifications fire from STORAGE through the SILO's `VIEWPORT*` up to the host.
+The host downcasts `NOTIFICATION*` to `STORAGE::SILO*`.
 
 ## Sidecar .meta Files
 
@@ -265,15 +290,17 @@ Each storage unit has a companion `.meta` sidecar — same pattern as NETWORK:
 
 ## Thread Safety
 
-- `STORAGE` — one recursive_mutex protecting the unit map and silo list
-- `UNIT` — one mutex per unit protecting its JSON document and metadata
+- `STORAGE` — `m_mxStorage` (recursive_mutex) protecting the UNIT map and SILO list
+- `UNIT` — `m_mutex` (recursive_mutex) per UNIT protecting its JSON document and metadata
 
 ## Files
 
-- `Storage.h` — single header with all nested types
-- `Storage.cpp` — top-level STORAGE methods (Initialize, Shutdown, Open, Close, Enumerate)
-- `Unit.cpp` — STORAGE::UNIT implementation (JSON access, changelog, lifecycle, meta)
-- `Silo.cpp` — STORAGE::SILO implementation (path-based API, attach/detach)
+| File | Contents |
+|------|----------|
+| `Storage.h` | `include/Storage.h` — single header with all nested types |
+| `Storage.cpp` | Top-level STORAGE (Initialize, Silo_Open, Silo_Close, Enumerate, destructor) |
+| `Unit.cpp` | STORAGE::UNIT (JSON access, path navigation, changelog, Load/Save/Evict, meta) |
+| `Silo.cpp` | STORAGE::SILO (path-based API, Attach/Detach, path construction) |
 
 ## WASM Interface (Current State)
 
@@ -307,7 +334,7 @@ the inspector is open — it just asks "do you want this?" on every creation.
 
 ### Dual Session Paths
 
-Currently `Initialize()` derives a single path from `SNEEZE::ISNEEZE::SessionPath()`.
+Currently `Initialize()` derives a single path from `SNEEZE::IENGINE::sAppDataPath()`.
 Artemis needs to provide two separate paths:
 - A permanent path (either `Persistent/` or `Ephemeral/<id>/`)
 - A temporary path (always `Ephemeral/<session_id>/`)

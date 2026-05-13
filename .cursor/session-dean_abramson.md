@@ -626,3 +626,29 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 - **Coding standards discussion** — Extensive review of naming conventions, symmetry principles, and why variable names matter for human readability. Created `e:\dev\code-rules.mdc` as a focused pre-flight checklist for the most frequently violated rules.
 - **project.mdc** — Updated CONTROL, AGENT, COMPOSITOR, SCRUBBER, and placeholder agent class descriptions. Updated Hungarian notation (added `mx`, `cv`, `th`, `pth` prefixes). Added coding convention rules: no Get/Set prefixes, parameter names match member names, no convenience copies of owner data, use structs for parallel data, variable names describe purpose. Updated metronome Hz values, implementation backlog entries.
 
+## 2026-05-11 (Monday) — session log
+
+- **THREAD / CONTROL / AGENT** — Confirmed design: `THREAD::Wait` overloads have **no** `m_bShutdown` / `IsShutdown()` inside `Thread.cpp`; predicates live in `Tick()` / `DrainQueue()`; `CONTROL::Cleanup_Queue` calls `Signal()` after releasing `m_mxCleanup` to wake the metronome.
+- **Read-only code review** — Walked `Control.cpp` metronome (`if (!IsShutdown()) … else break`, timed `Wait`, cleanup relay), `Scrubber.cpp`, `AgentC`–`E`, `Thread.cpp` at user request (no edits during review).
+- **Q&A** — `m_cvThread.wait(lock, fnWork)` vs redundant lambda; assignment-in-`if` requires parentheses around `(p = …)` when combined with `&&`.
+- **Friction** — Prior multi-file edits over-applied `IsShutdown` and ignored repeated STOP; user restored intended design. **project.mdc** updated with authoritative **THREAD / CONTROL / AGENT wait and shutdown contract** subsection + corrected `CONTROL` / `THREAD` Key Classes rows to match current `Control.cpp`.
+
+## 2026-05-12 (Tuesday) — Storage refactoring + documentation
+
+- **STORAGE refactoring — two-counter ownership model:**
+  - Replaced `std::unique_ptr<UNIT>` in `m_umpUnit` with raw `UNIT*`, managed via manual `m_nCount_Open` counter (lifetime: how many SILOs reference a UNIT, initialized to 1, deleted at zero).
+  - Added `m_nCount_Load` on UNIT (cache state: how many consumers have JSON loaded, incremented by `Attach()`, evicted at zero).
+  - Replaced `std::unique_ptr<SILO>` in `m_apSilo` with raw `SILO*` (SILOs are not shared, each `Silo_Open` creates a new instance). Renamed SILO's `m_nRefCount` to `m_nCount_Load`, getter `RefCount()` to `Count_Load()`.
+  - Renamed: `m_mapUnit` → `m_umpUnit`, `m_aSilo` → `m_apSilo`, `m_mutex` → `m_mxStorage`.
+  - SILO constructor now appends `Storage/` to viewport paths, fixing storage files landing in the network cache directory.
+  - Fingerprint path limited to 2+22=24 chars (`substr(2, 22)` instead of `substr(2)`).
+  - Directory creation moved from `Save()`/`SaveMeta()` to `UNIT::Load()` (once per UNIT, not per save).
+- **JWS test crash fix** — Added `if (!aServices.empty())` guards before `aServices[0]` access in `JwsTest.cpp`. The `ASSERT` macro does not stop execution; code after a failed assertion must be safe. This was a pre-existing bug causing the entire `SneezeTest` to crash before printing any test output.
+- **Compositor teardown race** — Identified pre-existing access violation in `ENGINE::Viewport_Capture()` during test teardown (compositor thread accessing viewport after shutdown). Not fixed — outside scope.
+- **All 42 storage tests passing** after refactoring (verified in debugger).
+- **Documentation created/updated:**
+  - Created `src/sneeze/control/Control.md` (comprehensive module documentation)
+  - Updated `src/sneeze/storage/Storage.md` (two-counter model, ownership, path changes)
+  - Updated `project.mdc` (STORAGE module, STORAGE class, JWS known issue, control module ref)
+
+

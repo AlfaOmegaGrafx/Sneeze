@@ -90,10 +90,11 @@ public:
    void OnStorageUnitDeleted (STORAGE::SILO*) override { m_nDeletedCount++; }
 };
 
-static STORAGE_TEST_HOST*          s_pHost    = nullptr;
-static STORAGE_TEST_VIEWPORT_HOST* s_pVPHost  = nullptr;
-static ENGINE*                     s_pSneeze  = nullptr;
-static STORAGE*                    s_pStorage = nullptr;
+static STORAGE_TEST_HOST*          s_pHost     = nullptr;
+static STORAGE_TEST_VIEWPORT_HOST* s_pVPHost   = nullptr;
+static ENGINE*                     s_pSneeze   = nullptr;
+static STORAGE*                    s_pStorage  = nullptr;
+static VIEWPORT*                   s_pViewport = nullptr;
 
 static std::shared_ptr<VIEWPORT::CONTAINER::NAME> MakeTestName (const std::string& sContainer = "poker")
 {
@@ -110,6 +111,7 @@ static std::shared_ptr<VIEWPORT::CONTAINER::NAME> MakeTestName (const std::strin
 static void CleanTestDir ()
 {
    std::error_code ec;
+   std::filesystem::remove_all ("Sneeze", ec);
    std::filesystem::remove_all ("test_storage_session", ec);
 }
 
@@ -125,14 +127,14 @@ static void TestInitializeAndOpenClose ()
    Check (pStorage != nullptr, "Storage exists");
 
    auto pName = MakeTestName ();
-   STORAGE::SILO* pSilo = pStorage->Open (pName);
+   STORAGE::SILO* pSilo = pStorage->Silo_Open (pName, s_pViewport);
    Check (pSilo != nullptr, "Open returns SILO");
    Check (pSilo->Name () == pName, "SILO holds correct NAME");
-   Check (pSilo->GetRefCount () == 1, "Ref count is 1 after Open");
+   Check (pSilo->Count_Load () == 1, "Load count is 1 after Open");
 
    Check (s_pVPHost->m_nCreatedCount == 1, "OnStorageUnitCreated fired");
 
-   pStorage->Close (pSilo);
+   pStorage->Silo_Close (pSilo);
 }
 
 // ---------------------------------------------------------------------------
@@ -145,7 +147,7 @@ static void TestBasicOperations ()
 
    STORAGE* pStorage = s_pStorage;
    auto pName = MakeTestName ();
-   STORAGE::SILO* pSilo = pStorage->Open (pName);
+   STORAGE::SILO* pSilo = pStorage->Silo_Open (pName, s_pViewport);
 
    s_pVPHost->m_nChangedCount = 0;
 
@@ -162,7 +164,7 @@ static void TestBasicOperations ()
    pSilo->Remove (STORAGE::CONTAINER_PERMANENT, "player.name");
    Check (!pSilo->Has (STORAGE::CONTAINER_PERMANENT, "player.name"), "Remove deletes key");
 
-   pStorage->Close (pSilo);
+   pStorage->Silo_Close (pSilo);
 }
 
 // ---------------------------------------------------------------------------
@@ -175,7 +177,7 @@ static void TestPathNavigation ()
 
    STORAGE* pStorage = s_pStorage;
    auto pName = MakeTestName ();
-   STORAGE::SILO* pSilo = pStorage->Open (pName);
+   STORAGE::SILO* pSilo = pStorage->Silo_Open (pName, s_pViewport);
 
    pSilo->Set (STORAGE::CONTAINER_PERMANENT, "game.poker.table.color", "green");
    pSilo->Set (STORAGE::CONTAINER_PERMANENT, "game.poker.table.seats", 8);
@@ -189,7 +191,7 @@ static void TestPathNavigation ()
    Check (pSilo->Has (STORAGE::CONTAINER_PERMANENT, "game.poker.table.color"), "Has works for deep path");
    Check (!pSilo->Has (STORAGE::CONTAINER_PERMANENT, "game.poker.table.missing"), "Has fails for missing deep path");
 
-   pStorage->Close (pSilo);
+   pStorage->Silo_Close (pSilo);
 }
 
 // ---------------------------------------------------------------------------
@@ -202,7 +204,7 @@ static void TestArrayAccess ()
 
    STORAGE* pStorage = s_pStorage;
    auto pName = MakeTestName ();
-   STORAGE::SILO* pSilo = pStorage->Open (pName);
+   STORAGE::SILO* pSilo = pStorage->Silo_Open (pName, s_pViewport);
 
    pSilo->Set (STORAGE::CONTAINER_PERMANENT, "scores[0]", 100);
    pSilo->Set (STORAGE::CONTAINER_PERMANENT, "scores[1]", 200);
@@ -225,7 +227,7 @@ static void TestArrayAccess ()
    Check (jAlice.is_string ()  &&  jAlice.get<std::string> () == "Alice", "Nested array object [0]");
    Check (jBob.is_string ()  &&  jBob.get<std::string> () == "Bob", "Nested array object [1]");
 
-   pStorage->Close (pSilo);
+   pStorage->Silo_Close (pSilo);
 }
 
 // ---------------------------------------------------------------------------
@@ -240,21 +242,21 @@ static void TestPersistence ()
    auto pName = MakeTestName ("persist-test");
 
    {
-      STORAGE::SILO* pSilo = pStorage->Open (pName);
+      STORAGE::SILO* pSilo = pStorage->Silo_Open (pName, s_pViewport);
       pSilo->Set (STORAGE::CONTAINER_PERMANENT, "saved.value", 42);
       pSilo->Set (STORAGE::CONTAINER_PERMANENT, "saved.text", "hello");
-      pStorage->Close (pSilo);
+      pStorage->Silo_Close (pSilo);
    }
 
    {
-      STORAGE::SILO* pSilo = pStorage->Open (pName);
+      STORAGE::SILO* pSilo = pStorage->Silo_Open (pName, s_pViewport);
       auto jValue = pSilo->Get (STORAGE::CONTAINER_PERMANENT, "saved.value");
       auto jText  = pSilo->Get (STORAGE::CONTAINER_PERMANENT, "saved.text");
 
       Check (jValue.is_number ()  &&  jValue.get<int> () == 42, "Number persisted across Open/Close");
       Check (jText.is_string ()  &&  jText.get<std::string> () == "hello", "String persisted across Open/Close");
 
-      pStorage->Close (pSilo);
+      pStorage->Silo_Close (pSilo);
    }
 }
 
@@ -270,21 +272,21 @@ static void TestOrgSharing ()
    auto pNameA = MakeTestName ("container-a");
    auto pNameB = MakeTestName ("container-b");
 
-   STORAGE::SILO* pSiloA = pStorage->Open (pNameA);
+   STORAGE::SILO* pSiloA = pStorage->Silo_Open (pNameA, s_pViewport);
    pSiloA->Set (STORAGE::ORG_PERMANENT, "org.setting", "shared-value");
 
-   STORAGE::SILO* pSiloB = pStorage->Open (pNameB);
+   STORAGE::SILO* pSiloB = pStorage->Silo_Open (pNameB, s_pViewport);
    auto jOrgB = pSiloB->Get (STORAGE::ORG_PERMANENT, "org.setting");
 
    Check (jOrgB.is_string ()  &&  jOrgB.get<std::string> () == "shared-value",
       "Org storage visible to second container");
 
-   Check (pSiloA->GetUnit (STORAGE::ORG_PERMANENT) ==
-          pSiloB->GetUnit (STORAGE::ORG_PERMANENT),
+   Check (pSiloA->Unit (STORAGE::ORG_PERMANENT) ==
+          pSiloB->Unit (STORAGE::ORG_PERMANENT),
       "Both containers share the same org UNIT");
 
-   pStorage->Close (pSiloA);
-   pStorage->Close (pSiloB);
+   pStorage->Silo_Close (pSiloA);
+   pStorage->Silo_Close (pSiloB);
 }
 
 // ---------------------------------------------------------------------------
@@ -297,7 +299,7 @@ static void TestScopeIsolation ()
 
    STORAGE* pStorage = s_pStorage;
    auto pName = MakeTestName ("scope-test");
-   STORAGE::SILO* pSilo = pStorage->Open (pName);
+   STORAGE::SILO* pSilo = pStorage->Silo_Open (pName, s_pViewport);
 
    pSilo->Set (STORAGE::CONTAINER_PERMANENT, "key", "permanent");
    pSilo->Set (STORAGE::CONTAINER_TEMPORARY, "key", "temporary");
@@ -314,7 +316,7 @@ static void TestScopeIsolation ()
    Check (j3.get<std::string> () == "org-permanent", "ORG_PERMANENT isolated");
    Check (j4.get<std::string> () == "org-temporary", "ORG_TEMPORARY isolated");
 
-   pStorage->Close (pSilo);
+   pStorage->Silo_Close (pSilo);
 }
 
 // ---------------------------------------------------------------------------
@@ -331,8 +333,7 @@ static void TestCrashRecovery ()
    // Compute the actual path that STORAGE will use
    std::string sFp2  = pName->sFingerprint.substr (0, 2);
    std::string sFp22 = pName->sFingerprint.substr (2);
-   std::filesystem::path sDir = std::filesystem::path (pStorage->GetPermanentPath ())
-      / pName->sPersonaHash / (sFp2 + "/" + sFp22);
+   std::filesystem::path sDir = std::filesystem::path (s_pViewport->sPath_Permanent ()) / pName->sPersonaHash / (sFp2 + "/" + sFp22);
    std::filesystem::path sJsonPath = sDir / "container-crash-test.json";
    std::filesystem::path sLogPath  = std::filesystem::path (sJsonPath.string () + ".log");
 
@@ -352,7 +353,7 @@ static void TestCrashRecovery ()
       f << "[\"Remove\",\"will-remove\"]\n";
    }
 
-   STORAGE::SILO* pSilo = pStorage->Open (pName);
+   STORAGE::SILO* pSilo = pStorage->Silo_Open (pName, s_pViewport);
 
    auto jRecovered = pSilo->Get (STORAGE::CONTAINER_PERMANENT, "recovered");
    auto jBase      = pSilo->Get (STORAGE::CONTAINER_PERMANENT, "base");
@@ -367,7 +368,7 @@ static void TestCrashRecovery ()
 
    Check (!std::filesystem::exists (sLogPath), "Log file deleted after recovery");
 
-   pStorage->Close (pSilo);
+   pStorage->Silo_Close (pSilo);
 }
 
 // ---------------------------------------------------------------------------
@@ -380,9 +381,9 @@ static void TestBulkJson ()
 
    STORAGE* pStorage = s_pStorage;
    auto pName = MakeTestName ("bulk-test");
-   STORAGE::SILO* pSilo = pStorage->Open (pName);
+   STORAGE::SILO* pSilo = pStorage->Silo_Open (pName, s_pViewport);
 
-   pSilo->SetJson (STORAGE::CONTAINER_PERMANENT,
+   pSilo->Json (STORAGE::CONTAINER_PERMANENT,
       "{\"bulk\": {\"a\": 1, \"b\": 2}, \"list\": [10, 20, 30]}");
 
    auto jA = pSilo->Get (STORAGE::CONTAINER_PERMANENT, "bulk.a");
@@ -393,10 +394,10 @@ static void TestBulkJson ()
    Check (jB.is_number ()  &&  jB.get<int> () == 2, "Bulk set: nested value b");
    Check (jList1.is_number ()  &&  jList1.get<int> () == 20, "Bulk set: array access");
 
-   std::string sJson = pSilo->GetJson (STORAGE::CONTAINER_PERMANENT);
-   Check (sJson.find ("\"bulk\"") != std::string::npos, "GetJson contains data");
+   std::string sJson = pSilo->Json (STORAGE::CONTAINER_PERMANENT);
+   Check (sJson.find ("\"bulk\"") != std::string::npos, "Json contains data");
 
-   pStorage->Close (pSilo);
+   pStorage->Silo_Close (pSilo);
 }
 
 // ---------------------------------------------------------------------------
@@ -410,14 +411,13 @@ static void TestMetaSidecar ()
    STORAGE* pStorage = s_pStorage;
    auto pName = MakeTestName ("meta-test");
 
-   STORAGE::SILO* pSilo = pStorage->Open (pName);
+   STORAGE::SILO* pSilo = pStorage->Silo_Open (pName, s_pViewport);
    pSilo->Set (STORAGE::CONTAINER_PERMANENT, "data", "value");
-   pStorage->Close (pSilo);
+   pStorage->Silo_Close (pSilo);
 
    std::string sFp2  = pName->sFingerprint.substr (0, 2);
    std::string sFp22 = pName->sFingerprint.substr (2);
-   std::filesystem::path sDir = std::filesystem::path (pStorage->GetPermanentPath ())
-      / pName->sPersonaHash / (sFp2 + "/" + sFp22);
+   std::filesystem::path sDir = std::filesystem::path (s_pViewport->sPath_Permanent ()) / pName->sPersonaHash / (sFp2 + "/" + sFp22);
    std::filesystem::path sMetaPath = sDir / "container-meta-test.json.meta";
 
    Check (std::filesystem::exists (sMetaPath), "Meta sidecar file created on Close");
@@ -451,15 +451,20 @@ int RunStorageTests (int nArgc, char** aArgv)
 
    s_pHost = new STORAGE_TEST_HOST ();
    s_pSneeze = new ENGINE (s_pHost);
-
    s_pVPHost = new STORAGE_TEST_VIEWPORT_HOST ();
-   s_pSneeze->Viewport_Open (s_pVPHost);
 
-   s_pStorage = new STORAGE (s_pSneeze);
-   bool bInit = s_pStorage->Initialize ();
-   Check (bInit, "Storage initialized");
+   bool bEngineInit = s_pSneeze->Initialize ();
+   Check (bEngineInit, "Engine initialized");
 
-   if (bInit)
+   s_pViewport = s_pSneeze->Viewport_Open (s_pVPHost);
+   Check (s_pViewport != nullptr, "Viewport opened");
+
+   s_pStorage = s_pSneeze->Storage ();
+   Check (s_pStorage != nullptr, "Engine storage exists");
+
+   bool bRun = bEngineInit  &&  s_pViewport  &&  s_pStorage;
+
+   if (bRun)
    {
       TestInitializeAndOpenClose ();
       TestBasicOperations ();
@@ -473,10 +478,14 @@ int RunStorageTests (int nArgc, char** aArgv)
       TestMetaSidecar ();
    }
 
-   delete s_pStorage;
-   s_pStorage = nullptr;
+   delete s_pVPHost;
+   s_pVPHost = nullptr;
    delete s_pSneeze;
+   s_pSneeze = nullptr;
+   s_pViewport = nullptr;
+   s_pStorage = nullptr;
    delete s_pHost;
+   s_pHost = nullptr;
 
    CleanTestDir ();
 

@@ -42,13 +42,23 @@ std::string STORAGE::UNIT::NowIso8601 ()
 // STORAGE::UNIT
 // ===========================================================================
 
+bool                 STORAGE::UNIT::IsLoaded () const        { return m_bLoaded; }
+bool                 STORAGE::UNIT::IsDirty () const         { return m_bDirty; }
+STORAGE::SCOPE       STORAGE::UNIT::GetScope () const        { return m_eScope; }
+const std::string&   STORAGE::UNIT::JsonPath () const        { return m_sJsonPath; }
+uint64_t             STORAGE::UNIT::SizeBytes () const       { return m_nSizeBytes; }
+const std::string&   STORAGE::UNIT::CreatedTime () const     { return m_sCreatedAt; }
+const std::string&   STORAGE::UNIT::LastAccessTime () const  { return m_sLastAccessedAt; }
+uint32_t             STORAGE::UNIT::AccessCount () const     { return m_nAccessCount; }
+
 STORAGE::UNIT::UNIT (STORAGE* pStorage, SCOPE eScope, const std::string& sJsonPath) :
    m_pStorage       (pStorage),
    m_eScope         (eScope),
    m_sJsonPath      (sJsonPath),
    m_bLoaded        (false),
    m_bDirty         (false),
-   m_nRefCount      (0),
+   m_nCount_Open    (1),
+   m_nCount_Load    (0),
    m_nSizeBytes     (0),
    m_nAccessCount   (0)
 {
@@ -187,7 +197,7 @@ void STORAGE::UNIT::Set (const std::string& sPath, const nlohmann::json& jValue)
       }
 
       m_bDirty = true;
-      AppendLog ("Set", sPath, jValue);
+      Log_Append ("Set", sPath, jValue);
    }
 }
 
@@ -214,7 +224,7 @@ void STORAGE::UNIT::Remove (const std::string& sPath)
       }
 
       m_bDirty = true;
-      AppendLog ("Remove", sPath, nlohmann::json ());
+      Log_Append ("Remove", sPath, nlohmann::json ());
    }
 }
 
@@ -241,13 +251,13 @@ bool STORAGE::UNIT::Has (const std::string& sPath) const
    return bHas;
 }
 
-std::string STORAGE::UNIT::GetJson () const
+std::string STORAGE::UNIT::Json () const
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
    return m_jData.dump (2);
 }
 
-void STORAGE::UNIT::SetJson (const std::string& sJson)
+void STORAGE::UNIT::Json (const std::string& sJson)
 {
    std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -267,7 +277,7 @@ void STORAGE::UNIT::SetJson (const std::string& sJson)
 // JSONL Changelog — crash durability
 // ---------------------------------------------------------------------------
 
-void STORAGE::UNIT::AppendLog (const std::string& sOp, const std::string& sPath, const nlohmann::json& jValue)
+void STORAGE::UNIT::Log_Append (const std::string& sOp, const std::string& sPath, const nlohmann::json& jValue)
 {
    std::string sLogPath = m_sJsonPath + ".log";
 
@@ -283,7 +293,7 @@ void STORAGE::UNIT::AppendLog (const std::string& sOp, const std::string& sPath,
    }
 }
 
-void STORAGE::UNIT::ReplayLog ()
+void STORAGE::UNIT::Log_Replay ()
 {
    std::string sLogPath = m_sJsonPath + ".log";
 
@@ -359,7 +369,7 @@ void STORAGE::UNIT::ReplayLog ()
    }
 }
 
-void STORAGE::UNIT::DeleteLog ()
+void STORAGE::UNIT::Log_Delete ()
 {
    std::string sLogPath = m_sJsonPath + ".log";
    std::error_code ec;
@@ -376,6 +386,9 @@ void STORAGE::UNIT::Load ()
 
    if (!m_bLoaded)
    {
+      std::error_code ec;
+      std::filesystem::create_directories (std::filesystem::path (m_sJsonPath).parent_path (), ec);
+
       m_jData = nlohmann::json::object ();
 
       if (std::filesystem::exists (m_sJsonPath))
@@ -394,7 +407,7 @@ void STORAGE::UNIT::Load ()
          }
       }
 
-      ReplayLog ();
+      Log_Replay ();
 
       if (m_sCreatedAt.empty ())
          m_sCreatedAt = NowIso8601 ();
@@ -412,8 +425,6 @@ void STORAGE::UNIT::Save ()
 
    if (m_bLoaded)
    {
-      std::filesystem::create_directories (std::filesystem::path (m_sJsonPath).parent_path ());
-
       std::string sTmpPath = m_sJsonPath + ".temp";
       std::ofstream file (sTmpPath, std::ios::trunc);
       if (file.is_open ())
@@ -432,7 +443,7 @@ void STORAGE::UNIT::Save ()
          }
       }
 
-      DeleteLog ();
+      Log_Delete ();
       m_bDirty = false;
    }
 }
@@ -461,7 +472,6 @@ void STORAGE::UNIT::TouchAccess ()
 void STORAGE::UNIT::SaveMeta (std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName)
 {
    std::string sMetaPath = m_sJsonPath + ".meta";
-   std::filesystem::create_directories (std::filesystem::path (sMetaPath).parent_path ());
 
    nlohmann::json jMeta;
 

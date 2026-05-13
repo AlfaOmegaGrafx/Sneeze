@@ -16,6 +16,7 @@
 #include "scene/Scene.h"
 #include "renderer/AnariRenderer.h"
 #include <cstring>
+#include <filesystem>
 
 using namespace SNEEZE;
 
@@ -35,7 +36,8 @@ VIEWPORT::VIEWPORT (ENGINE* pEngine, IVIEWPORT* pHost) :
    m_nHeight                    (0),
    m_bResizePending             (false),
    m_nResizeWidth               (0),
-   m_nResizeHeight              (0)
+   m_nResizeHeight              (0),
+   m_eSession                   (kSESSION_PERSISTENT)
 {
 }
 
@@ -44,11 +46,13 @@ VIEWPORT::~VIEWPORT ()
    Shutdown ();
 }
 
-bool VIEWPORT::Initialize (const std::string& sUrl, const std::string& sPath_Transitory)
+bool VIEWPORT::Initialize (const std::string& sUrl, eSESSION eSession, const std::string& sPath_Permanent, const std::string& sPath_Temporary)
 {
    bool bResult = false;
 
-   m_sPath_Transitory = sPath_Transitory;
+   m_eSession            = eSession;
+   m_sPath_Permanent     = sPath_Permanent;
+   m_sPath_Temporary     = sPath_Temporary;
 
    m_pHost->FrameSize (m_nWidth, m_nHeight);
 
@@ -162,15 +166,24 @@ bool VIEWPORT::ServiceRendererShutdown ()
    return bResult;
 }
 
-ENGINE*              VIEWPORT::Sneeze () const              { return m_pEngine; }
-IVIEWPORT*           VIEWPORT::Host () const                { return m_pHost; }
-VIEWPORT::SCENE*     VIEWPORT::Scene () const               { return m_pScene; }
-const std::string&   VIEWPORT::sPath_Transitory () const    { return m_sPath_Transitory; }
-bool                 VIEWPORT::IsReady () const             { return m_bReady; }
-int                  VIEWPORT::Width () const      { return m_nWidth; }
-int                  VIEWPORT::Height () const     { return m_nHeight; }
-VIEWPORT::VIEW&      VIEWPORT::View ()             { return m_View; }
-VIEWPORT::RENDERER*  VIEWPORT::Renderer () const   { return m_pRenderer; }
+ENGINE*              VIEWPORT::Sneeze          () const { return m_pEngine; }
+IVIEWPORT*           VIEWPORT::Host            () const { return m_pHost; }
+VIEWPORT::SCENE*     VIEWPORT::Scene           () const { return m_pScene; }
+VIEWPORT::eSESSION   VIEWPORT::Session         () const { return m_eSession; }
+const std::string&   VIEWPORT::sPath_Permanent () const { return m_sPath_Permanent; }
+const std::string&   VIEWPORT::sPath_Temporary () const { return m_sPath_Temporary; }
+std::string          VIEWPORT::sViewportId     () const
+{
+   std::string sResult;
+   if (!m_sPath_Temporary.empty ())
+      sResult = std::filesystem::path (m_sPath_Temporary).filename ().generic_string ();
+   return sResult;
+}
+bool                 VIEWPORT::IsReady         () const { return m_bReady; }
+int                  VIEWPORT::Width           () const { return m_nWidth; }
+int                  VIEWPORT::Height          () const { return m_nHeight; }
+VIEWPORT::VIEW&      VIEWPORT::View            ()       { return m_View; }
+VIEWPORT::RENDERER*  VIEWPORT::Renderer        () const { return m_pRenderer; }
 
 // ---------------------------------------------------------------------------
 // Input
