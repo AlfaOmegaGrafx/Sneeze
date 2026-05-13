@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{E5F6A7B8-2345-6789-ABCD-EF0123456789}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <Platform>x64</Platform>
+    <ProjectName>Sneeze</ProjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+
+  <!-- ===================================================================== -->
+  <!-- Path macros                                                            -->
+  <!-- ===================================================================== -->
+  <PropertyGroup Label="UserMacros">
+    <SneezeRoot>$(MSBuildProjectDirectory)\..</SneezeRoot>
+    <SneezeBuildRoot>$(SneezeRoot)\builds\windows-x64</SneezeBuildRoot>
+    <SneezeDepsRoot>$(SneezeRoot)\deps\builds\windows-x64</SneezeDepsRoot>
+  </PropertyGroup>
+  <PropertyGroup>
+    <CfgLower Condition="'$(Configuration)'=='Debug'">debug</CfgLower>
+    <CfgLower Condition="'$(Configuration)'=='Release'">release</CfgLower>
+  </PropertyGroup>
+
+  <!-- ===================================================================== -->
+  <!-- Output directories                                                     -->
+  <!-- ===================================================================== -->
+  <PropertyGroup>
+    <OutDir>$(SneezeBuildRoot)\install\$(CfgLower)\lib\</OutDir>
+    <IntDir>$(SneezeBuildRoot)\build\Sneeze.dir\$(Configuration)\</IntDir>
+    <TargetName>Sneeze</TargetName>
+    <TargetExt>.lib</TargetExt>
+  </PropertyGroup>
+
+  <!-- ===================================================================== -->
+  <!-- Debug configuration                                                    -->
+  <!-- ===================================================================== -->
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(SneezeRoot)\src;$(SneezeRoot)\include;$(SneezeRoot)\src\sneeze;$(SneezeRoot)\src\viewport;$(SneezeRoot)\src\deps;$(SneezeDepsRoot)\debug\libs\SPIRV-Tools\install\include;$(SneezeDepsRoot)\debug\libs\curl\install\include;$(SneezeDepsRoot)\debug\libs\FreeType\install\include\freetype2;$(SneezeDepsRoot)\debug\libs\RmlUi\install\include;$(SneezeDepsRoot)\debug\libs\nlohmann-json\install\include;$(SneezeDepsRoot)\debug\libs\boringssl\install\include;$(SneezeDepsRoot)\debug\libs\jwt-cpp\install\include;$(SneezeDepsRoot)\debug\libs\Wasmtime\install\include;$(SneezeDepsRoot)\debug\libs\OpenXR-SDK\install\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /external:I "$(SneezeDepsRoot)\debug\libs\ANARI-SDK\install\include" /external:I "$(SneezeDepsRoot)\debug\libs\Vox\install\include"</AdditionalOptions>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <Optimization>Disabled</Optimization>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>Pch.h</PrecompiledHeaderFile>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>WIN32;_WINDOWS;_DEBUG;CURL_STATICLIB;RMLUI_STATIC_LIB;SNEEZE_VERSION="0.0.0";SNEEZE_HAS_WASM;WASM_API_EXTERN=;WASI_API_EXTERN=;ANARI_STATIC_DEFINE;_USE_MATH_DEFINES;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+      <ForcedIncludeFiles>Pch.h</ForcedIncludeFiles>
+    </ClCompile>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+
+  <!-- ===================================================================== -->
+  <!-- Release configuration                                                  -->
+  <!-- ===================================================================== -->
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(SneezeRoot)\src;$(SneezeRoot)\include;$(SneezeRoot)\src\sneeze;$(SneezeRoot)\src\viewport;$(SneezeRoot)\src\deps;$(SneezeDepsRoot)\release\libs\SPIRV-Tools\install\include;$(SneezeDepsRoot)\release\libs\curl\install\include;$(SneezeDepsRoot)\release\libs\FreeType\install\include\freetype2;$(SneezeDepsRoot)\release\libs\RmlUi\install\include;$(SneezeDepsRoot)\release\libs\nlohmann-json\install\include;$(SneezeDepsRoot)\release\libs\boringssl\install\include;$(SneezeDepsRoot)\release\libs\jwt-cpp\install\include;$(SneezeDepsRoot)\release\libs\Wasmtime\install\include;$(SneezeDepsRoot)\release\libs\OpenXR-SDK\install\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /external:I "$(SneezeDepsRoot)\release\libs\ANARI-SDK\install\include" /external:I "$(SneezeDepsRoot)\release\libs\Vox\install\include"</AdditionalOptions>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>Pch.h</PrecompiledHeaderFile>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>WIN32;_WINDOWS;NDEBUG;CURL_STATICLIB;RMLUI_STATIC_LIB;SNEEZE_VERSION="0.0.0";SNEEZE_HAS_WASM;WASM_API_EXTERN=;WASI_API_EXTERN=;ANARI_STATIC_DEFINE;_USE_MATH_DEFINES;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+      <ForcedIncludeFiles>Pch.h</ForcedIncludeFiles>
+    </ClCompile>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+
+  <!-- ===================================================================== -->
+  <!-- PCH creation source                                                    -->
+  <!-- ===================================================================== -->
+  <ItemGroup>
+    <ClCompile Include="..\src\sneeze\Pch.cpp">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>
+  </ItemGroup>
+
+  <!-- ===================================================================== -->
+  <!-- Source files                                                            -->
+  <!-- ===================================================================== -->
+  <ItemGroup>
+    <!-- sneeze core -->
+    <ClCompile Include="..\src\sneeze\Engine.cpp" />
+    <ClCompile Include="..\src\sneeze\Thread.cpp" />
+    <ClCompile Include="..\src\sneeze\control\Agent.cpp" />
+    <ClCompile Include="..\src\sneeze\control\Control.cpp" />
+    <ClCompile Include="..\src\sneeze\control\Compositor.cpp" />
+    <ClCompile Include="..\src\sneeze\control\Scrubber.cpp" />
+    <ClCompile Include="..\src\sneeze\control\AgentC.cpp" />
+    <ClCompile Include="..\src\sneeze\control\AgentD.cpp" />
+    <ClCompile Include="..\src\sneeze\control\AgentE.cpp" />
+    <!-- astro -->
+    <ClCompile Include="..\src\astro\BodyData.cpp" />
+    <ClCompile Include="..\src\astro\Celestial.cpp" />
+    <ClCompile Include="..\src\astro\Orbit.cpp" />
+    <ClCompile Include="..\src\astro\RMCObject.cpp" />
+    <ClCompile Include="..\src\astro\AstroService.cpp" />
+    <!-- viewport -->
+    <ClCompile Include="..\src\viewport\Viewport.cpp" />
+    <ClCompile Include="..\src\viewport\scene\Epoch.cpp" />
+    <ClCompile Include="..\src\viewport\scene\Node.cpp" />
+    <ClCompile Include="..\src\viewport\scene\Fabric.cpp" />
+    <ClCompile Include="..\src\viewport\scene\Scene.cpp" />
+    <ClCompile Include="..\src\viewport\scene\MapObject.cpp" />
+    <ClCompile Include="..\src\viewport\scene\AccessControl.cpp" />
+    <ClCompile Include="..\src\viewport\scene\Events.cpp" />
+    <ClCompile Include="..\src\viewport\scene\SpatialIndex.cpp" />
+    <!-- network -->
+    <ClCompile Include="..\src\sneeze\network\Asset.cpp" />
+    <ClCompile Include="..\src\sneeze\network\File.cpp" />
+    <ClCompile Include="..\src\sneeze\network\Network.cpp" />
+    <!-- storage -->
+    <ClCompile Include="..\src\sneeze\storage\Storage.cpp" />
+    <ClCompile Include="..\src\sneeze\storage\Unit.cpp" />
+    <ClCompile Include="..\src\sneeze\storage\Silo.cpp" />
+    <!-- persona -->
+    <ClCompile Include="..\src\persona\Persona.cpp" />
+    <!-- renderer -->
+    <ClCompile Include="..\src\viewport\renderer\AnariRenderer.cpp" />
+    <ClCompile Include="..\src\viewport\renderer\UVSphere.cpp" />
+    <!-- deps: wasm -->
+    <ClCompile Include="..\src\deps\wasm\WasmRuntime.cpp" />
+    <ClCompile Include="..\src\deps\wasm\WasmStore.cpp" />
+    <ClCompile Include="..\src\deps\wasm\WasmInstance.cpp" />
+    <ClCompile Include="..\src\deps\wasm\HostFunctions.cpp" />
+    <ClCompile Include="..\src\deps\wasm\ThreadPool.cpp" />
+    <!-- deps: spirv -->
+    <ClCompile Include="..\src\deps\spirv\SpvPipeline.cpp" />
+    <!-- deps: xr -->
+    <ClCompile Include="..\src\deps\xr\XrRuntime.cpp" />
+    <!-- deps: ui -->
+    <ClCompile Include="..\src\deps\ui\UiContext.cpp" />
+    <!-- deps: compute -->
+    <ClCompile Include="..\src\deps\compute\EmbeddedKernels.cpp" />
+    <ClCompile Include="..\src\deps\compute\ComputeDispatch.cpp" />
+    <!-- msf -->
+    <ClCompile Include="..\src\viewport\msf\MsfFile.cpp" />
+    <ClCompile Include="..\src\viewport\msf\CertChain.cpp" />
+    <!-- stb -->
+    <ClCompile Include="..\src\deps\stb\stb_image_impl.cpp" />
+  </ItemGroup>
+
+  <!-- ===================================================================== -->
+  <!-- Header files                                                           -->
+  <!-- ===================================================================== -->
+  <ItemGroup>
+    <ClInclude Include="..\src\sneeze\Pch.h" />
+    <ClInclude Include="..\src\sneeze\Types.h" />
+    <ClInclude Include="..\src\sneeze\Engine.h" />
+    <ClInclude Include="..\src\sneeze\control\Control.h" />
+    <ClInclude Include="..\src\astro\BodyData.h" />
+    <ClInclude Include="..\src\astro\Celestial.h" />
+    <ClInclude Include="..\src\astro\Orbit.h" />
+    <ClInclude Include="..\src\astro\RMCObject.h" />
+    <ClInclude Include="..\src\astro\AstroService.h" />
+    <ClInclude Include="..\src\viewport\scene\Epoch.h" />
+    <ClInclude Include="..\src\viewport\scene\Node.h" />
+    <ClInclude Include="..\src\viewport\scene\Fabric.h" />
+    <ClInclude Include="..\src\viewport\scene\Scene.h" />
+    <ClInclude Include="..\src\viewport\scene\MapObject.h" />
+    <ClInclude Include="..\src\viewport\scene\AccessControl.h" />
+    <ClInclude Include="..\src\viewport\scene\Events.h" />
+    <ClInclude Include="..\src\viewport\scene\SpatialIndex.h" />
+    <ClInclude Include="..\src\viewport\renderer\Renderer.h" />
+    <ClInclude Include="..\src\viewport\renderer\AnariRenderer.h" />
+    <ClInclude Include="..\src\viewport\renderer\UVSphere.h" />
+    <ClInclude Include="..\src\deps\wasm\WasmRuntime.h" />
+    <ClInclude Include="..\src\deps\wasm\WasmStore.h" />
+    <ClInclude Include="..\src\deps\wasm\WasmInstance.h" />
+    <ClInclude Include="..\src\deps\wasm\HostFunctions.h" />
+    <ClInclude Include="..\src\deps\wasm\ThreadPool.h" />
+    <ClInclude Include="..\src\deps\spirv\SpvPipeline.h" />
+    <ClInclude Include="..\src\deps\xr\XrRuntime.h" />
+    <ClInclude Include="..\src\deps\ui\UiContext.h" />
+    <ClInclude Include="..\src\deps\compute\EmbeddedKernels.h" />
+    <ClInclude Include="..\src\deps\compute\ComputeDispatch.h" />
+    <ClInclude Include="..\src\viewport\msf\Msf.h" />
+    <ClInclude Include="..\src\deps\stb\stb_image.h" />
+    <!-- public headers -->
+    <ClInclude Include="..\include\Sneeze.h" />
+    <ClInclude Include="..\include\Persona.h" />
+    <ClInclude Include="..\include\Network.h" />
+    <ClInclude Include="..\include\Container.h" />
+    <ClInclude Include="..\include\Viewport.h" />
+    <ClInclude Include="..\include\Storage.h" />
+  </ItemGroup>
+
+  <!-- ===================================================================== -->
+  <!-- Resource files (SPIR-V kernels — generated by CompileKernels)          -->
+  <!-- ===================================================================== -->
+  <ItemGroup>
+    <ResourceCompile Include="$(SneezeBuildRoot)\build\kernels.rc" Condition="Exists('$(SneezeBuildRoot)\build\kernels.rc')" />
+  </ItemGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
