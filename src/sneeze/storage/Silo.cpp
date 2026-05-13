@@ -20,12 +20,25 @@ using namespace SNEEZE;
 // STORAGE::SILO
 // ===========================================================================
 
+std::shared_ptr<VIEWPORT::CONTAINER::NAME>  STORAGE::SILO::Name () const { return m_pName; }
+std::string          STORAGE::SILO::DisplayName () const { return m_pName ? m_pName->DisplayName () : ""; }
+VIEWPORT*            STORAGE::SILO::Viewport () const { return m_pViewport; }
+const std::string&   STORAGE::SILO::sPath_Permanent () const { return m_sPath_Permanent; }
+const std::string&   STORAGE::SILO::sPath_Temporary () const { return m_sPath_Temporary; }
+uint32_t             STORAGE::SILO::Count_Load () const { return m_nCount_Load; }
+bool                 STORAGE::SILO::IsPendingClear () const { return m_bPendingClear; }
+void                 STORAGE::SILO::SetPendingClear (bool b) { m_bPendingClear = b; }
+STORAGE::UNIT*       STORAGE::SILO::Unit (SCOPE eScope) const { return m_apUnits[eScope]; }
+void                 STORAGE::SILO::Unit (SCOPE eScope, UNIT* pUnit) { m_apUnits[eScope] = pUnit; }
+
 STORAGE::SILO::SILO (STORAGE* pStorage, std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, VIEWPORT* pViewport) :
-   m_pStorage      (pStorage),
-   m_pName         (std::move (pName)),
-   m_pViewport     (pViewport),
-   m_nRefCount     (0),
-   m_bPendingClear (false)
+   m_pStorage        (pStorage),
+   m_pName           (std::move (pName)),
+   m_pViewport       (pViewport),
+   m_sPath_Permanent ((std::filesystem::path (pViewport->sPath_Permanent ()) / "Storage").string ()),
+   m_sPath_Temporary ((std::filesystem::path (pViewport->sPath_Temporary ()) / "Storage").string ()),
+   m_nCount_Load     (0),
+   m_bPendingClear   (false)
 {
    for (int i = 0; i < SCOPE_COUNT; i++)
       m_apUnits[i] = nullptr;
@@ -67,19 +80,19 @@ bool STORAGE::SILO::Has (SCOPE eScope, const std::string& sPath) const
    return bHas;
 }
 
-std::string STORAGE::SILO::GetJson (SCOPE eScope) const
+std::string STORAGE::SILO::Json (SCOPE eScope) const
 {
    std::string sJson = "{}";
    if (m_apUnits[eScope])
-      sJson = m_apUnits[eScope]->GetJson ();
+      sJson = m_apUnits[eScope]->Json ();
    return sJson;
 }
 
-void STORAGE::SILO::SetJson (SCOPE eScope, const std::string& sJson)
+void STORAGE::SILO::Json (SCOPE eScope, const std::string& sJson)
 {
    if (m_apUnits[eScope])
    {
-      m_apUnits[eScope]->SetJson (sJson);
+      m_apUnits[eScope]->Json (sJson);
       m_apUnits[eScope]->TouchAccess ();
       m_pViewport->Host ()->OnStorageUnitChanged (this);
    }
@@ -87,15 +100,15 @@ void STORAGE::SILO::SetJson (SCOPE eScope, const std::string& sJson)
 
 void STORAGE::SILO::Attach ()
 {
-   m_nRefCount++;
+   m_nCount_Load++;
 
-   if (m_nRefCount == 1)
+   if (m_nCount_Load == 1)
    {
       for (int i = 0; i < SCOPE_COUNT; i++)
       {
          if (m_apUnits[i])
          {
-            m_apUnits[i]->m_nRefCount++;
+            m_apUnits[i]->m_nCount_Load++;
             m_apUnits[i]->Load ();
          }
       }
@@ -104,18 +117,18 @@ void STORAGE::SILO::Attach ()
 
 void STORAGE::SILO::Detach ()
 {
-   if (m_nRefCount > 0)
+   if (m_nCount_Load > 0)
    {
-      m_nRefCount--;
+      m_nCount_Load--;
 
-      if (m_nRefCount == 0)
+      if (m_nCount_Load == 0)
       {
          for (int i = 0; i < SCOPE_COUNT; i++)
          {
             if (m_apUnits[i])
             {
-               m_apUnits[i]->m_nRefCount--;
-               if (m_apUnits[i]->m_nRefCount == 0)
+               m_apUnits[i]->m_nCount_Load--;
+               if (m_apUnits[i]->m_nCount_Load == 0)
                   m_apUnits[i]->Evict ();
             }
          }

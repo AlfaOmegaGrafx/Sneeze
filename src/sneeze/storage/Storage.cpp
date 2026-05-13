@@ -20,19 +20,12 @@ using namespace SNEEZE;
 // STORAGE
 // ===========================================================================
 
+const std::string&   STORAGE::sPath_Permanent () const { return m_sPath_Permanent; }
+const std::string&   STORAGE::sPath_Temporary () const { return m_sPath_Temporary; }
+
 STORAGE::STORAGE (ENGINE* pEngine) :
    m_pEngine (pEngine)
 {
-}
-
-STORAGE::~STORAGE ()
-{
-   std::lock_guard<std::recursive_mutex> guard (m_mutex);
-
-   SaveAllDirty ();
-
-   m_aSilo.clear ();
-   m_mapUnits.clear ();
 }
 
 bool STORAGE::Initialize ()
@@ -40,81 +33,90 @@ bool STORAGE::Initialize ()
    bool bResult = false;
 
    IENGINE* pHost = m_pEngine->Host ();
-   std::string sAppDataPath = pHost->sAppDataPath ();
 
-   if (!sAppDataPath.empty ())
+   if (pHost  &&  !pHost->sAppDataPath ().empty ())
    {
-      m_sPermanentPath = (std::filesystem::path (sAppDataPath) / "Persistent" / "Storage" / "Permanent").string ();
-      m_sTemporaryPath = (std::filesystem::path (sAppDataPath) / "Persistent" / "Storage" / "Temporary").string ();
-
-      std::filesystem::create_directories (m_sPermanentPath);
-      std::filesystem::create_directories (m_sTemporaryPath);
-
-      m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "STORAGE",
-         "Initialized (permanent: " + m_sPermanentPath + ", temporary: " + m_sTemporaryPath + ")");
       bResult = true;
+
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "STORAGE", "Initialized");
    }
-   else
-   {
-      m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "STORAGE",
-         "Failed to determine storage path");
-   }
+   else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "STORAGE", "Host configuration incomplete (sAppDataPath required)");
 
    return bResult;
+}
+
+STORAGE::~STORAGE ()
+{
+   std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
+
+   while (!m_apSilo.empty ())
+      Silo_Close (m_apSilo.front ());
+
+   for (auto& pair : m_umpUnit)
+      delete pair.second;
+   m_umpUnit.clear ();
 }
 
 // ---------------------------------------------------------------------------
 // Container lifecycle
 // ---------------------------------------------------------------------------
 
-STORAGE::SILO* STORAGE::Open (std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, VIEWPORT* pViewport)
+STORAGE::SILO* STORAGE::Silo_Open (std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, VIEWPORT* pViewport)
 {
-   SILO* pRaw = nullptr;
+   SILO* pSilo = nullptr;
 
-   if (pName)
+   if (pName  &&  pViewport)
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+      std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
 
-      std::string sFp2  = pName->sFingerprint.substr (0, 2);
-      std::string sFp22 = pName->sFingerprint.substr (2);
+      pSilo = new SILO (this, pName, pViewport);
 
-      // Build paths for all four units
-      std::string aJsonPaths[SCOPE_COUNT];
-
-      aJsonPaths[ORG_PERMANENT      ] = ComputeUnitPath (m_sPermanentPath, pName->sPersonaHash, sFp2 + "/" + sFp22, "organization.json");
-      aJsonPaths[ORG_TEMPORARY      ] = ComputeUnitPath (m_sTemporaryPath, pName->sPersonaHash, sFp2 + "/" + sFp22, "organization.json");
-      aJsonPaths[CONTAINER_PERMANENT] = ComputeUnitPath (m_sPermanentPath, pName->sPersonaHash, sFp2 + "/" + sFp22, "container-" + pName->sContainerName + ".json");
-      aJsonPaths[CONTAINER_TEMPORARY] = ComputeUnitPath (m_sTemporaryPath, pName->sPersonaHash, sFp2 + "/" + sFp22, "container-" + pName->sContainerName + ".json");
-
-      auto pSilo = std::make_unique<SILO> (this, pName, pViewport);
+      std::string sFingerprint_2      = pName->sFingerprint.substr (0, 2);
+      std::string sFingerprint_22     = pName->sFingerprint.substr (2, 22);
+      std::string sFileName_Org       = "organization.json";
+      std::string sFileName_Container = "container-" + pName->sContainerName + ".json";
 
       for (int i = 0; i < SCOPE_COUNT; i++)
       {
-         UNIT* pUnit = FindOrCreateUnit (aJsonPaths[i]);
-         pSilo->SetUnit (static_cast<SCOPE> (i), pUnit);
+         SCOPE eScope = static_cast<SCOPE> (i);
+         const std::string& sBasePath = (eScope == ORG_TEMPORARY  ||  eScope == CONTAINER_TEMPORARY) ? pSilo->sPath_Temporary () : pSilo->sPath_Permanent ();
+         const std::string& sFileName = (eScope == ORG_PERMANENT  ||  eScope ==       ORG_TEMPORARY) ? sFileName_Org : sFileName_Container;
+         std::string sPath_Json = (std::filesystem::path (sBasePath) / pName->sPersonaHash / sFingerprint_2 / sFingerprint_22 / sFileName).string ();
+
+         auto it = m_umpUnit.find (sPath_Json);
+         if (it != m_umpUnit.end ())
+         {
+            it->second->m_nCount_Open++;
+            pSilo->Unit (eScope, it->second);
+         }
+         else
+         {
+            UNIT* pUnit = new UNIT (this, eScope, sPath_Json);
+            pUnit->LoadMeta ();
+            m_umpUnit[sPath_Json] = pUnit;
+            pSilo->Unit (eScope, pUnit);
+         }
       }
 
       pSilo->Attach ();
 
-      pRaw = pSilo.get ();
-      m_aSilo.push_back (std::move (pSilo));
+      m_apSilo.push_back (pSilo);
 
-      pRaw->Viewport ()->Host ()->OnStorageUnitCreated (pRaw);
+      pSilo->Viewport ()->Host ()->OnStorageUnitCreated (pSilo);
    }
 
-   return pRaw;
+   return pSilo;
 }
 
-void STORAGE::Close (SILO* pSilo)
+void STORAGE::Silo_Close (SILO* pSilo)
 {
    if (pSilo)
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+      std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
 
-      // Save dirty units and meta before detaching
       for (int i = 0; i < SCOPE_COUNT; i++)
       {
-         UNIT* pUnit = pSilo->GetUnit (static_cast<SCOPE> (i));
+         UNIT* pUnit = pSilo->Unit (static_cast<SCOPE> (i));
          if (pUnit)
          {
             if (pUnit->IsDirty ())
@@ -125,11 +127,27 @@ void STORAGE::Close (SILO* pSilo)
 
       pSilo->Detach ();
 
-      auto it = std::find_if (m_aSilo.begin (), m_aSilo.end (),
-         [pSilo] (const std::unique_ptr<SILO>& p) { return p.get () == pSilo; });
+      for (int i = 0; i < SCOPE_COUNT; i++)
+      {
+         UNIT* pUnit = pSilo->Unit (static_cast<SCOPE> (i));
+         if (pUnit)
+         {
+            pUnit->m_nCount_Open--;
+            if (pUnit->m_nCount_Open == 0)
+            {
+               m_umpUnit.erase (pUnit->JsonPath ());
+               delete pUnit;
+            }
+         }
+      }
 
-      if (it != m_aSilo.end ())
-         m_aSilo.erase (it);
+      auto it = std::find (m_apSilo.begin (), m_apSilo.end (), pSilo);
+
+      if (it != m_apSilo.end ())
+      {
+         delete *it;
+         m_apSilo.erase (it);
+      }
    }
 }
 
@@ -141,53 +159,12 @@ void STORAGE::Enumerate (IENUM* pEnum, VIEWPORT* pViewport)
 {
    if (pEnum)
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+      std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
 
-      for (auto& pSilo : m_aSilo)
+      for (SILO* pSilo : m_apSilo)
       {
          if (pSilo->Viewport () == pViewport)
-            pEnum->OnSilo (pSilo.get ());
+            pEnum->OnSilo (pSilo);
       }
    }
 }
-
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
-
-std::string STORAGE::ComputeUnitPath (const std::string& sBasePath, const std::string& sPersonaHash, const std::string& sFingerprint, const std::string& sFileName) const
-{
-   return (std::filesystem::path (sBasePath) / sPersonaHash / sFingerprint / sFileName).string ();
-}
-
-STORAGE::UNIT* STORAGE::FindOrCreateUnit (const std::string& sJsonPath)
-{
-   auto it = m_mapUnits.find (sJsonPath);
-   if (it != m_mapUnits.end ())
-      return it->second.get ();
-
-   SCOPE eScope = ORG_PERMANENT;
-   std::string sFilename = std::filesystem::path (sJsonPath).filename ().string ();
-   bool bTemp = (sJsonPath.find (m_sTemporaryPath) == 0  &&  m_sTemporaryPath != m_sPermanentPath);
-
-   if (sFilename == "organization.json")
-      eScope = bTemp ? ORG_TEMPORARY : ORG_PERMANENT;
-   else
-      eScope = bTemp ? CONTAINER_TEMPORARY : CONTAINER_PERMANENT;
-
-   auto pUnit = std::make_unique<UNIT> (this, eScope, sJsonPath);
-   pUnit->LoadMeta ();
-   UNIT* pRaw = pUnit.get ();
-   m_mapUnits[sJsonPath] = std::move (pUnit);
-   return pRaw;
-}
-
-void STORAGE::SaveAllDirty ()
-{
-   for (auto& [sPath, pUnit] : m_mapUnits)
-   {
-      if (pUnit->IsLoaded ()  &&  pUnit->IsDirty ())
-         pUnit->Save ();
-   }
-}
-

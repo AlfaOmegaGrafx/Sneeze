@@ -28,7 +28,7 @@
 namespace SNEEZE
 {
    // ---------------------------------------------------------------------------
-   // STORAGE — persistent per-persona/per-org/per-container JSON document store.
+   // STORAGE - persistent per-persona/per-org/per-container JSON document store.
    //
    // Analogous to localStorage/sessionStorage in a web browser. Each container
    // gets four independent JSON document stores (organization permanent/temporary,
@@ -94,9 +94,9 @@ namespace SNEEZE
 
          // --- State ---
 
-         bool     IsLoaded () const          { return m_bLoaded; }
-         bool     IsDirty () const           { return m_bDirty; }
-         SCOPE    GetScope () const          { return m_eScope; }
+         bool     IsLoaded () const;
+         bool     IsDirty () const;
+         SCOPE    GetScope () const;
 
          // --- JSON access ---
 
@@ -107,8 +107,8 @@ namespace SNEEZE
 
          // --- Bulk ---
 
-         std::string     GetJson () const;
-         void            SetJson (const std::string& sJson);
+         std::string     Json () const;
+         void            Json (const std::string& sJson);
 
          // --- Lifecycle ---
 
@@ -118,11 +118,11 @@ namespace SNEEZE
 
          // --- Meta sidecar ---
 
-         const std::string&  GetJsonPath    () const { return m_sJsonPath; }
-         uint64_t            SizeBytes      () const { return m_nSizeBytes; }
-         const std::string&  CreatedTime    () const { return m_sCreatedAt; }
-         const std::string&  LastAccessTime () const { return m_sLastAccessedAt; }
-         uint32_t            AccessCount    () const { return m_nAccessCount; }
+         const std::string&  JsonPath       () const;
+         uint64_t            SizeBytes      () const;
+         const std::string&  CreatedTime    () const;
+         const std::string&  LastAccessTime () const;
+         uint32_t            AccessCount    () const;
 
          void  TouchAccess ();
          void  SaveMeta (std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName);
@@ -130,9 +130,9 @@ namespace SNEEZE
 
       private:
          void  NavigatePath (const std::string& sPath, nlohmann::json*& pParent, std::string& sFinalKey) const;
-         void  AppendLog (const std::string& sOp, const std::string& sPath, const nlohmann::json& jValue);
-         void  ReplayLog ();
-         void  DeleteLog ();
+         void  Log_Append (const std::string& sOp, const std::string& sPath, const nlohmann::json& jValue);
+         void  Log_Replay ();
+         void  Log_Delete ();
 
          static std::string NowIso8601 ();
 
@@ -143,7 +143,8 @@ namespace SNEEZE
          nlohmann::json       m_jData;
          bool                 m_bLoaded;
          bool                 m_bDirty;
-         uint32_t             m_nRefCount;
+         uint32_t             m_nCount_Open;
+         uint32_t             m_nCount_Load;
 
          // Meta sidecar fields
          uint64_t             m_nSizeBytes;
@@ -172,44 +173,48 @@ namespace SNEEZE
 
          // --- Identity ---
 
-         std::shared_ptr<VIEWPORT::CONTAINER::NAME>  Name () const { return m_pName; }
-         std::string  DisplayName () const { return m_pName ? m_pName->DisplayName () : ""; }
-         VIEWPORT* Viewport () const { return m_pViewport; }
+         std::shared_ptr<VIEWPORT::CONTAINER::NAME>  Name () const;
+         std::string  DisplayName () const;
+         VIEWPORT* Viewport () const;
+         const std::string& sPath_Permanent () const;
+         const std::string& sPath_Temporary () const;
 
          // --- Path-based API ---
 
-         nlohmann::json  Get (SCOPE eScope, const std::string& sPath) const;
-         void            Set (SCOPE eScope, const std::string& sPath, const nlohmann::json& jValue);
+         nlohmann::json  Get    (SCOPE eScope, const std::string& sPath) const;
+         void            Set    (SCOPE eScope, const std::string& sPath, const nlohmann::json& jValue);
          void            Remove (SCOPE eScope, const std::string& sPath);
-         bool            Has (SCOPE eScope, const std::string& sPath) const;
+         bool            Has    (SCOPE eScope, const std::string& sPath) const;
 
          // --- Bulk ---
 
-         std::string     GetJson (SCOPE eScope) const;
-         void            SetJson (SCOPE eScope, const std::string& sJson);
+         std::string     Json (SCOPE eScope) const;
+         void            Json (SCOPE eScope, const std::string& sJson);
 
          // --- Reference counting (WASM + inspector attachments) ---
 
          void     Attach ();
          void     Detach ();
-         uint32_t GetRefCount () const { return m_nRefCount; }
+         uint32_t Count_Load () const;
 
          // --- Clear flag (deferred history removal) ---
 
-         bool     IsPendingClear () const       { return m_bPendingClear; }
-         void     SetPendingClear (bool b)      { m_bPendingClear = b; }
+         bool     IsPendingClear () const;
+         void     SetPendingClear (bool b);
 
          // --- Internal ---
 
-         UNIT*    GetUnit (SCOPE eScope) const  { return m_apUnits[eScope]; }
-         void     SetUnit (SCOPE eScope, UNIT* pUnit) { m_apUnits[eScope] = pUnit; }
+         UNIT*    Unit (SCOPE eScope) const;
+         void     Unit (SCOPE eScope, UNIT* pUnit);
 
       private:
          STORAGE*    m_pStorage;
          std::shared_ptr<VIEWPORT::CONTAINER::NAME>  m_pName;
          VIEWPORT* m_pViewport;
+         std::string m_sPath_Permanent;
+         std::string m_sPath_Temporary;
          UNIT*       m_apUnits[SCOPE_COUNT];
-         uint32_t    m_nRefCount;
+         uint32_t    m_nCount_Load;
          bool        m_bPendingClear;
       };
 
@@ -224,8 +229,8 @@ namespace SNEEZE
 
       // --- Container lifecycle ---
 
-      SILO*   Open (std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, VIEWPORT* pViewport = nullptr);
-      void    Close (SILO* pSilo);
+      SILO*   Silo_Open (std::shared_ptr<VIEWPORT::CONTAINER::NAME> pName, VIEWPORT* pViewport);
+      void    Silo_Close (SILO* pSilo);
 
       // --- Inspector ---
 
@@ -233,22 +238,17 @@ namespace SNEEZE
 
       // --- Paths ---
 
-      const std::string& GetPermanentPath () const { return m_sPermanentPath; }
-      const std::string& GetTemporaryPath () const { return m_sTemporaryPath; }
+      const std::string& sPath_Permanent () const;
+      const std::string& sPath_Temporary () const;
 
    private:
-      std::string  ComputeUnitPath (const std::string& sBasePath, const std::string& sPersonaHash,
-                                    const std::string& sFingerprint, const std::string& sFileName) const;
-      UNIT*        FindOrCreateUnit (const std::string& sJsonPath);
-      void         SaveAllDirty ();
-
       ENGINE*   m_pEngine;
-      std::string     m_sPermanentPath;
-      std::string     m_sTemporaryPath;
+      std::string     m_sPath_Permanent;
+      std::string     m_sPath_Temporary;
 
-      std::unordered_map<std::string, std::unique_ptr<UNIT>>  m_mapUnits;
-      std::vector<std::unique_ptr<SILO>>                      m_aSilo;
-      std::recursive_mutex                                    m_mutex;
+      std::unordered_map<std::string, UNIT*>  m_umpUnit;
+      std::vector<SILO*>                       m_apSilo;
+      std::recursive_mutex                    m_mxStorage;
    };
 }
 #endif // SNEEZE_STORAGE_STORAGE_H

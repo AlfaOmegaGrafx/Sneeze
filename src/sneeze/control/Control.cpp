@@ -99,9 +99,12 @@ void CONTROL::Cleanup_Queue (const std::string& sPath)
 
 void CONTROL::Cleanup_SwapQueue (std::vector<std::string>& aPath)
 {
-   std::lock_guard<std::mutex> guard (m_mxCleanup);
+   {
+      std::lock_guard<std::mutex> guard (m_mxCleanup);
    
-   aPath.swap (m_aCleanupPath);
+      aPath.swap (m_aCleanupPath);
+      m_bCleanupPending = false;
+   }
 }
 
 // ---------------------------------------------------------------------------
@@ -142,7 +145,6 @@ void CONTROL::Main ()
    {
       auto tpOrigin = std::chrono::steady_clock::now ();
       int64_t nLastReport = 0;
-      bool bSignalScrubber;
 
       do
       {
@@ -151,50 +153,44 @@ void CONTROL::Main ()
             auto tpNow = std::chrono::steady_clock::now ();
             double dElapsed = std::chrono::duration<double> (tpNow - tpOrigin).count ();
 
-         for (int nAgent = 0; nAgent < static_cast<int> (m_aAgent_State.size ()); nAgent++)
-         {
-            AGENT_STATE& Agent_State = m_aAgent_State[nAgent];
-            if (Agent_State.nHertz <= 0)
-               continue;
-
-            int64_t nCurrentTick = static_cast<int64_t> (dElapsed * Agent_State.nHertz);
-            if (nCurrentTick > Agent_State.nLastTick)
-            {
-               Agent_State.nLastTick = nCurrentTick;
-               Agent_State.nSignalCount++;
-               Agent_State.pAgent->Signal ();
-            }
-         }
-
-         int64_t nCurrentSecond = static_cast<int64_t> (dElapsed);
-         if (nCurrentSecond > nLastReport)
-         {
-            std::string sMetronome;
             for (int nAgent = 0; nAgent < static_cast<int> (m_aAgent_State.size ()); nAgent++)
             {
                AGENT_STATE& Agent_State = m_aAgent_State[nAgent];
                if (Agent_State.nHertz <= 0)
                   continue;
-               sMetronome += "  [" + std::to_string (nAgent) + "] " + std::to_string (Agent_State.nSignalCount) + "/" + std::to_string (Agent_State.nHertz) + " Hz";
-               Agent_State.nSignalCount = 0;
+
+               int64_t nCurrentTick = static_cast<int64_t> (dElapsed * Agent_State.nHertz);
+               if (nCurrentTick > Agent_State.nLastTick)
+               {
+                  Agent_State.nLastTick = nCurrentTick;
+                  Agent_State.nSignalCount++;
+                  Agent_State.pAgent->Signal ();
+               }
             }
 
-            nLastReport = nCurrentSecond;
+            int64_t nCurrentSecond = static_cast<int64_t> (dElapsed);
+            if (nCurrentSecond > nLastReport)
+            {
+               std::string sMetronome;
+               for (int nAgent = 0; nAgent < static_cast<int> (m_aAgent_State.size ()); nAgent++)
+               {
+                  AGENT_STATE& Agent_State = m_aAgent_State[nAgent];
+                  if (Agent_State.nHertz <= 0)
+                     continue;
+                  sMetronome += "  [" + std::to_string (nAgent) + "] " + std::to_string (Agent_State.nSignalCount) + "/" + std::to_string (Agent_State.nHertz) + " Hz";
+                  Agent_State.nSignalCount = 0;
+               }
 
-            // m_pEngine->Log (IENGINE::kLOGLEVEL_Trace, "METRONOME", sMetronome);
+               nLastReport = nCurrentSecond;
+
+               // m_pEngine->Log (IENGINE::kLOGLEVEL_Trace, "METRONOME", sMetronome);
             }
          }
          else break;
 
          Wait (std::chrono::milliseconds (1));
 
-         {
-            std::lock_guard<std::mutex> guard (m_mxCleanup);
-            bSignalScrubber = m_bCleanupPending;
-            m_bCleanupPending = false;
-         }
-
-         if (bSignalScrubber)
+         if (m_bCleanupPending)
             m_aAgent_State[kAGENT_SCRUBBER].pAgent->Signal ();
       }
       while (true);

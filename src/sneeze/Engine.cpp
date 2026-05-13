@@ -306,12 +306,14 @@ m_pPersona = new persona::PERSONA (m_pEngine);
    VIEWPORT* Viewport_Open (IVIEWPORT* pHost, const std::string& sUrl, VIEWPORT::eSESSION kSession)
    {
       VIEWPORT* pViewport = nullptr;
-      std::string sPath_Transitory;
+      std::string sPath_Temporary;
 
-      sPath_Transitory = CreateTransitoryFolder (m_sPath_Transitory, kTRANSITORY_VIEWPORT);
+      sPath_Temporary = CreateTransitoryFolder (m_sPath_Transitory, kTRANSITORY_VIEWPORT);
 
-      if (!sPath_Transitory.empty ())
+      if (!sPath_Temporary.empty ())
       {
+         std::string sPath_Permanent = (kSession == VIEWPORT::kSESSION_PERSISTENT) ? m_sPath_Persistent : m_sPath_Transitory_Session;
+
          pViewport = new VIEWPORT (m_pEngine, pHost);
 
          {
@@ -319,7 +321,7 @@ m_pPersona = new persona::PERSONA (m_pEngine);
             m_apViewport.push_back (pViewport);
          }
 
-         if (!pViewport->Initialize (sUrl, sPath_Transitory))
+         if (!pViewport->Initialize (sUrl, kSession, sPath_Permanent, sPath_Temporary))
          {
             m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize viewport");
 
@@ -331,7 +333,7 @@ m_pPersona = new persona::PERSONA (m_pEngine);
             delete pViewport;
             pViewport = nullptr;
 
-            Cleanup_Queue (sPath_Transitory);
+            Cleanup_Queue (sPath_Temporary);
          }
       }
 
@@ -341,7 +343,7 @@ m_pPersona = new persona::PERSONA (m_pEngine);
    bool Viewport_Close (VIEWPORT* pViewport)
    {
       bool bResult = false;
-      std::string sPath_Transitory;
+      std::string sPath_Temporary;
 
       {
          std::lock_guard<std::mutex> guard (m_mutexViewport);
@@ -352,7 +354,7 @@ m_pPersona = new persona::PERSONA (m_pEngine);
 
       if (pViewport)
       {
-         sPath_Transitory = pViewport->sPath_Transitory ();
+         sPath_Temporary = pViewport->sPath_Temporary ();
 
          pViewport->Shutdown ();
 
@@ -364,7 +366,7 @@ m_pPersona = new persona::PERSONA (m_pEngine);
          delete pViewport;
          bResult = true;
 
-         Cleanup_Queue (sPath_Transitory);
+         Cleanup_Queue (sPath_Temporary);
       }
 
       return bResult;

@@ -35,7 +35,7 @@ namespace SNEEZE
 
    public:
       // ---------------------------------------------------------------------------
-      // VIEWPORT::CONTAINER � the runtime manifestation of an MSF file.
+      // VIEWPORT::CONTAINER - the runtime manifestation of an MSF file.
       //
       // NAME is the identity record for a container. Uniqueness is determined by
       // the tuple (persona hash, fingerprint, container name).
@@ -106,7 +106,7 @@ namespace SNEEZE
       explicit VIEWPORT (ENGINE* pEngine, IVIEWPORT* pHost);
       ~VIEWPORT ();
 
-      bool Initialize (const std::string& sUrl, const std::string& sPath_Transitory);
+      bool Initialize (const std::string& sUrl, eSESSION eSession, const std::string& sPath_Permanent, const std::string& sPath_Temporary);
       bool InitializeRenderer ();
       void Shutdown ();
       void ShutdownRenderer ();
@@ -116,7 +116,10 @@ namespace SNEEZE
       ENGINE*              Sneeze () const;
       IVIEWPORT*           Host () const;
       SCENE*               Scene () const;
-      const std::string&   sPath_Transitory () const;
+      eSESSION             Session () const;
+      const std::string&   sPath_Permanent () const;
+      const std::string&   sPath_Temporary () const;
+      std::string          sViewportId () const;
       bool                 IsReady () const;
 
       // --- Input (called by application) ---
@@ -147,43 +150,45 @@ namespace SNEEZE
       RENDERER* Renderer () const;
 
    private:
-      ENGINE*              m_pEngine;
-      IVIEWPORT*           m_pHost;
-      eINIT_STATE          m_eInitState;
-      bool                 m_bReady;
-      SCENE*               m_pScene;
-      RENDERER*            m_pRenderer;
-      bool                 m_bRendererPending;
-      std::atomic<bool>    m_bRendererShutdownRequested;
-      bool                 m_bRendererShutdownComplete;
-      std::mutex           m_rendererMutex;
+      ENGINE*                 m_pEngine;
+      IVIEWPORT*              m_pHost;
+      eINIT_STATE             m_eInitState;
+      bool                    m_bReady;
+      SCENE*                  m_pScene;
+      RENDERER*               m_pRenderer;
+      bool                    m_bRendererPending;
+      std::atomic<bool>       m_bRendererShutdownRequested;
+      bool                    m_bRendererShutdownComplete;
+      std::mutex              m_rendererMutex;
       std::condition_variable m_rendererCondVar;
 
       // Input
-      std::mutex           m_inputMutex;
-      INPUT                m_Input;
+      std::mutex              m_inputMutex;
+      INPUT                   m_Input;
 
       // Framebuffer
-      std::mutex           m_fbMutex;
-      std::vector<uint32_t> m_aFrameBuffer;
-      int                  m_nFbWidth;
-      int                  m_nFbHeight;
+      std::mutex              m_fbMutex;
+      std::vector<uint32_t>   m_aFrameBuffer;
+      int                     m_nFbWidth;
+      int                     m_nFbHeight;
 
       // Dimensions
-      int                  m_nWidth;
-      int                  m_nHeight;
+      int                     m_nWidth;
+      int                     m_nHeight;
 
       // Resize request
-      std::mutex           m_resizeMutex;
-      bool                 m_bResizePending;
-      int                  m_nResizeWidth;
-      int                  m_nResizeHeight;
+      std::mutex              m_resizeMutex;
+      bool                    m_bResizePending;
+      int                     m_nResizeWidth;
+      int                     m_nResizeHeight;
 
       // Paths
-      std::string          m_sPath_Transitory;
+      eSESSION                m_eSession;
+      std::string             m_sPath_Permanent;
+      std::string             m_sPath_Temporary;
 
       // Camera
-      VIEW                 m_View;
+      VIEW                    m_View;
    };
 }
 #endif // SNEEZE_VIEWPORT_H
