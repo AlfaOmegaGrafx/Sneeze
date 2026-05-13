@@ -19,10 +19,8 @@
 #include <mutex>
 #include <memory>
 #include <queue>
-#include <thread>
 #include <atomic>
 #include <chrono>
-#include <cstdint>
 
 namespace SNEEZE
 {
@@ -103,42 +101,42 @@ namespace SNEEZE
       public:
          ASSET (NETWORK* pNetwork, const std::string& sUrl, const std::string& sHash);
 
-         const std::string& Url               () const { return m_sUrl; }
-         const std::string& Hash              () const { return m_sHash; }
-         bool               IsHashed          () const { return !m_sHash.empty (); }
+         const std::string& Url               () const;
+         const std::string& Hash              () const;
+         bool               IsHashed          () const;
 
          STATE              State             () const;
-         const std::string& DiskPath          () const { return m_sDiskPath; }
+         const std::string& DiskPath          () const;
 
-         long               HttpStatus        () const { return m_nHttpStatus; }
-         double             FetchStartTime    () const { return m_dFetchStartTime; }
-         double             FetchEndTime      () const { return m_dFetchEndTime; }
-         double             FetchDuration     () const { return m_dFetchEndTime - m_dFetchStartTime; }
-         double             FetchQueuedTime   () const { return m_dFetchQueuedTime; }
-         double             GetQueueDuration  () const { return m_dFetchStartTime - m_dFetchQueuedTime; }
-         bool               IsServedFromCache () const { return m_bServedFromCache; }
+         long               HttpStatus        () const;
+         double             FetchStartTime    () const;
+         double             FetchEndTime      () const;
+         double             FetchDuration     () const;
+         double             FetchQueuedTime   () const;
+         double             GetQueueDuration  () const;
+         bool               IsServedFromCache () const;
 
-         void               SetHttpStatus        (long nStatus) { m_nHttpStatus = nStatus; }
-         void               SetFetchStartTime    (double dTime) { m_dFetchStartTime = dTime; }
-         void               SetFetchEndTime      (double dTime) { m_dFetchEndTime = dTime; }
-         void               SetFetchQueuedTime   (double dTime) { m_dFetchQueuedTime = dTime; }
-         void               SetServedFromCache   (bool bServed) { m_bServedFromCache = bServed; }
+         void               SetHttpStatus        (long nStatus);
+         void               SetFetchStartTime    (double dTime);
+         void               SetFetchEndTime      (double dTime);
+         void               SetFetchQueuedTime   (double dTime);
+         void               SetServedFromCache   (bool bServed);
 
-         const std::unordered_map<std::string, std::string>& Headers () const { return m_mapHeaders; }
+         const std::unordered_map<std::string, std::string>& Headers () const;
          std::string Header (const std::string& sName) const;
 
-         uint64_t    SizeBytes      () const { return m_nSizeBytes; }
-         std::string CreatedTime    () const { return m_sCreatedAt; }
-         std::string LastAccessTime () const { return m_sLastAccessedAt; }
-         uint32_t    AccessCount    () const { return m_nAccessCount; }
-         uint32_t    AssetIx        () const { return m_nAssetIx; }
+         uint64_t    SizeBytes      () const;
+         std::string CreatedTime    () const;
+         std::string LastAccessTime () const;
+         uint32_t    AccessCount    () const;
+         uint32_t    AssetIx        () const;
 
-         void        SetDiskPath (const std::string& sPath) { m_sDiskPath = sPath; }
-         void        SetHash (const std::string& sHash) { m_sHash = sHash; }
+         void        SetDiskPath (const std::string& sPath);
+         void        SetHash (const std::string& sHash);
          void        SetHeaders (const std::unordered_map<std::string, std::string>& mapHeaders);
-         void        SetSizeBytes (uint64_t nBytes) { m_nSizeBytes = nBytes; }
-         void        SetCreatedTime (const std::string& sTime) { m_sCreatedAt = sTime; }
-         void        SetAssetIx (uint32_t nAssetIx) { m_nAssetIx = nAssetIx; }
+         void        SetSizeBytes (uint64_t nBytes);
+         void        SetCreatedTime (const std::string& sTime);
+         void        SetAssetIx (uint32_t nAssetIx);
          void        TouchAccess ();
 
          void        AttachFile (FILE* pFile);
@@ -151,15 +149,13 @@ namespace SNEEZE
 
          void        ResetState ();
 
-         void        SetPendingReset (bool b)           { m_bPendingReset = b; }
-         bool        IsPendingReset () const            { return m_bPendingReset; }
-         size_t      GetFileCount () const            { return m_apFiles.size (); }
+         void        SetPendingReset (bool b);
+         bool        IsPendingReset () const;
+         size_t      GetFileCount () const;
 
          std::vector<FILE*> CollectFiles () const;
 
          std::vector<uint8_t> ReadData () const;
-
-         std::mutex& GetMutex () { return m_mutex; }
 
       private:
          static std::string NowIso8601 ();
@@ -243,29 +239,27 @@ namespace SNEEZE
 
          // --- Container ---
 
-//         const VIEWPORT::CONTAINER::NAME& Name () const   { return *m_pName; }
          std::string ContainerName () const;
-
-         VIEWPORT* Viewport () const { return m_pViewport; }
+         VIEWPORT* Viewport () const;
 
          // --- Listener ---
 
-         IFILE*      Listener () const          { return m_pListener; }
+         IFILE* Listener () const;
 
          // --- Internal (NETWORK use only) ---
 
-         ASSET*      Asset () const              { return m_pAsset; }
-         void        SetAsset (ASSET* pAsset)       { m_pAsset = pAsset; }
-         bool        IsPendingClear () const       { return m_bPendingClear; }
-         bool        IsReleased () const           { return m_bReleased; }
-         bool        IsAttached () const           { return m_pAsset != nullptr; }
+         ASSET* Asset () const;
+         void   SetAsset (ASSET* pAsset);
+         bool   IsPendingClear () const;
+         bool   IsReleased () const;
+         bool   IsAttached () const;
 
-         void        SetReleased ()                { m_bReleased = true; }
-         bool        SetPendingClear (bool b)      { bool bChanged = (b != m_bPendingClear); m_bPendingClear = b; return bChanged; }
+         void   SetReleased ();
+         bool   SetPendingClear (bool b);
 
-         void        SnapshotInitial ();
-         void        SnapshotProgress ();
-         void        SnapshotFinal ();
+         void   SnapshotInitial ();
+         void   SnapshotProgress ();
+         void   SnapshotFinal ();
 
       private:
          NETWORK*    m_pNetwork;

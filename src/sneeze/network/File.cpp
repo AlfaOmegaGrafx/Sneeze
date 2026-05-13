@@ -225,3 +225,50 @@ uint64_t NETWORK::FILE::SizeBytes () const
 { 
    return m_nSizeBytes; 
 }
+
+NETWORK::ASSET* NETWORK::FILE::Asset () const
+{ 
+   return m_pAsset; 
+}
+
+void NETWORK::FILE::SetAsset (ASSET* pAsset)
+{ 
+   m_pAsset = pAsset; 
+}
+
+bool NETWORK::FILE::IsPendingClear () const
+{ 
+   return m_bPendingClear; 
+}
+
+bool NETWORK::FILE::IsReleased () const
+{ 
+   return m_bReleased; 
+}
+
+bool NETWORK::FILE::IsAttached () const
+{ 
+   return m_pAsset != nullptr; 
+}
+
+void NETWORK::FILE::SetReleased ()
+{ 
+   m_bReleased = true; 
+}
+
+bool NETWORK::FILE::SetPendingClear (bool b)
+{ 
+   bool bChanged = (b != m_bPendingClear); m_bPendingClear = b; 
+
+   return bChanged; 
+}
+
+VIEWPORT* NETWORK::FILE::Viewport () const
+{
+   return m_pViewport;
+}
+
+NETWORK::IFILE* NETWORK::FILE::Listener () const
+{ 
+   return m_pListener; 
+}

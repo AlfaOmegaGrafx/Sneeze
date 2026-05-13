@@ -178,3 +178,153 @@ std::vector<uint8_t> NETWORK::ASSET::ReadData () const
 
    return aData;
 }
+
+const std::string& NETWORK::ASSET::Hash () const 
+{ 
+   return m_sHash; 
+}
+
+bool NETWORK::ASSET::IsHashed () const 
+{ 
+   return !m_sHash.empty (); 
+}
+
+const std::string& NETWORK::ASSET::DiskPath () const 
+{ 
+   return m_sDiskPath; 
+}
+
+long   NETWORK::ASSET::HttpStatus () const 
+{ 
+   return m_nHttpStatus; 
+}
+
+double NETWORK::ASSET::FetchStartTime () const 
+{ 
+   return m_dFetchStartTime; 
+}
+
+double NETWORK::ASSET::FetchEndTime () const 
+{ 
+   return m_dFetchEndTime; 
+}
+
+double NETWORK::ASSET::FetchDuration () const 
+{ 
+   return m_dFetchEndTime - m_dFetchStartTime; 
+}
+
+double NETWORK::ASSET::FetchQueuedTime () const 
+{ 
+   return m_dFetchQueuedTime; 
+}
+
+double NETWORK::ASSET::GetQueueDuration () const 
+{ 
+   return m_dFetchStartTime - m_dFetchQueuedTime;
+}
+
+bool NETWORK::ASSET::IsServedFromCache () const 
+{ 
+   return m_bServedFromCache; 
+}
+
+void NETWORK::ASSET::SetHttpStatus (long nStatus) 
+{ 
+   m_nHttpStatus = nStatus; 
+}
+
+void NETWORK::ASSET::SetFetchStartTime (double dTime) 
+{ 
+   m_dFetchStartTime = dTime; 
+}
+
+void NETWORK::ASSET::SetFetchEndTime (double dTime) 
+{ 
+   m_dFetchEndTime = dTime; 
+}
+
+void NETWORK::ASSET::SetFetchQueuedTime (double dTime) 
+{ 
+   m_dFetchQueuedTime = dTime; 
+}
+
+void NETWORK::ASSET::SetServedFromCache (bool bServed) 
+{ 
+   m_bServedFromCache = bServed; 
+}
+
+const std::unordered_map<std::string, std::string>& NETWORK::ASSET::Headers () const 
+{ 
+   return m_mapHeaders; 
+}
+
+uint64_t    NETWORK::ASSET::SizeBytes () const
+{ 
+   return m_nSizeBytes; 
+}
+
+std::string NETWORK::ASSET::CreatedTime () const 
+{ 
+   return m_sCreatedAt; 
+}
+
+std::string NETWORK::ASSET::LastAccessTime () const 
+{ 
+   return m_sLastAccessedAt; 
+}
+
+uint32_t    NETWORK::ASSET::AccessCount () const 
+{ 
+   return m_nAccessCount; 
+}
+
+uint32_t    NETWORK::ASSET::AssetIx () const 
+{ 
+   return m_nAssetIx; 
+}
+
+void   NETWORK::ASSET::SetDiskPath (const std::string& sPath) 
+{ 
+   m_sDiskPath = sPath; 
+}
+
+void   NETWORK::ASSET::SetHash (const std::string& sHash) 
+{ 
+   m_sHash = sHash; 
+}
+
+void   NETWORK::ASSET::SetSizeBytes (uint64_t nBytes) 
+{ 
+   m_nSizeBytes = nBytes; 
+}
+
+void   NETWORK::ASSET::SetCreatedTime (const std::string& sTime) 
+{ 
+   m_sCreatedAt = sTime; 
+}
+
+void   NETWORK::ASSET::SetAssetIx (uint32_t nAssetIx) 
+{ 
+   m_nAssetIx = nAssetIx; 
+}
+
+void   NETWORK::ASSET::SetPendingReset (bool b) 
+{ 
+   m_bPendingReset = b; 
+}
+
+bool   NETWORK::ASSET::IsPendingReset () const 
+{ 
+   return m_bPendingReset; 
+}
+
+size_t NETWORK::ASSET::GetFileCount () const 
+{ 
+   return m_apFiles.size (); 
+}
+
+const std::string& NETWORK::ASSET::Url () const 
+{ 
+   return m_sUrl; 
+}
