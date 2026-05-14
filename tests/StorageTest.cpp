@@ -86,7 +86,7 @@ public:
    void OnFrameReady (const uint32_t*, int, int) override {}
 
    void OnStorageUnitCreated (STORAGE::SILO*) override { m_nCreatedCount++; }
-   void OnStorageUnitChanged (STORAGE::SILO*, STORAGE::ASSET*, const std::string&) override { m_nChangedCount++; }
+   void OnStorageUnitChanged (STORAGE::SILO*, STORAGE::eSCOPE, const std::string&) override { m_nChangedCount++; }
    void OnStorageUnitDeleted (STORAGE::SILO*) override { m_nDeletedCount++; }
 };
 

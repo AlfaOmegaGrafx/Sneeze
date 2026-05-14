@@ -15,8 +15,6 @@
 #ifndef SNEEZE_STORAGE_STORAGE_H
 #define SNEEZE_STORAGE_STORAGE_H
 
-#include <mutex>
-
 namespace SNEEZE
 {
    // ---------------------------------------------------------------------------
@@ -34,6 +32,8 @@ namespace SNEEZE
    // Crash durability: JSONL changelog appended on every mutation.
    // ---------------------------------------------------------------------------
 
+   class ASSET;
+
    class STORAGE
    {
    public:
@@ -49,85 +49,6 @@ namespace SNEEZE
          kSCOPE_TEMPORARY_ORG     = 2,
          kSCOPE_TEMPORARY_COMPANY = 3,
          kSCOPE_COUNT             = 4,
-      };
-
-      // -----------------------------------------------------------------------
-      // Forward declarations
-      // -----------------------------------------------------------------------
-
-      class ASSET;
-      class SILO;
-
-      // -----------------------------------------------------------------------
-      // IENUM — enumeration callback interface.
-      //
-      // Implement to receive SILO pointers during Silo_Enum().
-      // -----------------------------------------------------------------------
-
-      class IENUM
-      {
-      public:
-         virtual ~IENUM () {}
-         virtual void OnSilo (SILO* pSilo) = 0;
-      };
-
-      // -----------------------------------------------------------------------
-      // ASSET — one per JSON file on disk. The core data wrapper.
-      //
-      // Caches an nlohmann::json document in memory, manages a .meta sidecar
-      // file for inspector metadata, and provides the JSONL changelog for crash
-      // durability. Also serves as the interface for flat file sandbox ops.
-      // -----------------------------------------------------------------------
-
-      class ASSET
-      {
-      public:
-         ASSET (STORAGE* pStorage, eSCOPE eScope, const std::string& sPathname);
-         virtual ~ASSET ();
-
-         // --- State ---
-
-         bool                IsLoaded       () const;
-         bool                IsDirty        () const;
-         eSCOPE              GetScope       () const;
-
-         // --- JSON access ---
-
-         nlohmann::json      Get            (const std::string& sPath) const;
-         void                Set            (const std::string& sPath, const nlohmann::json& jValue);
-         void                Remove         (const std::string& sPath);
-         bool                Has            (const std::string& sPath) const;
-
-         // --- Bulk ---
-
-         std::string         Json           () const;
-         void                Json           (const std::string& sJson);
-
-         // --- Lifecycle ---
-
-         uint32_t            Open           ();
-         uint32_t            Close          ();
-         void                Attach         ();
-         void                Detach         (const VIEWPORT::CONTAINER::CID& CID);
-         void                Load           ();
-         void                Save           ();
-         void                Evict          ();
-
-         // --- Meta sidecar ---
-
-         const std::string&  Pathname       () const;
-         uint64_t            SizeBytes      () const;
-         const std::string&  CreatedTime    () const;
-         const std::string&  LastAccessTime () const;
-         uint32_t            AccessCount    () const;
-
-         void  TouchAccess ();
-         void  SaveMeta (const VIEWPORT::CONTAINER::CID& CID);
-         void  LoadMeta ();
-
-      private:
-         class Impl;
-         Impl* m_pImpl;
       };
 
       // -----------------------------------------------------------------------
@@ -181,20 +102,22 @@ namespace SNEEZE
          std::string sFilename (eSCOPE eScope, const std::string& sExt = "") const;
          std::string sPathname (eSCOPE eScope, const std::string& sExt = "") const;
 
-         // --- Internal ---
-
-         ASSET*   Asset (eSCOPE eScope) const;
-
       private:
-         STORAGE*                                    m_pStorage;
-         VIEWPORT*                                   m_pViewport;
-         VIEWPORT::CONTAINER::CID                    m_CID;
-         std::string                                 m_sPath_Permanent;
-         std::string                                 m_sPath_Temporary;
-         ASSET*                                      m_apAsset[kSCOPE_COUNT];
-         std::mutex                                  m_mxSilo;
-         bool                                        m_bAttached;
-         bool                                        m_bPendingClear;
+         class Impl;
+         Impl* m_pImpl;
+      };
+
+      // -----------------------------------------------------------------------
+      // IENUM — enumeration callback interface.
+      //
+      // Implement to receive SILO pointers during Silo_Enum().
+      // -----------------------------------------------------------------------
+
+      class IENUM
+      {
+      public:
+         virtual ~IENUM () {}
+         virtual void OnSilo (SILO* pSilo) = 0;
       };
 
       // -----------------------------------------------------------------------

@@ -56,7 +56,7 @@ namespace SNEEZE
       virtual void OnNetworkFileDeleted (NETWORK::FILE*) {}
 
       virtual void OnStorageUnitCreated (STORAGE::SILO*) {}
-      virtual void OnStorageUnitChanged (STORAGE::SILO*, STORAGE::ASSET*, const std::string&) {}
+      virtual void OnStorageUnitChanged (STORAGE::SILO*, STORAGE::eSCOPE eScope, const std::string&) {}
       virtual void OnStorageUnitDeleted (STORAGE::SILO*) {}
    };
 

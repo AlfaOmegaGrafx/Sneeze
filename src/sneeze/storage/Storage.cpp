@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <Sneeze.h>
+#include "Storage_Asset.h"
 
 using namespace SNEEZE;
 
@@ -112,7 +113,7 @@ public:
    // under m_mxStorage via Silo_Open/Silo_Close. Not independently thread-safe.
    // ---------------------------------------------------------------------------
 
-   STORAGE::ASSET* Asset_Open (eSCOPE eScope, const std::string& sPathname)
+   ASSET* Asset_Open (eSCOPE eScope, const std::string& sPathname)
    {
       ASSET* pAsset = nullptr;
 
@@ -167,8 +168,8 @@ STORAGE::~STORAGE ()
 // Container lifecycle
 // ---------------------------------------------------------------------------
 
-STORAGE::SILO* STORAGE::Silo_Open  (VIEWPORT* pViewport, const VIEWPORT::CONTAINER::CID* pCID)  { return m_pImpl->Silo_Open  (pViewport, pCID); }
-void           STORAGE::Silo_Close (VIEWPORT* pViewport, SILO* pSilo)                           {        m_pImpl->Silo_Close (pViewport, pSilo); }
-void           STORAGE::Silo_Enum  (VIEWPORT* pViewport, IENUM* pEnum)                          {        m_pImpl->Silo_Enum  (pViewport, pEnum); }
-STORAGE::ASSET* STORAGE::Asset_Open  (eSCOPE eScope, const std::string& sPathname)               { return m_pImpl->Asset_Open  (eScope, sPathname); }
-void            STORAGE::Asset_Close (ASSET* pAsset)                                            {        m_pImpl->Asset_Close (pAsset); }
+STORAGE::SILO* STORAGE::Silo_Open   (VIEWPORT* pViewport, const VIEWPORT::CONTAINER::CID* pCID) { return m_pImpl->Silo_Open  (pViewport, pCID); }
+void           STORAGE::Silo_Close  (VIEWPORT* pViewport, SILO* pSilo)                          {        m_pImpl->Silo_Close (pViewport, pSilo); }
+void           STORAGE::Silo_Enum   (VIEWPORT* pViewport, IENUM* pEnum)                         {        m_pImpl->Silo_Enum  (pViewport, pEnum); }
+ASSET*         STORAGE::Asset_Open  (eSCOPE eScope, const std::string& sPathname)               { return m_pImpl->Asset_Open  (eScope, sPathname); }
+void           STORAGE::Asset_Close (ASSET* pAsset)                                             {        m_pImpl->Asset_Close (pAsset); }

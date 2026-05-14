@@ -154,7 +154,7 @@
     <ClCompile Include="..\src\sneeze\network\Network.cpp" />
     <!-- storage -->
     <ClCompile Include="..\src\sneeze\storage\Storage.cpp" />
-    <ClCompile Include="..\src\sneeze\storage\Unit.cpp" />
+    <ClCompile Include="..\src\sneeze\storage\Storage_Asset.cpp" />
     <ClCompile Include="..\src\sneeze\storage\Silo.cpp" />
     <!-- persona -->
     <ClCompile Include="..\src\persona\Persona.cpp" />
@@ -187,6 +187,7 @@
   <!-- ===================================================================== -->
   <ItemGroup>
     <ClInclude Include="..\src\sneeze\Pch.h" />
+    <ClInclude Include="..\src\sneeze\storage\Storage_Asset.h" />
     <ClInclude Include="..\src\sneeze\Types.h" />
     <ClInclude Include="..\src\sneeze\Engine.h" />
     <ClInclude Include="..\src\sneeze\control\Control.h" />

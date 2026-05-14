@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include <Sneeze.h>
+#include "Storage_Asset.h"
+
 #include <sstream>
 #include <chrono>
 #include <iomanip>
@@ -23,10 +25,10 @@ using namespace SNEEZE;
 // Helpers
 // ===========================================================================
 
-class STORAGE::ASSET::Impl
+class ASSET::Impl
 {
 public:
-   Impl (STORAGE* pStorage, eSCOPE eScope, const std::string& sPathname) :
+   Impl (STORAGE* pStorage, STORAGE::eSCOPE eScope, const std::string& sPathname) :
       m_pStorage (pStorage),
       m_eScope (eScope),
       m_sPathname (sPathname),
@@ -374,7 +376,7 @@ public:
    }
 
    STORAGE*             m_pStorage;
-   eSCOPE               m_eScope;
+   STORAGE::eSCOPE      m_eScope;
    std::string          m_sPathname;
 
    nlohmann::json       m_jData;
@@ -396,15 +398,15 @@ public:
 };
 
 // ===========================================================================
-// STORAGE::ASSET
+// ASSET
 // ===========================================================================
 
-STORAGE::ASSET::ASSET (STORAGE* pStorage, eSCOPE eScope, const std::string& sPathname) :
+ASSET::ASSET (STORAGE* pStorage, STORAGE::eSCOPE eScope, const std::string& sPathname) :
    m_pImpl (new Impl (pStorage, eScope, sPathname))
 {
 }
 
-STORAGE::ASSET::~ASSET ()
+ASSET::~ASSET ()
 {
    delete m_pImpl;
 }
@@ -413,20 +415,20 @@ STORAGE::ASSET::~ASSET ()
 // Accessors
 // ---------------------------------------------------------------------------
 
-bool                 STORAGE::ASSET::IsLoaded       () const { return m_pImpl->m_bLoaded; }
-bool                 STORAGE::ASSET::IsDirty        () const { return m_pImpl->m_bDirty; }
-STORAGE::eSCOPE      STORAGE::ASSET::GetScope       () const { return m_pImpl->m_eScope; }
-const std::string&   STORAGE::ASSET::Pathname       () const { return m_pImpl->m_sPathname; }
-uint64_t             STORAGE::ASSET::SizeBytes      () const { return m_pImpl->m_nSizeBytes; }
-const std::string&   STORAGE::ASSET::CreatedTime    () const { return m_pImpl->m_sCreatedAt; }
-const std::string&   STORAGE::ASSET::LastAccessTime () const { return m_pImpl->m_sLastAccessedAt; }
-uint32_t             STORAGE::ASSET::AccessCount    () const { return m_pImpl->m_nAccessCount; }
+bool                 ASSET::IsLoaded       () const { return m_pImpl->m_bLoaded; }
+bool                 ASSET::IsDirty        () const { return m_pImpl->m_bDirty; }
+STORAGE::eSCOPE      ASSET::GetScope       () const { return m_pImpl->m_eScope; }
+const std::string&   ASSET::Pathname       () const { return m_pImpl->m_sPathname; }
+uint64_t             ASSET::SizeBytes      () const { return m_pImpl->m_nSizeBytes; }
+const std::string&   ASSET::CreatedTime    () const { return m_pImpl->m_sCreatedAt; }
+const std::string&   ASSET::LastAccessTime () const { return m_pImpl->m_sLastAccessedAt; }
+uint32_t             ASSET::AccessCount    () const { return m_pImpl->m_nAccessCount; }
 
 // ---------------------------------------------------------------------------
 // JSON access
 // ---------------------------------------------------------------------------
 
-nlohmann::json STORAGE::ASSET::Get (const std::string& sPath) const
+nlohmann::json ASSET::Get (const std::string& sPath) const
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mutex);
 
@@ -450,7 +452,7 @@ nlohmann::json STORAGE::ASSET::Get (const std::string& sPath) const
    return jResult;
 }
 
-void STORAGE::ASSET::Set (const std::string& sPath, const nlohmann::json& jValue)
+void ASSET::Set (const std::string& sPath, const nlohmann::json& jValue)
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mutex);
 
@@ -482,7 +484,7 @@ void STORAGE::ASSET::Set (const std::string& sPath, const nlohmann::json& jValue
    }
 }
 
-void STORAGE::ASSET::Remove (const std::string& sPath)
+void ASSET::Remove (const std::string& sPath)
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mutex);
 
@@ -510,7 +512,7 @@ void STORAGE::ASSET::Remove (const std::string& sPath)
    }
 }
 
-bool STORAGE::ASSET::Has (const std::string& sPath) const
+bool ASSET::Has (const std::string& sPath) const
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mutex);
 
@@ -533,14 +535,14 @@ bool STORAGE::ASSET::Has (const std::string& sPath) const
    return bHas;
 }
 
-std::string STORAGE::ASSET::Json () const
+std::string ASSET::Json () const
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mutex);
 
    return m_pImpl->m_jData.dump (2);
 }
 
-void STORAGE::ASSET::Json (const std::string& sJson)
+void ASSET::Json (const std::string& sJson)
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mutex);
 
@@ -561,18 +563,18 @@ void STORAGE::ASSET::Json (const std::string& sJson)
 // Lifecycle
 // ---------------------------------------------------------------------------
 
-uint32_t STORAGE::ASSET::Open ()  { return ++m_pImpl->m_nCount_Open; }
-uint32_t STORAGE::ASSET::Close () { return --m_pImpl->m_nCount_Open; }
+uint32_t ASSET::Open ()  { return ++m_pImpl->m_nCount_Open; }
+uint32_t ASSET::Close () { return --m_pImpl->m_nCount_Open; }
 
-void STORAGE::ASSET::Attach ()    { m_pImpl->Attach (); }
-void STORAGE::ASSET::Detach (const VIEWPORT::CONTAINER::CID& CID) { m_pImpl->Detach (CID); }
-void STORAGE::ASSET::Load ()      { m_pImpl->Load ();   }
-void STORAGE::ASSET::Save ()      { m_pImpl->Save ();   }
-void STORAGE::ASSET::Evict ()     { m_pImpl->Evict ();  }
+void ASSET::Attach ()    { m_pImpl->Attach (); }
+void ASSET::Detach (const VIEWPORT::CONTAINER::CID& CID) { m_pImpl->Detach (CID); }
+void ASSET::Load ()      { m_pImpl->Load ();   }
+void ASSET::Save ()      { m_pImpl->Save ();   }
+void ASSET::Evict ()     { m_pImpl->Evict ();  }
 
 // ---------------------------------------------------------------------------
 // Meta sidecar
 // ---------------------------------------------------------------------------
 
-void STORAGE::ASSET::TouchAccess ()                                   { m_pImpl->TouchAccess (); }
-void STORAGE::ASSET::SaveMeta (const VIEWPORT::CONTAINER::CID& CID)   { m_pImpl->SaveMeta (CID); }
+void ASSET::TouchAccess ()                                   { m_pImpl->TouchAccess (); }
+void ASSET::SaveMeta (const VIEWPORT::CONTAINER::CID& CID)   { m_pImpl->SaveMeta (CID); }
