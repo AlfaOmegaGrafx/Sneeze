@@ -371,7 +371,7 @@ bool VIEWPORT::ServiceRendererShutdown ()
 // Accessors
 // ---------------------------------------------------------------------------
 
-ENGINE*              VIEWPORT::Sneeze          () const { return m_pImpl->m_pEngine;         }
+SNEEZE::ENGINE*      VIEWPORT::Sneeze          () const { return m_pImpl->m_pEngine;         }
 IVIEWPORT*           VIEWPORT::Host            () const { return m_pImpl->m_pHost;           }
 VIEWPORT::SCENE*     VIEWPORT::Scene           () const { return m_pImpl->m_pScene;          }
 VIEWPORT::eSESSION   VIEWPORT::Session         () const { return m_pImpl->m_eSession;        }

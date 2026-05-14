@@ -15,11 +15,6 @@
 #ifndef SNEEZE_VIEWPORT_MSF_H
 #define SNEEZE_VIEWPORT_MSF_H
 
-#include <nlohmann/json.hpp>
-#include <map>
-#include <string>
-#include <vector>
-
 namespace SNEEZE
 {
    class VIEWPORT::MSF

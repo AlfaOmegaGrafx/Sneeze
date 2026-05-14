@@ -15,8 +15,6 @@
 #include <Sneeze.h>
 
 #include <nlohmann/json.hpp>
-#include <openssl/evp.h>
-#include <openssl/sha.h>
 #include <curl/curl.h>
 
 using namespace SNEEZE;

@@ -27,8 +27,6 @@
 #include "xr/XrRuntime.h"
 #include "ui/UiContext.h"
 
-using namespace SNEEZE;
-
 std::string NowIso8601 ()
 {
    auto tpNow = std::chrono::system_clock::now ();
@@ -54,7 +52,7 @@ class SNEEZE::ENGINE::Impl
 {
 public:
 
-   Impl (IENGINE* pHost, ENGINE* pEngine) :
+   Impl (IENGINE* pHost, SNEEZE::ENGINE* pEngine) :
       m_pHost        (pHost),
       m_pEngine      (pEngine),
       m_bInitialized (false),
@@ -430,17 +428,17 @@ private:
 **  ENGINE Class
 ***********************************************************************************************************************************/
 
-ENGINE::ENGINE (IENGINE* pHost) :
+SNEEZE::ENGINE::ENGINE (IENGINE* pHost) :
    m_pImpl (new Impl (pHost, this))
 {
 }
 
-ENGINE::~ENGINE ()
+SNEEZE::ENGINE::~ENGINE ()
 {
    delete m_pImpl;
 }
 
-bool ENGINE::Initialize ()
+bool SNEEZE::ENGINE::Initialize ()
 {
    return m_pImpl->Initialize ();
 }
@@ -449,12 +447,12 @@ bool ENGINE::Initialize ()
 // Viewport management
 // ---------------------------------------------------------------------------
 
-VIEWPORT* ENGINE::Viewport_Open (IVIEWPORT* pHost, const std::string& sUrl, VIEWPORT::eSESSION kSession)
+SNEEZE::VIEWPORT* SNEEZE::ENGINE::Viewport_Open (IVIEWPORT* pHost, const std::string& sUrl, VIEWPORT::eSESSION kSession)
 {
    return m_pImpl->Viewport_Open (pHost, sUrl, kSession);
 }
 
-bool ENGINE::Viewport_Close (VIEWPORT* pViewport)
+bool SNEEZE::ENGINE::Viewport_Close (VIEWPORT* pViewport)
 {
    bool bResult = false;
 
@@ -464,34 +462,34 @@ bool ENGINE::Viewport_Close (VIEWPORT* pViewport)
    return bResult;
 }
 
-void ENGINE::Viewport_Capture ()
+void SNEEZE::ENGINE::Viewport_Capture ()
 {
    m_pImpl->Viewport_Capture ();
 }
 
-const std::vector<VIEWPORT*>& ENGINE::Viewport_GetList () const
+const std::vector<SNEEZE::VIEWPORT*>& SNEEZE::ENGINE::Viewport_GetList () const
 { 
    return m_pImpl->Viewport_GetList ();
 }
 
-void ENGINE::Viewport_Release ()
+void SNEEZE::ENGINE::Viewport_Release ()
 {
    m_pImpl->Viewport_Release ();
 }
 
-IENGINE*  ENGINE::Host () const              { return m_pImpl->m_pHost;      }
-const std::string& ENGINE::sPath_Persistent () const { return m_pImpl->m_sPath_Persistent; }
-const std::string& ENGINE::sPath_Session    () const { return m_pImpl->m_sPath_Transitory_Session; }
+SNEEZE::IENGINE* SNEEZE::ENGINE::Host () const                { return m_pImpl->m_pHost;      }
+const std::string& SNEEZE::ENGINE::sPath_Persistent () const  { return m_pImpl->m_sPath_Persistent; }
+const std::string& SNEEZE::ENGINE::sPath_Session    () const  { return m_pImpl->m_sPath_Transitory_Session; }
 
-NETWORK*  ENGINE::Network () const           { return m_pImpl->m_pNetwork;   }
-STORAGE*  ENGINE::Storage () const           { return m_pImpl->m_pStorage;   }
-persona::PERSONA* ENGINE::Persona () const   { return m_pImpl->m_pPersona;   }
+SNEEZE::NETWORK*           SNEEZE::ENGINE::Network () const   { return m_pImpl->m_pNetwork;   }
+SNEEZE::STORAGE*           SNEEZE::ENGINE::Storage () const   { return m_pImpl->m_pStorage;   }
+SNEEZE::persona::PERSONA*  SNEEZE::ENGINE::Persona () const   { return m_pImpl->m_pPersona;   }
 
 // ---------------------------------------------------------------------------
 // Logging and notifications
 // ---------------------------------------------------------------------------
 
-void ENGINE::Log (IENGINE::eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage)
+void SNEEZE::ENGINE::Log (SNEEZE::IENGINE::eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage)
 {
    if (m_pImpl->m_pHost)
       m_pImpl->m_pHost->Log (Level, sModule, sMessage);
@@ -501,13 +499,13 @@ void ENGINE::Log (IENGINE::eLOGLEVEL Level, const std::string& sModule, const st
 // Persona
 // ---------------------------------------------------------------------------
 
-void ENGINE::Login (const std::string& sFirst, const std::string& sSecond)
+void SNEEZE::ENGINE::Login (const std::string& sFirst, const std::string& sSecond)
 {
    if (m_pImpl->m_pPersona)
       m_pImpl->m_pPersona->Login (sFirst, sSecond);
 }
 
-void ENGINE::Logout ()
+void SNEEZE::ENGINE::Logout ()
 {
    Log (IENGINE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 1 (signal)");
    Log (IENGINE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 2 (communicate)");
@@ -523,7 +521,7 @@ void ENGINE::Logout ()
       m_pImpl->m_pPersona->Logout ();
 }
 
-void ENGINE::ChangePersona (const std::string& sFirst, const std::string& sSecond)
+void SNEEZE::ENGINE::ChangePersona (const std::string& sFirst, const std::string& sSecond)
 {
    Logout ();
    Login (sFirst, sSecond);

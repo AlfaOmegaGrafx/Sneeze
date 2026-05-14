@@ -21,8 +21,6 @@
 #pragma comment (lib, "winmm.lib")
 #endif
 
-using namespace SNEEZE;
-
 // ---------------------------------------------------------------------------
 // Agent configuration table
 // ---------------------------------------------------------------------------
@@ -39,16 +37,16 @@ enum eAGENT
 struct AGENT_INIT
 {
    int                                                  nHertz;
-   std::function<AGENT* (SNEEZE::CONTROL*, int)>        fnCreate;
+   std::function<SNEEZE::AGENT* (SNEEZE::CONTROL*, int)>        fnCreate;
 };
 
 static const std::vector<AGENT_INIT> aAgent_Init =
 {
-   {   0, [] (SNEEZE::CONTROL* pControl, int nIx) -> AGENT* { return new AGENT::COMPOSITOR (pControl, nIx); } },
-   {   1, [] (SNEEZE::CONTROL* pControl, int nIx) -> AGENT* { return new AGENT::SCRUBBER   (pControl, nIx); } },
-   {  30, [] (SNEEZE::CONTROL* pControl, int nIx) -> AGENT* { return new AGENT::C          (pControl, nIx); } },
-   {  60, [] (SNEEZE::CONTROL* pControl, int nIx) -> AGENT* { return new AGENT::D          (pControl, nIx); } },
-   {  64, [] (SNEEZE::CONTROL* pControl, int nIx) -> AGENT* { return new AGENT::E          (pControl, nIx); } },
+   {   0, [] (SNEEZE::CONTROL* pControl, int nIx) -> SNEEZE::AGENT* { return new SNEEZE::AGENT::COMPOSITOR (pControl, nIx); } },
+   {   1, [] (SNEEZE::CONTROL* pControl, int nIx) -> SNEEZE::AGENT* { return new SNEEZE::AGENT::SCRUBBER   (pControl, nIx); } },
+   {  30, [] (SNEEZE::CONTROL* pControl, int nIx) -> SNEEZE::AGENT* { return new SNEEZE::AGENT::C          (pControl, nIx); } },
+   {  60, [] (SNEEZE::CONTROL* pControl, int nIx) -> SNEEZE::AGENT* { return new SNEEZE::AGENT::D          (pControl, nIx); } },
+   {  64, [] (SNEEZE::CONTROL* pControl, int nIx) -> SNEEZE::AGENT* { return new SNEEZE::AGENT::E          (pControl, nIx); } },
 };
 
 /***********************************************************************************************************************************
@@ -56,14 +54,14 @@ static const std::vector<AGENT_INIT> aAgent_Init =
 **
 ***********************************************************************************************************************************/
 
-CONTROL::CONTROL (ENGINE* pEngine) :
+SNEEZE::CONTROL::CONTROL (ENGINE* pEngine) :
    THREAD (),
    m_pEngine (pEngine),
    m_bCleanupPending (false)
 {
 }
 
-bool CONTROL::Initialize (int& nAgentCount)
+bool SNEEZE::CONTROL::Initialize (int& nAgentCount)
 {
    bool bResult = THREAD::Initialize ();
 
@@ -72,12 +70,12 @@ bool CONTROL::Initialize (int& nAgentCount)
    return bResult;
 }
 
-CONTROL::~CONTROL ()
+SNEEZE::CONTROL::~CONTROL ()
 {
    Join ();
 }
 
-ENGINE* CONTROL::Engine () const
+SNEEZE::ENGINE* SNEEZE::CONTROL::Engine () const
 {
    return m_pEngine;
 }
@@ -86,7 +84,7 @@ ENGINE* CONTROL::Engine () const
 // Cleanup queue
 // ---------------------------------------------------------------------------
 
-void CONTROL::Cleanup_Queue (const std::string& sPath)
+void SNEEZE::CONTROL::Cleanup_Queue (const std::string& sPath)
 {
    {
       std::lock_guard<std::mutex> guard (m_mxCleanup);
@@ -98,7 +96,7 @@ void CONTROL::Cleanup_Queue (const std::string& sPath)
    Signal ();
 }
 
-void CONTROL::Cleanup_SwapQueue (std::vector<std::string>& aPath)
+void SNEEZE::CONTROL::Cleanup_SwapQueue (std::vector<std::string>& aPath)
 {
    {
       std::lock_guard<std::mutex> guard (m_mxCleanup);
@@ -112,7 +110,7 @@ void CONTROL::Cleanup_SwapQueue (std::vector<std::string>& aPath)
 // Thread loop (metronome + agent scheduling)
 // ---------------------------------------------------------------------------
 
-void CONTROL::Main ()
+void SNEEZE::CONTROL::Main ()
 {
 #ifdef _WIN32
    timeBeginPeriod (1);
@@ -123,7 +121,7 @@ void CONTROL::Main ()
    bool bInitialized = true;
    for (const auto& Agent_Init : aAgent_Init)
    {
-      AGENT* pAgent = Agent_Init.fnCreate (this, static_cast<int> (m_aAgent_State.size ()));
+      SNEEZE::AGENT* pAgent = Agent_Init.fnCreate (this, static_cast<int> (m_aAgent_State.size ()));
 
       AGENT_STATE Agent_State = { pAgent, Agent_Init.nHertz, 0, 0 };
       m_aAgent_State.push_back (Agent_State);

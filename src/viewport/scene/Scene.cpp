@@ -42,9 +42,9 @@ SCENE::~SCENE ()
 
 VIEWPORT* SCENE::Viewport () const   { return m_pViewport; }
 
-ENGINE*  SCENE::Sneeze () const         { return m_pViewport ? m_pViewport->Sneeze () : nullptr; }
-FABRIC*  SCENE::Fabric_Root () const    { return m_pFabric_Root; }
-FABRIC*  SCENE::Fabric_Primary () const { return m_pFabric_Primary; }
+SNEEZE::ENGINE* SCENE::Sneeze () const         { return m_pViewport ? m_pViewport->Sneeze () : nullptr; }
+FABRIC*         SCENE::Fabric_Root () const    { return m_pFabric_Root; }
+FABRIC*         SCENE::Fabric_Primary () const { return m_pFabric_Primary; }
 
 bool SCENE::Initialize (const std::string& sUrl)
 {

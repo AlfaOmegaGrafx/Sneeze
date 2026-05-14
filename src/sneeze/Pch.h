@@ -45,6 +45,13 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <sstream>
+
+#include <openssl/evp.h>
+#include <openssl/sha.h>
+
+#include <nlohmann/json.hpp>
+
 
 // --- Sneeze public umbrella (included by almost every .cpp) ---
 

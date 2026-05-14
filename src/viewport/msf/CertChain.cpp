@@ -16,9 +16,7 @@
 #include "Msf.h"
 
 #include <openssl/bio.h>
-#include <openssl/evp.h>
 #include <openssl/pem.h>
-#include <openssl/sha.h>
 #include <openssl/x509.h>
 #include <openssl/x509_vfy.h>
 
@@ -30,11 +28,6 @@
 #endif
 
 #include <openssl/bn.h>
-
-#include <cstdio>
-#include <iomanip>
-#include <sstream>
-#include <vector>
 
 using namespace SNEEZE;
 

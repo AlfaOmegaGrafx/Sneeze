@@ -15,21 +15,19 @@
 #include <Sneeze.h>
 #include "Control.h"
 
-using namespace SNEEZE;
-
-AGENT::AGENT (CONTROL* pControl, int nAgentIndex)
+SNEEZE::AGENT::AGENT (CONTROL* pControl, int nAgentIndex)
    : THREAD ()
    , m_pControl (pControl)
    , m_nAgentIndex (nAgentIndex)
 {
 }
 
-AGENT::~AGENT ()
+SNEEZE::AGENT::~AGENT ()
 {
    Join ();
 }
 
-ENGINE* AGENT::Engine () const
+SNEEZE::ENGINE* SNEEZE::AGENT::Engine () const
 {
    return m_pControl->Engine ();
 }
