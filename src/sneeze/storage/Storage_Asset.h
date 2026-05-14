@@ -69,7 +69,6 @@ namespace SNEEZE
 
       void  TouchAccess ();
       void  SaveMeta (const VIEWPORT::CONTAINER::CID& CID);
-      void  LoadMeta ();
 
    private:
       class Impl;
