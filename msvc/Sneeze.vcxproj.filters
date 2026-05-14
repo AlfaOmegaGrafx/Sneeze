@@ -1,298 +1,325 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="sneeze">
+    <Filter Include="src">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000000}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\sneeze">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000001}</UniqueIdentifier>
     </Filter>
-    <Filter Include="sneeze\control">
+    <Filter Include="src\sneeze\control">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000002}</UniqueIdentifier>
     </Filter>
-    <Filter Include="sneeze\network">
+    <Filter Include="src\sneeze\network">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000003}</UniqueIdentifier>
     </Filter>
-    <Filter Include="sneeze\storage">
+    <Filter Include="src\sneeze\storage">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000004}</UniqueIdentifier>
     </Filter>
-    <Filter Include="astro">
+    <Filter Include="src\astro">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000005}</UniqueIdentifier>
     </Filter>
-    <Filter Include="viewport">
+    <Filter Include="src\viewport">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000006}</UniqueIdentifier>
     </Filter>
-    <Filter Include="viewport\scene">
+    <Filter Include="src\viewport\scene">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000007}</UniqueIdentifier>
     </Filter>
-    <Filter Include="viewport\renderer">
+    <Filter Include="src\viewport\renderer">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000008}</UniqueIdentifier>
     </Filter>
-    <Filter Include="viewport\msf">
+    <Filter Include="src\viewport\msf">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000009}</UniqueIdentifier>
     </Filter>
-    <Filter Include="persona">
+    <Filter Include="src\persona">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-00000000000A}</UniqueIdentifier>
     </Filter>
-    <Filter Include="deps\wasm">
+    <Filter Include="src\deps">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000030}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\deps\wasm">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-00000000000B}</UniqueIdentifier>
     </Filter>
-    <Filter Include="deps\spirv">
+    <Filter Include="src\deps\spirv">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-00000000000C}</UniqueIdentifier>
     </Filter>
-    <Filter Include="deps\xr">
+    <Filter Include="src\deps\xr">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-00000000000D}</UniqueIdentifier>
     </Filter>
-    <Filter Include="deps\ui">
+    <Filter Include="src\deps\ui">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-00000000000E}</UniqueIdentifier>
     </Filter>
-    <Filter Include="deps\compute">
+    <Filter Include="src\deps\compute">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-00000000000F}</UniqueIdentifier>
     </Filter>
-    <Filter Include="deps\stb">
+    <Filter Include="src\deps\stb">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000010}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="deps">
-      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000020}</UniqueIdentifier>
     </Filter>
     <Filter Include="include">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000011}</UniqueIdentifier>
     </Filter>
+    <Filter Include="tests">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000022}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="tests\certs">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000023}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="tools">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000024}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="tools\SignMsf">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000025}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="tools\MsfViewer">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000026}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="deps">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000020}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="scripts">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000021}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
+  <!-- Source files (.cpp) -->
   <ItemGroup>
     <ClCompile Include="..\src\sneeze\Pch.cpp">
-      <Filter>sneeze</Filter>
+      <Filter>src\sneeze</Filter>
     </ClCompile>
     <ClCompile Include="..\src\sneeze\Engine.cpp">
-      <Filter>sneeze</Filter>
+      <Filter>src\sneeze</Filter>
     </ClCompile>
     <ClCompile Include="..\src\sneeze\Thread.cpp">
-      <Filter>sneeze</Filter>
+      <Filter>src\sneeze</Filter>
     </ClCompile>
     <ClCompile Include="..\src\sneeze\control\Agent.cpp">
-      <Filter>sneeze\control</Filter>
+      <Filter>src\sneeze\control</Filter>
     </ClCompile>
     <ClCompile Include="..\src\sneeze\control\Control.cpp">
-      <Filter>sneeze\control</Filter>
+      <Filter>src\sneeze\control</Filter>
     </ClCompile>
     <ClCompile Include="..\src\sneeze\control\Compositor.cpp">
-      <Filter>sneeze\control</Filter>
+      <Filter>src\sneeze\control</Filter>
     </ClCompile>
     <ClCompile Include="..\src\sneeze\control\Scrubber.cpp">
-      <Filter>sneeze\control</Filter>
+      <Filter>src\sneeze\control</Filter>
     </ClCompile>
     <ClCompile Include="..\src\sneeze\control\AgentC.cpp">
-      <Filter>sneeze\control</Filter>
+      <Filter>src\sneeze\control</Filter>
     </ClCompile>
     <ClCompile Include="..\src\sneeze\control\AgentD.cpp">
-      <Filter>sneeze\control</Filter>
+      <Filter>src\sneeze\control</Filter>
     </ClCompile>
     <ClCompile Include="..\src\sneeze\control\AgentE.cpp">
-      <Filter>sneeze\control</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\astro\BodyData.cpp">
-      <Filter>astro</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\astro\Celestial.cpp">
-      <Filter>astro</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\astro\Orbit.cpp">
-      <Filter>astro</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\astro\RMCObject.cpp">
-      <Filter>astro</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\astro\AstroService.cpp">
-      <Filter>astro</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\viewport\Viewport.cpp">
-      <Filter>viewport</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\viewport\scene\Epoch.cpp">
-      <Filter>viewport\scene</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\viewport\scene\Node.cpp">
-      <Filter>viewport\scene</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\viewport\scene\Fabric.cpp">
-      <Filter>viewport\scene</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\viewport\scene\Scene.cpp">
-      <Filter>viewport\scene</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\viewport\scene\MapObject.cpp">
-      <Filter>viewport\scene</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\viewport\scene\AccessControl.cpp">
-      <Filter>viewport\scene</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\viewport\scene\Events.cpp">
-      <Filter>viewport\scene</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\viewport\scene\SpatialIndex.cpp">
-      <Filter>viewport\scene</Filter>
+      <Filter>src\sneeze\control</Filter>
     </ClCompile>
     <ClCompile Include="..\src\sneeze\network\Asset.cpp">
-      <Filter>sneeze\network</Filter>
+      <Filter>src\sneeze\network</Filter>
     </ClCompile>
     <ClCompile Include="..\src\sneeze\network\File.cpp">
-      <Filter>sneeze\network</Filter>
+      <Filter>src\sneeze\network</Filter>
     </ClCompile>
     <ClCompile Include="..\src\sneeze\network\Network.cpp">
-      <Filter>sneeze\network</Filter>
+      <Filter>src\sneeze\network</Filter>
     </ClCompile>
     <ClCompile Include="..\src\sneeze\storage\Storage.cpp">
-      <Filter>sneeze\storage</Filter>
+      <Filter>src\sneeze\storage</Filter>
     </ClCompile>
     <ClCompile Include="..\src\sneeze\storage\Unit.cpp">
-      <Filter>sneeze\storage</Filter>
+      <Filter>src\sneeze\storage</Filter>
     </ClCompile>
     <ClCompile Include="..\src\sneeze\storage\Silo.cpp">
-      <Filter>sneeze\storage</Filter>
+      <Filter>src\sneeze\storage</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\persona\Persona.cpp">
-      <Filter>persona</Filter>
+    <ClCompile Include="..\src\astro\BodyData.cpp">
+      <Filter>src\astro</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\astro\Celestial.cpp">
+      <Filter>src\astro</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\astro\Orbit.cpp">
+      <Filter>src\astro</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\astro\RMCObject.cpp">
+      <Filter>src\astro</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\astro\AstroService.cpp">
+      <Filter>src\astro</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\viewport\Viewport.cpp">
+      <Filter>src\viewport</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\viewport\scene\Epoch.cpp">
+      <Filter>src\viewport\scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\viewport\scene\Node.cpp">
+      <Filter>src\viewport\scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\viewport\scene\Fabric.cpp">
+      <Filter>src\viewport\scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\viewport\scene\Scene.cpp">
+      <Filter>src\viewport\scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\viewport\scene\MapObject.cpp">
+      <Filter>src\viewport\scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\viewport\scene\AccessControl.cpp">
+      <Filter>src\viewport\scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\viewport\scene\Events.cpp">
+      <Filter>src\viewport\scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\viewport\scene\SpatialIndex.cpp">
+      <Filter>src\viewport\scene</Filter>
     </ClCompile>
     <ClCompile Include="..\src\viewport\renderer\AnariRenderer.cpp">
-      <Filter>viewport\renderer</Filter>
+      <Filter>src\viewport\renderer</Filter>
     </ClCompile>
     <ClCompile Include="..\src\viewport\renderer\UVSphere.cpp">
-      <Filter>viewport\renderer</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\deps\wasm\WasmRuntime.cpp">
-      <Filter>deps\wasm</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\deps\wasm\WasmStore.cpp">
-      <Filter>deps\wasm</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\deps\wasm\WasmInstance.cpp">
-      <Filter>deps\wasm</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\deps\wasm\HostFunctions.cpp">
-      <Filter>deps\wasm</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\deps\wasm\ThreadPool.cpp">
-      <Filter>deps\wasm</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\deps\spirv\SpvPipeline.cpp">
-      <Filter>deps\spirv</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\deps\xr\XrRuntime.cpp">
-      <Filter>deps\xr</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\deps\ui\UiContext.cpp">
-      <Filter>deps\ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\deps\compute\EmbeddedKernels.cpp">
-      <Filter>deps\compute</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\deps\compute\ComputeDispatch.cpp">
-      <Filter>deps\compute</Filter>
+      <Filter>src\viewport\renderer</Filter>
     </ClCompile>
     <ClCompile Include="..\src\viewport\msf\MsfFile.cpp">
-      <Filter>viewport\msf</Filter>
+      <Filter>src\viewport\msf</Filter>
     </ClCompile>
     <ClCompile Include="..\src\viewport\msf\CertChain.cpp">
-      <Filter>viewport\msf</Filter>
+      <Filter>src\viewport\msf</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\persona\Persona.cpp">
+      <Filter>src\persona</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\deps\wasm\WasmRuntime.cpp">
+      <Filter>src\deps\wasm</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\deps\wasm\WasmStore.cpp">
+      <Filter>src\deps\wasm</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\deps\wasm\WasmInstance.cpp">
+      <Filter>src\deps\wasm</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\deps\wasm\HostFunctions.cpp">
+      <Filter>src\deps\wasm</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\deps\wasm\ThreadPool.cpp">
+      <Filter>src\deps\wasm</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\deps\spirv\SpvPipeline.cpp">
+      <Filter>src\deps\spirv</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\deps\xr\XrRuntime.cpp">
+      <Filter>src\deps\xr</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\deps\ui\UiContext.cpp">
+      <Filter>src\deps\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\deps\compute\EmbeddedKernels.cpp">
+      <Filter>src\deps\compute</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\deps\compute\ComputeDispatch.cpp">
+      <Filter>src\deps\compute</Filter>
     </ClCompile>
     <ClCompile Include="..\src\deps\stb\stb_image_impl.cpp">
-      <Filter>deps\stb</Filter>
+      <Filter>src\deps\stb</Filter>
     </ClCompile>
   </ItemGroup>
+  <!-- Header files (.h) -->
   <ItemGroup>
     <ClInclude Include="..\src\sneeze\Pch.h">
-      <Filter>sneeze</Filter>
+      <Filter>src\sneeze</Filter>
     </ClInclude>
     <ClInclude Include="..\src\sneeze\Types.h">
-      <Filter>sneeze</Filter>
+      <Filter>src\sneeze</Filter>
     </ClInclude>
     <ClInclude Include="..\src\sneeze\Engine.h">
-      <Filter>sneeze</Filter>
+      <Filter>src\sneeze</Filter>
     </ClInclude>
     <ClInclude Include="..\src\sneeze\control\Control.h">
-      <Filter>sneeze\control</Filter>
+      <Filter>src\sneeze\control</Filter>
     </ClInclude>
     <ClInclude Include="..\src\astro\BodyData.h">
-      <Filter>astro</Filter>
+      <Filter>src\astro</Filter>
     </ClInclude>
     <ClInclude Include="..\src\astro\Celestial.h">
-      <Filter>astro</Filter>
+      <Filter>src\astro</Filter>
     </ClInclude>
     <ClInclude Include="..\src\astro\Orbit.h">
-      <Filter>astro</Filter>
+      <Filter>src\astro</Filter>
     </ClInclude>
     <ClInclude Include="..\src\astro\RMCObject.h">
-      <Filter>astro</Filter>
+      <Filter>src\astro</Filter>
     </ClInclude>
     <ClInclude Include="..\src\astro\AstroService.h">
-      <Filter>astro</Filter>
+      <Filter>src\astro</Filter>
     </ClInclude>
     <ClInclude Include="..\src\viewport\scene\Epoch.h">
-      <Filter>viewport\scene</Filter>
+      <Filter>src\viewport\scene</Filter>
     </ClInclude>
     <ClInclude Include="..\src\viewport\scene\Node.h">
-      <Filter>viewport\scene</Filter>
+      <Filter>src\viewport\scene</Filter>
     </ClInclude>
     <ClInclude Include="..\src\viewport\scene\Fabric.h">
-      <Filter>viewport\scene</Filter>
+      <Filter>src\viewport\scene</Filter>
     </ClInclude>
     <ClInclude Include="..\src\viewport\scene\Scene.h">
-      <Filter>viewport\scene</Filter>
+      <Filter>src\viewport\scene</Filter>
     </ClInclude>
     <ClInclude Include="..\src\viewport\scene\MapObject.h">
-      <Filter>viewport\scene</Filter>
+      <Filter>src\viewport\scene</Filter>
     </ClInclude>
     <ClInclude Include="..\src\viewport\scene\AccessControl.h">
-      <Filter>viewport\scene</Filter>
+      <Filter>src\viewport\scene</Filter>
     </ClInclude>
     <ClInclude Include="..\src\viewport\scene\Events.h">
-      <Filter>viewport\scene</Filter>
+      <Filter>src\viewport\scene</Filter>
     </ClInclude>
     <ClInclude Include="..\src\viewport\scene\SpatialIndex.h">
-      <Filter>viewport\scene</Filter>
+      <Filter>src\viewport\scene</Filter>
     </ClInclude>
     <ClInclude Include="..\src\viewport\renderer\Renderer.h">
-      <Filter>viewport\renderer</Filter>
+      <Filter>src\viewport\renderer</Filter>
     </ClInclude>
     <ClInclude Include="..\src\viewport\renderer\AnariRenderer.h">
-      <Filter>viewport\renderer</Filter>
+      <Filter>src\viewport\renderer</Filter>
     </ClInclude>
     <ClInclude Include="..\src\viewport\renderer\UVSphere.h">
-      <Filter>viewport\renderer</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\deps\wasm\WasmRuntime.h">
-      <Filter>deps\wasm</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\deps\wasm\WasmStore.h">
-      <Filter>deps\wasm</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\deps\wasm\WasmInstance.h">
-      <Filter>deps\wasm</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\deps\wasm\HostFunctions.h">
-      <Filter>deps\wasm</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\deps\wasm\ThreadPool.h">
-      <Filter>deps\wasm</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\deps\spirv\SpvPipeline.h">
-      <Filter>deps\spirv</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\deps\xr\XrRuntime.h">
-      <Filter>deps\xr</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\deps\ui\UiContext.h">
-      <Filter>deps\ui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\deps\compute\EmbeddedKernels.h">
-      <Filter>deps\compute</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\deps\compute\ComputeDispatch.h">
-      <Filter>deps\compute</Filter>
+      <Filter>src\viewport\renderer</Filter>
     </ClInclude>
     <ClInclude Include="..\src\viewport\msf\Msf.h">
-      <Filter>viewport\msf</Filter>
+      <Filter>src\viewport\msf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\deps\wasm\WasmRuntime.h">
+      <Filter>src\deps\wasm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\deps\wasm\WasmStore.h">
+      <Filter>src\deps\wasm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\deps\wasm\WasmInstance.h">
+      <Filter>src\deps\wasm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\deps\wasm\HostFunctions.h">
+      <Filter>src\deps\wasm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\deps\wasm\ThreadPool.h">
+      <Filter>src\deps\wasm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\deps\spirv\SpvPipeline.h">
+      <Filter>src\deps\spirv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\deps\xr\XrRuntime.h">
+      <Filter>src\deps\xr</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\deps\ui\UiContext.h">
+      <Filter>src\deps\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\deps\compute\EmbeddedKernels.h">
+      <Filter>src\deps\compute</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\deps\compute\ComputeDispatch.h">
+      <Filter>src\deps\compute</Filter>
     </ClInclude>
     <ClInclude Include="..\src\deps\stb\stb_image.h">
-      <Filter>deps\stb</Filter>
+      <Filter>src\deps\stb</Filter>
     </ClInclude>
+    <!-- public headers -->
     <ClInclude Include="..\include\Sneeze.h">
       <Filter>include</Filter>
     </ClInclude>
@@ -311,5 +338,125 @@
     <ClInclude Include="..\include\Storage.h">
       <Filter>include</Filter>
     </ClInclude>
+  </ItemGroup>
+  <!-- Resource files -->
+  <ItemGroup>
+    <ResourceCompile Include="$(SneezeBuildRoot)\build\kernels.rc" Condition="Exists('$(SneezeBuildRoot)\build\kernels.rc')" />
+  </ItemGroup>
+  <!-- CMake build files -->
+  <ItemGroup>
+    <None Include="..\src\CMakeLists.txt">
+      <Filter>src</Filter>
+    </None>
+  </ItemGroup>
+  <!-- tests/ -->
+  <ItemGroup>
+    <None Include="..\tests\CMakeLists.txt">
+      <Filter>tests</Filter>
+    </None>
+    <None Include="..\tests\TestRunner.cpp">
+      <Filter>tests</Filter>
+    </None>
+    <None Include="..\tests\ComputeTest.cpp">
+      <Filter>tests</Filter>
+    </None>
+    <None Include="..\tests\GenCerts.cpp">
+      <Filter>tests</Filter>
+    </None>
+    <None Include="..\tests\HttpClientTest.cpp">
+      <Filter>tests</Filter>
+    </None>
+    <None Include="..\tests\JwsTest.cpp">
+      <Filter>tests</Filter>
+    </None>
+    <None Include="..\tests\NetworkTest.cpp">
+      <Filter>tests</Filter>
+    </None>
+    <None Include="..\tests\SpvPipelineTest.cpp">
+      <Filter>tests</Filter>
+    </None>
+    <None Include="..\tests\StorageTest.cpp">
+      <Filter>tests</Filter>
+    </None>
+    <None Include="..\tests\UiContextTest.cpp">
+      <Filter>tests</Filter>
+    </None>
+    <None Include="..\tests\VoxTest.cpp">
+      <Filter>tests</Filter>
+    </None>
+    <None Include="..\tests\WasmRuntimeTest.cpp">
+      <Filter>tests</Filter>
+    </None>
+    <None Include="..\tests\XrRuntimeTest.cpp">
+      <Filter>tests</Filter>
+    </None>
+    <None Include="..\tests\certs\ca-cert.pem">
+      <Filter>tests\certs</Filter>
+    </None>
+    <None Include="..\tests\certs\ca-key.pem">
+      <Filter>tests\certs</Filter>
+    </None>
+    <None Include="..\tests\certs\expired-cert.pem">
+      <Filter>tests\certs</Filter>
+    </None>
+    <None Include="..\tests\certs\expired-key.pem">
+      <Filter>tests\certs</Filter>
+    </None>
+    <None Include="..\tests\certs\provider-cert.pem">
+      <Filter>tests\certs</Filter>
+    </None>
+    <None Include="..\tests\certs\provider-key.pem">
+      <Filter>tests\certs</Filter>
+    </None>
+  </ItemGroup>
+  <!-- tools/ -->
+  <ItemGroup>
+    <None Include="..\tools\SignMsf\CMakeLists.txt">
+      <Filter>tools\SignMsf</Filter>
+    </None>
+    <None Include="..\tools\SignMsf\main.cpp">
+      <Filter>tools\SignMsf</Filter>
+    </None>
+    <None Include="..\tools\MsfViewer\index.html">
+      <Filter>tools\MsfViewer</Filter>
+    </None>
+    <None Include="..\tools\MsfViewer\sample-msf.json">
+      <Filter>tools\MsfViewer</Filter>
+    </None>
+    <None Include="..\tools\MsfViewer\sample.msf">
+      <Filter>tools\MsfViewer</Filter>
+    </None>
+    <None Include="..\tools\MsfViewer\test-headless.mjs">
+      <Filter>tools\MsfViewer</Filter>
+    </None>
+  </ItemGroup>
+  <!-- Root-level project files -->
+  <ItemGroup>
+    <None Include="..\.gitignore" />
+    <None Include="..\LICENSE" />
+    <None Include="..\NOTICE" />
+    <None Include="..\README.md" />
+    <None Include="..\VERSION" />
+  </ItemGroup>
+  <!-- deps/ -->
+  <ItemGroup>
+    <None Include="..\deps\CMakeLists.txt">
+      <Filter>deps</Filter>
+    </None>
+  </ItemGroup>
+  <!-- scripts/ -->
+  <ItemGroup>
+    <None Include="..\scripts\build-windows.ps1">
+      <Filter>scripts</Filter>
+    </None>
+    <None Include="..\scripts\build-linux.sh">
+      <Filter>scripts</Filter>
+    </None>
+    <None Include="..\scripts\build-macos.sh">
+      <Filter>scripts</Filter>
+    </None>
+    <None Include="..\scripts\build-deps.sh">
+      <Filter>scripts</Filter>
+    </None>
   </ItemGroup>
 </Project>
