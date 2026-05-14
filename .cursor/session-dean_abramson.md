@@ -672,3 +672,25 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 - **Thread.cpp refinement:** Moved `delete m_pthThread; m_pthThread = nullptr;` from `Join()` into `~THREAD()` for constructor/destructor symmetry. `Join()` now uses `joinable()` guard instead of null check — safe for multiple calls since a joined thread is no longer joinable.
 - **VIEWPORT::CONTAINER::NAME -> CID rename:** Renamed the container identity class and all corresponding variables (`m_pName`->`m_pCID`, `m_Name`->`m_CID`, `pName`->`pCID`, `Name()`->`CID()`, `MakeTestName`->`MakeTestCID`, `s_pTestName`->`s_pTestCID`). 11 files touched, zero stale references.
 
+## 2026-05-13 (Wednesday) ~8:11 PM – 8:35 PM PDT
+
+- **STORAGE::SILO refinements:**
+  - Restored `std::lock_guard<std::mutex>` on `Attach()`/`Detach()` (guards had been lost during prior refactoring).
+  - CID ownership: `Silo_Open` now takes `const CID*` (raw pointer), SILO stores `CID m_CID` by value (copy). Removed `shared_ptr<CID>` dependency and `#include <memory>` from `Storage.h`.
+  - Simplified attach model: `m_nCount_Load` replaced with `bool m_bAttached` (single-owner semantics). Idempotency check in `Attach()`.
+  - Removed unused `SILO::Count_Load()` accessor and `SILO::Unit()` setter.
+  - Removed redundant `if (m_apUnit[i])` null checks in SILO methods (array guaranteed populated after Initialize).
+  - `UNIT::Detach` now takes `const CID&` and calls `SaveMeta(CID)` internally (was SILO's responsibility).
+  - `TouchAccess()` pushed down from SILO into UNIT's `Set()`, `Remove()`, and `Json(setter)`.
+  - `OnStorageUnitChanged` callback signature updated to include `UNIT*` and `std::string` path.
+  - `OnStorageUnitDeleted` notification added to `Silo_Close`.
+- **STORAGE::UNIT -> STORAGE::ASSET rename:**
+  - Renamed class, all member variables (`m_apUnit`->`m_apAsset`, `m_umpUnit`->`m_umpAsset`), methods (`Unit_Open`->`Asset_Open`, `Unit_Close`->`Asset_Close`, `Unit()`->`Asset()`), comments, and section headers.
+  - Files: `Storage.h`, `Sneeze.h`, `Storage.cpp`, `Silo.cpp`, `Unit.cpp`, `StorageTest.cpp`.
+  - Test updated: removed direct `Asset()` pointer comparison (will be hidden when ASSET goes private); org sharing now tested via data visibility only.
+- **StorageTest fixes:**
+  - Meta sidecar test: replaced hand-built path with `pSilo->sPathname(eScope, "meta")` accessor (was double-dotting the extension).
+  - All 44 storage tests passing.
+- **Identified notification fan-out design issue:** Shared org ASSETs notify only the writing SILO's viewport, not all viewports sharing that ASSET. Fix deferred to Asset.cpp pass — ASSET will keep a listener list (matching NETWORK::ASSET's `CollectFiles` pattern).
+- **Next steps (deferred):** Rename `Unit.cpp` to `Asset.cpp`, move notifications into ASSET with listener list, rename SILO to UNIT (once ASSET is private).
+

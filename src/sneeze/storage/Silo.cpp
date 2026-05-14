@@ -20,17 +20,17 @@ using namespace SNEEZE;
 // STORAGE::SILO
 // ===========================================================================
 
-STORAGE::SILO::SILO (STORAGE* pStorage, const VIEWPORT::CONTAINER::CID* pCID, VIEWPORT* pViewport) :
+STORAGE::SILO::SILO (STORAGE* pStorage, VIEWPORT* pViewport, const VIEWPORT::CONTAINER::CID* pCID) :
    m_pStorage        (pStorage),
-   m_CID             (*pCID),
    m_pViewport       (pViewport),
+   m_CID             (*pCID),
    m_sPath_Permanent ((std::filesystem::path (pViewport->sPath_Permanent ()) / "Storage").string ()),
    m_sPath_Temporary ((std::filesystem::path (pViewport->sPath_Temporary ()) / "Storage").string ()),
-   m_nCount_Load     (0),
+   m_bAttached       (false),
    m_bPendingClear   (false)
 {
    for (int nScope = 0; nScope < kSCOPE_COUNT; nScope++)
-      m_apUnit[nScope] = nullptr;
+      m_apAsset[nScope] = nullptr;
 }
 
 void STORAGE::SILO::Initialize ()
@@ -39,21 +39,21 @@ void STORAGE::SILO::Initialize ()
    {
       eSCOPE eScope = static_cast<eSCOPE> (nScope);
 
-      m_apUnit[nScope] = m_pStorage->Unit_Open (eScope, sPathname (eScope));
+      m_apAsset[nScope] = m_pStorage->Asset_Open (eScope, sPathname (eScope));
    }
 }
 
 STORAGE::SILO::~SILO ()
 {
-   if (m_nCount_Load > 0)
+   if (m_bAttached)
       Detach ();
 
    for (int nScope = 0; nScope < kSCOPE_COUNT; nScope++)
    {
-      if (m_apUnit[nScope])
+      if (m_apAsset[nScope])
       {
-         m_pStorage->Unit_Close (m_apUnit[nScope]);
-         m_apUnit[nScope] = nullptr;
+         m_pStorage->Asset_Close (m_apAsset[nScope]);
+         m_apAsset[nScope] = nullptr;
       }
    }
 }
@@ -62,16 +62,14 @@ STORAGE::SILO::~SILO ()
 // Accessors
 // ---------------------------------------------------------------------------
 
+VIEWPORT*                       STORAGE::SILO::Viewport        () const { return m_pViewport; }
 const VIEWPORT::CONTAINER::CID& STORAGE::SILO::CID             () const { return m_CID; }
 std::string                     STORAGE::SILO::DisplayName     () const { return m_CID.DisplayName (); }
-VIEWPORT*                       STORAGE::SILO::Viewport        () const { return m_pViewport; }
 const std::string&              STORAGE::SILO::sPath_Permanent () const { return m_sPath_Permanent; }
 const std::string&              STORAGE::SILO::sPath_Temporary () const { return m_sPath_Temporary; }
-uint32_t                        STORAGE::SILO::Count_Load      () const { return m_nCount_Load; }
 bool                            STORAGE::SILO::IsPendingClear  () const { return m_bPendingClear; }
 void                            STORAGE::SILO::SetPendingClear (bool b) { m_bPendingClear = b; }
-STORAGE::UNIT*                  STORAGE::SILO::Unit            (eSCOPE eScope) const { return m_apUnit[eScope]; }
-void                            STORAGE::SILO::Unit            (eSCOPE eScope, UNIT* pUnit) { m_apUnit[eScope] = pUnit; }
+STORAGE::ASSET*                 STORAGE::SILO::Asset           (eSCOPE eScope) const { return m_apAsset[eScope]; }
 
 std::string STORAGE::SILO::sPath (eSCOPE eScope) const
 {
@@ -95,91 +93,73 @@ std::string STORAGE::SILO::sPathname (eSCOPE eScope, const std::string& sExt) co
    return (std::filesystem::path (sPath (eScope)) / sFilename (eScope, sExt)).string ();
 }
 
-nlohmann::json STORAGE::SILO::Get (eSCOPE eScope, const std::string& sPath) const
-{
-   nlohmann::json jResult;
-   if (m_apUnit[eScope])
-      jResult = m_apUnit[eScope]->Get (sPath);
-   return jResult;
-}
-
-void STORAGE::SILO::Set (eSCOPE eScope, const std::string& sPath, const nlohmann::json& jValue)
-{
-   if (m_apUnit[eScope])
-   {
-      m_apUnit[eScope]->Set (sPath, jValue);
-      m_apUnit[eScope]->TouchAccess ();
-      m_pViewport->Host ()->OnStorageUnitChanged (this);
-   }
-}
-
-void STORAGE::SILO::Remove (eSCOPE eScope, const std::string& sPath)
-{
-   if (m_apUnit[eScope])
-   {
-      m_apUnit[eScope]->Remove (sPath);
-      m_apUnit[eScope]->TouchAccess ();
-      m_pViewport->Host ()->OnStorageUnitChanged (this);
-   }
-}
-
-bool STORAGE::SILO::Has (eSCOPE eScope, const std::string& sPath) const
-{
-   bool bHas = false;
-   if (m_apUnit[eScope])
-      bHas = m_apUnit[eScope]->Has (sPath);
-   return bHas;
-}
-
-std::string STORAGE::SILO::Json (eSCOPE eScope) const
-{
-   std::string sJson = "{}";
-   if (m_apUnit[eScope])
-      sJson = m_apUnit[eScope]->Json ();
-   return sJson;
-}
-
-void STORAGE::SILO::Json (eSCOPE eScope, const std::string& sJson)
-{
-   if (m_apUnit[eScope])
-   {
-      m_apUnit[eScope]->Json (sJson);
-      m_apUnit[eScope]->TouchAccess ();
-      m_pViewport->Host ()->OnStorageUnitChanged (this);
-   }
-}
+// ---------------------------------------------------------------------------
+// ASSET Caching
+// ---------------------------------------------------------------------------
 
 void STORAGE::SILO::Attach ()
 {
-   m_nCount_Load++;
+   std::lock_guard<std::mutex> guard (m_mxSilo);
 
-   if (m_nCount_Load == 1)
+   if (!m_bAttached)
    {
-      for (int i = 0; i < kSCOPE_COUNT; i++)
-      {
-         if (m_apUnit[i])
-            m_apUnit[i]->Attach ();
-      }
+      m_bAttached = true;
+
+      for (int nScope = 0; nScope < kSCOPE_COUNT; nScope++)
+         m_apAsset[nScope]->Attach ();
    }
 }
 
 void STORAGE::SILO::Detach ()
 {
-   if (m_nCount_Load > 0)
-   {
-      m_nCount_Load--;
+   std::lock_guard<std::mutex> guard (m_mxSilo);
 
-      if (m_nCount_Load == 0)
-      {
-         for (int i = 0; i < kSCOPE_COUNT; i++)
-         {
-            if (m_apUnit[i])
-            {
-               m_apUnit[i]->SaveMeta (m_CID);
-               m_apUnit[i]->Detach ();
-            }
-         }
-      }
+   if (m_bAttached)
+   {
+      for (int nScope = 0; nScope < kSCOPE_COUNT; nScope++)
+         m_apAsset[nScope]->Detach (m_CID);
+
+      m_bAttached = false;
    }
+}
+
+// ---------------------------------------------------------------------------
+// ASSET Pass-through
+// ---------------------------------------------------------------------------
+
+nlohmann::json STORAGE::SILO::Get (eSCOPE eScope, const std::string& sPath) const
+{
+   return m_apAsset[eScope]->Get (sPath);
+}
+
+void STORAGE::SILO::Set (eSCOPE eScope, const std::string& sPath, const nlohmann::json& jValue)
+{
+   m_apAsset[eScope]->Set (sPath, jValue);
+
+   m_pViewport->Host ()->OnStorageUnitChanged (this, m_apAsset[eScope], sPath);
+}
+
+void STORAGE::SILO::Remove (eSCOPE eScope, const std::string& sPath)
+{
+   m_apAsset[eScope]->Remove (sPath);
+
+   m_pViewport->Host ()->OnStorageUnitChanged (this, m_apAsset[eScope], sPath);
+}
+
+bool STORAGE::SILO::Has (eSCOPE eScope, const std::string& sPath) const
+{
+   return m_apAsset[eScope]->Has (sPath);
+}
+
+std::string STORAGE::SILO::Json (eSCOPE eScope) const
+{
+   return m_apAsset[eScope]->Json ();
+}
+
+void STORAGE::SILO::Json (eSCOPE eScope, const std::string& sJson)
+{
+   m_apAsset[eScope]->Json (sJson);
+
+   m_pViewport->Host ()->OnStorageUnitChanged (this, m_apAsset[eScope], "");
 }
 

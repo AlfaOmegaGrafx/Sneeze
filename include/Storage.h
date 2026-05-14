@@ -15,6 +15,8 @@
 #ifndef SNEEZE_STORAGE_STORAGE_H
 #define SNEEZE_STORAGE_STORAGE_H
 
+#include <mutex>
+
 namespace SNEEZE
 {
    // ---------------------------------------------------------------------------
@@ -25,10 +27,10 @@ namespace SNEEZE
    // container permanent/temporary). Data is stored as JSON files on disk.
    //
    // Consumers:
-   //   1. WASM modules — scoped to their own four storage units
+   //   1. WASM modules — scoped to their own four storage assets
    //   2. Inspector — omniscient, browsable, request/release pattern
    //
-   // Caching: UNITs are loaded on demand and evicted when no longer referenced.
+   // Caching: ASSETs are loaded on demand and evicted when no longer referenced.
    // Crash durability: JSONL changelog appended on every mutation.
    // ---------------------------------------------------------------------------
 
@@ -37,7 +39,7 @@ namespace SNEEZE
    public:
 
       // -----------------------------------------------------------------------
-      // SCOPE — selects one of the four storage units within a SILO.
+      // SCOPE — selects one of the four storage assets within a SILO.
       // -----------------------------------------------------------------------
 
       enum eSCOPE
@@ -53,7 +55,7 @@ namespace SNEEZE
       // Forward declarations
       // -----------------------------------------------------------------------
 
-      class UNIT;
+      class ASSET;
       class SILO;
 
       // -----------------------------------------------------------------------
@@ -70,18 +72,18 @@ namespace SNEEZE
       };
 
       // -----------------------------------------------------------------------
-      // UNIT — one per JSON file on disk. The core data wrapper.
+      // ASSET — one per JSON file on disk. The core data wrapper.
       //
       // Caches an nlohmann::json document in memory, manages a .meta sidecar
       // file for inspector metadata, and provides the JSONL changelog for crash
       // durability. Also serves as the interface for flat file sandbox ops.
       // -----------------------------------------------------------------------
 
-      class UNIT
+      class ASSET
       {
       public:
-         UNIT (STORAGE* pStorage, eSCOPE eScope, const std::string& sPathname);
-         virtual ~UNIT ();
+         ASSET (STORAGE* pStorage, eSCOPE eScope, const std::string& sPathname);
+         virtual ~ASSET ();
 
          // --- State ---
 
@@ -106,7 +108,7 @@ namespace SNEEZE
          uint32_t            Open           ();
          uint32_t            Close          ();
          void                Attach         ();
-         void                Detach         ();
+         void                Detach         (const VIEWPORT::CONTAINER::CID& CID);
          void                Load           ();
          void                Save           ();
          void                Evict          ();
@@ -129,7 +131,7 @@ namespace SNEEZE
       };
 
       // -----------------------------------------------------------------------
-      // SILO — groups four UNITs for a specific container.
+      // SILO — groups four ASSETs for a specific container.
       //
       // The handle passed to both WASM host functions and the inspector.
       // Created when a WASM container is instantiated or when the inspector
@@ -139,16 +141,16 @@ namespace SNEEZE
       class SILO
       {
       public:
-         SILO (STORAGE* pStorage, const VIEWPORT::CONTAINER::CID* pCID, VIEWPORT* pViewport);
+         SILO (STORAGE* pStorage, VIEWPORT* pViewport, const VIEWPORT::CONTAINER::CID* pCID);
         ~SILO ();
 
          void Initialize ();
 
          // --- Identity ---
 
+         VIEWPORT* Viewport () const;
          const VIEWPORT::CONTAINER::CID&  CID () const;
          std::string  DisplayName () const;
-         VIEWPORT* Viewport () const;
          const std::string& sPath_Permanent () const;
          const std::string& sPath_Temporary () const;
 
@@ -168,8 +170,6 @@ namespace SNEEZE
 
          void     Attach ();
          void     Detach ();
-         uint32_t Count_Load () const;
-
          // --- Clear flag (deferred history removal) ---
 
          bool     IsPendingClear () const;
@@ -183,8 +183,7 @@ namespace SNEEZE
 
          // --- Internal ---
 
-         UNIT*    Unit (eSCOPE eScope) const;
-         void     Unit (eSCOPE eScope, UNIT* pUnit);
+         ASSET*   Asset (eSCOPE eScope) const;
 
       private:
          STORAGE*                                    m_pStorage;
@@ -192,8 +191,9 @@ namespace SNEEZE
          VIEWPORT::CONTAINER::CID                    m_CID;
          std::string                                 m_sPath_Permanent;
          std::string                                 m_sPath_Temporary;
-         UNIT*                                       m_apUnit[kSCOPE_COUNT];
-         uint32_t                                    m_nCount_Load;
+         ASSET*                                      m_apAsset[kSCOPE_COUNT];
+         std::mutex                                  m_mxSilo;
+         bool                                        m_bAttached;
          bool                                        m_bPendingClear;
       };
 
@@ -216,8 +216,8 @@ namespace SNEEZE
       class Impl;
       Impl* m_pImpl;
 
-      UNIT* Unit_Open  (eSCOPE eScope, const std::string& sPathname);
-      void  Unit_Close (UNIT* pUnit);
+      ASSET* Asset_Open  (eSCOPE eScope, const std::string& sPathname);
+      void   Asset_Close (ASSET* pAsset);
    };
 }
 #endif // SNEEZE_STORAGE_STORAGE_H

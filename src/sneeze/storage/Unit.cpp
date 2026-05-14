@@ -23,7 +23,7 @@ using namespace SNEEZE;
 // Helpers
 // ===========================================================================
 
-class STORAGE::UNIT::Impl
+class STORAGE::ASSET::Impl
 {
 public:
    Impl (STORAGE* pStorage, eSCOPE eScope, const std::string& sPathname) :
@@ -242,15 +242,17 @@ public:
          Load (); 
    }
 
-   void Detach () 
-   { 
-      if (m_nCount_Load > 0 && --m_nCount_Load == 0) 
-      { 
-         if (m_bDirty) 
-            Save (); 
+   void Detach (const VIEWPORT::CONTAINER::CID& CID)
+   {
+      if (m_nCount_Load > 0 && --m_nCount_Load == 0)
+      {
+         SaveMeta (CID);
 
-         Evict (); 
-      } 
+         if (m_bDirty)
+            Save ();
+
+         Evict ();
+      }
    }
 
    void Load ()
@@ -394,15 +396,15 @@ public:
 };
 
 // ===========================================================================
-// STORAGE::UNIT
+// STORAGE::ASSET
 // ===========================================================================
 
-STORAGE::UNIT::UNIT (STORAGE* pStorage, eSCOPE eScope, const std::string& sPathname) :
+STORAGE::ASSET::ASSET (STORAGE* pStorage, eSCOPE eScope, const std::string& sPathname) :
    m_pImpl (new Impl (pStorage, eScope, sPathname))
 {
 }
 
-STORAGE::UNIT::~UNIT ()
+STORAGE::ASSET::~ASSET ()
 {
    delete m_pImpl;
 }
@@ -411,20 +413,20 @@ STORAGE::UNIT::~UNIT ()
 // Accessors
 // ---------------------------------------------------------------------------
 
-bool                 STORAGE::UNIT::IsLoaded       () const { return m_pImpl->m_bLoaded; }
-bool                 STORAGE::UNIT::IsDirty        () const { return m_pImpl->m_bDirty; }
-STORAGE::eSCOPE      STORAGE::UNIT::GetScope       () const { return m_pImpl->m_eScope; }
-const std::string&   STORAGE::UNIT::Pathname       () const { return m_pImpl->m_sPathname; }
-uint64_t             STORAGE::UNIT::SizeBytes      () const { return m_pImpl->m_nSizeBytes; }
-const std::string&   STORAGE::UNIT::CreatedTime    () const { return m_pImpl->m_sCreatedAt; }
-const std::string&   STORAGE::UNIT::LastAccessTime () const { return m_pImpl->m_sLastAccessedAt; }
-uint32_t             STORAGE::UNIT::AccessCount    () const { return m_pImpl->m_nAccessCount; }
+bool                 STORAGE::ASSET::IsLoaded       () const { return m_pImpl->m_bLoaded; }
+bool                 STORAGE::ASSET::IsDirty        () const { return m_pImpl->m_bDirty; }
+STORAGE::eSCOPE      STORAGE::ASSET::GetScope       () const { return m_pImpl->m_eScope; }
+const std::string&   STORAGE::ASSET::Pathname       () const { return m_pImpl->m_sPathname; }
+uint64_t             STORAGE::ASSET::SizeBytes      () const { return m_pImpl->m_nSizeBytes; }
+const std::string&   STORAGE::ASSET::CreatedTime    () const { return m_pImpl->m_sCreatedAt; }
+const std::string&   STORAGE::ASSET::LastAccessTime () const { return m_pImpl->m_sLastAccessedAt; }
+uint32_t             STORAGE::ASSET::AccessCount    () const { return m_pImpl->m_nAccessCount; }
 
 // ---------------------------------------------------------------------------
 // JSON access
 // ---------------------------------------------------------------------------
 
-nlohmann::json STORAGE::UNIT::Get (const std::string& sPath) const
+nlohmann::json STORAGE::ASSET::Get (const std::string& sPath) const
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mutex);
 
@@ -448,7 +450,7 @@ nlohmann::json STORAGE::UNIT::Get (const std::string& sPath) const
    return jResult;
 }
 
-void STORAGE::UNIT::Set (const std::string& sPath, const nlohmann::json& jValue)
+void STORAGE::ASSET::Set (const std::string& sPath, const nlohmann::json& jValue)
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mutex);
 
@@ -475,11 +477,12 @@ void STORAGE::UNIT::Set (const std::string& sPath, const nlohmann::json& jValue)
       }
 
       m_pImpl->m_bDirty = true;
+      m_pImpl->TouchAccess ();
       m_pImpl->Log_Append ("Set", sPath, jValue);
    }
 }
 
-void STORAGE::UNIT::Remove (const std::string& sPath)
+void STORAGE::ASSET::Remove (const std::string& sPath)
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mutex);
 
@@ -502,11 +505,12 @@ void STORAGE::UNIT::Remove (const std::string& sPath)
       }
 
       m_pImpl->m_bDirty = true;
+      m_pImpl->TouchAccess ();
       m_pImpl->Log_Append ("Remove", sPath, nlohmann::json ());
    }
 }
 
-bool STORAGE::UNIT::Has (const std::string& sPath) const
+bool STORAGE::ASSET::Has (const std::string& sPath) const
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mutex);
 
@@ -529,14 +533,14 @@ bool STORAGE::UNIT::Has (const std::string& sPath) const
    return bHas;
 }
 
-std::string STORAGE::UNIT::Json () const
+std::string STORAGE::ASSET::Json () const
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mutex);
 
    return m_pImpl->m_jData.dump (2);
 }
 
-void STORAGE::UNIT::Json (const std::string& sJson)
+void STORAGE::ASSET::Json (const std::string& sJson)
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mutex);
 
@@ -550,24 +554,25 @@ void STORAGE::UNIT::Json (const std::string& sJson)
    }
 
    m_pImpl->m_bDirty = true;
+   m_pImpl->TouchAccess ();
 }
 
 // ---------------------------------------------------------------------------
 // Lifecycle
 // ---------------------------------------------------------------------------
 
-uint32_t STORAGE::UNIT::Open ()  { return ++m_pImpl->m_nCount_Open; }
-uint32_t STORAGE::UNIT::Close () { return --m_pImpl->m_nCount_Open; }
+uint32_t STORAGE::ASSET::Open ()  { return ++m_pImpl->m_nCount_Open; }
+uint32_t STORAGE::ASSET::Close () { return --m_pImpl->m_nCount_Open; }
 
-void STORAGE::UNIT::Attach ()    { m_pImpl->Attach (); }
-void STORAGE::UNIT::Detach ()    { m_pImpl->Detach (); }
-void STORAGE::UNIT::Load ()      { m_pImpl->Load ();   }
-void STORAGE::UNIT::Save ()      { m_pImpl->Save ();   }
-void STORAGE::UNIT::Evict ()     { m_pImpl->Evict ();  }
+void STORAGE::ASSET::Attach ()    { m_pImpl->Attach (); }
+void STORAGE::ASSET::Detach (const VIEWPORT::CONTAINER::CID& CID) { m_pImpl->Detach (CID); }
+void STORAGE::ASSET::Load ()      { m_pImpl->Load ();   }
+void STORAGE::ASSET::Save ()      { m_pImpl->Save ();   }
+void STORAGE::ASSET::Evict ()     { m_pImpl->Evict ();  }
 
 // ---------------------------------------------------------------------------
 // Meta sidecar
 // ---------------------------------------------------------------------------
 
-void STORAGE::UNIT::TouchAccess ()                                   { m_pImpl->TouchAccess (); }
-void STORAGE::UNIT::SaveMeta (const VIEWPORT::CONTAINER::CID& CID)   { m_pImpl->SaveMeta (CID); }
+void STORAGE::ASSET::TouchAccess ()                                   { m_pImpl->TouchAccess (); }
+void STORAGE::ASSET::SaveMeta (const VIEWPORT::CONTAINER::CID& CID)   { m_pImpl->SaveMeta (CID); }
