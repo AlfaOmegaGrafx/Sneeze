@@ -14,12 +14,6 @@
 
 #include <Sneeze.h>
 #include "Control.h"
-#include <cstdio>
-
-#ifdef _WIN32
-#include <windows.h>
-#pragma comment (lib, "winmm.lib")
-#endif
 
 // ---------------------------------------------------------------------------
 // Agent configuration table

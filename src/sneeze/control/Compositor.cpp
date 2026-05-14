@@ -57,7 +57,6 @@
 #include "scene/Fabric.h"
 #include "scene/MapObject.h"
 #include <cmath>
-#include <cstdio>
 
 #ifdef _WIN32
 #include <dwmapi.h>

@@ -14,8 +14,6 @@
 
 #include <Sneeze.h>
 #include "ThreadPool.h"
-#include <cstdio>
-#include <algorithm>
 
 using namespace SNEEZE::DEP;
 

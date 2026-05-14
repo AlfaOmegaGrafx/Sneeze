@@ -46,6 +46,7 @@
 #include <string>
 #include <thread>
 #include <sstream>
+#include <random>
 
 #include <openssl/evp.h>
 #include <openssl/sha.h>
@@ -59,6 +60,8 @@
 #include <wincrypt.h>
 #undef X509_NAME
 #undef X509_EXTENSIONS
+
+#pragma comment (lib, "winmm.lib")
 #endif
 
 // --- Sneeze public umbrella (included by almost every .cpp) ---

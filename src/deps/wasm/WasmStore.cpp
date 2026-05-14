@@ -15,7 +15,6 @@
 #include <Sneeze.h>
 #include "WasmStore.h"
 #include "WasmInstance.h"
-#include <cstdio>
 
 using namespace SNEEZE::DEP;
 

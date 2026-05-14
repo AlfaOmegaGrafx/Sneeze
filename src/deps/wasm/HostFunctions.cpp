@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "HostFunctions.h"
-#include <cstdio>
 
 namespace DEP {
 

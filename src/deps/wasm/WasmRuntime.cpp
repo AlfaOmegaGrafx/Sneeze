@@ -14,7 +14,6 @@
 
 #include <Sneeze.h>
 #include "WasmRuntime.h"
-#include <cstdio>
 
 using namespace SNEEZE::DEP;
 
