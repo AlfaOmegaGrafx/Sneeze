@@ -49,9 +49,17 @@
 
 #include <openssl/evp.h>
 #include <openssl/sha.h>
+#include <openssl/pem.h>
 
 #include <nlohmann/json.hpp>
 
+#ifdef _WIN32
+#define NOMINMAX
+#include <windows.h>
+#include <wincrypt.h>
+#undef X509_NAME
+#undef X509_EXTENSIONS
+#endif
 
 // --- Sneeze public umbrella (included by almost every .cpp) ---
 

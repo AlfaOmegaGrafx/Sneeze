@@ -15,20 +15,6 @@
 #include <Sneeze.h>
 #include "Msf.h"
 
-#include <openssl/bio.h>
-#include <openssl/pem.h>
-#include <openssl/x509.h>
-#include <openssl/x509_vfy.h>
-
-#ifdef _WIN32
-#include <windows.h>
-#include <wincrypt.h>
-#undef X509_NAME
-#undef X509_EXTENSIONS
-#endif
-
-#include <openssl/bn.h>
-
 using namespace SNEEZE;
 
 using CHAIN    = VIEWPORT::MSF::CHAIN;

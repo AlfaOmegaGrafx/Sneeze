@@ -17,8 +17,6 @@
 
 #include <jwt-cpp/traits/nlohmann-json/defaults.h>
 
-#include <cstdio>
-
 using namespace SNEEZE;
 
 using MSF     = VIEWPORT::MSF;

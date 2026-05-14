@@ -15,8 +15,6 @@
 #include <Sneeze.h>
 #include "scene/Scene.h"
 #include "renderer/AnariRenderer.h"
-#include <cstring>
-#include <filesystem>
 
 using namespace SNEEZE;
 
