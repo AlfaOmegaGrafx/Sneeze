@@ -15,9 +15,6 @@
 #ifndef SNEEZE_CORE_TYPES_H
 #define SNEEZE_CORE_TYPES_H
 
-#include <cmath>
-#include <cstdint>
-
 struct VEC3
 {
    double x;

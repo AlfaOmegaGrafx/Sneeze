@@ -16,7 +16,6 @@
 #define SNEEZE_SOM_SPATIALINDEX_H
 
 #include "scene/Fabric.h"
-#include <cstdint>
 
 namespace SNEEZE
 {

@@ -16,7 +16,6 @@
 #define SNEEZE_VIEWPORT_RENDERER_H
 
 #include "Types.h"
-#include <cstdint>
 
 namespace SNEEZE
 {

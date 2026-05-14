@@ -16,9 +16,6 @@
 #define SNEEZE_SOM_EVENTS_H
 
 #include "scene/Fabric.h"
-#include <cstdint>
-#include <mutex>
-#include <functional>
 
 namespace SNEEZE
 {

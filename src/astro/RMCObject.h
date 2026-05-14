@@ -17,12 +17,6 @@
 
 #include "Orbit.h"
 #include "Types.h"
-#include <string>
-#include <vector>
-#include <map>
-#include <memory>
-#include <optional>
-#include <cstdint>
 
 namespace SNEEZE
 {

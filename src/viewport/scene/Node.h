@@ -18,11 +18,6 @@
 #include "scene/Fabric.h"
 #include "scene/MapObject.h"
 
-#include <atomic>
-#include <mutex>
-#include <unordered_map>
-#include <cstdint>
-
 namespace SNEEZE
 {
    class MAP_OBJECT;

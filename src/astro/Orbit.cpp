@@ -14,7 +14,6 @@
 
 #include <Sneeze.h>
 #include "Orbit.h"
-#include <cmath>
 
 using namespace SNEEZE::astro;
 

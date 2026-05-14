@@ -16,11 +16,6 @@
 #define SNEEZE_CORE_CONTROL_H
 
 #include "Engine.h"
-#include <functional>
-#include <chrono>
-#include <cstdint>
-#include <string>
-#include <vector>
 
 namespace SNEEZE
 {

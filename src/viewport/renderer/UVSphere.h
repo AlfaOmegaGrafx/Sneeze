@@ -15,9 +15,6 @@
 #ifndef SNEEZE_RENDERER_UVSPHERE_H
 #define SNEEZE_RENDERER_UVSPHERE_H
 
-#include <vector>
-#include <cstdint>
-
 struct UV_SPHERE
 {
    std::vector<float>    aPositions;

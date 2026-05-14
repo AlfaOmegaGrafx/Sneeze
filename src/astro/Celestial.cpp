@@ -13,8 +13,6 @@
 // limitations under the License.
 
 #include "Celestial.h"
-#include <cmath>
-#include <algorithm>
 
 using namespace SNEEZE::astro;
 

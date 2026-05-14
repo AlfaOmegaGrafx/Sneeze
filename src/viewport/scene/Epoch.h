@@ -15,9 +15,6 @@
 #ifndef SNEEZE_CORE_EPOCH_H
 #define SNEEZE_CORE_EPOCH_H
 
-#include <string>
-#include <cstdint>
-
 class EPOCH
 {
 public:

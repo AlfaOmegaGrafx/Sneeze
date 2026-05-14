@@ -15,10 +15,6 @@
 #ifndef SNEEZE_SOM_MAPOBJECT_H
 #define SNEEZE_SOM_MAPOBJECT_H
 
-#include <atomic>
-#include <cstdint>
-#include <mutex>
-
 namespace SNEEZE
 {
    // ---------------------------------------------------------------------------
