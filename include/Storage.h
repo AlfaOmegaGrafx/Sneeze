@@ -39,7 +39,7 @@ namespace SNEEZE
    public:
 
       // -----------------------------------------------------------------------
-      // SCOPE — selects one of the four storage assets within a SILO.
+      // SCOPE — selects one of the four storage assets within a UNIT.
       // -----------------------------------------------------------------------
 
       enum eSCOPE
@@ -52,18 +52,18 @@ namespace SNEEZE
       };
 
       // -----------------------------------------------------------------------
-      // SILO — groups four ASSETs for a specific container.
+      // UNIT — groups four ASSETs for a specific container.
       //
       // The handle passed to both WASM host functions and the inspector.
       // Created when a WASM container is instantiated or when the inspector
       // enumerates from disk. Destroyed/evicted when last reference releases.
       // -----------------------------------------------------------------------
 
-      class SILO
+      class UNIT
       {
       public:
-         SILO (STORAGE* pStorage, VIEWPORT* pViewport, const VIEWPORT::CONTAINER::CID* pCID);
-        ~SILO ();
+         UNIT (STORAGE* pStorage, VIEWPORT* pViewport, const VIEWPORT::CONTAINER::CID* pCID);
+        ~UNIT ();
 
          void Initialize ();
 
@@ -110,14 +110,14 @@ namespace SNEEZE
       // -----------------------------------------------------------------------
       // IENUM — enumeration callback interface.
       //
-      // Implement to receive SILO pointers during Silo_Enum().
+      // Implement to receive UNIT pointers during Unit_Enum().
       // -----------------------------------------------------------------------
 
       class IENUM
       {
       public:
          virtual ~IENUM () {}
-         virtual void OnSilo (SILO* pSilo) = 0;
+         virtual void OnUnit (UNIT* pUnit) = 0;
       };
 
       // -----------------------------------------------------------------------
@@ -131,9 +131,9 @@ namespace SNEEZE
 
       // --- Container lifecycle ---
 
-      SILO*   Silo_Open  (VIEWPORT* pViewport, const VIEWPORT::CONTAINER::CID* pCID);
-      void    Silo_Close (VIEWPORT* pViewport, SILO* pSilo);
-      void    Silo_Enum  (VIEWPORT* pViewport, IENUM* pEnum);
+      UNIT*   Unit_Open  (VIEWPORT* pViewport, const VIEWPORT::CONTAINER::CID* pCID);
+      void    Unit_Close (VIEWPORT* pViewport, UNIT* pUnit);
+      void    Unit_Enum  (VIEWPORT* pViewport, IENUM* pEnum);
 
    private:
       class Impl;

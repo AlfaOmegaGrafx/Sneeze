@@ -389,7 +389,7 @@ public:
 
    mutable std::recursive_mutex  m_mutex;
 
-   friend class SILO;
+   friend class UNIT;
    friend class STORAGE;
 };
 

@@ -552,7 +552,7 @@ set (SOM_HEADERS
    viewport/scene/SpatialIndex.h)
 
 set (NETWORK_SOURCES
-   sneeze/network/Asset.cpp
+   sneeze/network/Network_Asset.cpp
    sneeze/network/Encoding.cpp
    sneeze/network/File.cpp
    sneeze/network/Network.cpp)
@@ -612,7 +612,7 @@ set (NETWORK_GENERATED_SOURCES "${CMAKE_CURRENT_BINARY_DIR}/cacert_data.cpp")
 
 set (CONTAINER_HEADERS)
 
-set (STORAGE_SOURCES  sneeze/storage/Storage.cpp sneeze/storage/Storage_Asset.cpp sneeze/storage/Silo.cpp)
+set (STORAGE_SOURCES  sneeze/storage/Storage.cpp sneeze/storage/Storage_Asset.cpp sneeze/storage/Unit.cpp)
 set (STORAGE_HEADERS  sneeze/storage/Storage_Asset.h)
 
 set (PERSONA_SOURCES  persona/Persona.cpp)

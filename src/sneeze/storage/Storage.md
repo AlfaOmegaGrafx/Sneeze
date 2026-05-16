@@ -7,7 +7,7 @@ The `storage` module (`SNEEZE::STORAGE`) provides persistent, per-persona, per-o
 ```
 STORAGE (singleton, constructor takes ENGINE*)
  ├── m_umpUnit: path -> UNIT*           (one per JSON file on disk)
- ├── m_apSilo: all active SILOs         (one per Silo_Open call)
+ ├── m_apUnit: all active UNITs         (one per Unit_Open call)
  ├── m_sPath_Permanent + m_sPath_Temporary
  └── m_mxStorage (recursive_mutex)
 
@@ -15,13 +15,13 @@ UNIT (one per JSON file on disk, keyed by full path)
  ├── nlohmann::json document (in-memory cache)
  ├── .meta sidecar (SNEEZE::VIEWPORT::CONTAINER::NAME, statistics)
  ├── .log changelog (JSONL write-ahead log for crash durability)
- ├── m_nCount_Open (lifetime: how many SILOs reference this UNIT)
+ ├── m_nCount_Open (lifetime: how many UNITs reference this UNIT)
  ├── m_nCount_Load (cache: how many consumers have data loaded)
  ├── m_bDirty flag
  ├── Load/Save/Evict lifecycle
  └── m_mutex (recursive_mutex, per-UNIT)
 
-SILO (groups four UNITs for a specific container)
+UNIT (groups four UNITs for a specific container)
  ├── shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME>
  ├── UNIT* m_apUnits[4] indexed by SCOPE
  ├── m_nCount_Load (tracks active attachments)
@@ -36,17 +36,17 @@ UNITs use two separate counters to decouple object lifetime from cache state:
 
 ### m_nCount_Open (UNIT lifetime)
 
-Tracks how many SILOs reference a UNIT. Initialized to 1 on construction. Incremented when `Silo_Open` finds an existing UNIT in `m_umpUnit` (shared org UNITs). Decremented in `Silo_Close`. When it reaches zero, the UNIT is erased from `m_umpUnit` and deleted.
+Tracks how many UNITs reference a UNIT. Initialized to 1 on construction. Incremented when `Unit_Open` finds an existing UNIT in `m_umpUnit` (shared org UNITs). Decremented in `Unit_Close`. When it reaches zero, the UNIT is erased from `m_umpUnit` and deleted.
 
 ### m_nCount_Load (cache state)
 
-Tracks how many consumers require the JSON data to be loaded in memory. Initialized to 0. Incremented by `SILO::Attach()` (which also calls `UNIT::Load()` on the first attach). Decremented by `SILO::Detach()`. When it reaches zero, the UNIT is evicted (`UNIT::Evict()`).
+Tracks how many consumers require the JSON data to be loaded in memory. Initialized to 0. Incremented by `UNIT::Attach()` (which also calls `UNIT::Load()` on the first attach). Decremented by `UNIT::Detach()`. When it reaches zero, the UNIT is evicted (`UNIT::Evict()`).
 
-This separation allows the inspector to browse SILOs/UNITs without loading their JSON data. The inspector holds references (increments `m_nCount_Open`) but only loads data (`Attach()`) when drilling into a specific UNIT's contents.
+This separation allows the inspector to browse UNITs/UNITs without loading their JSON data. The inspector holds references (increments `m_nCount_Open`) but only loads data (`Attach()`) when drilling into a specific UNIT's contents.
 
-### SILO ownership
+### UNIT ownership
 
-SILOs are stored as raw `SILO*` in `m_apSilo`. Each `Silo_Open` creates a new SILO instance — SILOs are not shared across callers. They maintain their own `m_nCount_Load` to track active attachments. SILOs are deleted in `Silo_Close` after decrementing `m_nCount_Open` on their UNITs.
+UNITs are stored as raw `UNIT*` in `m_apUnit`. Each `Unit_Open` creates a new UNIT instance — UNITs are not shared across callers. They maintain their own `m_nCount_Load` to track active attachments. UNITs are deleted in `Unit_Close` after decrementing `m_nCount_Open` on their UNITs.
 
 ## Nested Types
 
@@ -55,7 +55,7 @@ All types are nested inside `SNEEZE::STORAGE`:
 | Type    | Parent    | Purpose                                          |
 |---------|-----------|--------------------------------------------------|
 | `UNIT`  | `STORAGE` | Core data wrapper for one JSON file              |
-| `SILO`  | `STORAGE` | Groups four UNITs for a container                |
+| `UNIT`  | `STORAGE` | Groups four UNITs for a container                |
 | `SCOPE` | `STORAGE` | Enum selecting which of the four UNITs           |
 | `IENUM` | `STORAGE` | Enumeration callback interface                   |
 
@@ -82,10 +82,10 @@ both paths are ephemeral so everything is wiped on session end.
 
 ## Session Paths
 
-The SILO constructor appends `Storage/` to the viewport's permanent and temporary base paths, ensuring that storage files live in a dedicated `Storage/` subdirectory — separate from the network cache at the same level.
+The UNIT constructor appends `Storage/` to the viewport's permanent and temporary base paths, ensuring that storage files live in a dedicated `Storage/` subdirectory — separate from the network cache at the same level.
 
 ```
-SILO::SILO (...) :
+UNIT::UNIT (...) :
    m_sPath_Permanent ((std::filesystem::path (pViewport->sPath_Permanent ()) / "Storage").string ()),
    m_sPath_Temporary ((std::filesystem::path (pViewport->sPath_Temporary ()) / "Storage").string ()),
 ```
@@ -132,28 +132,28 @@ pName->sContainerName = "poker";
 pName->sPersonaHash   = "def456...";
 pName->bValidated     = true;
 
-STORAGE::SILO* pSilo = pSneeze->Storage ()->Silo_Open (pName, pViewport);
+STORAGE::UNIT* pUnit = pSneeze->Storage ()->Unit_Open (pName, pViewport);
 
 // Path-based JSON access
-pSilo->Set (STORAGE::CONTAINER_PERMANENT, "player.name", "Dean");
-pSilo->Set (STORAGE::CONTAINER_PERMANENT, "player.chips", 5000);
-pSilo->Set (STORAGE::CONTAINER_PERMANENT, "game.poker.table[0].color", "green");
+pUnit->Set (STORAGE::CONTAINER_PERMANENT, "player.name", "Dean");
+pUnit->Set (STORAGE::CONTAINER_PERMANENT, "player.chips", 5000);
+pUnit->Set (STORAGE::CONTAINER_PERMANENT, "game.poker.table[0].color", "green");
 
-auto jName  = pSilo->Get (STORAGE::CONTAINER_PERMANENT, "player.name");   // "Dean"
-auto jChips = pSilo->Get (STORAGE::CONTAINER_PERMANENT, "player.chips");  // 5000
-bool bHas   = pSilo->Has (STORAGE::CONTAINER_PERMANENT, "player.chips");  // true
+auto jName  = pUnit->Get (STORAGE::CONTAINER_PERMANENT, "player.name");   // "Dean"
+auto jChips = pUnit->Get (STORAGE::CONTAINER_PERMANENT, "player.chips");  // 5000
+bool bHas   = pUnit->Has (STORAGE::CONTAINER_PERMANENT, "player.chips");  // true
 
-pSilo->Remove (STORAGE::CONTAINER_PERMANENT, "player.chips");
+pUnit->Remove (STORAGE::CONTAINER_PERMANENT, "player.chips");
 
 // Organization storage (shared with other containers from same org)
-pSilo->Set (STORAGE::ORG_PERMANENT, "org.theme", "dark");
+pUnit->Set (STORAGE::ORG_PERMANENT, "org.theme", "dark");
 
 // Bulk JSON (for programs with their own JSON library)
-std::string sJson = pSilo->Json (STORAGE::CONTAINER_PERMANENT);
-pSilo->Json (STORAGE::CONTAINER_TEMPORARY, "{\"session\": {\"start\": 12345}}");
+std::string sJson = pUnit->Json (STORAGE::CONTAINER_PERMANENT);
+pUnit->Json (STORAGE::CONTAINER_TEMPORARY, "{\"session\": {\"start\": 12345}}");
 
 // Close when container is destroyed
-pSneeze->Storage ()->Silo_Close (pSilo);
+pSneeze->Storage ()->Unit_Close (pUnit);
 ```
 
 ## Data Model
@@ -182,32 +182,32 @@ the array with null values if the index exceeds the current size.
 
 ```
 Container instantiated:
-   STORAGE::Silo_Open(pName, pViewport)
-   → create SILO (appends Storage/ to viewport paths)
+   STORAGE::Unit_Open(pName, pViewport)
+   → create UNIT (appends Storage/ to viewport paths)
    → for each of 4 scopes: find or create UNIT (increment m_nCount_Open if shared)
-   → SILO::Attach() → increment m_nCount_Load on each UNIT → UNIT::Load()
+   → UNIT::Attach() → increment m_nCount_Load on each UNIT → UNIT::Load()
    → fire OnStorageUnitCreated
-   → return SILO*
+   → return UNIT*
 
 WASM calls storage_set_string(CONTAINER_PERMANENT, "player.name", "Dean"):
-   → host function resolves SILO from WASM store identity
-   → SILO::Set(CONTAINER_PERMANENT, "player.name", "Dean")
+   → host function resolves UNIT from WASM store identity
+   → UNIT::Set(CONTAINER_PERMANENT, "player.name", "Dean")
    → navigates nlohmann::json via path, sets value, marks dirty
    → appends JSONL line to .log file
    → fires OnStorageUnitChanged notification
 
 Container destroyed:
-   STORAGE::Silo_Close(pSilo)
+   STORAGE::Unit_Close(pUnit)
    → save any dirty UNITs (full .json write + delete .log)
    → save .meta sidecar for all UNITs
-   → SILO::Detach() → decrement m_nCount_Load → evict at zero
+   → UNIT::Detach() → decrement m_nCount_Load → evict at zero
    → decrement m_nCount_Open on all 4 UNITs → delete UNIT at zero
-   → delete SILO, remove from m_apSilo
+   → delete UNIT, remove from m_apUnit
 ```
 
-Organization UNITs are shared — multiple SILOs from the same publisher point
+Organization UNITs are shared — multiple UNITs from the same publisher point
 to the same org UNITs. `m_nCount_Open` ensures org UNITs stay alive as long as
-any container from that org has an open SILO.
+any container from that org has an open UNIT.
 
 ## Crash Durability — JSONL Changelog
 
@@ -258,9 +258,9 @@ use bulk `GetJson`/`SetJson`.
 
 ### 2. Inspector — Omniscient, Browsable
 
-- `Enumerate(IENUM*, VIEWPORT*)` walks active SILOs for a specific viewport
-  and calls `OnSilo()` for each
-- Inspector gains access to UNITs via SILOs — when drilling into a UNIT's
+- `Enumerate(IENUM*, VIEWPORT*)` walks active UNITs for a specific viewport
+  and calls `OnUnit()` for each
+- Inspector gains access to UNITs via UNITs — when drilling into a UNIT's
   contents, the inspector calls `Attach()` to load the JSON data into memory
 - Real-time notifications via `OnStorageUnitCreated/Changed/Deleted`
 - Storage units not held by WASM or inspector don't need to live in memory
@@ -274,8 +274,8 @@ virtual void OnStorageUnitChanged (NOTIFICATION* pNotification);
 virtual void OnStorageUnitDeleted (NOTIFICATION* pNotification);
 ```
 
-Notifications fire from STORAGE through the SILO's `VIEWPORT*` up to the host.
-The host downcasts `NOTIFICATION*` to `STORAGE::SILO*`.
+Notifications fire from STORAGE through the UNIT's `VIEWPORT*` up to the host.
+The host downcasts `NOTIFICATION*` to `STORAGE::UNIT*`.
 
 ## Sidecar .meta Files
 
@@ -290,7 +290,7 @@ Each storage unit has a companion `.meta` sidecar — same pattern as NETWORK:
 
 ## Thread Safety
 
-- `STORAGE` — `m_mxStorage` (recursive_mutex) protecting the UNIT map and SILO list
+- `STORAGE` — `m_mxStorage` (recursive_mutex) protecting the UNIT map and UNIT list
 - `UNIT` — `m_mutex` (recursive_mutex) per UNIT protecting its JSON document and metadata
 
 ## Files
@@ -298,15 +298,15 @@ Each storage unit has a companion `.meta` sidecar — same pattern as NETWORK:
 | File | Contents |
 |------|----------|
 | `Storage.h` | `include/Storage.h` — single header with all nested types |
-| `Storage.cpp` | Top-level STORAGE (Initialize, Silo_Open, Silo_Close, Enumerate, destructor) |
+| `Storage.cpp` | Top-level STORAGE (Initialize, Unit_Open, Unit_Close, Enumerate, destructor) |
 | `Unit.cpp` | STORAGE::UNIT (JSON access, path navigation, changelog, Load/Save/Evict, meta) |
-| `Silo.cpp` | STORAGE::SILO (path-based API, Attach/Detach, path construction) |
+| `Unit.cpp` | STORAGE::UNIT (path-based API, Attach/Detach, path construction) |
 
 ## WASM Interface (Current State)
 
 The WASM host functions (`Storage_Get`, `Storage_Set`, `Storage_Remove`,
 `Storage_Has`) are currently stubs that return nullptr. They will be wired
-to resolve the calling WASM store's SILO and dispatch to the path-based API.
+to resolve the calling WASM store's UNIT and dispatch to the path-based API.
 
 ## Not Yet Implemented
 
@@ -315,8 +315,8 @@ The following features from the design plan are not yet implemented:
 ### Host-Decides Pattern
 
 `OnStorageUnitCreated` should return `bool` instead of `void`. If the host
-returns `true`, the SILO is kept in the history list (inspector wants it).
-If `false`, the clear bit is set and the SILO is cleaned up silently.
+returns `true`, the UNIT is kept in the history list (inspector wants it).
+If `false`, the clear bit is set and the UNIT is cleaned up silently.
 
 This same pattern needs to be retrofitted to NETWORK:
 `OnNetworkFileCreated(FILE*)` changes from `void` to `bool`.
@@ -353,8 +353,8 @@ directory from it. Stubbed — no functionality yet.
 
 The `Storage_Get/Set/Remove/Has` host functions need to:
 1. Resolve the calling WASM store's identity (persona, fingerprint, container)
-2. Look up or open the corresponding STORAGE::SILO
-3. Dispatch to the SILO's path-based API
+2. Look up or open the corresponding STORAGE::UNIT
+3. Dispatch to the UNIT's path-based API
 4. Marshal results back across the WASM boundary
 
 ### Fine-Grained WASM Host Functions

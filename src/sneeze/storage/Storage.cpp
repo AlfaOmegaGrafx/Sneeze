@@ -47,8 +47,8 @@ public:
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
 
-      while (!m_apSilo.empty ())
-         Silo_Close (m_apSilo.front ()->Viewport (), m_apSilo.front ());
+      while (!m_apUnit.empty ())
+         Unit_Close (m_apUnit.front ()->Viewport (), m_apUnit.front ());
 
       for (auto& pair : m_umpAsset)
          delete pair.second;
@@ -58,59 +58,59 @@ public:
 
 public:
 
-   STORAGE::SILO* Silo_Open (VIEWPORT* pViewport, const VIEWPORT::CONTAINER::CID* pCID)
+   STORAGE::UNIT* Unit_Open (VIEWPORT* pViewport, const VIEWPORT::CONTAINER::CID* pCID)
    {
-      SILO* pSilo = nullptr;
+      UNIT* pUnit = nullptr;
 
       if (pCID && pViewport)
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
 
-         pSilo = new SILO (m_pStorage, pViewport, pCID);
+         pUnit = new UNIT (m_pStorage, pViewport, pCID);
 
-         m_apSilo.push_back (pSilo);
+         m_apUnit.push_back (pUnit);
 
-         pSilo->Initialize ();
+         pUnit->Initialize ();
 
-         pViewport->Host ()->OnStorageUnitCreated (pSilo);
+         pViewport->Host ()->OnStorageUnitCreated (pUnit);
       }
 
-      return pSilo;
+      return pUnit;
    }
 
-   void Silo_Close (VIEWPORT* pViewport, SILO* pSilo)
+   void Unit_Close (VIEWPORT* pViewport, UNIT* pUnit)
    {
-      if (pSilo)
+      if (pUnit)
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
 
-         pViewport->Host ()->OnStorageUnitDeleted (pSilo);
+         pViewport->Host ()->OnStorageUnitDeleted (pUnit);
 
-         auto it = std::find (m_apSilo.begin (), m_apSilo.end (), pSilo);
-         if (it != m_apSilo.end ())
-            m_apSilo.erase (it);
+         auto it = std::find (m_apUnit.begin (), m_apUnit.end (), pUnit);
+         if (it != m_apUnit.end ())
+            m_apUnit.erase (it);
 
-         delete pSilo;
+         delete pUnit;
       }
    }
 
-   void Silo_Enum (VIEWPORT* pViewport, IENUM* pEnum)
+   void Unit_Enum (VIEWPORT* pViewport, IENUM* pEnum)
    {
       if (pEnum)
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
 
-         for (SILO* pSilo : m_apSilo)
+         for (UNIT* pUnit : m_apUnit)
          {
-            if (pSilo->Viewport () == pViewport)
-               pEnum->OnSilo (pSilo);
+            if (pUnit->Viewport () == pViewport)
+               pEnum->OnUnit (pUnit);
          }
       }
    }
 
    // ---------------------------------------------------------------------------
-   // Asset helpers -- called by SILO (Initialize, ~SILO) which is always invoked
-   // under m_mxStorage via Silo_Open/Silo_Close. Not independently thread-safe.
+   // Asset helpers -- called by UNIT (Initialize, ~UNIT) which is always invoked
+   // under m_mxStorage via Unit_Open/Unit_Close. Not independently thread-safe.
    // ---------------------------------------------------------------------------
 
    ASSET* Asset_Open (eSCOPE eScope, const std::string& sPathname)
@@ -144,7 +144,7 @@ public:
    ENGINE*                                 m_pEngine;
 
    std::recursive_mutex                    m_mxStorage;
-   std::vector<SILO*>                      m_apSilo;
+   std::vector<UNIT*>                      m_apUnit;
    std::unordered_map<std::string, ASSET*> m_umpAsset;
 };
 
@@ -168,8 +168,8 @@ STORAGE::~STORAGE ()
 // Container lifecycle
 // ---------------------------------------------------------------------------
 
-STORAGE::SILO* STORAGE::Silo_Open   (VIEWPORT* pViewport, const VIEWPORT::CONTAINER::CID* pCID) { return m_pImpl->Silo_Open  (pViewport, pCID); }
-void           STORAGE::Silo_Close  (VIEWPORT* pViewport, SILO* pSilo)                          {        m_pImpl->Silo_Close (pViewport, pSilo); }
-void           STORAGE::Silo_Enum   (VIEWPORT* pViewport, IENUM* pEnum)                         {        m_pImpl->Silo_Enum  (pViewport, pEnum); }
+STORAGE::UNIT* STORAGE::Unit_Open   (VIEWPORT* pViewport, const VIEWPORT::CONTAINER::CID* pCID) { return m_pImpl->Unit_Open  (pViewport, pCID); }
+void           STORAGE::Unit_Close  (VIEWPORT* pViewport, UNIT* pUnit)                          {        m_pImpl->Unit_Close (pViewport, pUnit); }
+void           STORAGE::Unit_Enum   (VIEWPORT* pViewport, IENUM* pEnum)                         {        m_pImpl->Unit_Enum  (pViewport, pEnum); }
 ASSET*         STORAGE::Asset_Open  (eSCOPE eScope, const std::string& sPathname)               { return m_pImpl->Asset_Open  (eScope, sPathname); }
 void           STORAGE::Asset_Close (ASSET* pAsset)                                             {        m_pImpl->Asset_Close (pAsset); }

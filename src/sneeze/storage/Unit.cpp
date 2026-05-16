@@ -18,10 +18,10 @@
 using namespace SNEEZE;
 
 // ---------------------------------------------------------------------------
-// STORAGE::SILO::Impl
+// STORAGE::UNIT::Impl
 // ---------------------------------------------------------------------------
 
-class STORAGE::SILO::Impl
+class STORAGE::UNIT::Impl
 {
 public:
    Impl (STORAGE* pStorage, VIEWPORT* pViewport, const VIEWPORT::CONTAINER::CID* pCID) :
@@ -86,7 +86,7 @@ public:
 
    void Attach ()
    {
-      std::lock_guard<std::mutex> guard (m_mxSilo);
+      std::lock_guard<std::mutex> guard (m_mxUnit);
 
       if (!m_bAttached)
       {
@@ -99,7 +99,7 @@ public:
 
    void Detach ()
    {
-      std::lock_guard<std::mutex> guard (m_mxSilo);
+      std::lock_guard<std::mutex> guard (m_mxUnit);
 
       if (m_bAttached)
       {
@@ -116,85 +116,85 @@ public:
    std::string              m_sPath_Permanent;
    std::string              m_sPath_Temporary;
    ASSET*                   m_apAsset[STORAGE::kSCOPE_COUNT];
-   std::mutex               m_mxSilo;
+   std::mutex               m_mxUnit;
    bool                     m_bAttached;
    bool                     m_bPendingClear;
 };
 
 // ===========================================================================
-// STORAGE::SILO
+// STORAGE::UNIT
 // ===========================================================================
 
-STORAGE::SILO::SILO (STORAGE* pStorage, VIEWPORT* pViewport, const VIEWPORT::CONTAINER::CID* pCID) :
-   m_pImpl (new STORAGE::SILO::Impl (pStorage, pViewport, pCID))
+STORAGE::UNIT::UNIT (STORAGE* pStorage, VIEWPORT* pViewport, const VIEWPORT::CONTAINER::CID* pCID) :
+   m_pImpl (new STORAGE::UNIT::Impl (pStorage, pViewport, pCID))
 {
 }
 
-void STORAGE::SILO::Initialize ()   { m_pImpl->Initialize ();  }
-STORAGE::SILO::~SILO ()             { delete m_pImpl;          }
+void STORAGE::UNIT::Initialize ()   { m_pImpl->Initialize ();  }
+STORAGE::UNIT::~UNIT ()             { delete m_pImpl;          }
 
 // ---------------------------------------------------------------------------
 // Accessors
 // ---------------------------------------------------------------------------
 
-VIEWPORT*                       STORAGE::SILO::Viewport        () const { return m_pImpl->m_pViewport; }
-const VIEWPORT::CONTAINER::CID& STORAGE::SILO::CID             () const { return m_pImpl->m_CID; }
-std::string                     STORAGE::SILO::DisplayName     () const { return m_pImpl->m_CID.DisplayName (); }
-const std::string&              STORAGE::SILO::sPath_Permanent () const { return m_pImpl->m_sPath_Permanent; }
-const std::string&              STORAGE::SILO::sPath_Temporary () const { return m_pImpl->m_sPath_Temporary; }
-bool                            STORAGE::SILO::IsPendingClear  () const { return m_pImpl->m_bPendingClear; }
+VIEWPORT*                       STORAGE::UNIT::Viewport        () const { return m_pImpl->m_pViewport; }
+const VIEWPORT::CONTAINER::CID& STORAGE::UNIT::CID             () const { return m_pImpl->m_CID; }
+std::string                     STORAGE::UNIT::DisplayName     () const { return m_pImpl->m_CID.DisplayName (); }
+const std::string&              STORAGE::UNIT::sPath_Permanent () const { return m_pImpl->m_sPath_Permanent; }
+const std::string&              STORAGE::UNIT::sPath_Temporary () const { return m_pImpl->m_sPath_Temporary; }
+bool                            STORAGE::UNIT::IsPendingClear  () const { return m_pImpl->m_bPendingClear; }
 
 // ---------------------------------------------------------------------------
 // Modifiers
 // ---------------------------------------------------------------------------
 
-void                            STORAGE::SILO::SetPendingClear (bool b)              { m_pImpl->m_bPendingClear = b; }
+void                            STORAGE::UNIT::SetPendingClear (bool b)              { m_pImpl->m_bPendingClear = b; }
 
 // ---------------------------------------------------------------------------
 // ASSET Caching
 // ---------------------------------------------------------------------------
 
-std::string STORAGE::SILO::sPath     (eSCOPE eScope)                          const { return m_pImpl->sPath (eScope);           }
-std::string STORAGE::SILO::sFilename (eSCOPE eScope, const std::string& sExt) const { return m_pImpl->sFilename (eScope, sExt); }
-std::string STORAGE::SILO::sPathname (eSCOPE eScope, const std::string& sExt) const { return m_pImpl->sPathname (eScope, sExt); }
+std::string STORAGE::UNIT::sPath     (eSCOPE eScope)                          const { return m_pImpl->sPath (eScope);           }
+std::string STORAGE::UNIT::sFilename (eSCOPE eScope, const std::string& sExt) const { return m_pImpl->sFilename (eScope, sExt); }
+std::string STORAGE::UNIT::sPathname (eSCOPE eScope, const std::string& sExt) const { return m_pImpl->sPathname (eScope, sExt); }
 
-void STORAGE::SILO::Attach () { m_pImpl->Attach (); }
-void STORAGE::SILO::Detach () { m_pImpl->Detach (); }
+void STORAGE::UNIT::Attach () { m_pImpl->Attach (); }
+void STORAGE::UNIT::Detach () { m_pImpl->Detach (); }
 
 // ---------------------------------------------------------------------------
 // ASSET Pass-through
 // ---------------------------------------------------------------------------
 
-nlohmann::json STORAGE::SILO::Get (eSCOPE eScope, const std::string& sPath) const
+nlohmann::json STORAGE::UNIT::Get (eSCOPE eScope, const std::string& sPath) const
 {
    return m_pImpl->m_apAsset[eScope]->Get (sPath);
 }
 
-void STORAGE::SILO::Set (eSCOPE eScope, const std::string& sPath, const nlohmann::json& jValue)
+void STORAGE::UNIT::Set (eSCOPE eScope, const std::string& sPath, const nlohmann::json& jValue)
 {
    m_pImpl->m_apAsset[eScope]->Set (sPath, jValue);
 
    m_pImpl->m_pViewport->Host ()->OnStorageUnitChanged (this, eScope, sPath);
 }
 
-void STORAGE::SILO::Remove (eSCOPE eScope, const std::string& sPath)
+void STORAGE::UNIT::Remove (eSCOPE eScope, const std::string& sPath)
 {
    m_pImpl->m_apAsset[eScope]->Remove (sPath);
 
    m_pImpl->m_pViewport->Host ()->OnStorageUnitChanged (this, eScope, sPath);
 }
 
-bool STORAGE::SILO::Has (eSCOPE eScope, const std::string& sPath) const
+bool STORAGE::UNIT::Has (eSCOPE eScope, const std::string& sPath) const
 {
    return m_pImpl->m_apAsset[eScope]->Has (sPath);
 }
 
-std::string STORAGE::SILO::Json (eSCOPE eScope) const
+std::string STORAGE::UNIT::Json (eSCOPE eScope) const
 {
    return m_pImpl->m_apAsset[eScope]->Json ();
 }
 
-void STORAGE::SILO::Json (eSCOPE eScope, const std::string& sJson)
+void STORAGE::UNIT::Json (eSCOPE eScope, const std::string& sJson)
 {
    m_pImpl->m_apAsset[eScope]->Json (sJson);
    m_pImpl->m_pViewport->Host ()->OnStorageUnitChanged (this, eScope, "");

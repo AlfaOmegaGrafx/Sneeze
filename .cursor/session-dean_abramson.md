@@ -731,3 +731,9 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 - **Documentation updated:** `project.mdc` (NETWORK/ASSET/FILE descriptions, ENGINE curl ownership, CID by-value, Network test suite added), `Network.md` (architecture diagram, ASSET map key, FETCH count release, FILE path members, Close/Detach behavior, test table, active refactoring status).
 - **Deferred tasks documented** in `resume-network-pathnames.md` and Network.md.
 
+## 2026-05-16 (Sat) ~8:30 AM PDT
+
+- **Git merge and build fix:** Merged upstream changes. Resolved merge conflicts in `Network.cpp` (accepted local/stashed version). Fixed post-merge compile error — ambiguous `ENGINE` symbol (`SNEEZE::ENGINE` vs BoringSSL global `ENGINE` typedef) — fully qualified to `SNEEZE::ENGINE*`.
+- **Build system sync (vcxproj → CMake):** Added `Encoding.cpp` / `Encoding.h` to `msvc/Sneeze.vcxproj` (upstream additions via CMake). Synced two file renames from vcxproj to CMakeLists.txt: `sneeze/network/Asset.cpp` → `Network_Asset.cpp`, `sneeze/storage/Silo.cpp` → `Unit.cpp`.
+- **SILO → UNIT rename:** Global rename across all source, header, test, and markdown files. Class `SILO` → `UNIT`, methods `Silo_Open/Close/Enum` → `Unit_Open/Close/Enum`, variables `pSilo` → `pUnit`, `m_apSilo` → `m_apUnit`, `m_mxSilo` → `m_mxUnit`, callback `OnSilo` → `OnUnit`. Files touched: `Storage.h`, `Sneeze.h`, `Unit.cpp`, `Storage.cpp`, `Storage_Asset.cpp`, `StorageTest.cpp`, `Storage.md`. Dean updated `project.mdc` independently.
+
