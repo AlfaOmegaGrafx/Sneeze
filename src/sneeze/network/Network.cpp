@@ -271,16 +271,6 @@ public:
          m_apFile.push_back (pFile);
 
          pFile->Initialize (pListener);
-
-         if (!pListener  &&  !pFile->IsReady ())
-         {
-            auto it = std::find (m_apFile.begin (), m_apFile.end (), pFile);
-            if (it != m_apFile.end ())
-               m_apFile.erase (it);
-
-            delete pFile;
-            pFile = nullptr;
-         }
       }
 
       return pFile;
@@ -291,8 +281,6 @@ public:
       if (pFile)
       {
          std::lock_guard<std::recursive_mutex> guard (m_mutex);
-
-         pFile->Detach ();
 
          if (pFile->Pending_Close ())
          {

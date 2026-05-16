@@ -220,7 +220,7 @@
     <ClCompile Include="..\src\deps\stb\stb_image_impl.cpp">
       <Filter>src\deps\stb</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\sneeze\network\Encoding.cpp">
+    <ClCompile Include="..\src\sneeze\network\Fetch.cpp">
       <Filter>src\sneeze\network</Filter>
     </ClCompile>
   </ItemGroup>
@@ -344,7 +344,7 @@
     <ClInclude Include="..\src\sneeze\storage\Storage_Asset.h">
       <Filter>src\sneeze\storage</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\sneeze\network\Encoding.h">
+    <ClInclude Include="..\src\sneeze\network\Fetch.h">
       <Filter>src\sneeze\network</Filter>
     </ClInclude>
   </ItemGroup>

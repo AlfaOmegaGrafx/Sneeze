@@ -19,6 +19,7 @@
 #include <openssl/sha.h>
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -453,7 +454,7 @@ static void TestReset ()
 
 static void TestResetFlag ()
 {
-   std::printf ("\n[Test 7] Reset flag\n");
+   std::printf ("\n[Test 7] Reset flag persisted in meta\n");
 
    NETWORK* pNetwork = new NETWORK (s_pSneeze);
    pNetwork->Initialize ();
@@ -474,7 +475,7 @@ static void TestResetFlag ()
          pFile->Reset ();
          pFile->Close ();
 
-         Check (!std::filesystem::exists (sDiskPath), "Disk file removed after reset+close");
+         Check (std::filesystem::exists (sDiskPath), "Disk file preserved (reset deferred to next load)");
       }
       else
       {
@@ -931,8 +932,8 @@ static void TestDeferredReset ()
 
       if (bHadDisk)
       {
-         Check (!std::filesystem::exists (sDiskPath),
-            "Disk file removed after last handle closes");
+         Check (std::filesystem::exists (sDiskPath),
+            "Disk file preserved (reset flag deferred to next load)");
       }
 
       Check (true, "Deferred reset completed without crash");
@@ -1092,7 +1093,7 @@ static void TestStalenessRules ()
 
 static void TestNoFetchOpen ()
 {
-   std::printf ("\n[Test 23] File_Open with bFetch=false\n");
+   std::printf ("\n[Test 23] File_Open without listener (passive open)\n");
 
    NETWORK* pNetwork = new NETWORK (s_pSneeze);
    pNetwork->Initialize ();
@@ -1100,7 +1101,14 @@ static void TestNoFetchOpen ()
    NETWORK::FILE* pFile = pNetwork->File_Open (s_pViewport, &s_pTestCID, "https://this-url-does-not-exist-in-cache.invalid/none",
       std::string (), 0, nullptr);
 
-   Check (pFile == nullptr, "bFetch=false returns null for uncached URL");
+   Check (pFile != nullptr, "Passive open returns a valid handle");
+
+   if (pFile)
+   {
+      Check (pFile->State () == NETWORK::STATE_IDLE, "No fetch triggered without listener");
+      Check (!pFile->Url ().empty (), "URL accessible on passive handle");
+      pFile->Close ();
+   }
 
    delete pNetwork;
 }
@@ -1114,7 +1122,7 @@ int RunNetworkTests (int /*nArgc*/, char** /*aArgv*/)
    std::printf ("=== Network Test Suite ===\n");
 
    s_pTestListener = new CACHE_TEST_LISTENER ();
-   s_pTestListener->m_sAppDataPath = (std::filesystem::temp_directory_path () / "SneezeTest").string ();
+   s_pTestListener->m_sAppDataPath = (std::filesystem::path (std::getenv ("APPDATA")) / "Metaversal" / "Sneeze" / "Test").string ();
    s_pTestListener->m_sSessionPath = s_pTestListener->m_sAppDataPath;
 
    std::filesystem::remove_all (s_pTestListener->m_sAppDataPath);

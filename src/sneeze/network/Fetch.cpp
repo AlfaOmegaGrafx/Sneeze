@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Encoding.h"
+#include "Fetch.h"
 #include <fstream>
 #include <filesystem>
 
@@ -249,20 +249,18 @@ void NETWORK::FETCH::Main ()
             {
                if (m_pAsset->VerifyHash (m_sPath_Temp, m_sHash))
                {
-                  m_Fetch_Result.sFinalPath = m_sPath_Data;
-
                   std::error_code ec;
-                  std::filesystem::rename (m_sPath_Temp, m_Fetch_Result.sFinalPath, ec);
+                  std::filesystem::rename (m_sPath_Temp, m_sPath_Data, ec);
                   if (!ec)
                   {
-                     auto nFsSize = std::filesystem::file_size (m_Fetch_Result.sFinalPath, ec);
+                     auto nFsSize = std::filesystem::file_size (m_sPath_Data, ec);
                      if (!ec)
                      {
                         m_Fetch_Result.nSizeBytes = static_cast<uint64_t> (nFsSize);
                         m_Fetch_Result.bSuccess = true;
                      }
                   }
-                  else m_pAsset->Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to rename " + m_sPath_Temp + " -> " + m_Fetch_Result.sFinalPath + ": " + ec.message ());
+                  else m_pAsset->Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to rename " + m_sPath_Temp + " -> " + m_sPath_Data + ": " + ec.message ());
                }
                else m_pAsset->Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Hash mismatch for " + m_sUrl);
             }

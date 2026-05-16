@@ -731,9 +731,21 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 - **Documentation updated:** `project.mdc` (NETWORK/ASSET/FILE descriptions, ENGINE curl ownership, CID by-value, Network test suite added), `Network.md` (architecture diagram, ASSET map key, FETCH count release, FILE path members, Close/Detach behavior, test table, active refactoring status).
 - **Deferred tasks documented** in `resume-network-pathnames.md` and Network.md.
 
-## 2026-05-16 (Sat) ~8:30 AM PDT
+## 2026-05-16 (Sat) ~8:30 AM – 1:30 PM PDT
 
 - **Git merge and build fix:** Merged upstream changes. Resolved merge conflicts in `Network.cpp` (accepted local/stashed version). Fixed post-merge compile error — ambiguous `ENGINE` symbol (`SNEEZE::ENGINE` vs BoringSSL global `ENGINE` typedef) — fully qualified to `SNEEZE::ENGINE*`.
 - **Build system sync (vcxproj → CMake):** Added `Encoding.cpp` / `Encoding.h` to `msvc/Sneeze.vcxproj` (upstream additions via CMake). Synced two file renames from vcxproj to CMakeLists.txt: `sneeze/network/Asset.cpp` → `Network_Asset.cpp`, `sneeze/storage/Silo.cpp` → `Unit.cpp`.
 - **SILO → UNIT rename:** Global rename across all source, header, test, and markdown files. Class `SILO` → `UNIT`, methods `Silo_Open/Close/Enum` → `Unit_Open/Close/Enum`, variables `pSilo` → `pUnit`, `m_apSilo` → `m_apUnit`, `m_mxSilo` → `m_mxUnit`, callback `OnSilo` → `OnUnit`. Files touched: `Storage.h`, `Sneeze.h`, `Unit.cpp`, `Storage.cpp`, `Storage_Asset.cpp`, `StorageTest.cpp`, `Storage.md`. Dean updated `project.mdc` independently.
+- **Removed `m_sDiskPath` from ASSET::Impl:** Redundant with `Path(DISKFILE_DATA)`. All usages in `VerifyHash`, `std::ifstream`, `Evict`, `ResetState` replaced with the accessor. `DiskPath()` now returns `std::string` by value.
+- **Removed `sFinalPath` from `Resolve` and `FETCH_RESULT`:** Path computed internally by `Resolve()`, no need to pass it as a parameter.
+- **Truncated persona hash to 12 hex chars:** `PERSONA::ComputeHash` now returns only the first 12 characters of the SHA-256 hex string, producing cleaner cache folder names.
+- **Fixed ASSET::Detach reset behavior:** `Meta_Save()` is now always called when READY (persists the reset flag in `.meta`), instead of calling `Meta_Reset()` (which deleted files immediately). Deferred deletion happens on next load.
+- **Reverted File_Open null-return:** Removed logic that returned nullptr when no listener was present and file wasn't ready. `File_Open` always returns a valid `FILE*`.
+- **Redesigned FILE Attach/Detach symmetry:** Moved implicit Detach from `NETWORK::File_Close` to `FILE::Impl::Pending_Close()`, making it symmetric with the implicit Attach in `FILE::Impl::Initialize()`. Three usage cases defined: (1) active fetch with listener, (2) inspector, (3) passive open.
+- **Added `m_nCount_Attach` to FILE::Impl:** Tracks outstanding attachments. Safety-net drain loop in `~Impl()`. Public `Attach()` simplified to no parameters (always passive).
+- **Changed `m_mxFile` to `std::recursive_mutex`:** Prevents deadlocks from nested locking in Initialize, Attach, Detach, and Pending_Close.
+- **Centralized test output directories:** Both `NetworkTest.cpp` and `StorageTest.cpp` now use `%APPDATA%/Metaversal/Sneeze/Test/` instead of scattering files in temp or repo directories.
+- **Updated test expectations:** Tests 7, 18, 23 updated to match new deferred-reset and passive-open behavior. All 9 suites passing (69 network, 44 storage, 246 total across all suites).
+- **Updated `project.mdc`:** NETWORK, ASSET, FILE, PERSONA class descriptions; network and storage test suite descriptions; module table.
+- **Next session:** Fetch thread cleanup; move NETWORK and STORAGE under VIEWPORT.
 

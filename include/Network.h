@@ -79,7 +79,6 @@ namespace SNEEZE
       struct FETCH_RESULT
       {
          bool        bSuccess;
-         std::string sFinalPath;
          uint64_t    nSizeBytes;
          long        nHttpStatus;
          std::unordered_map<std::string, std::string> mapHeaders;
@@ -108,7 +107,7 @@ namespace SNEEZE
          void        Detach (FILE* pFile);
 
          // State transitions
-         void        Resolve (const std::string& sFinalPath, uint64_t nSizeBytes, long nHttpStatus, double dFetchEndTime, const std::unordered_map<std::string, std::string>& mapHeaders);
+         void        Resolve (uint64_t nSizeBytes, long nHttpStatus, double dFetchEndTime, const std::unordered_map<std::string, std::string>& mapHeaders);
          void        Fail (long nHttpStatus, double dFetchEndTime, const std::unordered_map<std::string, std::string>& mapHeaders);
 
          // Fetch completion (called by FETCH thread)
@@ -134,7 +133,7 @@ namespace SNEEZE
          uint32_t             AssetIx           () const;
          const std::string&   Hash              () const;
          bool                 IsHashed          () const;
-         const std::string&   DiskPath          () const;
+         std::string          DiskPath          () const;
          const std::string&   Pathname          () const;
          std::string          Path              (DISKFILE eType) const;
          long                 HttpStatus        () const;
@@ -224,7 +223,7 @@ namespace SNEEZE
          // --- Lifecycle ---
 
          bool   Initialize (IFILE* pListener = nullptr);
-         bool   Attach     (IFILE* pListener, bool bFetch = true);
+         bool   Attach     ();
          void   Detach     ();
          void   Clear      ();
          void   Close      ();

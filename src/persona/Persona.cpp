@@ -57,5 +57,5 @@ std::string PERSONA::ComputeHash (const std::string& sInput)
       std::sprintf (szHex + i * 2, "%02x", aDigest[i]);
    szHex[SHA256_DIGEST_LENGTH * 2] = '\0';
 
-   return std::string (szHex);
+   return std::string (szHex, 12);
 }

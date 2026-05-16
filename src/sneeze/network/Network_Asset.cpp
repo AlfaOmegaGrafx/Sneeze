@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Encoding.h"
+#include "Fetch.h"
 #include <fstream>
 #include <filesystem>
 #include <chrono>
@@ -93,7 +93,7 @@ public:
             {
                m_sHash         = jMeta.value ("hash", "");
                m_nAssetIx      = jMeta.value ("nMetaIx", static_cast<uint32_t> (0));
-               m_sDiskPath     = sDataPath;
+               // Data file confirmed on disk — state is READY
                m_nSizeBytes    = jMeta.value ("sizeBytes", static_cast<uint64_t> (0));
                m_sCreatedAt    = jMeta.value ("createdAt", "");
                m_nHttpStatus   = jMeta.value ("httpStatus", static_cast<long> (0));
@@ -182,7 +182,6 @@ public:
    void ResetState ()
    {
       m_bState = STATE_IDLE;
-      m_sDiskPath.clear ();
       m_sHash.clear ();
       m_nSizeBytes = 0;
       m_nHttpStatus = 0;
@@ -198,7 +197,6 @@ public:
    void Evict ()
    {
       m_bState = STATE_IDLE;
-      m_sDiskPath.clear ();
       m_nSizeBytes = 0;
       m_nHttpStatus = 0;
       m_dFetchQueuedTime = 0.0;
@@ -302,7 +300,6 @@ public:
    std::string                m_sHash;
    std::string                m_sPathname;
    STATE                      m_bState;
-   std::string                m_sDiskPath;
 
    uint64_t                   m_nSizeBytes;
    std::string                m_sCreatedAt;
@@ -408,7 +405,7 @@ bool NETWORK::ASSET::Attach (FILE* pFile, bool bFetch_Allowed)
       else if (bState == STATE_READY  &&  !sHash.empty ()  &&  !IsHashed ())
       {
          // Cached without hash — caller now requires integrity verification
-         if (VerifyHash (m_pImpl->m_sDiskPath, sHash))
+         if (VerifyHash (m_pImpl->Path (DISKFILE_DATA), sHash))
          {
             m_pImpl->m_sHash = sHash;
             m_pImpl->TouchAccess ();
@@ -512,9 +509,7 @@ void NETWORK::ASSET::Detach (FILE* pFile)
 
    if (m_pImpl->m_nCount_Attach == 0)
    {
-      if (m_pImpl->m_bState == STATE_READY  &&  m_pImpl->m_bReset)
-         m_pImpl->Meta_Reset ();
-      else if (m_pImpl->m_bState == STATE_READY)
+      if (m_pImpl->m_bState == STATE_READY)
          m_pImpl->Meta_Save ();
       else if (m_pImpl->m_bState == STATE_FAILED)
          m_pImpl->Meta_Reset ();
@@ -548,7 +543,7 @@ void NETWORK::ASSET::FetchComplete (const FETCH_RESULT& result)
 
    if (result.bSuccess)
    {
-      Resolve (result.sFinalPath, result.nSizeBytes, result.nHttpStatus, dEndTime, result.mapHeaders);
+      Resolve (result.nSizeBytes, result.nHttpStatus, dEndTime, result.mapHeaders);
 
       for (auto* pFile : m_pImpl->m_apFiles)
       {
@@ -589,11 +584,10 @@ void NETWORK::ASSET::FetchComplete (const FETCH_RESULT& result)
    m_pImpl->m_nCount_Open--;
 }
 
-void NETWORK::ASSET::Resolve (const std::string& sFinalPath, uint64_t nSizeBytes, long nHttpStatus, double dFetchEndTime, const std::unordered_map<std::string, std::string>& mapHeaders)
+void NETWORK::ASSET::Resolve (uint64_t nSizeBytes, long nHttpStatus, double dFetchEndTime, const std::unordered_map<std::string, std::string>& mapHeaders)
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
 
-   m_pImpl->m_sDiskPath       = sFinalPath;
    m_pImpl->m_nSizeBytes      = nSizeBytes;
    m_pImpl->m_nHttpStatus     = nHttpStatus;
    m_pImpl->m_dFetchEndTime   = dFetchEndTime;
@@ -622,9 +616,9 @@ std::vector<uint8_t> NETWORK::ASSET::ReadData () const
 
    std::vector<uint8_t> aData;
 
-   if (m_pImpl->m_bState == STATE_READY  &&  !m_pImpl->m_sDiskPath.empty ())
+   if (m_pImpl->m_bState == STATE_READY)
    {
-      std::ifstream file (m_pImpl->m_sDiskPath, std::ios::binary | std::ios::ate);
+      std::ifstream file (m_pImpl->Path (DISKFILE_DATA), std::ios::binary | std::ios::ate);
       if (file.is_open ())
       {
          auto nSize = file.tellg ();
@@ -692,7 +686,7 @@ uint32_t             NETWORK::ASSET::AccessCount ()         const { return m_pIm
 uint32_t             NETWORK::ASSET::AssetIx ()             const { return m_pImpl->m_nAssetIx;          }
 const std::string&   NETWORK::ASSET::Hash ()                const { return m_pImpl->m_sHash;             }
 bool                 NETWORK::ASSET::IsHashed ()            const { return !m_pImpl->m_sHash.empty ();   }
-const std::string&   NETWORK::ASSET::DiskPath ()            const { return m_pImpl->m_sDiskPath;         }
+std::string          NETWORK::ASSET::DiskPath ()            const { return m_pImpl->Path (DISKFILE_DATA); }
 const std::string&   NETWORK::ASSET::Pathname ()            const { return m_pImpl->m_sPathname;         }
 std::string          NETWORK::ASSET::Path (DISKFILE eType)  const { return m_pImpl->Path (eType);        }
 long                 NETWORK::ASSET::HttpStatus ()          const { return m_pImpl->m_nHttpStatus;       }

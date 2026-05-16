@@ -15,6 +15,7 @@
 #include <Sneeze.h>
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <filesystem>
@@ -52,8 +53,8 @@ public:
 
    STORAGE_TEST_HOST ()
    {
-      m_sAppDataPath = ".";
-      m_sSessionPath = "test_storage_session";
+      m_sAppDataPath = (std::filesystem::path (std::getenv ("APPDATA")) / "Metaversal" / "Sneeze" / "Test").string ();
+      m_sSessionPath = m_sAppDataPath;
    }
 
    std::string const& sAppDataPath () const& override { return m_sAppDataPath; }
@@ -111,8 +112,7 @@ static VIEWPORT::CONTAINER::CID MakeTestCID (const std::string& sContainer = "po
 static void CleanTestDir ()
 {
    std::error_code ec;
-   std::filesystem::remove_all ("Sneeze", ec);
-   std::filesystem::remove_all ("test_storage_session", ec);
+   std::filesystem::remove_all (std::filesystem::path (std::getenv ("APPDATA")) / "Metaversal" / "Sneeze" / "Test", ec);
 }
 
 // ---------------------------------------------------------------------------

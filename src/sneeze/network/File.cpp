@@ -41,6 +41,7 @@ public:
       m_sDiskKey         (ComputeDiskKey (sUrl)),
       m_pAsset           (nullptr),
       m_pListener        (nullptr),
+      m_nCount_Attach    (0),
       m_nAssetIx         (0),
       m_bState           (STATE_IDLE),
       m_nSizeBytes       (0),
@@ -56,7 +57,8 @@ public:
 
    ~Impl ()
    {
-      Detach ();
+      while (m_nCount_Attach > 0)
+         Detach ();
 
       if (m_pAsset)
       {
@@ -71,12 +73,16 @@ public:
 
    bool Initialize (IFILE* pListener)
    {
+      std::lock_guard<std::recursive_mutex> guard (m_mxFile);
+
       m_pAsset = m_pNetwork->Asset_Open (m_pFile);
 
       if (m_pAsset)
       {
-         if (pListener)
-            Attach (pListener, true);
+         m_pListener = pListener;
+
+         if (m_pListener)
+            Attach (true);
 
          m_bPending_Clear = !m_pViewport->Host ()->OnNetworkFileCreated (m_pFile);
       }
@@ -84,35 +90,26 @@ public:
       return (m_pAsset != nullptr);
    }
 
-   bool Attach (IFILE* pListener, bool bFetch)
+   bool Attach (bool bFetch)
    {
-      bool bResult = false;
+      std::lock_guard<std::recursive_mutex> guard (m_mxFile);
 
-      std::lock_guard<std::mutex> guard (m_mxFile);
+      bool bResult = m_pAsset->Attach (m_pFile, bFetch);
 
-      if (!m_pListener)
-      {
-         m_pListener = pListener; // must be set going into the Attach
-
-         if (m_pAsset->Attach (m_pFile, bFetch))
-         {
-            bResult = true;
-         }
-         else m_pListener = nullptr;
-      }
+      if (bResult)
+         m_nCount_Attach++;
 
       return bResult;
    }
 
    void Detach ()
    {
-      std::lock_guard<std::mutex> guard (m_mxFile);
+      std::lock_guard<std::recursive_mutex> guard (m_mxFile);
 
-      if (m_pListener)
+      if (m_nCount_Attach > 0)
       {
          m_pAsset->Detach (m_pFile);
-
-         m_pListener = nullptr;
+         m_nCount_Attach--;
       }
    }
 
@@ -137,7 +134,7 @@ public:
 
    bool Pending_Clear ()
    {
-      std::lock_guard<std::mutex> guard (m_mxFile);
+      std::lock_guard<std::recursive_mutex> guard (m_mxFile);
 
       bool bChanged = false;
 
@@ -155,11 +152,19 @@ public:
 
    bool Pending_Close ()
    {
-      std::lock_guard<std::mutex> guard (m_mxFile);
+      std::lock_guard<std::recursive_mutex> guard (m_mxFile);
 
-      bool bChanged = !m_bPending_Close;
+      bool bChanged = false;
 
-      m_bPending_Close = true;
+      if (!m_bPending_Close)
+      {
+         m_bPending_Close = true;
+
+         if (m_pListener)
+            Detach ();
+
+         bChanged = true;
+      }
 
       return bChanged;
    }
@@ -170,7 +175,7 @@ public:
 
    void Notify_Changed ()
    {
-      std::lock_guard<std::mutex> guard (m_mxFile);
+      std::lock_guard<std::recursive_mutex> guard (m_mxFile);
 
       if (!m_bPending_Clear)
          m_pViewport->Host ()->OnNetworkFileChanged (m_pFile);
@@ -245,35 +250,36 @@ public:
    }
 
 public:
-   FILE*       m_pFile;
-   NETWORK*    m_pNetwork;
-   VIEWPORT*   m_pViewport;
+   FILE*                    m_pFile;
+   NETWORK*                 m_pNetwork;
+   VIEWPORT*                m_pViewport;
    VIEWPORT::CONTAINER::CID m_CID;
-   ASSET*      m_pAsset;
-   IFILE*      m_pListener;
-   std::mutex  m_mxFile;
+   ASSET*                   m_pAsset;
+   IFILE*                   m_pListener;
+   uint32_t                 m_nCount_Attach;
+   std::recursive_mutex     m_mxFile;
 
-   std::string m_sPath_Permanent;
-   std::string m_sDiskKey;
-   std::string m_sUrl;
-   std::string m_sOpenHash;
-   uint32_t    m_nFileIx;
-   uint32_t    m_nAssetIx;
-   bool        m_bCacheEnabled;
+   std::string              m_sPath_Permanent;
+   std::string              m_sDiskKey;
+   std::string              m_sUrl;
+   std::string              m_sOpenHash;
+   uint32_t                 m_nFileIx;
+   uint32_t                 m_nAssetIx;
+   bool                     m_bCacheEnabled;
 
-   STATE       m_bState;
-   double      m_dFetchQueuedTime;
-   double      m_dFetchStartTime;
+   STATE                    m_bState;
+   double                   m_dFetchQueuedTime;
+   double                   m_dFetchStartTime;
 
-   std::string m_sHash;
-   std::string m_sContentType;
-   uint64_t    m_nSizeBytes;
-   long        m_nHttpStatus;
-   double      m_dFetchEndTime;
-   bool        m_bServedFromCache;
+   std::string              m_sHash;
+   std::string              m_sContentType;
+   uint64_t                 m_nSizeBytes;
+   long                     m_nHttpStatus;
+   double                   m_dFetchEndTime;
+   bool                     m_bServedFromCache;
 
-   bool        m_bPending_Clear;
-   bool        m_bPending_Close;
+   bool                     m_bPending_Clear;
+   bool                     m_bPending_Close;
 };
 
 // ---------------------------------------------------------------------------
@@ -299,7 +305,7 @@ NETWORK::FILE::~FILE ()
 // Attach / Detach / Close
 // ---------------------------------------------------------------------------
 
-bool NETWORK::FILE::Attach        (IFILE* pListener, bool bFetch) { return m_pImpl->Attach           (pListener, bFetch); }
+bool NETWORK::FILE::Attach        ()                              { return m_pImpl->Attach           (false); }
 void NETWORK::FILE::Detach        ()                              {        m_pImpl->Detach           (); }
 
 void NETWORK::FILE::Clear         ()                              {        m_pImpl->Clear            (); }
