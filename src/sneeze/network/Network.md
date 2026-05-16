@@ -13,50 +13,63 @@ All files are stored on disk, never solely in memory. Fetches stream to a tempor
 
 ```
 NETWORK (singleton)
- ├── ASSET_MAP: URL -> unique_ptr<ASSET>        (only assets with active FILE handles)
- ├── Fetch thread pool (capped at 16) + overflow queue
- ├── History list: all FILE* handles ever created
+ ├── ASSET_MAP: pathname -> ASSET*                (keyed by FILE::sPathname(""), only assets with active FILE handles)
+ ├── Legacy thread pool (capped at 16) + overflow queue (to be replaced)
+ ├── History list: all FILE* handles ever created (m_apFile)
  ├── m_nNextFileIx: monotonic FILE index counter
  ├── m_nNextAssetIx: monotonic ASSET index counter (persisted in rules.json)
  ├── rules.json: staleness rules + nNextMetaIx counter
  ├── Sidecar .meta files per ASSET (replaces manifest.json)
+ ├── SecondsSinceEpoch(): public accessor for timing (ASSET uses for fetch start/end)
  └── Epoch (steady_clock time point)
 
-ASSET (internal shared state, one per URL)
+ASSET (internal shared state, one per URL, pImpl)
  ├── NETWORK* (parent back-pointer)
- ├── STATE lifecycle (atomic)
- ├── nAssetIx: monotonic content-version index (assigned at creation/reset)
- ├── Disk path, headers, metadata
- ├── HTTP status, fetch queued/start/end times, served-from-cache flag
- ├── m_dFetchQueuedTime (when asset entered the fetch queue)
- ├── m_bPendingReset (deferred destruction flag)
- └── list<FILE*> attached handles
+ ├── Impl* m_pImpl
+ │   ├── m_mxAsset (recursive_mutex)
+ │   ├── STATE lifecycle (plain enum)
+ │   ├── m_nCount_Open: how many FILEs reference this ASSET (structural)
+ │   ├── m_nCount_Attach: how many FILEs have active listeners (triggers fetch)
+ │   ├── m_pFetch: current FETCH thread (one per ASSET, replaced on re-fetch)
+ │   ├── nAssetIx: monotonic content-version index (persisted in .meta)
+ │   ├── Disk path, headers, metadata
+ │   ├── HTTP status, fetch queued/start/end times, served-from-cache flag
+ │   ├── m_bReset (deferred destruction flag)
+ │   └── m_apFiles: vector<FILE*> attached handles
+ └── Meta_Load/Meta_Save/Meta_Reset (private Impl methods)
 
-FILE (per-caller handle)
- ├── NETWORK* (parent back-pointer)
- ├── ASSET* (attached while live, null after Release)
- ├── shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME> (identity of requesting container)
- ├── IFILE* listener for notifications
- ├── nFileIx: monotonic file-handle index (uint32_t)
- ├── Snapshot fields (owned copies of ASSET display data):
- │   ├── Initial (set once at construction):
- │   │   └── URL, nAssetIx
- │   ├── Progress (updated during fetch):
- │   │   └── state, fetch queued/start times
- │   └── Final (set when fetch resolves):
- │       └── hash, content-type, size, HTTP status, fetch end time, served-from-cache
- ├── m_bPendingClear (deferred history removal flag)
- ├── m_bReleased (detached from ASSET)
- └── Request() to reattach a released FILE to its ASSET
+FETCH (per-ASSET download thread, inherits THREAD)
+ ├── Impl* m_pImpl
+ │   ├── NETWORK* + ASSET* back-pointers
+ │   ├── URL, cache path, hash, flags
+ │   └── curl easy handle (blocking curl_easy_perform)
+ ├── Main(): performs download, calls ASSET::FetchComplete on completion
+ └── ~FETCH(): calls Join() before member destruction
 
-SNEEZE::VIEWPORT::CONTAINER::NAME (identity record, shared via shared_ptr)
- ├── sFingerprint (SHA-256 of cert public key)
- ├── sOrganization
- ├── sCommonName
- ├── sContainerName
- ├── sPersonaHash
- ├── bValidated
- └── DisplayName() -> sCommonName + "/" + sContainerName
+FILE (per-caller handle, pImpl)
+ ├── Impl* m_pImpl
+ │   ├── NETWORK* (parent back-pointer)
+ │   ├── ASSET* (attached while live)
+ │   ├── VIEWPORT::CONTAINER::CID m_CID (by value, copied from CID*)
+ │   ├── VIEWPORT* m_pViewport (for notification routing)
+ │   ├── IFILE* m_pListener
+ │   ├── m_mxFile (std::mutex, protects control flags)
+ │   ├── Path members (set at construction from VIEWPORT + CID + URL):
+ │   │   ├── m_sPath_Permanent: viewport permanent path + "/Network"
+ │   │   ├── m_sDiskKey: truncated SHA-1 hex of URL (24 chars)
+ │   │   ├── sPath(): full fan-out directory (permanent/persona/fp[0:2]/fp[2:24]/container/dk[0:2])
+ │   │   ├── sFilename(ext): disk key remainder + extension (dk[2:] + "." + ext)
+ │   │   └── sPathname(ext): sPath() / sFilename(ext) — full disk path
+ │   ├── Snapshot fields (owned copies of ASSET display data):
+ │   │   ├── Initial (set once at construction):
+ │   │   │   └── URL, nAssetIx
+ │   │   ├── Progress (updated during fetch):
+ │   │   │   └── state, fetch queued/start times
+ │   │   └── Final (set when fetch resolves):
+ │   │       └── hash, content-type, size, HTTP status, fetch end time, served-from-cache
+ │   ├── m_bPending_Clear (inspector has dismissed this FILE)
+ │   └── m_bPending_Close (caller has closed this FILE)
+ └── Deleted only when BOTH m_bPending_Close AND m_bPending_Clear are true
 ```
 
 ## Nested Types
@@ -66,15 +79,17 @@ Types in `SNEEZE::NETWORK` and related namespaces:
 | Type            | Role                                              |
 |-----------------|---------------------------------------------------|
 | NETWORK         | Singleton network manager. Owns assets and threads.|
-| NETWORK::ASSET  | Internal shared state per URL. Not exposed.        |
-| NETWORK::FILE   | Per-caller handle. Returned by Request().          |
+| NETWORK::ASSET  | Internal shared state per URL. Not exposed. pImpl. |
+| NETWORK::FETCH  | Per-ASSET download thread. Inherits THREAD. pImpl. |
+| NETWORK::FILE   | Per-caller handle. Returned by File_Open(). pImpl. |
 | NETWORK::IFILE  | Observer interface (OnFileReady, OnFileFailed).    |
 | NETWORK::IENUM  | Enumeration callback interface (OnAsset).          |
 | NETWORK::STATE  | Enum: IDLE, FETCHING, VALIDATING, READY, FAILED.  |
-| NETWORK::REQUEST| Flags: REQUEST_CREATE, REQUEST_FETCH.              |
+| NETWORK::REQUEST| Flags: REQUEST_CREATE.                             |
 | NETWORK::DISKFILE| Enum: DISKFILE_DATA, DISKFILE_TEMP, DISKFILE_META.|
 | NETWORK::RULE   | Staleness rule (content-type + olderThan).         |
-| SNEEZE::VIEWPORT::CONTAINER::NAME | Identity record for a container.              |
+| NETWORK::FETCH_RESULT | Result struct delivered by FETCH to ASSET.   |
+| SNEEZE::VIEWPORT::CONTAINER::CID | Identity record for a container.   |
 
 ## Usage
 
@@ -99,16 +114,16 @@ public:
    }
 };
 
-// Request a file (no hash, default flags)
+// Open a file (no hash, default flags)
 MY_LISTENER listener;
-auto pName = std::make_shared<SNEEZE::VIEWPORT::CONTAINER::NAME> ();
-pName->sCommonName    = "Metaversal";
-pName->sContainerName = "Solar System";
-pName->bValidated     = true;
-SNEEZE::NETWORK::FILE* pFile = pNetwork->Request (&listener, pName, "https://example.com/model.glb");
+SNEEZE::VIEWPORT::CONTAINER::CID cid;
+cid.sCommonName    = "Metaversal";
+cid.sContainerName = "Solar System";
+cid.bValidated     = true;
+SNEEZE::NETWORK::FILE* pFile = pNetwork->File_Open (pViewport, &cid, "https://example.com/model.glb", &listener);
 
 // ... later, when done:
-pFile->Release ();
+pFile->Close ();
 ```
 
 ### Hash-verified fetch
@@ -116,7 +131,7 @@ pFile->Release ();
 ```cpp
 std::string sSri = "sha256-a1b2c3d4e5f6...";  // SRI-format hash
 
-SNEEZE::NETWORK::FILE* pModule = pNetwork->Request (&listener, pName, "https://cdn.example.com/game.wasm", sSri);
+SNEEZE::NETWORK::FILE* pModule = pNetwork->File_Open (pViewport, &cid, "https://cdn.example.com/game.wasm", sSri);
 
 // If the hash matches, OnFileReady fires. If mismatch, OnFileFailed fires.
 ```
@@ -137,34 +152,27 @@ void OnFileReady (SNEEZE::NETWORK::FILE* pFile) override
 
 ### Request flags
 
-The 5-arg `Request()` accepts an optional `bFlags` parameter controlling whether to create and/or fetch the asset. Defaults to `kREQUEST_DEFAULT` (`REQUEST_CREATE | REQUEST_FETCH`).
+The multi-arg `File_Open()` accepts an optional `bFlags` parameter controlling whether to create the asset. Defaults to `kREQUEST_DEFAULT` (`REQUEST_CREATE`).
 
 ```cpp
-// Find only — returns nullptr if the URL isn't already cached
-SNEEZE::NETWORK::FILE* pExisting = pNetwork->Request (&listener, pName, url, "", 0);
+// Create + fetch (default behavior, same as the simple overload)
+SNEEZE::NETWORK::FILE* pFile = pNetwork->File_Open (pViewport, &cid, url, &listener);
 
-// Create + fetch (default behavior, same as the 3-arg overload)
-SNEEZE::NETWORK::FILE* pFile = pNetwork->Request (&listener, pName, url);
-
-// Create + fetch with explicit flags
-SNEEZE::NETWORK::FILE* pFile2 = pNetwork->Request (&listener, pName, url, "",
-   SNEEZE::NETWORK::REQUEST_CREATE | SNEEZE::NETWORK::REQUEST_FETCH);
+// Create + fetch with explicit flags, hash, and asset index
+SNEEZE::NETWORK::FILE* pFile2 = pNetwork->File_Open (pViewport, &cid, url, sSri,
+   SNEEZE::NETWORK::REQUEST_CREATE, 0, &listener);
 ```
 
 | Flag             | Effect                                            |
 |------------------|---------------------------------------------------|
 | `REQUEST_CREATE` | Create the ASSET if it doesn't already exist.     |
-| `REQUEST_FETCH`  | Initiate a network fetch for IDLE assets.         |
-
-Without `CREATE`, a missing asset returns `nullptr`. Without `FETCH`, an IDLE asset is not fetched — a stale-but-READY asset is rejected rather than re-fetched (returns `nullptr`).
 
 ### Container Identity
 
-Every `Request()` call includes a `std::shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME>` identifying which container originated the request. The caller creates the shared_ptr (typically one per container, reused across all requests from that container). FILE stores a copy of the shared_ptr, so all FILEs from the same container share a single NAME object in memory. CONTAINER::NAME holds: `sFingerprint` (SHA-256 of cert public key), `sOrganization`, `sCommonName`, `sContainerName`, `sPersonaHash`, and `bValidated`. The display name is `sCommonName + "/" + sContainerName` via `DisplayName()`. For unauthenticated certs, `sOrganization` and `sCommonName` are set to `fingerprint[0..15]`.
+Every `File_Open()` call includes a `VIEWPORT::CONTAINER::CID*` identifying which container originated the request. FILE stores the CID by value (copied from the pointer at construction). CID holds: `sFingerprint` (SHA-256 of cert public key), `sOrganization`, `sCommonName`, `sContainerName`, `sPersonaHash`, and `bValidated`. The display name is `sCommonName + "/" + sContainerName` via `DisplayName()`.
 
 ```cpp
 // FILE exposes the container identity
-const SNEEZE::VIEWPORT::CONTAINER::NAME& name = pFile->Name ();
 std::string sDisplay = pFile->ContainerName ();  // "Metaversal/Solar System"
 ```
 
@@ -180,71 +188,41 @@ bool b = pNetwork->IsCacheEnabled ();
 
 This is intended for the inspector's "Disable cache" toggle, analogous to the same checkbox in browser developer tools.
 
-### Release, Clear, and Reset
+### Close, Clear, and Reset
 
-**Release** detaches the FILE from its ASSET and snapshots the ASSET's current state into the FILE's local fields. If the FILE has a pending clear flag, it is deleted from the history list. When the ASSET's last FILE handle releases:
-- If the ASSET is READY: the `.meta` sidecar is saved and the ASSET is evicted from `m_mapAssets`.
-- If the ASSET has a pending reset: the ASSET's disk files are destroyed, state is reset, and the ASSET is evicted from `m_mapAssets`.
+**Close** marks the FILE as closed by the caller (`m_bPending_Close = true`). The caller promises never to touch this FILE again. However, the FILE remains fully live for the inspector — it can still Attach, ReadData, inspect Headers, etc. If the FILE is also pending-clear (inspector is done too), it is deleted from the history list. Otherwise, `OnNetworkFileChanged` fires so the inspector can update the file's status display.
 
-This means assets don't accumulate in memory indefinitely — only assets with active FILE handles live in the map.
+**Clear** is a visibility toggle for the inspector. `Clear(true)` marks the FILE as dismissed by the inspector (`m_bPending_Clear = true`) and fires `OnNetworkFileDeleted` — the inspector row vanishes. If the FILE is also pending-close (caller is done too), it is deleted from the history list. `Clear(false)` un-clears it and fires `OnNetworkFileCreated`. The ASSET and its cached data are not affected — this is purely inspector housekeeping.
 
-**Clear** is an immediate visibility toggle for the inspector. `Clear(true)` removes the FILE from the history list and fires `OnNetworkFileDeleted` immediately — the inspector row vanishes on the spot. If the FILE is already released, it is also deleted. `Clear(false)` adds the FILE back to the history list and fires `OnNetworkFileCreated`. The ASSET and its cached data are not affected — this is purely inspector housekeeping.
+A FILE is only freed when **both** `m_bPending_Close` and `m_bPending_Clear` are true. `SetPending_Close(bool)` and `SetPending_Clear(bool)` return `bool` (true when the value actually changes), preventing double-close and double-clear from having any effect.
 
-The clear flag also acts as a deferred destruction flag: when a cleared FILE is eventually released, it is deleted rather than kept in history.
-
-**Reset** marks the ASSET for destruction. When the last attached FILE is released and the count reaches zero, the ASSET's disk files (`.data`, `.meta`, `.temp`) are deleted and the ASSET is erased from `m_mapAssets`. FILE handles in the history that pointed to the destroyed ASSET retain their snapshot data (getters return the snapshotted values).
-
-Both `Clear()` and `Reset()` accept a `bool` parameter (default `true`) so the flag can be toggled on/off:
+**Reset** marks the ASSET for destruction. When the last attached FILE detaches and the count reaches zero, the ASSET's disk files (`.data`, `.meta`, `.temp`) are deleted and the ASSET is erased from `m_umpAsset`.
 
 ```cpp
 pFile->Clear ();              // immediately remove from inspector
-pFile->Clear (false);         // immediately add back to inspector
 
 pFile->Reset ();              // mark ASSET for destruction
-pFile->Release ();            // triggers it (if last holder)
-
-pFile->Reset ();              // mark for reset
-pFile->Reset (false);         // changed my mind
-pFile->Release ();            // normal release, no reset
+pFile->Close ();              // caller is done — Detach runs, disk files deleted
 ```
 
-All three actions are available on both FILE and NETWORK:
+`Close()` calls `Detach()` immediately — the listener is disconnected and the ASSET's attach count decreases. If the count reaches zero, `Meta_Save()` or `Meta_Reset()` runs synchronously. The FILE remains in the history list for the inspector until both `m_bPending_Close` and `m_bPending_Clear` are true.
+
+Actions available on both FILE and NETWORK:
 
 ```cpp
-pFile->Release ();             // via FILE
-pNetwork->Release (pFile);     // via NETWORK (equivalent)
+pFile->Close ();               // via FILE
+pNetwork->File_Close (pFile);  // via NETWORK (equivalent)
 
 pFile->Clear ();               // via FILE (routes through NETWORK)
-pNetwork->Clear (pFile);       // via NETWORK
+pNetwork->File_Clear (pFile);  // via NETWORK
 
 pFile->Reset ();               // via FILE (routes through NETWORK)
-pNetwork->Reset (pFile);       // via NETWORK
+pNetwork->File_Reset (pFile);  // via NETWORK
 ```
-
-### FILE::Request() — Reopen
-
-A released FILE can be re-attached to its ASSET by calling `Request()`. This is used by the inspector detail pane to drill into a previously-released cached resource.
-
-```cpp
-bool bOk = pFile->Request (&listener);
-if (!bOk)
-{
-   // ASSET was replaced (nAssetIx mismatch) or no longer exists on disk
-}
-```
-
-Internally, `Request()` calls `NETWORK::Reopen()`:
-1. Looks up the ASSET in `m_mapAssets` by the FILE's snapshotted URL.
-2. If not in memory, loads the ASSET from its `.meta` sidecar on disk.
-3. Validates that the ASSET's `nAssetIx` matches the FILE's snapshotted `nAssetIx`.
-4. If matched: reattaches the FILE, snapshots, and fires the listener callback.
-5. Returns `false` if the content has been replaced (nAssetIx mismatch) or if no `.meta`/`.data` exists on disk.
-
-An optional `IFILE*` parameter can replace the listener; passing `nullptr` keeps the existing listener.
 
 ### Display Toggle
 
-The display can be globally toggled via `SetDisplayEnabled(bool)`. When disabled, every new FILE created by `Request()` is automatically cleared — it is never added to the inspector history and no `OnNetworkFileCreated` notification fires. The FILE still functions normally for its consumer (IFILE listener receives `OnFileReady`/`OnFileFailed`), and data is still cached to disk. When the FILE is released, it is deleted silently.
+The display can be globally toggled via `SetDisplayEnabled(bool)`. When disabled, every new FILE created by `File_Open()` is automatically cleared — it is never added to the inspector history and no `OnNetworkFileCreated` notification fires. The FILE still functions normally for its consumer (IFILE listener receives `OnFileReady`/`OnFileFailed`), and data is still cached to disk.
 
 ```cpp
 pNetwork->SetDisplayEnabled (false);   // new requests are invisible to inspector
@@ -256,7 +234,7 @@ This is intended for the inspector's stop/play toggle. Existing FILEs already in
 
 ### Bulk Management
 
-Bulk operations set flags on all matching assets/files, then immediately process any that are already eligible (released FILEs, zero-attach ASSETs). In-use items are cleaned up automatically when their last holder releases.
+Bulk operations set flags on all matching files. Files where both `m_bPending_Close` and `m_bPending_Clear` are true are deleted immediately; others remain in the history until both flags are set.
 
 ```cpp
 // Clear all released FILE records from history
@@ -273,7 +251,7 @@ pNetwork->Reset ();
 
 ### Enumerate
 
-`Enumerate(IENUM*, VIEWPORT*)` walks the live `m_apFile` list and yields each FILE whose `Viewport()` matches the given viewport. This scopes the enumeration to a single inspector — each viewport sees only the files it requested.
+`File_Enum(IENUM*, VIEWPORT*)` walks the live `m_apFile` list and yields each FILE whose `Viewport()` matches the given viewport. This scopes the enumeration to a single inspector — each viewport sees only the files it requested.
 
 ```cpp
 struct ENUM_LIST : SNEEZE::NETWORK::IENUM
@@ -284,14 +262,14 @@ struct ENUM_LIST : SNEEZE::NETWORK::IENUM
    }
 };
 ENUM_LIST enumList;
-pNetwork->Enumerate (&enumList, pViewport);
+pNetwork->File_Enum (&enumList, pViewport);
 ```
 
 Cache-wide policy changes (e.g. invalidating stale content-types) are handled via staleness rules (`AddRule`) rather than enumeration.
 
 ## FILE Data Ownership (Snapshotting)
 
-FILE stores a local snapshot of display-relevant ASSET fields so that inspector data remains valid even after `Release()` detaches the FILE from its ASSET (and the ASSET is potentially evicted from memory).
+FILE stores a local snapshot of display-relevant ASSET fields in its `Impl` struct so that inspector data remains valid even after the caller closes the FILE (and the ASSET is potentially evicted from memory).
 
 Snapshot fields are organized into three lifecycle phases, each with its own method:
 
@@ -326,11 +304,11 @@ Snapshot fields are organized into three lifecycle phases, each with its own met
 
 ### When Each Snapshot Method is Called
 
-- **SnapshotInitial()** — in the FILE constructor.
+- **SnapshotInitial()** — in `FILE::Impl` construction (called by `Impl::Initialize` after `Asset_Open`).
 - **SnapshotProgress()** — when a fetch is dispatched (after `SetFetching()` and `SetFetchQueuedTime()`).
-- **SnapshotFinal()** — when the fetch resolves (READY/FAILED), on Release, on Reopen, and during Enumerate. In `Request()`, a single `SnapshotFinal()` covers all resolved-state branches.
+- **SnapshotFinal()** — when the fetch resolves (READY/FAILED), on Close, and during File_Enum.
 
-Getters on FILE read from these snapshot members, not from the ASSET. ASSET-dependent accessors (`ReadData()`, `Headers()`, `DiskPath()`, etc.) still require an attached ASSET and return empty defaults after Release.
+Getters on FILE read from these snapshot members, not from the ASSET. ASSET-dependent accessors (`ReadData()`, `Headers()`, `DiskPath()`, etc.) still require an attached ASSET and return empty defaults after the FILE detaches.
 
 ## Network Inspector Data
 
@@ -364,18 +342,9 @@ uint32_t nAssetIx = pFile->AssetIx ();
 
 ### History List
 
-`NETWORK::Files()` returns a `const std::vector<FILE*>&` containing all FILE handles, in creation order. `Release()` detaches the FILE from its ASSET (stops notifications) but does **not** remove it from the list unless the FILE has a pending clear flag. This list is the data backing the inspector's request table.
+NETWORK's `m_apFile` (`std::vector<FILE*>`) contains all FILE handles, in creation order. `Close()` marks the FILE as pending-close but does **not** remove it from the list unless the FILE is also pending-clear. `Clear()` marks the FILE as pending-clear but does **not** remove it unless the FILE is also pending-close. This list is the data backing the inspector's request table.
 
-```cpp
-const auto& aHistory = pNetwork->Files ();
-for (auto* pFile : aHistory)
-{
-   // pFile->Url(), FileIx(), HttpStatus(), ...
-   // All snapshot fields are valid even after Release.
-}
-```
-
-FILEs are removed from history via `Clear()` + `Release()`, or bulk via `Clear()`. All remaining FILEs are deleted on `Shutdown()`.
+FILEs are removed from history only when both `m_bPending_Close` and `m_bPending_Clear` are true. All remaining FILEs are deleted on `Shutdown()`.
 
 ### Served-from-Cache Detection
 
@@ -420,15 +389,15 @@ The NETWORK routes these through `SNEEZE::OnNetworkFileCreated()`, `SNEEZE::OnNe
 
 ## Request Deduplication
 
-If multiple callers request the same URL before the first fetch completes, they share a single ASSET. Each caller gets their own FILE handle with their own IFILE listener, and all listeners are notified when the fetch resolves.
+If multiple callers open the same URL before the first fetch completes, they share a single ASSET. Each caller gets their own FILE handle with their own IFILE listener, and all listeners are notified when the fetch resolves.
 
 ```cpp
-NETWORK::FILE* pA = pNetwork->Request (&listenerA, pName, url);
-NETWORK::FILE* pB = pNetwork->Request (&listenerB, pName, url);
+NETWORK::FILE* pA = pNetwork->File_Open (pViewport, &cid, url, &listenerA);
+NETWORK::FILE* pB = pNetwork->File_Open (pViewport, &cid, url, &listenerB);
 // pA and pB wrap the same ASSET; both listeners fire on completion.
 
-pA->Release ();
-pB->Release ();
+pA->Close ();
+pB->Close ();
 ```
 
 ## SRI Hash Format
@@ -488,7 +457,7 @@ Each cached resource has its own `.meta` JSON file alongside the `.data` file. T
 
 ### .meta File Format
 
-Written via `SaveMeta()` using nlohmann::json. Atomically written (write to `.temp`, then rename).
+Written via `Meta_Save()` using nlohmann::json. Atomically written (write to `.temp`, then rename).
 
 ```json
 {
@@ -510,9 +479,9 @@ Written via `SaveMeta()` using nlohmann::json. Atomically written (write to `.te
 
 ### .meta Lifecycle
 
-- **Written** when an ASSET is evicted from memory (last FILE handle calls `Release()` and `GetFileCount()` drops to zero while state is READY), or during `Shutdown()` for all READY assets still in memory.
-- **Loaded** on demand by `LoadMeta()` when `Request()` looks up a URL that isn't in `m_mapAssets` but has a `.meta` on disk. Also loaded during `Enumerate()` for assets not currently in memory.
-- **Deleted** when an ASSET is reset (`ResetAsset()` removes `.data`, `.meta`, and `.temp`).
+- **Written** when an ASSET's last FILE detaches (`Detach` calls `Meta_Save` if state is READY), or during `Shutdown()` for all READY assets still in memory.
+- **Loaded** on first attach by `Meta_Load()` when an ASSET exists on disk but hasn't been loaded yet.
+- **Deleted** when an ASSET is reset (`Meta_Reset()` removes `.data`, `.meta`, and `.temp`).
 
 Loading uses `file >> jDoc` inside a `try/catch` block. A corrupt `.meta` is logged as a warning and skipped. The URL stored in the `.meta` is validated against the requested URL before the ASSET is constructed.
 
@@ -532,20 +501,18 @@ Loading uses `file >> jDoc` inside a `try/catch` block. A corrupt `.meta` is log
 }
 ```
 
-- **`LoadRules()`** runs at `Initialize()`. Restores `m_nNextAssetIx` and `m_aRules`. If `rules.json` is missing, creates a fresh empty one via `SaveRules()`.
-- **`SaveRules()`** writes atomically (`.temp` then rename). Called at shutdown and after `AddRule()`.
-- **`IsAssetStale()`** checks a READY asset against all rules. A rule matches if its `sContentType` matches (or is empty = wildcard) **and** the asset's `createdAt` is older than `sOlderThan`.
+- **`Rules_Load()`** runs at `Initialize()`. Restores `m_nNextAssetIx` and `m_aRules`. If `rules.json` is missing, creates a fresh empty one via `Rules_Save()`.
+- **`Rules_Save()`** writes atomically (`.temp` then rename). Called at shutdown and after `Rules_Add()`.
+- **`Rules_Stale()`** checks a READY asset against all rules. A rule matches if its `sContentType` matches (or is empty = wildcard) **and** the asset's `createdAt` is older than `sOlderThan`.
 - On `Request()`, if an asset is READY but stale: if `bFetch` is set, the asset is reset and re-fetched; if `!bFetch`, the request is rejected (returns `nullptr`).
 
 ### ASSET Eviction
 
-ASSETs are actively evicted from `m_mapAssets` when their last FILE handle calls `Release()`. In `NETWORK::Release()`, when `pAsset->GetFileCount() == 0`:
+ASSETs are actively evicted from `m_umpAsset` when their last FILE calls `Asset_Close()` (via `FILE::~Impl`). In `NETWORK::Impl::Asset_Close()`, when `pAsset->Close(pFile)` returns 0 (no remaining FILE handles), the ASSET is erased from the map and deleted.
 
-- If the ASSET has a pending reset flag: `ResetAsset()` deletes disk files and resets state, then the ASSET is erased from the map.
-- If the ASSET is READY: `SaveMeta()` persists the sidecar, then the ASSET is erased from the map.
-- If the ASSET is in any other state: it is erased from the map.
+`Meta_Save()` (on last detach if READY) and `Meta_Reset()` (on last detach if FAILED) are handled internally by ASSET::Detach, not by NETWORK.
 
-This means only assets with active FILE handles live in memory. Re-requesting a previously evicted URL triggers `LoadMeta()` to reconstruct the ASSET from disk.
+This means only assets with active FILE handles live in memory. Re-opening a previously evicted URL triggers `Meta_Load()` to reconstruct the ASSET from disk.
 
 ## HTTP Behavior
 
@@ -556,39 +523,43 @@ This means only assets with active FILE handles live in memory. Re-requesting a 
 
 ## Concurrency Model
 
-### Current: Capped Thread Pool (16 threads)
+### Current: Per-ASSET FETCH Thread (Legacy)
 
-Background fetches run on dedicated `std::thread` instances, capped at 16 concurrent threads. When a fetch is requested and all 16 slots are occupied, the ASSET is pushed to `m_aFetchQueue`. When a fetch completes, the thread checks the queue and dispatches the next pending asset.
+Each ASSET spawns its own `FETCH` thread (inherits `THREAD`) when first attached. FETCH performs a blocking `curl_easy_perform()`, then calls `ASSET::FetchComplete()` with the result. The thread is joined on the next attach (when the old FETCH is replaced) or in FETCH's destructor.
 
-Each thread slot uses a `FETCH_SLOT` struct with an `std::atomic<bool> bDone` flag. Before dispatching a new fetch, completed slots are swept (joined and freed), making room for new work.
+Legacy infrastructure (capped 16 FETCH_SLOTs + overflow queue) still exists and is functional but is targeted for replacement.
 
-`FetchWriteCallback` and `FetchHeaderCallback` are static methods on NETWORK (not free functions). `GetEvpMd` remains a file-local static in `Network.cpp`. `NowIso8601` is a private static method on ASSET.
+`FetchWriteCallback` and `FetchHeaderCallback` are static methods on FETCH's Impl. `GetEvpMd` remains a file-local static in `Encoding.cpp`.
 
 ### Race Condition Mitigations
 
-Three specific race conditions were identified and addressed:
+Three specific concerns and their mitigations:
 
-1. **`ASSET::m_bState` is `std::atomic<STATE>`** — allows safe reads from any thread without holding the NETWORK lock. State transitions still happen under `m_mutex` for consistency with the rest of the ASSET fields.
+1. **ASSET state is a plain enum, not `std::atomic`** — all state transitions happen under `m_mxAsset` (recursive_mutex in ASSET::Impl). The `std::atomic<STATE>` was removed during refactoring; the mutex provides the needed consistency.
 
-2. **`m_mutex` is a `recursive_mutex`** — IFILE notifications and ISNEEZE callbacks fire under the lock. The recursive mutex allows listeners to safely call back into NETWORK (e.g., calling `Request()` or `Release()` from a callback) without deadlocking.
+2. **NETWORK's `m_mutex` is a `recursive_mutex`** — IFILE notifications and IVIEWPORT callbacks fire under the lock. The recursive mutex allows listeners to safely call back into NETWORK (e.g., calling `File_Open()` or `File_Close()` from a callback) without deadlocking.
 
-3. **`.meta` files are written only at eviction/shutdown** — sidecar files are saved when the last FILE handle releases (evicting the ASSET from memory) or during `Shutdown()`. No concurrent fetch activity exists at shutdown (all threads are joined first), and eviction writes happen under `m_mutex`.
+3. **`.meta` files are written only on last detach or shutdown** — sidecar files are saved when the last FILE detaches (ASSET::Detach calls Meta_Save if READY) or during `Shutdown()`. No concurrent fetch activity exists at shutdown (all threads are joined first).
+
+4. **FETCH thread count release** — `ASSET::FetchComplete()` is called on the FETCH thread and now decrements both `m_nCount_Attach` and `m_nCount_Open` to release the FETCH's implicit counts. This allows `Detach` to reach zero when the last real FILE detaches, triggering `Meta_Save`/`Meta_Reset`/`Evict` synchronously. `Asset_Close` is still not called on the FETCH thread (requires the NETWORK mutex); that cleanup happens when the FILE is destroyed.
 
 ### Deferred: Non-Blocking I/O Thread Pool
 
-The current model creates one `std::thread` per active fetch. While capped at 16, this is still inefficient — each thread blocks in `curl_easy_perform()` waiting for network I/O. A proper implementation would use non-blocking I/O to handle hundreds of concurrent requests with far fewer threads.
+The current model spawns one `FETCH` thread per ASSET. While only one FETCH exists per ASSET at a time, this is still inefficient — each thread blocks in `curl_easy_perform()` waiting for network I/O. A proper implementation would use non-blocking I/O to handle hundreds of concurrent requests with far fewer threads.
 
 **Target Architecture:**
 
-1. **Fixed worker pool (4-8 threads)** — a small number of long-lived worker threads, each running an event loop. Thread count would be configurable but default to `min(4, hardware_concurrency - 2)`.
+1. **Fixed worker pool (4-8 THREAD subclass workers)** — a small number of long-lived worker threads (inheriting from `THREAD`), each in a persistent wait loop. Thread count would be configurable but default to `min(4, hardware_concurrency - 2)`.
 
 2. **`curl_multi` interface** — each worker uses `curl_multi_init()` to manage multiple transfers simultaneously. The event loop calls `curl_multi_poll()` (blocks until activity or timeout) followed by `curl_multi_perform()` (drives transfers forward). When a transfer completes, `curl_multi_info_read()` retrieves the result.
 
-3. **Dispatch queue** — incoming requests from `Request()` are pushed to a thread-safe queue (or lock-free MPSC queue). Workers check the queue after each poll cycle and add new `curl_easy` handles to their multi handle via `curl_multi_add_handle()`.
+3. **Dispatch queue** — incoming requests from `File_Open()` are pushed to a thread-safe queue. Workers check the queue after each poll cycle and add new `curl_easy` handles to their multi handle via `curl_multi_add_handle()`.
 
 4. **Load balancing** — round-robin or least-loaded assignment of new requests to workers. Each worker could handle 50-100+ concurrent transfers, so 4 workers could manage 200-400 simultaneous requests.
 
-5. **Stretch goal: single-threaded** — since the work is purely I/O-bound (no CPU processing during transfer), a single thread with `curl_multi` and platform-native polling (`epoll` on Linux, `IOCP` on Windows, `kqueue` on macOS) might suffice. This would be the most efficient model but requires platform abstraction.
+5. **Completion on worker thread** — when a transfer completes, the worker calls `ASSET::FetchComplete()` directly on its own thread. Since the worker is NETWORK-owned, it can safely call `Asset_Close()` and decrement counters — no scrubber relay needed.
+
+6. **No spawn/join per fetch** — workers are created at `NETWORK::Initialize()` and destroyed at `Shutdown()`. When not fetching, they sleep (wait on condition variable). FETCH objects and the `m_pFetch` per-ASSET member are eliminated entirely.
 
 **References:**
 - libcurl multi interface: https://curl.se/libcurl/c/libcurl-multi.html
@@ -597,22 +568,22 @@ The current model creates one `std::thread` per active fetch. While capped at 16
 - Boost.Asio (C++ async I/O): https://www.boost.org/doc/libs/release/libs/asio/
 
 **Implementation notes:**
-- The `FETCH_SLOT` / `m_apFetchSlots` / `m_aFetchQueue` infrastructure can be replaced wholesale — the rest of the NETWORK API is unchanged.
-- `FetchAsset()` would be refactored: the curl setup portion would prepare an easy handle and submit it to a worker, and the completion logic would run as a callback when the multi handle reports completion.
-- The `FETCH_CONTEXT` struct (`NETWORK::FETCH_CONTEXT`) and write/header callbacks (static methods on NETWORK) remain unchanged — they're already compatible with both easy and multi modes.
+- The `FETCH` class and per-ASSET `m_pFetch` member are replaced by the worker pool — no per-ASSET thread objects.
+- `curl_easy` handle setup (URL, write callback, header callback, timeout) remains unchanged — it's already compatible with both easy and multi modes.
+- The `FETCH_RESULT` struct delivered by `FetchComplete()` is unchanged — only the delivery mechanism changes (worker thread instead of dedicated FETCH thread).
 
 ## Shutdown
 
-The NETWORK's `Shutdown()` method:
+The NETWORK's `Shutdown()` method (**partially implemented — shutdown rework pending**):
 
 1. Sets the atomic shutdown flag (cancels in-flight fetches at next check)
 2. Joins all fetch threads and drains the fetch queue
-3. Saves `.meta` sidecars for all READY assets still in memory
+3. Saves `.meta` sidecars for all READY assets still in memory (currently broken — calls removed `SaveMeta()` method)
 4. Saves `rules.json` (persists `m_nNextAssetIx` and staleness rules)
-5. Clears all assets from `m_mapAssets`
+5. Clears all assets from `m_umpAsset`
 6. Deletes all FILE handles in the history list
 
-In-flight fetches check the shutdown flag after `curl_easy_perform` returns and discard results if shutdown was requested. Pending clear/reset flags are irrelevant during shutdown — everything is torn down unconditionally.
+In-flight fetches check the shutdown flag after `curl_easy_perform` returns and discard results if shutdown was requested. Pending clear/close/reset flags are irrelevant during shutdown — everything is torn down unconditionally.
 
 ## STATE Lifecycle
 
@@ -644,10 +615,9 @@ The `NetworkTest` suite (`SneezeTest --network`) validates:
 | 14 | Served-from-cache           | Second request for same URL detects cache hit           |
 | 15 | Failed fetch HTTP status    | 404 response records correct HTTP status code           |
 | 16 | Clear flag                  | Clear immediately removes FILE from history             |
-| 17 | Clear flag toggle           | Clear(false) adds FILE back to history                  |
-| 18 | Reset flag toggle           | Reset(true) then Reset(false) preserves asset           |
-| 19 | Deferred reset              | Reset deferred until last handle releases               |
-| 20 | Clear                       | Released FILEs removed, in-use FILEs survive            |
+| 17 | Close without reset         | Close without Reset preserves disk file                 |
+| 18 | Deferred reset              | Reset deferred until last handle releases               |
+| 19 | Clear                       | Released FILEs removed, in-use FILEs survive            |
 | 21 | OnNetworkFileDeleted        | Notification fires immediately on Clear                 |
 | 22 | Staleness rules             | Rules mark assets stale, trigger re-fetch on request    |
 | 23 | Request with bFetch=false   | No-fetch request returns null for uncached URL          |
@@ -697,3 +667,29 @@ This reduces bandwidth for resources that haven't changed.
 No download progress tracking is currently exposed. A future IFILE method `OnFileProgress(FILE*, uint64_t nBytesReceived, uint64_t nBytesTotal)` could be added, driven by a CURLOPT_XFERINFOFUNCTION callback.
 
 This would enable UI progress bars for large file downloads.
+
+## Active Refactoring — Status
+
+The NETWORK module completed a multi-session bottom-up refactoring. Build errors are resolved, all 67 network tests pass. **Constraint: `NETWORK::Asset_Open`, `NETWORK::Asset_Close`, and `NETWORK::Asset_Index` must not be edited.**
+
+### Completed
+
+- FILE now owns all path computation (m_sPath_Permanent, m_sDiskKey, sPath/sFilename/sPathname accessors). ASSET stores the pathname but does not compute it.
+- ASSET map keyed by pathname (FILE::sPathname("")) instead of URL — supports per-viewport, per-CID scoping.
+- FetchComplete decrements FETCH's implicit m_nCount_Attach and m_nCount_Open, so Detach reaches zero and triggers Meta_Save/Meta_Reset synchronously.
+- Close() calls Detach() immediately — listener disconnected, ASSET attach count decremented on close rather than deferred to destructor.
+- Fetch timing: m_dFetchStartTime set in ASSET::Attach when spawning fetch, m_dFetchEndTime set in FetchComplete via NETWORK::SecondsSinceEpoch().
+- File_Open with null listener returns null for uncached URLs (cache probe path).
+- curl_global_init/cleanup moved from NETWORK to ENGINE (truly global, reference-counted).
+- ASSET::Attach branches documented with state comments.
+
+### Deferred Tasks
+
+| # | Task | Notes |
+|---|------|-------|
+| 1 | **Move NETWORK from ENGINE to VIEWPORT** | Each viewport gets its own NETWORK instance. Removes singleton scoping of rules and cache. Architectural change — deferred until current refactoring is stable. |
+| 2 | **Remove m_sCachePath from Network::Impl** | NETWORK still derives its own cache path. Should use ENGINE's sPath_Persistent() once NETWORK moves to VIEWPORT. |
+| 3 | **Remove DISKFILE enum from Network.h** | FILE's sPathname(ext) replaces DiskKeyToPath(). DISKFILE enum only used inside ASSET::Impl::Path() — can be made private or replaced. |
+| 4 | **Thread pool redesign** | Replace per-ASSET FETCH objects with NETWORK-owned worker threads using `curl_multi` for non-blocking concurrent downloads. See "Deferred: Non-Blocking I/O Thread Pool" section above. |
+| 5 | **Audit `Node.cpp`** | NODE implements `NETWORK::IFILE` — verify it uses the renamed API (`File_Open`/`Close` instead of `Request`/`Release`). |
+| 6 | **Leaked FILE/ASSET messages** | Per-test NETWORK instances log "Leaked" on teardown because OnNetworkFileCreated returns true (files aren't auto-cleared). Tests need explicit Clear+Close or the destructor needs a clean teardown path. |

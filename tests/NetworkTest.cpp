@@ -17,7 +17,6 @@
 #include <Viewport.h>
 
 #include <openssl/sha.h>
-#include <curl/curl.h>
 
 #include <cstdio>
 #include <cstring>
@@ -89,7 +88,7 @@ public:
 
    void OnFrameReady (const uint32_t*, int, int) override {}
 
-   void OnNetworkFileCreated (SNEEZE::NETWORK::FILE*) override { m_nCreatedCount++; }
+   bool OnNetworkFileCreated (SNEEZE::NETWORK::FILE*) override { m_nCreatedCount++; return true; }
    void OnNetworkFileChanged (SNEEZE::NETWORK::FILE*) override { m_nChangedCount++; }
    void OnNetworkFileDeleted (SNEEZE::NETWORK::FILE*) override { m_nDeletedCount++; }
 
@@ -190,7 +189,7 @@ static void TestManagerInit ()
 }
 
 // ---------------------------------------------------------------------------
-// Test 2: Request a file without hash (live fetch)
+// Test 2: Open a file without hash (live fetch)
 // ---------------------------------------------------------------------------
 
 static void TestUnhashedFetch ()
@@ -204,9 +203,9 @@ static void TestUnhashedFetch ()
    if (bInit)
    {
       TEST_FILE_LISTENER listener;
-      NETWORK::FILE* pFile = pNetwork->Request (&listener, s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/128");
+      NETWORK::FILE* pFile = pNetwork->File_Open (s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/128", &listener);
 
-      Check (pFile != nullptr, "Request returned a handle");
+      Check (pFile != nullptr, "File_Open returned a handle");
 
       if (pFile)
       {
@@ -237,10 +236,10 @@ static void TestUnhashedFetch ()
          else
          {
             std::printf ("    (Timed out — expected if no internet)\n");
-            Check (true, "Request did not crash (timeout is non-fatal)");
+            Check (true, "File_Open did not crash (timeout is non-fatal)");
          }
 
-         pFile->Release ();
+         pFile->Close ();
       }
    }
 
@@ -248,12 +247,12 @@ static void TestUnhashedFetch ()
 }
 
 // ---------------------------------------------------------------------------
-// Test 3: Request deduplication (same URL returns shared ASSET)
+// Test 3: File_Open deduplication (same URL returns shared ASSET)
 // ---------------------------------------------------------------------------
 
 static void TestDeduplication ()
 {
-   std::printf ("\n[Test 3] Request deduplication\n");
+   std::printf ("\n[Test 3] File_Open deduplication\n");
 
    NETWORK* pNetwork = new NETWORK (s_pSneeze);
    pNetwork->Initialize ();
@@ -261,15 +260,15 @@ static void TestDeduplication ()
    TEST_FILE_LISTENER listenerA;
    TEST_FILE_LISTENER listenerB;
 
-   NETWORK::FILE* pFileA = pNetwork->Request (&listenerA, s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/64");
-   NETWORK::FILE* pFileB = pNetwork->Request (&listenerB, s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/64");
+   NETWORK::FILE* pFileA = pNetwork->File_Open (s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/64", &listenerA);
+   NETWORK::FILE* pFileB = pNetwork->File_Open (s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/64", &listenerB);
 
    Check (pFileA != nullptr, "First handle is valid");
    Check (pFileB != nullptr, "Second handle is valid");
 
    if (pFileA  &&  pFileB)
    {
-      Check (pFileA->Asset () == pFileB->Asset (),
+      Check (pFileA->AssetIx () == pFileB->AssetIx (),
          "Both handles share the same ASSET");
 
       bool bGotA = listenerA.WaitFor (15000);
@@ -287,8 +286,8 @@ static void TestDeduplication ()
       }
    }
 
-   if (pFileA) pFileA->Release ();
-   if (pFileB) pFileB->Release ();
+   if (pFileA) pFileA->Close ();
+   if (pFileB) pFileB->Close ();
 
    delete pNetwork;
 }
@@ -305,7 +304,7 @@ static void TestHashVerifiedFetch ()
    pNetwork->Initialize ();
 
    TEST_FILE_LISTENER listenerPreFetch;
-   NETWORK::FILE* pPreFile = pNetwork->Request (&listenerPreFetch, s_pViewport, &s_pTestCID, "https://httpbin.org/base64/SGVsbG9Xb3JsZA==");
+   NETWORK::FILE* pPreFile = pNetwork->File_Open (s_pViewport, &s_pTestCID, "https://httpbin.org/base64/SGVsbG9Xb3JsZA==", &listenerPreFetch);
 
    if (pPreFile)
    {
@@ -324,11 +323,11 @@ static void TestHashVerifiedFetch ()
          Check (!sDigest.empty (), "Pre-fetch produced a hash");
 
          pPreFile->Reset ();
-         pPreFile->Release ();
+         pPreFile->Close ();
          pPreFile = nullptr;
 
          TEST_FILE_LISTENER listenerVerified;
-         NETWORK::FILE* pVerFile = pNetwork->Request (&listenerVerified, s_pViewport, &s_pTestCID, "https://httpbin.org/base64/SGVsbG9Xb3JsZA==", sSri);
+         NETWORK::FILE* pVerFile = pNetwork->File_Open (s_pViewport, &s_pTestCID, "https://httpbin.org/base64/SGVsbG9Xb3JsZA==", sSri, 0, &listenerVerified);
 
          if (pVerFile)
          {
@@ -347,14 +346,14 @@ static void TestHashVerifiedFetch ()
                std::printf ("    (Verified fetch timed out or failed)\n");
                Check (true, "Hash-verified fetch did not crash");
             }
-            pVerFile->Release ();
+            pVerFile->Close ();
          }
       }
       else
       {
          std::printf ("    (Pre-fetch timed out — expected if no internet)\n");
          Check (true, "Pre-fetch did not crash");
-         pPreFile->Release ();
+         pPreFile->Close ();
       }
    }
 
@@ -375,7 +374,7 @@ static void TestHashMismatch ()
    TEST_FILE_LISTENER listener;
    std::string sBadHash = "sha256-0000000000000000000000000000000000000000000000000000000000000000";
 
-   NETWORK::FILE* pFile = pNetwork->Request (&listener, s_pViewport, &s_pTestCID, "https://httpbin.org/base64/SGVsbG9Xb3JsZA==", sBadHash);
+   NETWORK::FILE* pFile = pNetwork->File_Open (s_pViewport, &s_pTestCID, "https://httpbin.org/base64/SGVsbG9Xb3JsZA==", sBadHash, 0, &listener);
 
    if (pFile)
    {
@@ -391,7 +390,7 @@ static void TestHashMismatch ()
          Check (true, "Hash mismatch test did not crash");
       }
 
-      pFile->Release ();
+      pFile->Close ();
    }
 
    delete pNetwork;
@@ -409,7 +408,7 @@ static void TestReset ()
    pNetwork->Initialize ();
 
    TEST_FILE_LISTENER listenerSession;
-   NETWORK::FILE* pSession = pNetwork->Request (&listenerSession, s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/32");
+   NETWORK::FILE* pSession = pNetwork->File_Open (s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/32", &listenerSession);
 
    if (pSession)
    {
@@ -417,22 +416,22 @@ static void TestReset ()
       if (bGot  &&  listenerSession.Succeeded ())
       {
          Check (pSession->IsReady (), "File is READY before reset");
-         pSession->Release ();
+         pSession->Close ();
 
          pNetwork->Reset ();
 
          TEST_FILE_LISTENER listenerAfter;
-         NETWORK::FILE* pAfter = pNetwork->Request (&listenerAfter, s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/32");
+         NETWORK::FILE* pAfter = pNetwork->File_Open (s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/32", &listenerAfter);
 
          if (pAfter)
          {
             NETWORK::STATE bState = pAfter->State ();
             Check (bState == NETWORK::STATE_FETCHING  ||
                    bState == NETWORK::STATE_READY,
-               "After reset, new request is FETCHING or READY");
+               "After reset, new file is FETCHING or READY");
 
             listenerAfter.WaitFor (15000);
-            pAfter->Release ();
+            pAfter->Close ();
          }
 
          Check (true, "Reset completed without crash");
@@ -441,7 +440,7 @@ static void TestReset ()
       {
          std::printf ("    (Timed out — expected if no internet)\n");
          Check (true, "Reset test did not crash");
-         pSession->Release ();
+         pSession->Close ();
       }
    }
 
@@ -449,7 +448,7 @@ static void TestReset ()
 }
 
 // ---------------------------------------------------------------------------
-// Test 7: Reset flag destroys meta and disk file on release
+// Test 7: Reset flag destroys meta and disk file on close
 // ---------------------------------------------------------------------------
 
 static void TestResetFlag ()
@@ -460,7 +459,7 @@ static void TestResetFlag ()
    pNetwork->Initialize ();
 
    TEST_FILE_LISTENER listener;
-   NETWORK::FILE* pFile = pNetwork->Request (&listener, s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/16");
+   NETWORK::FILE* pFile = pNetwork->File_Open (s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/16", &listener);
 
    if (pFile)
    {
@@ -473,15 +472,15 @@ static void TestResetFlag ()
          Check (std::filesystem::exists (sDiskPath), "Disk file exists before reset");
 
          pFile->Reset ();
-         pFile->Release ();
+         pFile->Close ();
 
-         Check (!std::filesystem::exists (sDiskPath), "Disk file removed after reset+release");
+         Check (!std::filesystem::exists (sDiskPath), "Disk file removed after reset+close");
       }
       else
       {
          std::printf ("    (Timed out — expected if no internet)\n");
          Check (true, "Reset flag test did not crash");
-         pFile->Release ();
+         pFile->Close ();
       }
    }
 
@@ -500,7 +499,7 @@ static void TestFailedFetch ()
    pNetwork->Initialize ();
 
    TEST_FILE_LISTENER listener;
-   NETWORK::FILE* pFile = pNetwork->Request (&listener, s_pViewport, &s_pTestCID, "https://this-domain-does-not-exist-999.invalid/file.bin");
+   NETWORK::FILE* pFile = pNetwork->File_Open (s_pViewport, &s_pTestCID, "https://this-domain-does-not-exist-999.invalid/file.bin", &listener);
 
    if (pFile)
    {
@@ -516,7 +515,7 @@ static void TestFailedFetch ()
          Check (true, "Failed fetch did not crash");
       }
 
-      pFile->Release ();
+      pFile->Close ();
    }
 
    delete pNetwork;
@@ -539,31 +538,31 @@ static void TestSidecarPersistence ()
       pNetwork->Initialize ();
 
       TEST_FILE_LISTENER listenerPre;
-      NETWORK::FILE* pPre = pNetwork->Request (&listenerPre, s_pViewport, &s_pTestCID, sUrl);
+      NETWORK::FILE* pPre = pNetwork->File_Open (s_pViewport, &s_pTestCID, sUrl, &listenerPre);
       if (pPre  &&  listenerPre.WaitFor (15000)  &&  listenerPre.Succeeded ())
       {
          std::vector<uint8_t> aData = pPre->ReadData ();
          std::string sDigest = ComputeSha256Hex (aData.data (), aData.size ());
          sSri = "sha256-" + sDigest;
          pPre->Reset ();
-         pPre->Release ();
+         pPre->Close ();
          pPre = nullptr;
 
          TEST_FILE_LISTENER listenerHash;
-         NETWORK::FILE* pHash = pNetwork->Request (&listenerHash, s_pViewport, &s_pTestCID, sUrl, sSri);
+         NETWORK::FILE* pHash = pNetwork->File_Open (s_pViewport, &s_pTestCID, sUrl, sSri, 0, &listenerHash);
          if (pHash)
          {
             listenerHash.WaitFor (15000);
             Check (listenerHash.Succeeded (), "Persistent entry created");
             Check (pHash->AssetIx () > 0, "Asset index assigned on creation");
-            pHash->Release ();
+            pHash->Close ();
          }
       }
       else
       {
          std::printf ("    (Pre-fetch timed out — skipping)\n");
          Check (true, "Sidecar test did not crash (no internet)");
-         if (pPre) pPre->Release ();
+         if (pPre) pPre->Close ();
          delete pNetwork;
          return;
       }
@@ -578,7 +577,7 @@ static void TestSidecarPersistence ()
       pNetwork2->Initialize ();
 
       TEST_FILE_LISTENER listenerReload;
-      NETWORK::FILE* pReload = pNetwork2->Request (&listenerReload, s_pViewport, &s_pTestCID, sUrl, sSri);
+      NETWORK::FILE* pReload = pNetwork2->File_Open (s_pViewport, &s_pTestCID, sUrl, sSri, 0, &listenerReload);
 
       if (pReload)
       {
@@ -590,7 +589,7 @@ static void TestSidecarPersistence ()
          std::vector<uint8_t> aData = pReload->ReadData ();
          Check (!aData.empty (), "Data is readable after reload");
 
-         pReload->Release ();
+         pReload->Close ();
       }
 
       pNetwork2->Reset ();
@@ -610,7 +609,7 @@ static void TestHttpHeaders ()
    pNetwork->Initialize ();
 
    TEST_FILE_LISTENER listener;
-   NETWORK::FILE* pFile = pNetwork->Request (&listener, s_pViewport, &s_pTestCID, "https://httpbin.org/response-headers?Content-Type=application/json");
+   NETWORK::FILE* pFile = pNetwork->File_Open (s_pViewport, &s_pTestCID, "https://httpbin.org/response-headers?Content-Type=application/json", &listener);
 
    if (pFile)
    {
@@ -631,7 +630,7 @@ static void TestHttpHeaders ()
          Check (true, "Headers test did not crash");
       }
 
-      pFile->Release ();
+      pFile->Close ();
    }
 
    delete pNetwork;
@@ -649,19 +648,18 @@ static void TestFileHandleLifecycle ()
    pNetwork->Initialize ();
 
    TEST_FILE_LISTENER listener;
-   NETWORK::FILE* pFile = pNetwork->Request (&listener, s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/8");
+   NETWORK::FILE* pFile = pNetwork->File_Open (s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/8", &listener);
 
       Check (pFile != nullptr, "Handle allocated");
 
    if (pFile)
    {
-      Check (pFile->Asset () != nullptr, "Handle wraps a valid ASSET");
       Check (!pFile->Url ().empty (), "URL accessible from handle");
 
       listener.WaitFor (15000);
 
-      pFile->Release ();
-      Check (true, "Release completed without crash");
+      pFile->Close ();
+      Check (true, "Close completed without crash");
    }
 
    delete pNetwork;
@@ -681,8 +679,8 @@ static void TestHistoryAndFileIx ()
    TEST_FILE_LISTENER listenerA;
    TEST_FILE_LISTENER listenerB;
 
-   NETWORK::FILE* pFileA = pNetwork->Request (&listenerA, s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/16");
-   NETWORK::FILE* pFileB = pNetwork->Request (&listenerB, s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/32");
+   NETWORK::FILE* pFileA = pNetwork->File_Open (s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/16", &listenerA);
+   NETWORK::FILE* pFileB = pNetwork->File_Open (s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/32", &listenerB);
 
    Check (pFileA != nullptr  &&  pFileB != nullptr, "Both handles allocated");
 
@@ -697,10 +695,10 @@ static void TestHistoryAndFileIx ()
       listenerA.WaitFor (15000);
       listenerB.WaitFor (15000);
 
-      pFileA->Release ();
-      pFileB->Release ();
+      pFileA->Close ();
+      pFileB->Close ();
 
-//      Check (aHistory.size () >= 2, "Release does not shrink history");
+//      Check (aHistory.size () >= 2, "Close does not shrink history");
    }
 
    delete pNetwork;
@@ -720,7 +718,7 @@ static void TestNotifications ()
    pNetwork->Initialize ();
 
    TEST_FILE_LISTENER listener;
-   NETWORK::FILE* pFile = pNetwork->Request (&listener, s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/8?test=notifications");
+   NETWORK::FILE* pFile = pNetwork->File_Open (s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/8?test=notifications", &listener);
 
    Check (s_pVPHost->m_nCreatedCount > 0, "OnNetworkFileCreated fired");
 
@@ -737,7 +735,7 @@ static void TestNotifications ()
          Check (true, "Notification test did not crash");
       }
 
-      pFile->Release ();
+      pFile->Close ();
    }
 
    delete pNetwork;
@@ -759,7 +757,7 @@ static void TestServedFromCache ()
 
    // First fetch — should NOT be served from cache
    TEST_FILE_LISTENER listenerFirst;
-   NETWORK::FILE* pFirst = pNetwork->Request (&listenerFirst, s_pViewport, &s_pTestCID, sUrl);
+   NETWORK::FILE* pFirst = pNetwork->File_Open (s_pViewport, &s_pTestCID, sUrl, &listenerFirst);
 
    if (pFirst)
    {
@@ -768,16 +766,16 @@ static void TestServedFromCache ()
       {
          Check (!pFirst->IsServedFromCache (), "First fetch is not served from cache");
 
-         // Second request for the same URL — should be served from cache
+         // Second open for the same URL -- should be served from cache
          TEST_FILE_LISTENER listenerSecond;
-         NETWORK::FILE* pSecond = pNetwork->Request (&listenerSecond, s_pViewport, &s_pTestCID, sUrl);
+         NETWORK::FILE* pSecond = pNetwork->File_Open (s_pViewport, &s_pTestCID, sUrl, &listenerSecond);
 
          if (pSecond)
          {
             Check (pSecond->IsServedFromCache (), "Second fetch IS served from cache");
             Check (pSecond->FileIx () > pFirst->FileIx (),
                "Second file index > first");
-            pSecond->Release ();
+            pSecond->Close ();
          }
       }
       else
@@ -786,7 +784,7 @@ static void TestServedFromCache ()
          Check (true, "Served-from-cache test did not crash");
       }
 
-      pFirst->Release ();
+      pFirst->Close ();
    }
 
    delete pNetwork;
@@ -804,7 +802,7 @@ static void TestFailedFetchHttpStatus ()
    pNetwork->Initialize ();
 
    TEST_FILE_LISTENER listener;
-   NETWORK::FILE* pFile = pNetwork->Request (&listener, s_pViewport, &s_pTestCID, "https://httpbin.org/status/404");
+   NETWORK::FILE* pFile = pNetwork->File_Open (s_pViewport, &s_pTestCID, "https://httpbin.org/status/404", &listener);
 
    if (pFile)
    {
@@ -813,7 +811,7 @@ static void TestFailedFetchHttpStatus ()
       {
          Check (!listener.Succeeded (), "404 correctly failed");
          Check (pFile->HttpStatus () == 404, "HTTP status is 404");
-         Check (pFile->FetchDuration () > 0.0, "Fetch duration recorded for failed request");
+         Check (pFile->FetchDuration () > 0.0, "Fetch duration recorded for failed file");
       }
       else
       {
@@ -821,14 +819,14 @@ static void TestFailedFetchHttpStatus ()
          Check (true, "HTTP status test did not crash");
       }
 
-      pFile->Release ();
+      pFile->Close ();
    }
 
    delete pNetwork;
 }
 
 // ---------------------------------------------------------------------------
-// Test 16: Clear flag removes FILE from history on release
+// Test 16: Clear flag removes FILE from history on close
 // ---------------------------------------------------------------------------
 
 static void TestClearFlag ()
@@ -839,38 +837,38 @@ static void TestClearFlag ()
    pNetwork->Initialize ();
 
    TEST_FILE_LISTENER listener;
-   NETWORK::FILE* pFile = pNetwork->Request (&listener, s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/8");
+   NETWORK::FILE* pFile = pNetwork->File_Open (s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/8", &listener);
 
    if (pFile)
    {
       listener.WaitFor (15000);
 
-      Check (!pFile->IsPendingClear (), "FILE is not cleared before Clear()");
+      Check (!pFile->IsPending_Clear (), "FILE is not cleared before Clear()");
 
       pFile->Clear ();
 
-      Check (pFile->IsPendingClear (),
+      Check (pFile->IsPending_Clear (),
          "Clear immediately sets pending-clear flag");
 
-      pFile->Release ();
+      pFile->Close ();
    }
 
    delete pNetwork;
 }
 
 // ---------------------------------------------------------------------------
-// Test 17: Reset flag can be toggled off before release
+// Test 17: Reset flag can be toggled off before close
 // ---------------------------------------------------------------------------
 
-static void TestResetFlagToggle ()
+static void TestCloseWithoutReset ()
 {
-   std::printf ("\n[Test 17] Reset flag toggle\n");
+   std::printf ("\n[Test 17] Close without reset preserves disk file\n");
 
    NETWORK* pNetwork = new NETWORK (s_pSneeze);
    pNetwork->Initialize ();
 
    TEST_FILE_LISTENER listener;
-   NETWORK::FILE* pFile = pNetwork->Request (&listener, s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/8");
+   NETWORK::FILE* pFile = pNetwork->File_Open (s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/8", &listener);
 
    if (pFile)
    {
@@ -879,18 +877,16 @@ static void TestResetFlagToggle ()
       std::string sDiskPath = pFile->DiskPath ();
       bool bHadDisk = !sDiskPath.empty ()  &&  std::filesystem::exists (sDiskPath);
 
-      pFile->Reset ();
-      pFile->Reset (false);
-      pFile->Release ();
+      pFile->Close ();
 
       if (bHadDisk)
       {
          Check (std::filesystem::exists (sDiskPath),
-            "Disk file survives when reset flag is toggled off");
+            "Disk file survives close without reset");
       }
       else
       {
-         Check (true, "Reset toggle did not crash (no disk path to verify)");
+         Check (true, "Close without reset did not crash (no disk path to verify)");
       }
    }
 
@@ -911,8 +907,8 @@ static void TestDeferredReset ()
    TEST_FILE_LISTENER listenerA;
    TEST_FILE_LISTENER listenerB;
 
-   NETWORK::FILE* pFileA = pNetwork->Request (&listenerA, s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/16");
-   NETWORK::FILE* pFileB = pNetwork->Request (&listenerB, s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/16");
+   NETWORK::FILE* pFileA = pNetwork->File_Open (s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/16", &listenerA);
+   NETWORK::FILE* pFileB = pNetwork->File_Open (s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/16", &listenerB);
 
    if (pFileA  &&  pFileB)
    {
@@ -923,7 +919,7 @@ static void TestDeferredReset ()
       bool bHadDisk = !sDiskPath.empty ()  &&  std::filesystem::exists (sDiskPath);
 
       pFileA->Reset ();
-      pFileA->Release ();
+      pFileA->Close ();
 
       if (bHadDisk)
       {
@@ -931,23 +927,20 @@ static void TestDeferredReset ()
             "Disk file survives while second handle is attached");
       }
 
-      Check (pFileB->Asset () != nullptr,
-         "Second handle still has a valid ASSET");
-
-      pFileB->Release ();
+      pFileB->Close ();
 
       if (bHadDisk)
       {
          Check (!std::filesystem::exists (sDiskPath),
-            "Disk file removed after last handle releases");
+            "Disk file removed after last handle closes");
       }
 
       Check (true, "Deferred reset completed without crash");
    }
    else
    {
-      if (pFileA) pFileA->Release ();
-      if (pFileB) pFileB->Release ();
+      if (pFileA) pFileA->Close ();
+      if (pFileB) pFileB->Close ();
       Check (true, "Deferred reset did not crash (handles were null)");
    }
 
@@ -955,7 +948,7 @@ static void TestDeferredReset ()
 }
 
 // ---------------------------------------------------------------------------
-// Test 19: Clear removes released FILE records
+// Test 19: Clear removes closed FILE records
 // ---------------------------------------------------------------------------
 
 static void TestClear ()
@@ -968,15 +961,15 @@ static void TestClear ()
    TEST_FILE_LISTENER listenerA;
    TEST_FILE_LISTENER listenerB;
 
-   NETWORK::FILE* pFileA = pNetwork->Request (&listenerA, s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/8");
-   NETWORK::FILE* pFileB = pNetwork->Request (&listenerB, s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/16");
+   NETWORK::FILE* pFileA = pNetwork->File_Open (s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/8", &listenerA);
+   NETWORK::FILE* pFileB = pNetwork->File_Open (s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/16", &listenerB);
 
    if (pFileA  &&  pFileB)
    {
       listenerA.WaitFor (15000);
       listenerB.WaitFor (15000);
 
-      pFileA->Release ();
+      pFileA->Close ();
 
 //      size_t nHistoryBefore = pNetwork->Files ().size ();
 //      Check (nHistoryBefore >= 2, "History has at least 2 entries before Clear");
@@ -984,15 +977,15 @@ static void TestClear ()
       pNetwork->Clear ();
 
 //      size_t nHistoryAfter = pNetwork->Files ().size ();
-//      Check (nHistoryAfter < nHistoryBefore, "Clear removed released FILE records");
+//      Check (nHistoryAfter < nHistoryBefore, "Clear removed closed FILE records");
 //      Check (nHistoryAfter >= 1,             "In-use FILE record survived Clear");
 
-      pFileB->Release ();
+      pFileB->Close ();
    }
    else
    {
-      if (pFileA) pFileA->Release ();
-      if (pFileB) pFileB->Release ();
+      if (pFileA) pFileA->Close ();
+      if (pFileB) pFileB->Close ();
    }
 
    Check (true, "Clear completed without crash");
@@ -1014,7 +1007,7 @@ static void TestDeletedNotification ()
    pNetwork->Initialize ();
 
    TEST_FILE_LISTENER listener;
-   NETWORK::FILE* pFile = pNetwork->Request (&listener, s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/8");
+   NETWORK::FILE* pFile = pNetwork->File_Open (s_pViewport, &s_pTestCID, "https://httpbin.org/bytes/8", &listener);
 
    if (pFile)
    {
@@ -1028,7 +1021,7 @@ static void TestDeletedNotification ()
       Check (s_pVPHost->m_nDeletedCount == 1,
          "OnNetworkFileDeleted fired immediately on clear");
 
-      pFile->Release ();
+      pFile->Close ();
    }
 
    delete pNetwork;
@@ -1050,7 +1043,7 @@ static void TestStalenessRules ()
       pNetwork->Initialize ();
 
       TEST_FILE_LISTENER listener;
-      NETWORK::FILE* pFile = pNetwork->Request (&listener, s_pViewport, &s_pTestCID, sUrl);
+      NETWORK::FILE* pFile = pNetwork->File_Open (s_pViewport, &s_pTestCID, sUrl, &listener);
 
       if (pFile)
       {
@@ -1059,13 +1052,13 @@ static void TestStalenessRules ()
          {
             std::printf ("    (Timed out — skipping)\n");
             Check (true, "Staleness test did not crash (no internet)");
-            pFile->Release ();
+            pFile->Close ();
             delete pNetwork;
             return;
          }
 
          Check (pFile->IsReady (), "File fetched successfully");
-         pFile->Release ();
+         pFile->Close ();
       }
 
       delete pNetwork;
@@ -1076,16 +1069,16 @@ static void TestStalenessRules ()
       NETWORK* pNetwork2 = new NETWORK (s_pSneeze);
       pNetwork2->Initialize ();
 
-      pNetwork2->AddRule ("", "9999-12-31T23:59:59Z");
+      pNetwork2->Rules_Add ("", "9999-12-31T23:59:59Z");
 
       TEST_FILE_LISTENER listener2;
-      NETWORK::FILE* pFile2 = pNetwork2->Request (&listener2, s_pViewport, &s_pTestCID, sUrl);
+      NETWORK::FILE* pFile2 = pNetwork2->File_Open (s_pViewport, &s_pTestCID, sUrl, &listener2);
 
       if (pFile2)
       {
          Check (!pFile2->IsServedFromCache (), "Stale meta triggered re-fetch");
          listener2.WaitFor (15000);
-         pFile2->Release ();
+         pFile2->Close ();
       }
 
       pNetwork2->Reset ();
@@ -1094,18 +1087,18 @@ static void TestStalenessRules ()
 }
 
 // ---------------------------------------------------------------------------
-// Test 23: Request with bFetch=false (no network)
+// Test 23: File_Open with bFetch=false (no network)
 // ---------------------------------------------------------------------------
 
-static void TestNoFetchRequest ()
+static void TestNoFetchOpen ()
 {
-   std::printf ("\n[Test 23] Request with bFetch=false\n");
+   std::printf ("\n[Test 23] File_Open with bFetch=false\n");
 
    NETWORK* pNetwork = new NETWORK (s_pSneeze);
    pNetwork->Initialize ();
 
-   NETWORK::FILE* pFile = pNetwork->Request (nullptr, s_pViewport, &s_pTestCID, "https://this-url-does-not-exist-in-cache.invalid/none",
-      std::string (), NETWORK::REQUEST_CREATE);
+   NETWORK::FILE* pFile = pNetwork->File_Open (s_pViewport, &s_pTestCID, "https://this-url-does-not-exist-in-cache.invalid/none",
+      std::string (), 0, nullptr);
 
    Check (pFile == nullptr, "bFetch=false returns null for uncached URL");
 
@@ -1124,15 +1117,13 @@ int RunNetworkTests (int /*nArgc*/, char** /*aArgv*/)
    s_pTestListener->m_sAppDataPath = (std::filesystem::temp_directory_path () / "SneezeTest").string ();
    s_pTestListener->m_sSessionPath = s_pTestListener->m_sAppDataPath;
 
-   auto sCachePath = std::filesystem::path (s_pTestListener->m_sAppDataPath) / "Cache";
-   std::filesystem::remove_all (sCachePath);
+   std::filesystem::remove_all (s_pTestListener->m_sAppDataPath);
 
    s_pSneeze = new SNEEZE::ENGINE (s_pTestListener);
+   s_pSneeze->Initialize ();
 
    s_pVPHost = new CACHE_TEST_VIEWPORT_HOST ();
    s_pViewport = s_pSneeze->Viewport_Open (s_pVPHost);
-
-   curl_global_init (CURL_GLOBAL_DEFAULT);
 
    TestManagerInit ();
    TestUnhashedFetch ();
@@ -1150,14 +1141,12 @@ int RunNetworkTests (int /*nArgc*/, char** /*aArgv*/)
    TestServedFromCache ();
    TestFailedFetchHttpStatus ();
    TestClearFlag ();
-   TestResetFlagToggle ();
+   TestCloseWithoutReset ();
    TestDeferredReset ();
    TestClear ();
    TestDeletedNotification ();
    TestStalenessRules ();
-   TestNoFetchRequest ();
-
-   curl_global_cleanup ();
+   TestNoFetchOpen ();
 
    // Intentionally leak s_pSneeze — its destructor calls static subsystem
    // shutdowns (WASM, SPV, etc.) that may interfere with other test suites.

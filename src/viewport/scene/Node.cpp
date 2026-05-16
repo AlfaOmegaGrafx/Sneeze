@@ -216,7 +216,7 @@ void NODE::Texture_Request ()
 
       NETWORK* pNetwork = m_pFabric->Scene ()->Sneeze ()->Network ();
       if (pNetwork)
-         m_pFile = pNetwork->Request (this, m_pFabric->Scene ()->Viewport (), &CID, m_pMapObject->m_sTextureUrl);
+         m_pFile = pNetwork->File_Open (m_pFabric->Scene ()->Viewport (), &CID, m_pMapObject->m_sTextureUrl, this);
    }
 }
 
@@ -228,7 +228,7 @@ void NODE::Texture_Release ()
 {
    if (m_pFile)
    {
-      m_pFile->Release ();
+      m_pFile->Close ();
       m_pFile = nullptr;
    }
 }
@@ -244,7 +244,7 @@ void NODE::OnFileReady (NETWORK::FILE* pFile)
    if (m_pMapObject)
       aData = pFile->ReadData ();
 
-   pFile->Release ();
+   pFile->Close ();
    m_pFile = nullptr;
 
    if (!aData.empty ()  &&  m_pMapObject)
@@ -273,6 +273,6 @@ void NODE::OnFileReady (NETWORK::FILE* pFile)
 
 void NODE::OnFileFailed (NETWORK::FILE* pFile)
 {
-   pFile->Release ();
+   pFile->Close ();
    m_pFile = nullptr;
 }

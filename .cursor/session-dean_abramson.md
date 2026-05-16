@@ -694,3 +694,40 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 - **Identified notification fan-out design issue:** Shared org ASSETs notify only the writing SILO's viewport, not all viewports sharing that ASSET. Fix deferred to Asset.cpp pass — ASSET will keep a listener list (matching NETWORK::ASSET's `CollectFiles` pattern).
 - **Next steps (deferred):** Rename `Unit.cpp` to `Asset.cpp`, move notifications into ASSET with listener list, rename SILO to UNIT (once ASSET is private).
 
+## 2026-05-14 — 2026-05-15 (Wed night–Thu early AM) ~11:00 PM – 2:30 AM PDT
+
+- **NETWORK module refactoring (multi-step, bottom-up):**
+  - **API rename:** `Request()`→`File_Open()`, `Release()`→`File_Close()`, `Clear()`→`File_Clear()`, `Reset()`→`File_Reset()`, `Enumerate()`→`File_Enum()`. All internal methods renamed to match (`LoadMeta`→`Meta_Load`, `SaveMeta`→`Meta_Save`, `ResetState`→`Meta_Reset`, `m_mutex`→`m_mxAsset`).
+  - **ASSET pImpl and two-counter lifecycle:** `m_nCount_Open` (structural, FILE references) and `m_nCount_Attach` (active listeners, triggers fetch). `Meta_Load` on first attach, `Meta_Save`/`Meta_Reset` on last detach. Methods reorganized into logical groups.
+  - **FILE pImpl with dual-flag deletion model:** `m_bPending_Close` (caller done) + `m_bPending_Clear` (inspector done). FILE deleted only when BOTH are true. `SetPending_Close`/`SetPending_Clear` return bool (prevent double-ops). Delete-before-erase order in all removal paths. FILE fully functional for inspector after caller closes.
+  - **Removed `FILE::Asset()` and `FILE::IsAttached()`** — always-true accessors became redundant.
+  - **CID stored by value** in FILE (copied from `CID*` at construction), replacing `shared_ptr<CID>`.
+  - **FETCH class** (inherits THREAD): per-ASSET download thread, spawned by `ASSET::Attach`, delivers `FETCH_RESULT` via `FetchComplete`. Calls `Join()` in destructor. Identified FETCH thread hazard (cannot decrement counters on FETCH thread) — deferred to thread pool redesign.
+  - **Hash verification** consolidated into `ASSET::Impl` (`VerifyHash`).
+  - **SnapshotInitial/Progress/Final** migrated into `FILE::Impl`.
+  - **3 build errors deferred:** `SaveMeta`→`Meta_Save` in `~Impl`, FILE constructor arg swap, `Reset`→`Meta_Reset` in `Reset()`. All in `Network.cpp`.
+- **Agreed deferred architecture:** Replace per-ASSET FETCH with NETWORK-owned worker pool (THREAD subclass workers, persistent wait loop, `curl_multi` for non-blocking concurrent downloads).
+- **Documentation updated:** `project.mdc` (NETWORK/ASSET/FILE/IFILE/IENUM class descriptions, module description), `Network.md` (architecture diagram, API examples, lifecycle docs, pending tasks list).
+- **Pending for next session:** Fix 3 build errors, network shutdown rework, pathname integration, thread pool, `REQUEST_CREATE == false`, audit `Node.cpp`.
+
+## 2026-05-15 (Thu–Fri overnight) ~afternoon – 11:00 PM PDT
+
+- **Recovered `File.cpp` from prior session crash:** IDE restart lost 32 hours of changes. Restored from AI memory, fixed compilation errors (`s_mapEmpty` removal, missing `#include <openssl/sha.h>`, `#include <cstdio>`), reorganized `FILE::Impl` as class with methods at top + public members at bottom for style consistency.
+- **Network pathname refactoring completed:**
+  - FILE now owns all path computation: `m_sPath_Permanent` (viewport path + "/Network"), `m_sDiskKey` (truncated SHA-1 hex of URL), `sPath()` / `sFilename(ext)` / `sPathname(ext)` accessors with per-CID fan-out directory structure.
+  - `ComputeDiskKey` moved from ASSET to FILE. ASSET map key changed from URL to `pFile->sPathname("")`.
+  - `curl_global_init`/`cleanup` moved from NETWORK to ENGINE (truly global, prerequisite for per-viewport NETWORK).
+- **Systematic debugging of 67 network tests — all passing:**
+  - Fixed test harness: `ENGINE::Initialize()` not called, `OnNetworkFileCreated` returning `false`.
+  - Fixed race condition: `m_pListener` must be set before `ASSET::Attach` (callback can fire synchronously).
+  - Fixed use-after-free: `Asset_Close` erasing by wrong key; corrected to `pFile->sPathname("")`.
+  - Fixed infinite loop: missing `else ++it;` in `NETWORK::Impl::Clear()`.
+  - Exposed `NETWORK::SecondsSinceEpoch()` for fetch timing. `m_dFetchStartTime` set in `ASSET::Attach`, `m_dFetchEndTime` set in `FetchComplete`.
+  - `FetchComplete` now decrements `m_nCount_Attach` and `m_nCount_Open` (FETCH's implicit counts).
+  - `File_Close` now calls `pFile->Detach()` immediately — critical fix enabling Meta_Save/Meta_Reset on close.
+  - `File_Open` with null listener returns nullptr for uncached URLs.
+  - Renamed `TestResetFlagToggle` to `TestCloseWithoutReset` (invalid test case for new Reset semantics).
+- **Architectural discussion:** Agreed to move NETWORK and STORAGE from ENGINE (singleton) to VIEWPORT (per-instance). Deferred — first remove truly global components. curl moved to ENGINE as prerequisite.
+- **Documentation updated:** `project.mdc` (NETWORK/ASSET/FILE descriptions, ENGINE curl ownership, CID by-value, Network test suite added), `Network.md` (architecture diagram, ASSET map key, FETCH count release, FILE path members, Close/Detach behavior, test table, active refactoring status).
+- **Deferred tasks documented** in `resume-network-pathnames.md` and Network.md.
+

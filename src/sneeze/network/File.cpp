@@ -14,61 +14,185 @@
 
 #include <Sneeze.h>
 
+#include <cstdio>
+#include <mutex>
+
+#include <openssl/sha.h>
+
 using namespace SNEEZE;
 
-const std::unordered_map<std::string, std::string> NETWORK::FILE::s_mapEmpty;
-
-NETWORK::FILE::FILE (NETWORK* pNetwork, ASSET* pAsset, VIEWPORT::CONTAINER::CID* pCID, VIEWPORT* pViewport, IFILE* pListener, uint32_t nFileIx) :
-   m_pNetwork         (pNetwork),
-   m_pAsset           (pAsset),
-   m_CID              (*pCID),
-   m_pViewport        (pViewport),
-   m_pListener        (pListener),
-   m_nFileIx          (nFileIx),
-   m_nAssetIx         (0),
-   m_bState           (STATE_IDLE),
-   m_nSizeBytes       (0),
-   m_nHttpStatus      (0),
-   m_dFetchQueuedTime (0.0),
-   m_dFetchStartTime  (0.0),
-   m_dFetchEndTime    (0.0),
-   m_bServedFromCache (false),
-   m_bPendingClear    (false),
-   m_bReleased        (false)
-{
-   SnapshotInitial ();
-}
-
-NETWORK::FILE::~FILE ()
-{
-}
-
 // ---------------------------------------------------------------------------
-// Snapshot — copies display fields from the attached ASSET
+// Impl
 // ---------------------------------------------------------------------------
 
-void NETWORK::FILE::SnapshotInitial ()
+class NETWORK::FILE::Impl
 {
-   if (m_pAsset)
+public:
+   Impl (FILE* pFile, NETWORK* pNetwork, VIEWPORT* pViewport, VIEWPORT::CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
+      m_pFile            (pFile),
+      m_pNetwork         (pNetwork),
+      m_pViewport        (pViewport),
+      m_CID              (*pCID),
+      m_nFileIx          (nFileIx),
+      m_sUrl             (sUrl),
+      m_sOpenHash        (sHash),
+      m_bCacheEnabled    (bCacheEnabled),
+      m_sPath_Permanent  ((std::filesystem::path (pViewport->sPath_Permanent ()) / "Network").string ()),
+      m_sDiskKey         (ComputeDiskKey (sUrl)),
+      m_pAsset           (nullptr),
+      m_pListener        (nullptr),
+      m_nAssetIx         (0),
+      m_bState           (STATE_IDLE),
+      m_nSizeBytes       (0),
+      m_nHttpStatus      (0),
+      m_dFetchQueuedTime (0.0),
+      m_dFetchStartTime  (0.0),
+      m_dFetchEndTime    (0.0),
+      m_bServedFromCache (false),
+      m_bPending_Clear   (false),
+      m_bPending_Close   (false)
    {
-      m_sUrl     = m_pAsset->Url ();
+   }
+
+   ~Impl ()
+   {
+      Detach ();
+
+      if (m_pAsset)
+      {
+         m_pNetwork->Asset_Close (m_pAsset, m_pFile);
+         m_pAsset = nullptr;
+      }
+   }
+
+   // ---------------------------------------------------------------------------
+   // Lifecycle
+   // ---------------------------------------------------------------------------
+
+   bool Initialize (IFILE* pListener)
+   {
+      m_pAsset = m_pNetwork->Asset_Open (m_pFile);
+
+      if (m_pAsset)
+      {
+         if (pListener)
+            Attach (pListener, true);
+
+         m_bPending_Clear = !m_pViewport->Host ()->OnNetworkFileCreated (m_pFile);
+      }
+
+      return (m_pAsset != nullptr);
+   }
+
+   bool Attach (IFILE* pListener, bool bFetch)
+   {
+      bool bResult = false;
+
+      std::lock_guard<std::mutex> guard (m_mxFile);
+
+      if (!m_pListener)
+      {
+         m_pListener = pListener; // must be set going into the Attach
+
+         if (m_pAsset->Attach (m_pFile, bFetch))
+         {
+            bResult = true;
+         }
+         else m_pListener = nullptr;
+      }
+
+      return bResult;
+   }
+
+   void Detach ()
+   {
+      std::lock_guard<std::mutex> guard (m_mxFile);
+
+      if (m_pListener)
+      {
+         m_pAsset->Detach (m_pFile);
+
+         m_pListener = nullptr;
+      }
+   }
+
+   void Clear ()
+   {
+      m_pNetwork->File_Clear (m_pFile);
+   }
+
+   void Close ()
+   {
+      m_pNetwork->File_Close (m_pFile);
+   }
+
+   void Reset ()
+   {
+      m_pNetwork->File_Reset (m_pFile);
+   }
+
+   // ---------------------------------------------------------------------------
+   // Pending flags (one-way gates)
+   // ---------------------------------------------------------------------------
+
+   bool Pending_Clear ()
+   {
+      std::lock_guard<std::mutex> guard (m_mxFile);
+
+      bool bChanged = false;
+
+      if (!m_bPending_Clear)
+      {
+         m_bPending_Clear = true;
+
+         m_pViewport->Host ()->OnNetworkFileDeleted (m_pFile);
+
+         bChanged = true;
+      }
+
+      return bChanged;
+   }
+
+   bool Pending_Close ()
+   {
+      std::lock_guard<std::mutex> guard (m_mxFile);
+
+      bool bChanged = !m_bPending_Close;
+
+      m_bPending_Close = true;
+
+      return bChanged;
+   }
+
+   // ---------------------------------------------------------------------------
+   // Notifications
+   // ---------------------------------------------------------------------------
+
+   void Notify_Changed ()
+   {
+      std::lock_guard<std::mutex> guard (m_mxFile);
+
+      if (!m_bPending_Clear)
+         m_pViewport->Host ()->OnNetworkFileChanged (m_pFile);
+   }
+
+   // ---------------------------------------------------------------------------
+   // Snapshots
+   // ---------------------------------------------------------------------------
+
+   void SnapshotInitial ()
+   {
       m_nAssetIx = m_pAsset->AssetIx ();
    }
-}
 
-void NETWORK::FILE::SnapshotProgress ()
-{
-   if (m_pAsset)
+   void SnapshotProgress ()
    {
       m_bState           = m_pAsset->State ();
       m_dFetchQueuedTime = m_pAsset->FetchQueuedTime ();
       m_dFetchStartTime  = m_pAsset->FetchStartTime ();
    }
-}
 
-void NETWORK::FILE::SnapshotFinal ()
-{
-   if (m_pAsset)
+   void SnapshotFinal ()
    {
       m_bState           = m_pAsset->State ();
       m_sHash            = m_pAsset->Hash ();
@@ -80,196 +204,166 @@ void NETWORK::FILE::SnapshotFinal ()
       m_dFetchEndTime    = m_pAsset->FetchEndTime ();
       m_bServedFromCache = m_pAsset->IsServedFromCache ();
    }
+
+   // ---------------------------------------------------------------------------
+   // Path helpers
+   // ---------------------------------------------------------------------------
+
+   static std::string ComputeDiskKey (const std::string& sUrl)
+   {
+      unsigned char aDigest[SHA_DIGEST_LENGTH];
+
+      SHA1 (reinterpret_cast<const unsigned char*> (sUrl.data ()), sUrl.size (), aDigest);
+
+      static const int kTRUNCATED_BYTES = 12;
+      char szHex[kTRUNCATED_BYTES * 2 + 1];
+      for (int i = 0; i < kTRUNCATED_BYTES; i++)
+         std::sprintf (szHex + i * 2, "%02x", aDigest[i]);
+      szHex[kTRUNCATED_BYTES * 2] = '\0';
+
+      return std::string (szHex);
+   }
+
+   std::string sPath () const
+   {
+      return (std::filesystem::path (m_sPath_Permanent) / m_CID.sPersonaHash / m_CID.sFingerprint.substr (0, 2) / m_CID.sFingerprint.substr (2, 22) / m_CID.sContainerName / m_sDiskKey.substr (0, 2)).string ();
+   }
+
+   std::string sFilename (const std::string& sExt) const
+   {
+      std::string sName = m_sDiskKey.substr (2);
+
+      if (!sExt.empty ())
+         sName += "." + sExt;
+
+      return sName;
+   }
+
+   std::string sPathname (const std::string& sExt) const
+   {
+      return (std::filesystem::path (sPath ()) / sFilename (sExt)).string ();
+   }
+
+public:
+   FILE*       m_pFile;
+   NETWORK*    m_pNetwork;
+   VIEWPORT*   m_pViewport;
+   VIEWPORT::CONTAINER::CID m_CID;
+   ASSET*      m_pAsset;
+   IFILE*      m_pListener;
+   std::mutex  m_mxFile;
+
+   std::string m_sPath_Permanent;
+   std::string m_sDiskKey;
+   std::string m_sUrl;
+   std::string m_sOpenHash;
+   uint32_t    m_nFileIx;
+   uint32_t    m_nAssetIx;
+   bool        m_bCacheEnabled;
+
+   STATE       m_bState;
+   double      m_dFetchQueuedTime;
+   double      m_dFetchStartTime;
+
+   std::string m_sHash;
+   std::string m_sContentType;
+   uint64_t    m_nSizeBytes;
+   long        m_nHttpStatus;
+   double      m_dFetchEndTime;
+   bool        m_bServedFromCache;
+
+   bool        m_bPending_Clear;
+   bool        m_bPending_Close;
+};
+
+// ---------------------------------------------------------------------------
+// Constructor / Destructor
+// ---------------------------------------------------------------------------
+
+NETWORK::FILE::FILE (NETWORK* pNetwork, VIEWPORT* pViewport, VIEWPORT::CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
+   m_pImpl (new Impl (this, pNetwork, pViewport, pCID, nFileIx, sUrl, sHash, bCacheEnabled))
+{
+}
+
+bool NETWORK::FILE::Initialize (IFILE* pListener)
+{
+   return m_pImpl->Initialize (pListener);
+}
+
+NETWORK::FILE::~FILE ()
+{
+   delete m_pImpl;
 }
 
 // ---------------------------------------------------------------------------
-// Actions
+// Attach / Detach / Close
 // ---------------------------------------------------------------------------
 
-bool NETWORK::FILE::Request (IFILE* pListener)
-{
-   m_pListener = pListener;
-   
-   return m_pNetwork->Reopen (this);
-}
+bool NETWORK::FILE::Attach        (IFILE* pListener, bool bFetch) { return m_pImpl->Attach           (pListener, bFetch); }
+void NETWORK::FILE::Detach        ()                              {        m_pImpl->Detach           (); }
 
-void NETWORK::FILE::Release ()
-{
-   m_pNetwork->Release (this);
-}
+void NETWORK::FILE::Clear         ()                              {        m_pImpl->Clear            (); }
+void NETWORK::FILE::Close         ()                              {        m_pImpl->Close            (); }
+void NETWORK::FILE::Reset         ()                              {        m_pImpl->Reset            (); }
 
-void NETWORK::FILE::Clear (bool b)
-{
-   m_pNetwork->Clear (this, b);
-}
+bool NETWORK::FILE::Pending_Clear ()                              { return m_pImpl->Pending_Clear    (); }
+bool NETWORK::FILE::Pending_Close ()                              { return m_pImpl->Pending_Close    (); }
+void NETWORK::FILE::Pending_Reset ()                              {        m_pImpl->m_pAsset->Reset  (); }
 
-void NETWORK::FILE::Reset (bool b)
-{
-   m_pNetwork->Reset (this, b);
-}
+// ---------------------------------------------------------------------------
+// Notify — host callbacks
+// ---------------------------------------------------------------------------
+
+void NETWORK::FILE::Notify_Changed   ()                    {        m_pImpl->Notify_Changed (); }
+
+// ---------------------------------------------------------------------------
+// Snapshot — copies display fields from the attached ASSET
+// ---------------------------------------------------------------------------
+
+void NETWORK::FILE::SnapshotInitial  () { m_pImpl->SnapshotInitial (); }
+void NETWORK::FILE::SnapshotProgress () { m_pImpl->SnapshotProgress (); }
+void NETWORK::FILE::SnapshotFinal    () { m_pImpl->SnapshotFinal (); }
 
 // ---------------------------------------------------------------------------
 // ASSET-dependent accessors (require attached ASSET)
 // ---------------------------------------------------------------------------
 
-std::vector<uint8_t> NETWORK::FILE::ReadData () const
-{
-   return m_pAsset->ReadData ();
-}
+std::string                                        NETWORK::FILE::Header            (const std::string& sName) const { return m_pImpl->m_pAsset->Header (sName); }
 
-std::string NETWORK::FILE::Header (const std::string& sName) const
-{
-   return m_pAsset->Header (sName);
-}
+std::vector<uint8_t>                               NETWORK::FILE::ReadData          () const { return m_pImpl->m_pAsset->ReadData (); }
+std::string                                        NETWORK::FILE::DiskPath          () const { return m_pImpl->m_pAsset->DiskPath (); }
+std::string                                        NETWORK::FILE::CreatedTime       () const { return m_pImpl->m_pAsset->CreatedTime (); }
+std::string                                        NETWORK::FILE::LastAccessTime    () const { return m_pImpl->m_pAsset->LastAccessTime (); }
+uint32_t                                           NETWORK::FILE::AccessCount       () const { return m_pImpl->m_pAsset->AccessCount (); }
+const std::unordered_map<std::string, std::string> NETWORK::FILE::Headers           () const { return m_pImpl->m_pAsset->Headers (); }
+std::string                                        NETWORK::FILE::ContainerName     () const { return m_pImpl->m_CID.DisplayName (); }
+NETWORK::STATE                                     NETWORK::FILE::State             () const { return m_pImpl->m_bState; }
+bool                                               NETWORK::FILE::IsReady           () const { return m_pImpl->m_bState == STATE_READY; }
+std::string                                        NETWORK::FILE::Url               () const { return m_pImpl->m_sUrl; }
+std::string                                        NETWORK::FILE::Hash              () const { return m_pImpl->m_sHash; }
+bool                                               NETWORK::FILE::IsHashed          () const { return !m_pImpl->m_sHash.empty (); }
+uint32_t                                           NETWORK::FILE::FileIx            () const { return m_pImpl->m_nFileIx; }
+uint32_t                                           NETWORK::FILE::AssetIx           () const { return m_pImpl->m_nAssetIx; }
+long                                               NETWORK::FILE::HttpStatus        () const { return m_pImpl->m_nHttpStatus; }
+double                                             NETWORK::FILE::FetchQueuedTime   () const { return m_pImpl->m_dFetchQueuedTime; }
+double                                             NETWORK::FILE::FetchStartTime    () const { return m_pImpl->m_dFetchStartTime; }
+double                                             NETWORK::FILE::FetchEndTime      () const { return m_pImpl->m_dFetchEndTime; }
+double                                             NETWORK::FILE::FetchDuration     () const { return m_pImpl->m_dFetchEndTime - m_pImpl->m_dFetchStartTime; }
+bool                                               NETWORK::FILE::IsServedFromCache () const { return m_pImpl->m_bServedFromCache; }
+std::string                                        NETWORK::FILE::ContentType       () const { return m_pImpl->m_sContentType; }
+uint64_t                                           NETWORK::FILE::SizeBytes         () const { return m_pImpl->m_nSizeBytes; }
 
-std::string NETWORK::FILE::DiskPath () const
-{
-   return m_pAsset->DiskPath ();
-}
+bool                                               NETWORK::FILE::IsPending_Clear   () const { return m_pImpl->m_bPending_Clear; }
+bool                                               NETWORK::FILE::IsPending_Close   () const { return m_pImpl->m_bPending_Close; }
 
-std::string NETWORK::FILE::CreatedTime () const
-{
-   return m_pAsset->CreatedTime ();
-}
+VIEWPORT*                                          NETWORK::FILE::Viewport          () const { return m_pImpl->m_pViewport; }
 
-std::string NETWORK::FILE::LastAccessTime () const
-{
-   return m_pAsset->LastAccessTime ();
-}
+const std::string&                                 NETWORK::FILE::sPath_Permanent   () const { return m_pImpl->m_sPath_Permanent; }
+std::string                                        NETWORK::FILE::sPath             () const { return m_pImpl->sPath (); }
+std::string                                        NETWORK::FILE::sFilename         (const std::string& sExt) const { return m_pImpl->sFilename (sExt); }
+std::string                                        NETWORK::FILE::sPathname         (const std::string& sExt) const { return m_pImpl->sPathname (sExt); }
 
-uint32_t NETWORK::FILE::AccessCount () const
-{
-   return m_pAsset->AccessCount ();
-}
+NETWORK::IFILE*                                    NETWORK::FILE::Listener          () const { return m_pImpl->m_pListener; }
 
-const std::unordered_map<std::string, std::string> NETWORK::FILE::Headers () const
-{
-   return m_pAsset->Headers ();
-}
-
-std::string NETWORK::FILE::ContainerName () const
-{
-   return m_CID.DisplayName ();
-}
-
-NETWORK::STATE NETWORK::FILE::State () const
-{ 
-   return m_bState; 
-}
-
-bool NETWORK::FILE::IsReady () const 
-{ 
-   return m_bState == STATE_READY; 
-}
-
-std::string NETWORK::FILE::Url () const 
-{ 
-   return m_sUrl; 
-}
-
-std::string NETWORK::FILE::Hash () const 
-{ 
-   return m_sHash; 
-}
-
-bool NETWORK::FILE::IsHashed () const 
-{ 
-   return !m_sHash.empty (); 
-}
-
-uint32_t NETWORK::FILE::FileIx () const 
-{ 
-   return m_nFileIx; 
-}
-
-uint32_t NETWORK::FILE::AssetIx () const 
-{ 
-   return m_nAssetIx; 
-}
-
-long NETWORK::FILE::HttpStatus () const 
-{ 
-   return m_nHttpStatus; 
-}
-
-double NETWORK::FILE::FetchQueuedTime () const 
-{ 
-   return m_dFetchQueuedTime; 
-}
-
-double NETWORK::FILE::FetchStartTime () const 
-{ 
-   return m_dFetchStartTime; 
-}
-
-double NETWORK::FILE::FetchEndTime () const 
-{ 
-   return m_dFetchEndTime; 
-}
-
-double NETWORK::FILE::FetchDuration () const 
-{ 
-   return m_dFetchEndTime - m_dFetchStartTime; 
-}
-
-bool NETWORK::FILE::IsServedFromCache () const 
-{ 
-   return m_bServedFromCache; 
-}
-
-std::string NETWORK::FILE::ContentType () const
-{ 
-   return m_sContentType; 
-}
-
-uint64_t NETWORK::FILE::SizeBytes () const
-{ 
-   return m_nSizeBytes; 
-}
-
-NETWORK::ASSET* NETWORK::FILE::Asset () const
-{ 
-   return m_pAsset; 
-}
-
-void NETWORK::FILE::SetAsset (ASSET* pAsset)
-{ 
-   m_pAsset = pAsset; 
-}
-
-bool NETWORK::FILE::IsPendingClear () const
-{ 
-   return m_bPendingClear; 
-}
-
-bool NETWORK::FILE::IsReleased () const
-{ 
-   return m_bReleased; 
-}
-
-bool NETWORK::FILE::IsAttached () const
-{ 
-   return m_pAsset != nullptr; 
-}
-
-void NETWORK::FILE::SetReleased ()
-{ 
-   m_bReleased = true; 
-}
-
-bool NETWORK::FILE::SetPendingClear (bool b)
-{ 
-   bool bChanged = (b != m_bPendingClear); m_bPendingClear = b; 
-
-   return bChanged; 
-}
-
-VIEWPORT* NETWORK::FILE::Viewport () const
-{
-   return m_pViewport;
-}
-
-NETWORK::IFILE* NETWORK::FILE::Listener () const
-{ 
-   return m_pListener; 
-}
+const std::string&                                 NETWORK::FILE::OpenHash          () const { return m_pImpl->m_sOpenHash; }
+bool                                               NETWORK::FILE::CacheEnabled      () const { return m_pImpl->m_bCacheEnabled; }

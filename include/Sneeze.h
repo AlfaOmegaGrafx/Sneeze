@@ -51,7 +51,7 @@ namespace SNEEZE
 
       // --- Inspector callbacks (optional) ---
 
-      virtual void OnNetworkFileCreated (NETWORK::FILE*) {}
+      virtual bool OnNetworkFileCreated (NETWORK::FILE*) { return true; }
       virtual void OnNetworkFileChanged (NETWORK::FILE*) {}
       virtual void OnNetworkFileDeleted (NETWORK::FILE*) {}
 

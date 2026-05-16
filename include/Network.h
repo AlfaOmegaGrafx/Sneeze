@@ -24,12 +24,13 @@ namespace SNEEZE
    // via handle-based FILE objects. All files persist across restarts. Files
    // with a cryptographic hash are additionally integrity-verified.
    //
-   // Callers request files via Request(), which returns a FILE* handle. When
-   // done, they must return it via Release(). Assets are loaded lazily on first
-   // Request(). Only assets with active FILE handles live in m_mapAssets. The
-   // .meta sidecar is flushed to disk when the last active handle releases.
+   // Callers open files via File_Open(), which returns a FILE* handle. When
+   // done, they must return it via File_Close(). Assets are loaded lazily on
+   // first File_Open(). Only assets with active FILE handles live in
+   // m_mapAssets. The .meta sidecar is flushed to disk when the last active
+   // handle closes.
    //
-   // Background fetches are capped at 16 concurrent threads. Overflow requests
+   // Background fetches are capped at 16 concurrent threads. Overflow fetches
    // queue and are dispatched as threads complete.
    // ---------------------------------------------------------------------------
 
@@ -49,14 +50,6 @@ namespace SNEEZE
          STATE_READY      = 3,
          STATE_FAILED     = 4,
       };
-
-      enum REQUEST
-      {
-         REQUEST_CREATE = 0x01,
-         REQUEST_FETCH  = 0x02,
-      };
-
-      static const uint32_t kREQUEST_DEFAULT = REQUEST_CREATE | REQUEST_FETCH;
 
       enum DISKFILE
       {
@@ -82,6 +75,16 @@ namespace SNEEZE
          virtual void OnAsset (FILE* pFile) = 0;
       };
 
+      // Result delivered by a completed FETCH to its owning ASSET.
+      struct FETCH_RESULT
+      {
+         bool        bSuccess;
+         std::string sFinalPath;
+         uint64_t    nSizeBytes;
+         long        nHttpStatus;
+         std::unordered_map<std::string, std::string> mapHeaders;
+      };
+
       // -----------------------------------------------------------------------
       // ASSET — internal shared state for a single cached URL.
       //
@@ -89,28 +92,40 @@ namespace SNEEZE
       // Multiple FILE handles may reference the same ASSET.
       // -----------------------------------------------------------------------
 
+      class FETCH;
+
       class ASSET
       {
       public:
-         ASSET (NETWORK* pNetwork, const std::string& sUrl, const std::string& sHash);
+         ASSET (NETWORK* pNetwork, const std::string& sUrl, const std::string& sPathname, uint32_t nAssetIx);
          virtual ~ASSET ();
 
-         std::string Header (const std::string& sName) const;
+         // Lifecycle
+         void        Open (FILE* pFile);
+         size_t      Close (FILE* pFile);
 
-         void        TouchAccess ();
+         bool        Attach (FILE* pFile, bool bFetch_Allowed);
+         void        Detach (FILE* pFile);
 
-         void        AttachFile (FILE* pFile);
-         void        DetachFile (FILE* pFile);
+         // State transitions
+         void        Resolve (const std::string& sFinalPath, uint64_t nSizeBytes, long nHttpStatus, double dFetchEndTime, const std::unordered_map<std::string, std::string>& mapHeaders);
+         void        Fail (long nHttpStatus, double dFetchEndTime, const std::unordered_map<std::string, std::string>& mapHeaders);
 
-         void        Complete (const std::string& sDiskPath, uint64_t nSizeBytes);
-         void        ResetState ();
+         // Fetch completion (called by FETCH thread)
+         void        FetchComplete (const FETCH_RESULT& result);
+
+         // Hash verification
+         bool        VerifyHash (const std::string& sFilePath, const std::string& sHash) const;
 
          std::vector<uint8_t> ReadData () const;
+         std::string Header (const std::string& sName) const;
 
          // Accessors
+         ENGINE*              Engine            () const;
+         bool                 IsShuttingDown    () const;
          STATE                State             () const;
-         bool                 IsPendingReset    () const;
-         size_t               GetFileCount      () const;
+         bool                 IsReset           () const;
+         size_t               File_Count        () const;
          const std::string&   Url               () const;
          uint64_t             SizeBytes         () const;
          std::string          CreatedTime       () const;
@@ -120,30 +135,20 @@ namespace SNEEZE
          const std::string&   Hash              () const;
          bool                 IsHashed          () const;
          const std::string&   DiskPath          () const;
+         const std::string&   Pathname          () const;
+         std::string          Path              (DISKFILE eType) const;
          long                 HttpStatus        () const;
          double               FetchStartTime    () const;
          double               FetchEndTime      () const;
          double               FetchDuration     () const;
          double               FetchQueuedTime   () const;
-         double               GetQueueDuration  () const;
+         double               QueueDuration     () const;
          bool                 IsServedFromCache () const;
-         std::vector<FILE*>   CollectFiles      () const;
+         std::vector<FILE*>   File_Collect      () const;
          const std::unordered_map<std::string, std::string>& Headers () const;
 
          // Modifiers
-         void SetHttpStatus      (long nStatus);
-         void SetFetchStartTime  (double dTime);
-         void SetFetchEndTime    (double dTime);
-         void SetFetchQueuedTime (double dTime);
-         void SetServedFromCache (bool bServed);
-         void SetDiskPath        (const std::string& sPath);
-         void SetHash            (const std::string& sHash);
-         void SetSizeBytes       (uint64_t nBytes);
-         void SetCreatedTime     (const std::string& sTime);
-         void SetAssetIx         (uint32_t nAssetIx);
-         void SetPendingReset    (bool b);
-         void SetState           (STATE eState);
-         void SetHeaders         (const std::unordered_map<std::string, std::string>& mapHeaders);
+         void Reset              ();
 
       private:
          class Impl;
@@ -153,18 +158,18 @@ namespace SNEEZE
       // -----------------------------------------------------------------------
       // FILE — per-caller handle to a cached resource.
       //
-      // Created by NETWORK::Request(), returned to the caller as a raw pointer.
+      // Created by NETWORK::File_Open(), returned to the caller as a raw pointer.
       // Owns a snapshot of the asset's display-level fields so the inspector can
-      // read them after Release.
+      // read them after Close.
       // -----------------------------------------------------------------------
 
       class FILE
       {
       public:
-         FILE (NETWORK* pNetwork, ASSET* pAsset, VIEWPORT::CONTAINER::CID* pCID, VIEWPORT* pViewport, IFILE* pListener, uint32_t nFileIx);
+         FILE (NETWORK* pNetwork, VIEWPORT* pViewport, VIEWPORT::CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled);
          ~FILE ();
 
-         // --- Snapshot fields (always available, even after Release) ---
+         // --- Snapshot fields (always available, even after Close) ---
 
          STATE                State             () const;
          bool                 IsReady           () const;
@@ -185,7 +190,7 @@ namespace SNEEZE
          std::string          ContentType       () const;
          uint64_t             SizeBytes         () const;
 
-         // --- ASSET-dependent (require attached ASSET, empty/default after Release) ---
+         // --- ASSET-dependent (require attached ASSET, empty/default after Close) ---
 
          std::vector<uint8_t> ReadData          () const;
          std::string          Header (const std::string& sName) const;
@@ -195,67 +200,55 @@ namespace SNEEZE
          uint32_t             AccessCount       () const;
          const std::unordered_map<std::string, std::string> Headers () const;
 
-         // --- Actions ---
-
-         bool                 Request           (IFILE* pListener = nullptr);
-         void                 Release           ();
-         void                 Clear             (bool b = true);
-         void                 Reset             (bool b = true);
-
          // --- Container ---
 
          std::string ContainerName () const;
          VIEWPORT* Viewport () const;
 
+         // --- Paths ---
+
+         const std::string& sPath_Permanent () const;
+         std::string        sPath () const;
+         std::string        sFilename (const std::string& sExt = "") const;
+         std::string        sPathname (const std::string& sExt = "") const;
+
          // --- Listener ---
 
          IFILE* Listener () const;
 
+         // --- Open-time state (locked in at construction) ---
+
+         const std::string& OpenHash  () const;
+         bool               CacheEnabled () const;
+
+         // --- Lifecycle ---
+
+         bool   Initialize (IFILE* pListener = nullptr);
+         bool   Attach     (IFILE* pListener, bool bFetch = true);
+         void   Detach     ();
+         void   Clear      ();
+         void   Close      ();
+         void   Reset      ();
+
          // --- Internal (NETWORK use only) ---
 
-         ASSET* Asset () const;
-         void   SetAsset (ASSET* pAsset);
-         bool   IsPendingClear () const;
-         bool   IsReleased () const;
-         bool   IsAttached () const;
+         bool   IsPending_Clear () const;
+         bool   IsPending_Close () const;
 
-         void   SetReleased ();
-         bool   SetPendingClear (bool b);
+         bool   Pending_Clear ();
+         bool   Pending_Close ();
+         void   Pending_Reset ();
+
+         void   Notify_Changed ();
 
          void   SnapshotInitial ();
          void   SnapshotProgress ();
          void   SnapshotFinal ();
 
       private:
-         NETWORK*    m_pNetwork;
-         ASSET*      m_pAsset;
-         VIEWPORT::CONTAINER::CID m_CID;
-         VIEWPORT* m_pViewport;
-         IFILE*      m_pListener;
 
-         // Initial (set once at construction — request identity)
-         std::string m_sUrl;
-         uint32_t    m_nFileIx;
-         uint32_t    m_nAssetIx;
-
-         // Progress (updated during fetch lifecycle)
-         STATE       m_bState;
-         double      m_dFetchQueuedTime;
-         double      m_dFetchStartTime;
-
-         // Final (set when fetch resolves)
-         std::string m_sHash;
-         std::string m_sContentType;
-         uint64_t    m_nSizeBytes;
-         long        m_nHttpStatus;
-         double      m_dFetchEndTime;
-         bool        m_bServedFromCache;
-
-         // Control flags
-         bool        m_bPendingClear;
-         bool        m_bReleased;
-
-         static const std::unordered_map<std::string, std::string> s_mapEmpty;
+         class Impl;
+         Impl* m_pImpl;
       };
 
       // -----------------------------------------------------------------------
@@ -265,30 +258,34 @@ namespace SNEEZE
       explicit NETWORK (ENGINE* pEngine);
       ~NETWORK ();
 
+      ENGINE*     Engine () const;
+      bool        IsShuttingDown () const;
+      double      SecondsSinceEpoch () const;
+      uint32_t    Asset_Index ();
+      bool        Rules_Stale (ASSET* pAsset) const;
+      ASSET*      Asset_Open  (FILE* pFile);
+      void        Asset_Close (ASSET* pAsset, FILE* pFile);
+
       bool Initialize ();
 
       // --- Primary API ---
 
-      FILE* Request (IFILE* pListener, VIEWPORT* pViewport, VIEWPORT::CONTAINER::CID* pCID, const std::string& sUrl);
-      FILE* Request (IFILE* pListener, VIEWPORT* pViewport, VIEWPORT::CONTAINER::CID* pCID, const std::string& sUrl, const std::string& sHash, uint32_t bFlags = kREQUEST_DEFAULT, uint32_t nMetaIx = 0);
-      void  Release (FILE* pFile);
-      bool  Reopen  (FILE* pFile);
-      void  Clear   (FILE* pFile, bool b = true);
-      void  Reset   (FILE* pFile, bool b = true);
+      FILE* File_Open (VIEWPORT* pViewport, VIEWPORT::CONTAINER::CID* pCID, const std::string& sUrl, IFILE* pListener);
+      FILE* File_Open (VIEWPORT* pViewport, VIEWPORT::CONTAINER::CID* pCID, const std::string& sUrl, const std::string& sHash, uint32_t nAssetIx = 0, IFILE* pListener = nullptr);
+      void  File_Clear (FILE* pFile);
+      void  File_Close (FILE* pFile);
+      void  File_Reset (FILE* pFile);
 
       // --- Cache management ---
 
       void SetCacheEnabled (bool b);
       bool IsCacheEnabled () const;
 
-      void SetDisplayEnabled (bool b);
-      bool IsDisplayEnabled () const;
-
       void Clear ();
       void Reset ();
-      void Enumerate (IENUM* pEnum, VIEWPORT* pViewport);
+      void File_Enum (IENUM* pEnum, VIEWPORT* pViewport);
 
-      void AddRule (const std::string& sContentType, const std::string& sOlderThan);
+      void Rules_Add (const std::string& sContentType, const std::string& sOlderThan);
 
    private:
       class Impl;

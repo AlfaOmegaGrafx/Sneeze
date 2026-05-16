@@ -22,6 +22,10 @@
 #include "xr/XrRuntime.h"
 #include "ui/UiContext.h"
 
+#include <curl/curl.h>
+
+using namespace SNEEZE;
+
 std::string NowIso8601 ()
 {
    auto tpNow = std::chrono::system_clock::now ();
@@ -55,6 +59,7 @@ public:
       m_pSpvPipeline (nullptr),
       m_pXrRuntime   (nullptr),
       m_pUiContext   (nullptr),
+      m_nCurlInit    (CURLE_FAILED_INIT),
       m_pControl     (nullptr),
       m_pNetwork     (nullptr),
       m_pStorage     (nullptr),
@@ -88,31 +93,37 @@ m_pPersona = new persona::PERSONA (m_pEngine);
 
                   if (m_pUiContext->Initialize (m_pEngine))
                   {
-                     m_pNetwork = new NETWORK (m_pEngine);
+                     m_nCurlInit = curl_global_init (CURL_GLOBAL_DEFAULT);
 
-                     if (m_pNetwork->Initialize ())
+                     if (m_nCurlInit == CURLE_OK)
                      {
-                        m_pStorage = new STORAGE (m_pEngine);
+                        m_pNetwork = new NETWORK (m_pEngine);
 
-                        if (m_pStorage->Initialize ())
+                        if (m_pNetwork->Initialize ())
                         {
-                           m_pControl = new CONTROL (m_pEngine);
+                           m_pStorage = new STORAGE (m_pEngine);
 
-                           if (m_pControl->Initialize (nAgentCount))
+                           if (m_pStorage->Initialize ())
                            {
-                              if (InitializePaths ())
-                              {
-                                 m_bInitialized = true;
+                              m_pControl = new CONTROL (m_pEngine);
 
-                                 m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SNEEZE", "Initialized (1 engine thread + " + std::to_string (nAgentCount) + " agents)");
+                              if (m_pControl->Initialize (nAgentCount))
+                              {
+                                 if (InitializePaths ())
+                                 {
+                                    m_bInitialized = true;
+
+                                    m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SNEEZE", "Initialized (1 engine thread + " + std::to_string (nAgentCount) + " agents)");
+                                 }
+                                 else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize paths");
                               }
-                              else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize paths");
+                              else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize control");
                            }
-                           else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize control");
+                           else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize storage");
                         }
-                        else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize storage");
+                        else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize network");
                      }
-                     else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize network");
+                     else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "curl_global_init failed (code " + std::to_string (static_cast<int> (m_nCurlInit)) + ")");
                   }
                   else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize UI context");
                }
@@ -145,6 +156,9 @@ m_pPersona = new persona::PERSONA (m_pEngine);
 
       delete m_pNetwork;
       m_pNetwork = nullptr;
+
+      if (m_nCurlInit == CURLE_OK)
+         curl_global_cleanup ();
 
       delete m_pUiContext;
       m_pUiContext = nullptr;
@@ -410,7 +424,8 @@ private:
    SNEEZE::DEP::SPV_PIPELINE* m_pSpvPipeline;
    SNEEZE::DEP::XR_RUNTIME*   m_pXrRuntime;
    SNEEZE::DEP::UI_CONTEXT*   m_pUiContext;
-   
+   CURLcode                   m_nCurlInit;
+
    // Control (owns engine thread, agents, metronome, cleanup queue)
    CONTROL*                   m_pControl;
 
