@@ -225,7 +225,9 @@ static void TestUnhashedFetch ()
             Check (pFile->FetchDuration () > 0.0, "Fetch duration is positive");
             Check (!pFile->IsServedFromCache (), "Not served from cache");
 
-            std::vector<uint8_t> aData = pFile->ReadData ();
+            std::vector<uint8_t> aData;
+            
+            pFile->ReadData (aData);
             Check (!aData.empty (), "ReadData returned content");
             Check (aData.size () == pFile->SizeBytes (), "ReadData size matches SizeBytes");
 
@@ -312,7 +314,8 @@ static void TestHashVerifiedFetch ()
       bool bPreResult = listenerPreFetch.WaitFor (15000);
       if (bPreResult  &&  listenerPreFetch.Succeeded ())
       {
-         std::vector<uint8_t> aData = pPreFile->ReadData ();
+         std::vector<uint8_t> aData;
+         pPreFile->ReadData (aData);
          std::string sContent (aData.begin (), aData.end ());
          std::printf ("    Pre-fetch content: \"%s\" (%zu bytes)\n",
             sContent.c_str (), aData.size ());
@@ -339,7 +342,8 @@ static void TestHashVerifiedFetch ()
                Check (pVerFile->IsHashed (), "Verified file is persistent (hashed)");
                Check (pVerFile->Hash () == sSri, "Hash matches SRI");
 
-               std::vector<uint8_t> aVerData = pVerFile->ReadData ();
+               std::vector<uint8_t> aVerData;
+               pVerFile->ReadData (aVerData);
                Check (aVerData == aData, "Verified data matches original");
             }
             else
@@ -542,7 +546,8 @@ static void TestSidecarPersistence ()
       NETWORK::FILE* pPre = pNetwork->File_Open (s_pViewport, &s_pTestCID, sUrl, &listenerPre);
       if (pPre  &&  listenerPre.WaitFor (15000)  &&  listenerPre.Succeeded ())
       {
-         std::vector<uint8_t> aData = pPre->ReadData ();
+         std::vector<uint8_t> aData;
+         pPre->ReadData (aData);
          std::string sDigest = ComputeSha256Hex (aData.data (), aData.size ());
          sSri = "sha256-" + sDigest;
          pPre->Reset ();
@@ -587,7 +592,8 @@ static void TestSidecarPersistence ()
          Check (pReload->Hash () == sSri, "Hash matches after reload");
          Check (pReload->AssetIx () > 0, "Asset index preserved across sessions");
 
-         std::vector<uint8_t> aData = pReload->ReadData ();
+         std::vector<uint8_t> aData;
+         pReload->ReadData (aData);
          Check (!aData.empty (), "Data is readable after reload");
 
          pReload->Close ();
