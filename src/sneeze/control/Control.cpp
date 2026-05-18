@@ -16,57 +16,57 @@
 #include "Control.h"
 
 // ---------------------------------------------------------------------------
-// Agent configuration table
+// Pool / agent configuration table
 // ---------------------------------------------------------------------------
 
-enum eAGENT
+enum ePOOL
 {
-   kAGENT_COMPOSITOR = 0,
-   kAGENT_SCRUBBER   = 1,
-   kAGENT_C          = 2,
-   kAGENT_D          = 3,
-   kAGENT_E          = 4,
+   kPOOL_COMPOSITOR = 0,
+   kPOOL_SCRUB      = 1,
+   kPOOL_FETCH      = 2,
+   kPOOL_C          = 3,
 };
 
 struct AGENT_INIT
 {
-   int                                                  nHertz;
-   std::function<SNEEZE::AGENT* (SNEEZE::CONTROL*, int)>        fnCreate;
+   int                                                       nHertz;
+   int                                                       nAgents;
+   std::function<SNEEZE::POOL*  (SNEEZE::CONTROL*)>          fnCreate_Pool;
+   std::function<SNEEZE::AGENT* (SNEEZE::POOL*, int)>        fnCreate_Agent;
 };
 
 static const std::vector<AGENT_INIT> aAgent_Init =
 {
-   {   0, [] (SNEEZE::CONTROL* pControl, int nIx) -> SNEEZE::AGENT* { return new SNEEZE::AGENT::COMPOSITOR (pControl, nIx); } },
-   {   1, [] (SNEEZE::CONTROL* pControl, int nIx) -> SNEEZE::AGENT* { return new SNEEZE::AGENT::SCRUBBER   (pControl, nIx); } },
-   {  30, [] (SNEEZE::CONTROL* pControl, int nIx) -> SNEEZE::AGENT* { return new SNEEZE::AGENT::C          (pControl, nIx); } },
-   {  60, [] (SNEEZE::CONTROL* pControl, int nIx) -> SNEEZE::AGENT* { return new SNEEZE::AGENT::D          (pControl, nIx); } },
-   {  64, [] (SNEEZE::CONTROL* pControl, int nIx) -> SNEEZE::AGENT* { return new SNEEZE::AGENT::E          (pControl, nIx); } },
+   {  0,  1, [] (SNEEZE::CONTROL* pControl)->SNEEZE::POOL* { return new SNEEZE::POOL                          (pControl); }, [] (SNEEZE::POOL* pPool, int nAgentIz)->SNEEZE::AGENT* { return new SNEEZE::AGENT::COMPOSITOR (pPool, nAgentIz); } },
+   {  0,  2, [] (SNEEZE::CONTROL* pControl)->SNEEZE::POOL* { return new SNEEZE::POOL_QUEUE<SNEEZE::ISCRUB*>   (pControl); }, [] (SNEEZE::POOL* pPool, int nAgentIz)->SNEEZE::AGENT* { return new SNEEZE::AGENT::SCRUB     (pPool, nAgentIz); } },
+   {  0, 16, [] (SNEEZE::CONTROL* pControl)->SNEEZE::POOL* { return new SNEEZE::POOL_QUEUE<SNEEZE::IFETCH*>   (pControl); }, [] (SNEEZE::POOL* pPool, int nAgentIz)->SNEEZE::AGENT* { return new SNEEZE::AGENT::FETCH      (pPool, nAgentIz); } },
+   { 30,  1, [] (SNEEZE::CONTROL* pControl)->SNEEZE::POOL* { return new SNEEZE::POOL                          (pControl); }, [] (SNEEZE::POOL* pPool, int nAgentIz)->SNEEZE::AGENT* { return new SNEEZE::AGENT::C          (pPool, nAgentIz); } },
 };
 
 /***********************************************************************************************************************************
 **  CONTROL
-**
 ***********************************************************************************************************************************/
 
-SNEEZE::CONTROL::CONTROL (ENGINE* pEngine) :
-   THREAD (),
-   m_pEngine (pEngine),
-   m_bCleanupPending (false)
+SNEEZE::CONTROL::CONTROL (::SNEEZE::ENGINE* pEngine) : THREAD (),
+   m_pEngine (pEngine)
 {
+}
+
+SNEEZE::CONTROL::~CONTROL ()
+{
+   Join ();
 }
 
 bool SNEEZE::CONTROL::Initialize (int& nAgentCount)
 {
    bool bResult = THREAD::Initialize ();
 
-   nAgentCount = static_cast<int> (m_aAgent_State.size ());
+   nAgentCount = 0;
+
+   for (auto* pPool : m_apPool)
+      nAgentCount += static_cast<int> (pPool->m_apAgent.size ());
 
    return bResult;
-}
-
-SNEEZE::CONTROL::~CONTROL ()
-{
-   Join ();
 }
 
 SNEEZE::ENGINE* SNEEZE::CONTROL::Engine () const
@@ -75,33 +75,31 @@ SNEEZE::ENGINE* SNEEZE::CONTROL::Engine () const
 }
 
 // ---------------------------------------------------------------------------
-// Cleanup queue
+// Public API -- delegates immediately to pool methods
 // ---------------------------------------------------------------------------
 
-void SNEEZE::CONTROL::Cleanup_Queue (const std::string& sPath)
+SNEEZE::POOL_QUEUE<SNEEZE::ISCRUB*>& SNEEZE::CONTROL::Pool_Scrub ()
 {
-   {
-      std::lock_guard<std::mutex> guard (m_mxCleanup);
-
-      m_aCleanupPath.push_back (sPath);
-      m_bCleanupPending = true;
-   }
-
-   Signal ();
+   return static_cast<POOL_QUEUE<ISCRUB*>&> (*m_apPool[kPOOL_SCRUB]);
 }
 
-void SNEEZE::CONTROL::Cleanup_SwapQueue (std::vector<std::string>& aPath)
+SNEEZE::POOL_QUEUE<SNEEZE::IFETCH*>& SNEEZE::CONTROL::Pool_Fetch ()
 {
-   {
-      std::lock_guard<std::mutex> guard (m_mxCleanup);
-   
-      aPath.swap (m_aCleanupPath);
-      m_bCleanupPending = false;
-   }
+   return static_cast<POOL_QUEUE<IFETCH*>&> (*m_apPool[kPOOL_FETCH]);
+}
+
+void SNEEZE::CONTROL::Queue_Post_Scrub (ISCRUB* pIScrub)
+{
+   Pool_Scrub ().Post (pIScrub);
+}
+
+void SNEEZE::CONTROL::Queue_Post_Fetch (IFETCH* pIFetch)
+{
+   Pool_Fetch ().Post (pIFetch);
 }
 
 // ---------------------------------------------------------------------------
-// Thread loop (metronome + agent scheduling)
+// Thread loop (metronome + pool scheduling)
 // ---------------------------------------------------------------------------
 
 void SNEEZE::CONTROL::Main ()
@@ -110,21 +108,21 @@ void SNEEZE::CONTROL::Main ()
    timeBeginPeriod (1);
 #endif
 
-   // --- Create and initialize agent threads ---
+   // --- Create pools and their agent threads ---
 
    bool bInitialized = true;
+
    for (const auto& Agent_Init : aAgent_Init)
    {
-      SNEEZE::AGENT* pAgent = Agent_Init.fnCreate (this, static_cast<int> (m_aAgent_State.size ()));
+      POOL* pPool = Agent_Init.fnCreate_Pool (this);
 
-      AGENT_STATE Agent_State = { pAgent, Agent_Init.nHertz, 0, 0 };
-      m_aAgent_State.push_back (Agent_State);
+      m_apPool.push_back (pPool);
 
-      if (!pAgent->Initialize ())
+      if (!pPool->Initialize (Agent_Init.nHertz, Agent_Init.nAgents, Agent_Init.fnCreate_Agent))
       {
          bInitialized = false;
 
-         m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "CONTROL", "Agent failed to initialize");
+         m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "CONTROL", "Pool failed to initialize");
 
          break;
       }
@@ -146,60 +144,51 @@ void SNEEZE::CONTROL::Main ()
             auto tpNow = std::chrono::steady_clock::now ();
             double dElapsed = std::chrono::duration<double> (tpNow - tpOrigin).count ();
 
-            for (int nAgent = 0; nAgent < static_cast<int> (m_aAgent_State.size ()); nAgent++)
-            {
-               AGENT_STATE& Agent_State = m_aAgent_State[nAgent];
-               if (Agent_State.nHertz <= 0)
-                  continue;
+            for (auto* pPool : m_apPool)
+               pPool->Tick (dElapsed);
 
-               int64_t nCurrentTick = static_cast<int64_t> (dElapsed * Agent_State.nHertz);
-               if (nCurrentTick > Agent_State.nLastTick)
-               {
-                  Agent_State.nLastTick = nCurrentTick;
-                  Agent_State.nSignalCount++;
-                  Agent_State.pAgent->Signal ();
-               }
-            }
-
-            int64_t nCurrentSecond = static_cast<int64_t> (dElapsed);
-            if (nCurrentSecond > nLastReport)
-            {
-               std::string sMetronome;
-               for (int nAgent = 0; nAgent < static_cast<int> (m_aAgent_State.size ()); nAgent++)
-               {
-                  AGENT_STATE& Agent_State = m_aAgent_State[nAgent];
-                  if (Agent_State.nHertz <= 0)
-                     continue;
-                  sMetronome += "  [" + std::to_string (nAgent) + "] " + std::to_string (Agent_State.nSignalCount) + "/" + std::to_string (Agent_State.nHertz) + " Hz";
-                  Agent_State.nSignalCount = 0;
-               }
-
-               nLastReport = nCurrentSecond;
-
-               // m_pEngine->Log (IENGINE::kLOGLEVEL_Trace, "METRONOME", sMetronome);
-            }
+            Diagnostics (dElapsed, nLastReport);
          }
          else break;
 
          Wait (std::chrono::milliseconds (1));
-
-         if (m_bCleanupPending)
-            m_aAgent_State[kAGENT_SCRUBBER].pAgent->Signal ();
       }
       while (true);
    }
 
-   // --- Signal and destroy agent threads ---
+   // --- Shut down and destroy pools ---
 
-   for (auto& Agent_State : m_aAgent_State)
-      Agent_State.pAgent->Signal (true);
+   for (auto* pPool : m_apPool)
+      delete pPool;
 
-   for (auto& Agent_State : m_aAgent_State)
-      delete Agent_State.pAgent;
-
-   m_aAgent_State.clear ();
+   m_apPool.clear ();
 
 #ifdef _WIN32
    timeEndPeriod (1);
 #endif
+}
+
+void SNEEZE::CONTROL::Diagnostics (double dElapsed, int64_t& nLastReport)
+{
+   int64_t nCurrentSecond = static_cast<int64_t> (dElapsed);
+
+   if (nCurrentSecond > nLastReport)
+   {
+      std::string sMetronome;
+      for (int nPool = 0; nPool < static_cast<int> (m_apPool.size ()); nPool++)
+      {
+         POOL* pPool = m_apPool[nPool];
+
+         if (pPool->Hertz () > 0)
+         {
+            sMetronome += "  [" + std::to_string (nPool) + "] " + std::to_string (pPool->SignalCount ()) + "/" + std::to_string (pPool->Hertz ()) + " Hz";
+
+            pPool->SignalCount_Reset ();
+         }
+      }
+
+      nLastReport = nCurrentSecond;
+
+      // m_pEngine->Log (IENGINE::kLOGLEVEL_Trace, "METRONOME", sMetronome);
+   }
 }

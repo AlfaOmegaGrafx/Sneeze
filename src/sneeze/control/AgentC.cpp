@@ -17,8 +17,7 @@
 
 using namespace SNEEZE;
 
-AGENT::C::C (CONTROL* pControl, int nAgentIndex)
-   : AGENT (pControl, nAgentIndex)
+AGENT::C::C (POOL* pPool, int nAgentIz) : AGENT (pPool, nAgentIz)
 {
 }
 

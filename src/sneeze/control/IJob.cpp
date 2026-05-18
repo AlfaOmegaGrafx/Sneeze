@@ -15,26 +15,28 @@
 #include <Sneeze.h>
 #include "Control.h"
 
-using namespace SNEEZE;
-
-AGENT::D::D (CONTROL* pControl, int nAgentIndex)
-   : AGENT (pControl, nAgentIndex)
+bool SNEEZE::IJOB::IsCancelled () const
 {
+   std::lock_guard<std::mutex> lock (m_mxJob);
+
+   return m_bCancelled;
 }
 
-AGENT::D::~D ()
+void SNEEZE::IJOB::Cancel ()
 {
-   Join ();
+   std::lock_guard<std::mutex> lock (m_mxJob);
+
+   m_bCancelled = true;
 }
 
-void AGENT::D::Main ()
+void SNEEZE::IJOB::Complete ()
 {
-   Ready ();
-   
-   Wait ([this] { return Tick (); });
-}
+   {
+      std::lock_guard<std::mutex> lock (m_mxJob);
 
-bool AGENT::D::Tick ()
-{
-   return IsShutdown ();
+      if (!m_bCancelled)
+         Complete_Deliver ();
+   }
+
+   delete this;
 }

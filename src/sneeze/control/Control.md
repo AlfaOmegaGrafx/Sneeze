@@ -1,6 +1,6 @@
-# Control - Engine Thread, Agent Infrastructure, and Metronome
+# Control - Engine Thread, Agent Pools, and Metronome
 
-The `control` module (`SNEEZE::CONTROL` + `SNEEZE::AGENT` hierarchy) owns the engine thread, agent lifecycle, the drift-free metronome, and the disk cleanup queue. It is the engine's scheduler.
+The `control` module (`SNEEZE::CONTROL` + `SNEEZE::AGENT` hierarchy) owns the engine thread, agent pools, the drift-free metronome, and the job queues. It is the engine's scheduler.
 
 ## Architecture
 
@@ -8,17 +8,49 @@ The `control` module (`SNEEZE::CONTROL` + `SNEEZE::AGENT` hierarchy) owns the en
 CONTROL (inherits THREAD)
  ├── Engine thread (Main)
  ├── Metronome (drift-free, fixed-origin, 1ms resolution)
- ├── Agent factory table (AGENT_INIT)
- ├── Per-agent runtime state (AGENT_STATE)
- └── Cleanup queue (m_mxCleanup, m_aCleanupPath, m_bCleanupPending)
+ ├── Pool factory table (AGENT_INIT)
+ └── Pool vector (m_apPool)
+
+POOL (base class, non-template)
+ ├── Agent vector (m_apAgent)
+ ├── Metronome state (nHertz, nLastTick, nSignalCount)
+ └── Lifecycle (Initialize, Shutdown via destructor)
+
+POOL_QUEUE<JOB_PTR> (template, inherits POOL)
+ ├── Typed job queue (m_apJob, m_mxQueue)
+ ├── Post (targeted wake of first non-busy agent)
+ └── Grab (pops next job; caller updates AGENT::m_bBusy from Grab result)
 
 AGENT (inherits THREAD, abstract base)
+ ├── m_bBusy (atomic; queue workers and Post reserve / release around work)
  ├── COMPOSITOR  (self-paced, DwmFlush / 16ms sleep)
- ├── SCRUBBER    (signal-driven, drains cleanup queue)
- ├── C           (signal-driven, 30 Hz placeholder)
- ├── D           (signal-driven, 60 Hz placeholder)
- └── E           (signal-driven, 64 Hz placeholder)
+ ├── SCRUB       (queue-driven, drains ISCRUB jobs)
+ ├── FETCH       (queue-driven, drains IFETCH jobs)
+ └── C           (signal-driven, 30 Hz placeholder)
 ```
+
+## Ownership Chain
+
+```
+ENGINE -> CONTROL -> POOL -> AGENT
+```
+
+Each child holds a pointer to its immediate owner. Agents access engine services by following the chain: `m_pPool->Engine()` (which delegates to CONTROL's engine).
+
+## Job Interfaces
+
+All jobs derive from `IJOB` (base interface with `Cancel()`, `IsCancelled()`, `Release()`). Concrete jobs are heap-allocated and self-cleaning (`Release()` calls `delete this`). Callers create a job, post it, and walk away.
+
+| Interface | Concrete | Agent | Accessors | Callback |
+|-----------|----------|-------|-----------|----------|
+| `IFETCH` | `JOB_FETCH` | `AGENT::FETCH` | `Url()`, `Path_Temp()`, `Path_Data()`, `Hash()` | `OnFetch_Complete(FETCH_RESULT)` |
+| `ISCRUB` | `JOB_SCRUB` | `AGENT::SCRUB` | `Path()` | `OnScrub_Complete()` |
+
+Naming is symmetric: `JOB_FETCH -> IFETCH -> AGENT::FETCH`, `JOB_SCRUB -> ISCRUB -> AGENT::SCRUB`.
+
+### Cancellation
+
+Jobs support cancellation via `Cancel()` (sets `std::atomic<bool>`) and `IsCancelled()`. The caller calls `pJob->Cancel()` and walks away. The agent eventually grabs the job, sees the flag, skips work, and calls `Release()`.
 
 ## THREAD Base Class
 
@@ -30,7 +62,8 @@ Declared in `sneeze/Engine.h`, implemented in `sneeze/Thread.cpp`. Encapsulates 
 2. `Main()` - pure virtual, the thread's entry point
 3. `Ready(bResult)` - called by the thread to signal the initializing caller that startup is complete
 4. `Signal(bShutdown)` - wakes the thread; if `bShutdown == true`, latches the shutdown flag
-5. `~THREAD()` - calls `Signal(true)` then joins and deletes the thread
+5. `Join()` - calls `Signal(true)` then joins the thread. Must be called in every derived destructor.
+6. `~THREAD()` - calls `Join()` then deletes the thread (safety net)
 
 ### Wait Contract
 
@@ -41,96 +74,108 @@ Declared in `sneeze/Engine.h`, implemented in `sneeze/Thread.cpp`. Encapsulates 
 
 Shutdown policy belongs in derived `Main()` implementations and in predicate callables, not in the base class.
 
+## POOL
+
+Non-template base class. Manages a vector of agents, owns agent lifecycle (create, initialize, shutdown, delete), and handles its own metronome tick scheduling.
+
+### Lifecycle
+
+- `Initialize(nHertz, nAgents, fnCreate)` - stores Hz, creates and initializes agents
+- `~POOL()` - signals shutdown on all agents, deletes them, clears `m_apAgent`
+- `Tick(dElapsed)` - computes whether a tick is due based on Hz and elapsed time; if so, increments signal count and signals every agent in `m_apAgent`. No-ops if Hz is 0.
+
 ### Members
 
 | Member | Type | Purpose |
 |--------|------|---------|
-| `m_pthThread` | `std::thread*` | The managed thread |
-| `m_mxThread` | `std::mutex` | Protects condition variable |
-| `m_cvThread` | `std::condition_variable` | Wait/Signal mechanism |
-| `m_bReady` | `bool` | Ready handshake flag |
-| `m_bResult_Initialize` | `bool` | Initialization result |
-| `m_bShutdown` | `bool` | Shutdown latch |
+| `m_pControl` | `CONTROL*` | Back-pointer to owning CONTROL |
+| `m_apAgent` | `vector<AGENT*>` | Agents in this pool |
+| `m_nHertz` | `int` | Metronome frequency (0 = not metronome-driven) |
+| `m_nLastTick` | `int64_t` | Last metronome tick counter |
+| `m_nSignalCount` | `int` | Signals since last report |
+
+### Accessors
+
+- `Engine()` - delegates to `m_pControl->Engine()`
+- `Hertz()` - returns `m_nHertz`
+- `SignalCount()` / `SignalCount_Reset()` - for metronome diagnostics reporting
+
+## POOL_QUEUE\<JOB_PTR\>
+
+Template subclass of POOL. Adds a typed, thread-safe job queue.
+
+- `Post(JOB_PTR pJob)` - appends to queue under `m_mxQueue`, then `Busy()` on each agent in order until one returns `true` (idle→busy via CAS); that agent is `Signal()`d. If every `Busy()` returns `false` (already busy), no signal — workers self-schedule on the next `Grab`.
+- `Grab(JOB_PTR& pJob)` - under `m_mxQueue`, pops front if available and returns `true`. On empty queue returns `false` and assigns `pJob = nullptr` (for pointer job types). The caller updates `m_bBusy` from the boolean result while draining (`release` stores).
+
+Implementations and explicit instantiations (`IFETCH*`, `ISCRUB*`) live in `Pool_Queue.cpp`.
 
 ## CONTROL
 
-Inherits THREAD. Constructor takes `ENGINE*`. Owns the engine thread, agent lifecycle, the metronome, and the cleanup queue.
+Inherits THREAD. Constructor takes `ENGINE*`. Owns the engine thread, pool vector, and the metronome.
 
 ### Initialization
 
-`Initialize(int& nAgentCount)` calls `THREAD::Initialize()` which spawns the engine thread (`Main()`). On return, `nAgentCount` is populated with the number of agents created.
+`Initialize(int& nAgentCount)` calls `THREAD::Initialize()` which spawns the engine thread (`Main()`). On return, `nAgentCount` is populated with the total number of agents across all pools.
 
 ### Main() - Engine Thread Lifecycle
 
-1. **Create agents** from the static `AGENT_INIT` factory table (add-before-init principle)
+1. **Create pools** from the static `AGENT_INIT` factory table. Each entry specifies `fnCreate_Pool` (creates the pool) and `fnCreate_Agent` (creates agents within the pool).
 2. Call `Ready(bInitialized)` to unblock the caller
 3. **Metronome loop** (drift-free, fixed-origin scheduling):
-   - `if (!IsShutdown()) { ...tick agents... } else break;`
+   - `if (!IsShutdown()) { ...tick pools with nHertz > 0... } else break;`
    - `Wait(std::chrono::milliseconds(1))` (1ms resolution via `timeBeginPeriod(1)` on Windows)
-   - Under `m_mxCleanup`, read `m_bCleanupPending`; if true, `Signal()` the scrubber
-4. **Shutdown**: signal all agents with `Signal(true)`, then delete them
+4. **Shutdown**: `delete` each pool; `~POOL()` tears down agents
 
-### Agent Factory Table
+### Pool Configuration Table
 
-Static `aAgent_Init` array of `AGENT_INIT` structs. Each entry specifies `nHertz` and a `fnCreate` factory function.
+| Index | Pool Type | Agent | Pool Size | Hz | Behavior |
+|-------|-----------|-------|-----------|----|----------|
+| 0 | POOL | COMPOSITOR | 1 | 0 | Self-paced (DwmFlush) |
+| 1 | POOL_QUEUE\<ISCRUB*\> | SCRUB | 2 | 0 | Queue-driven (disk cleanup) |
+| 2 | POOL_QUEUE\<IFETCH*\> | FETCH | 16 | 0 | Queue-driven (HTTP downloads) |
+| 3 | POOL | C | 1 | 30 | Metronome-driven placeholder |
 
-| Index | Agent | Hz | Behavior |
-|-------|-------|----|----------|
-| 0 | COMPOSITOR | 0 | Self-paced (DwmFlush) |
-| 1 | SCRUBBER | 1 | Signal-driven (cleanup relay) |
-| 2 | C | 30 | Placeholder |
-| 3 | D | 60 | Placeholder |
-| 4 | E | 64 | Placeholder |
+### Public API
 
-`nHertz == 0` means the metronome never signals this agent. The agent must pace itself.
-
-### Per-Agent Runtime State
-
-```cpp
-struct AGENT_STATE
-{
-   AGENT*  pAgent;
-   int     nHertz;
-   int64_t nLastTick;
-   int     nSignalCount;
-};
-```
-
-### Cleanup Queue
-
-Two methods, both protected by `m_mxCleanup`:
-
-- `Cleanup_Queue(sPath)` - appends path, sets `m_bCleanupPending = true`, releases lock, then calls `Signal()` on CONTROL (wakes the metronome so it can relay to scrubber)
-- `Cleanup_SwapQueue(aPath)` - swaps `m_aCleanupPath` into the caller's vector, sets `m_bCleanupPending = false`
-
-The pending flag clears only in `Cleanup_SwapQueue` after the scrubber takes ownership of the paths. CONTROL's metronome reads the flag but never clears it.
+| Method | Delegates to |
+|--------|-------------|
+| `Queue_Post_Fetch(IFETCH*)` | `Pool_Fetch().Post(pFetch)` |
+| `Queue_Post_Scrub(ISCRUB*)` | `Pool_Scrub().Post(pScrub)` |
+| `Engine()` | Returns `m_pEngine` |
 
 ### Members
 
 | Member | Type | Purpose |
 |--------|------|---------|
 | `m_pEngine` | `ENGINE*` | Back-pointer to engine |
-| `m_aAgent_State` | `vector<AGENT_STATE>` | Per-agent runtime state |
-| `m_mxCleanup` | `mutex` | Protects cleanup queue |
-| `m_aCleanupPath` | `vector<string>` | Pending paths for deletion |
-| `m_bCleanupPending` | `bool` | Flag: paths waiting for scrubber |
+| `m_apPool` | `vector<POOL*>` | All pools |
 
 ## AGENT
 
-Abstract base class for engine agent threads. Inherits THREAD. Constructor takes `(CONTROL* pControl, int nAgentIndex)`.
+Abstract base class for engine agent threads. Inherits THREAD. Constructor takes `(POOL* pPool, int nAgentIz)`.
 
-- `Engine()` delegates to `m_pControl->Engine()` - agents do not cache a separate engine pointer
-- `Main()` is pure virtual - each derived agent implements its own thread loop
+- `Engine()` delegates to `m_pPool->Engine()` -- agents follow the ownership chain
+- `Busy()` — `compare_exchange_strong` on `m_bBusy`: if `false`, sets `true` and returns **`true`** (claimed for `Post` / `Signal`); if already `true`, returns **`false`**. Only `POOL_QUEUE::Post` calls this; workers update `m_bBusy` from `Grab` in `Job()`.
+- `Main()` is pure virtual -- each derived agent implements its own thread loop
+- Agent index is per-pool, not global
 
-### Signal-Driven Pattern (SCRUBBER, C, D, E)
+### Queue-Driven Pattern (SCRUB, FETCH)
 
 ```
 Main():
    Ready()
-   Wait([this] { return Tick(); })   // or DrainQueue()
+   Wait([this] { return Job(); })
 ```
 
-The predicate callable (`Tick()` / `DrainQueue()`) owns whatever work runs on each wake and returns `IsShutdown()` to end the wait.
+`Job()` loops: `Grab` under the queue mutex; on failure `m_bBusy.store(false, release)` and exit; on success `m_bBusy.store(true, release)`, then process the job (`IsCancelled()`, `OnFetch_Complete` / `OnScrub_Complete`, `Release()`). Returns `IsShutdown()`.
+
+### Signal-Driven Pattern (C)
+
+```
+Main():
+   Ready()
+   Wait([this] { return Tick(); })
+```
 
 ### Self-Paced Pattern (COMPOSITOR)
 
@@ -145,7 +190,7 @@ Main():
 
 ## AGENT::COMPOSITOR
 
-The rendering agent. Self-paced via `DwmFlush()` (Windows) or `sleep_for(16ms)`. Does NOT own a renderer or camera - those are per-viewport.
+The rendering agent. Self-paced via `DwmFlush()` (Windows) or `sleep_for(16ms)`. Does NOT own a renderer or camera -- those are per-viewport.
 
 Each iteration:
 1. Acquire viewport list via `Engine()->Viewport_Capture()`
@@ -158,48 +203,36 @@ Each iteration:
 
 Per-frame timing diagnostics logged once per second: FPS, input, scene, submit, render, publish, flush.
 
-Thread affinity: both renderer creation (`InitializeRenderer()`) and destruction (`ShutdownRenderer()`) happen on the compositor thread to satisfy Filament's requirement that its Engine is created and destroyed on the same thread.
+Thread affinity: both renderer creation (`InitializeRenderer()`) and destruction (`ShutdownRenderer()`) happen on the compositor thread to satisfy Filament's requirement.
 
-### Members
+## AGENT::SCRUB
 
-| Member | Type | Purpose |
-|--------|------|---------|
-| `m_tmNow` | `int64_t` | Current animation time |
-| `m_tpLastFrame` | `steady_clock::time_point` | Last frame timestamp |
-| `m_nFrameCount` | `int` | Frames since last FPS report |
-| `m_dFpsAccum` | `double` | Accumulated frame time |
-| `m_dAccumInput` | `double` | Input/camera section time |
-| `m_dAccumScene` | `double` | Scene build section time |
-| `m_dAccumSubmit` | `double` | ANARI submit section time |
-| `m_dAccumRender` | `double` | ANARI render section time |
-| `m_dAccumPublish` | `double` | Framebuffer publish section time |
-| `m_dAccumFlush` | `double` | DwmFlush section time |
+Disk cleanup agent. Queue-driven via `POOL_QUEUE<ISCRUB*>`.
 
-## AGENT::SCRUBBER
+`Job()` dequeues `ISCRUB*` jobs, validates each path contains the Transitory marker, then calls `std::filesystem::remove_all`. Calls `OnScrub_Complete()` and `Release()` on each job. Returns `IsShutdown()`.
 
-Disk cleanup agent. Drains the cleanup queue on wake. Main pattern:
+## AGENT::FETCH
 
-```
-Main():
-   Ready()
-   Wait([this] { return DrainQueue(); })
-```
+HTTP download agent. Queue-driven via `POOL_QUEUE<IFETCH*>`.
 
-`DrainQueue()` calls `m_pControl->Cleanup_SwapQueue(aPath)` to take ownership of pending paths, validates each path contains the Transitory marker, then calls `std::filesystem::remove_all`. Returns `IsShutdown()`.
+`Job()` dequeues `IFETCH*` jobs. `Execute()` performs the blocking curl download: streams response to a temp file, captures HTTP headers and status, verifies SRI hash if provided, renames temp to final path on success. Calls `OnFetch_Complete(FETCH_RESULT)` and `Release()` on each job. Returns `IsShutdown()`.
 
-## AGENT::C, D, E
+Curl progress callback checks `IsCancelled()` to abort in-flight downloads.
 
-Placeholder agents. Same signal-driven pattern with empty `Tick()` that returns `IsShutdown()`. Reserved for future subsystems (animator, spatial indexer, audio, etc.).
+## AGENT::C
+
+Placeholder agent. Signal-driven at 30 Hz with empty `Tick()` that returns `IsShutdown()`. Reserved for future subsystems (animator, spatial indexer, audio, etc.).
 
 ## Files
 
 | File | Contents |
 |------|----------|
-| `Control.h` | All declarations: CONTROL, AGENT, COMPOSITOR, SCRUBBER, C, D, E |
-| `Control.cpp` | CONTROL implementation, agent factory table, metronome loop |
+| `Control.h` | Declarations: IJOB, IFETCH, ISCRUB, JOB_FETCH, JOB_SCRUB, POOL, POOL_QUEUE, CONTROL, AGENT, COMPOSITOR, SCRUB, FETCH, C |
+| `Control.cpp` | CONTROL implementation, pool factory table, metronome loop |
+| `Pool.cpp` | POOL implementation |
+| `Pool_Queue.cpp` | `POOL_QUEUE` method bodies + explicit instantiations for `IFETCH*` / `ISCRUB*` |
 | `Agent.cpp` | AGENT base class (constructor, destructor, Engine() accessor) |
 | `Compositor.cpp` | COMPOSITOR (render loop, viewport iteration, timing) |
-| `Scrubber.cpp` | SCRUBBER (DrainQueue, path validation, remove_all) |
+| `Scrub.cpp` | SCRUB (Job, path validation, remove_all) |
+| `Fetch.cpp` | FETCH (Job, Execute, curl logic, hash verification) |
 | `AgentC.cpp` | Agent C placeholder |
-| `AgentD.cpp` | Agent D placeholder |
-| `AgentE.cpp` | Agent E placeholder |

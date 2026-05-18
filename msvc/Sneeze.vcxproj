@@ -128,10 +128,12 @@
     <ClCompile Include="..\src\sneeze\control\Agent.cpp" />
     <ClCompile Include="..\src\sneeze\control\Control.cpp" />
     <ClCompile Include="..\src\sneeze\control\Compositor.cpp" />
-    <ClCompile Include="..\src\sneeze\control\Scrubber.cpp" />
+    <ClCompile Include="..\src\sneeze\control\IJob.cpp" />
+    <ClCompile Include="..\src\sneeze\control\Scrub.cpp" />
     <ClCompile Include="..\src\sneeze\control\AgentC.cpp" />
-    <ClCompile Include="..\src\sneeze\control\AgentD.cpp" />
-    <ClCompile Include="..\src\sneeze\control\AgentE.cpp" />
+    <ClCompile Include="..\src\sneeze\control\Pool.cpp" />
+    <ClCompile Include="..\src\sneeze\control\Pool_Queue.cpp" />
+    <ClCompile Include="..\src\sneeze\control\Fetch.cpp" />
     <!-- astro -->
     <ClCompile Include="..\src\astro\BodyData.cpp" />
     <ClCompile Include="..\src\astro\Celestial.cpp" />
@@ -150,7 +152,6 @@
     <ClCompile Include="..\src\viewport\scene\SpatialIndex.cpp" />
     <!-- network -->
     <ClCompile Include="..\src\sneeze\network\Network_Asset.cpp" />
-    <ClCompile Include="..\src\sneeze\network\Fetch.cpp" />
     <ClCompile Include="..\src\sneeze\network\File.cpp" />
     <ClCompile Include="..\src\sneeze\network\Network.cpp" />
     <!-- storage -->
@@ -205,7 +206,6 @@
     <ClInclude Include="..\src\viewport\scene\AccessControl.h" />
     <ClInclude Include="..\src\viewport\scene\Events.h" />
     <ClInclude Include="..\src\viewport\scene\SpatialIndex.h" />
-    <ClInclude Include="..\src\sneeze\network\Fetch.h" />
     <ClInclude Include="..\src\viewport\renderer\Renderer.h" />
     <ClInclude Include="..\src\viewport\renderer\AnariRenderer.h" />
     <ClInclude Include="..\src\viewport\renderer\UVSphere.h" />

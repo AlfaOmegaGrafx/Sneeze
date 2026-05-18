@@ -16,27 +16,220 @@
 #define SNEEZE_CORE_CONTROL_H
 
 #include "Engine.h"
+#include <atomic>
+#include <mutex>
+#include <unordered_map>
+#include <vector>
 
 namespace SNEEZE
 {
    class AGENT;
+   class CONTROL;
+   class POOL;
+   template <typename JOB_PTR> class POOL_QUEUE;
+   class IJOB;
+   class IFETCH;
+   class ISCRUB;
 
-   // ---------------------------------------------------------------------------
-   // CONTROL -- owns the engine thread, agent lifecycle, and metronome
-   // ---------------------------------------------------------------------------
+   // ========================================================================
+   // IJOB -- base interface for all jobs submitted to agent pools.
+   //
+   // Owns: m_mxJob + m_bCancelled (Cancel / IsCancelled / Complete).
+   // ========================================================================
+
+   class IJOB
+   {
+   public:
+      virtual ~IJOB () {}
+
+      bool IsCancelled () const;
+      void Cancel      ();
+      void Complete    ();
+
+   protected:
+      virtual void Complete_Deliver () = 0;
+
+   private:
+      mutable std::mutex m_mxJob;
+      bool    m_bCancelled { false };
+   };
+
+   // ========================================================================
+   // FETCH_RESULT -- plain struct returned by a completed fetch.
+   // ========================================================================
+
+   struct FETCH_RESULT
+   {
+      bool        bSuccess;
+      uint64_t    nSizeBytes;
+      long        nHttpStatus;
+      std::unordered_map<std::string, std::string> mapHeaders;
+   };
+
+   // ========================================================================
+   // IFETCH -- interface for fetch jobs.
+   //
+   // Owns: fetch parameter accessors, fetch completion callback.
+   // Knows about: FETCH_RESULT (plain struct) for OnFetch_Complete only.
+   // ========================================================================
+
+   class IFETCH : public IJOB
+   {
+   public:
+      virtual const std::string& Url ()       = 0;
+      virtual const std::string& Path_Temp () = 0;
+      virtual const std::string& Path_Data () = 0;
+      virtual const std::string& Hash ()      = 0;
+
+      virtual void OnFetch_Complete (const FETCH_RESULT& result) {}
+   };
+
+   // ========================================================================
+   // ISCRUB -- interface for cleanup jobs.
+   //
+   // Owns: cleanup parameter accessor, cleanup completion callback.
+   // Knows about: nothing else.
+   // ========================================================================
+
+   class ISCRUB : public IJOB
+   {
+   public:
+      virtual const std::string& Path () = 0;
+
+      virtual void OnScrub_Complete () {}
+   };
+
+   // ========================================================================
+   // JOB_FETCH -- concrete fetch job. Heap-allocated, self-cleaning.
+   //
+   // Owns: concrete storage of URL, paths, hash.
+   // Knows about: nothing else (no ASSET, no NETWORK, no ENGINE).
+   // ========================================================================
+
+   class JOB_FETCH : public IFETCH
+   {
+   public:
+      JOB_FETCH (const std::string& sUrl, const std::string& sPath_Temp, const std::string& sPath_Data, const std::string& sHash);
+
+      const std::string& Url ()       override { return m_sUrl; }
+      const std::string& Path_Temp () override { return m_sPath_Temp; }
+      const std::string& Path_Data () override { return m_sPath_Data; }
+      const std::string& Hash ()      override { return m_sHash; }
+
+      void Result (const FETCH_RESULT& result);
+
+   private:
+      std::string m_sUrl;
+      std::string m_sPath_Temp;
+      std::string m_sPath_Data;
+      std::string m_sHash;
+      FETCH_RESULT m_ResultComplete;
+
+      void Complete_Deliver () override;
+   };
+
+   // ========================================================================
+   // JOB_SCRUB -- concrete cleanup job. Heap-allocated, self-cleaning.
+   //
+   // Owns: concrete storage of path.
+   // Knows about: nothing else.
+   // ========================================================================
+
+   class JOB_SCRUB : public ISCRUB
+   {
+   public:
+      explicit JOB_SCRUB (const std::string& sPath);
+
+      const std::string& Path () override { return m_sPath; }
+
+   private:
+      std::string m_sPath;
+
+      void Complete_Deliver () override;
+   };
+
+   // ========================================================================
+   // POOL -- owns agent lifecycle (create, initialize, shutdown, delete)
+   //         and metronome tick scheduling.
+   //
+   // Owns: m_apAgent vector, metronome state, Tick() (signals all agents on tick).
+   // Knows about: AGENT (base class only), CONTROL (pointer).
+   // Does NOT know about: queues, jobs, busy flags.
+   // ========================================================================
+
+   class POOL
+   {
+   public:
+      explicit POOL (CONTROL* pControl);
+      virtual ~POOL ();
+
+      bool Initialize (int nHertz, int nAgents, std::function<AGENT* (POOL*, int)> fnCreate);
+      void Tick (double dElapsed);
+
+      ::SNEEZE::ENGINE*  Engine () const;
+
+      int  Hertz () const;
+      int  SignalCount () const;
+      void SignalCount_Reset ();
+
+      CONTROL*             m_pControl;
+      std::vector<AGENT*>  m_apAgent;
+
+   private:
+      int                  m_nHertz;
+      int64_t              m_nLastTick;
+      int                  m_nSignalCount;
+
+      POOL            (const POOL&) = delete;
+      POOL& operator= (const POOL&) = delete;
+   };
+
+   // ========================================================================
+   // POOL_QUEUE -- adds a typed job queue on top of POOL.
+   //
+   // Owns: job queue, queue mutex, Post/Grab, targeted-wake logic.
+   // Knows about: POOL::m_apAgent (inherited), AGENT (for Signal(), Busy()).
+   // Does NOT know about: job contents, curl, paths, ASSET, ENGINE.
+   //
+   // Definitions in Pool_Queue.cpp; explicit instantiations for IFETCH* and ISCRUB* only.
+   // ========================================================================
+
+   template <typename JOB_PTR>
+   class POOL_QUEUE : public POOL
+   {
+   public:
+      using POOL::POOL;
+
+      void Post (JOB_PTR pJob);
+      bool Grab (JOB_PTR& pJob);
+
+   private:
+      mutable std::mutex      m_mxQueue;
+      std::vector<JOB_PTR>    m_apJob;
+   };
+
+   // ========================================================================
+   // CONTROL -- owns the engine thread, pool lifecycle, and metronome.
+   //
+   // Owns: m_apPool vector, metronome loop, thin public API.
+   // Does NOT: manage agents, queues, or busy flags directly.
+   // ========================================================================
 
    class CONTROL : public THREAD
    {
    public:
-      explicit CONTROL (ENGINE* pEngine);
+      explicit CONTROL (::SNEEZE::ENGINE* pEngine);
       ~CONTROL ();
 
       bool Initialize (int& nAgentCount);
 
-      void Cleanup_Queue (const std::string& sPath);
-      void Cleanup_SwapQueue (std::vector<std::string>& aPath);
+      void Queue_Post_Fetch (IFETCH* pFetch);
+      void Queue_Post_Scrub (ISCRUB* pScrub);
 
-      ENGINE* Engine () const;
+      ::SNEEZE::ENGINE* Engine () const;
+
+      POOL_QUEUE<ISCRUB*>& Pool_Scrub ();
+      POOL_QUEUE<IFETCH*>& Pool_Fetch ();
 
       CONTROL (const CONTROL&) = delete;
       CONTROL& operator= (const CONTROL&) = delete;
@@ -45,60 +238,50 @@ namespace SNEEZE
       void Main () override;
 
    private:
-      ENGINE*                    m_pEngine;
+      void Diagnostics (double dElapsed, int64_t& nLastReport);
 
-      // Agents
-      struct AGENT_STATE
-      {
-         AGENT*  pAgent;
-         int     nHertz;
-         int64_t nLastTick;
-         int     nSignalCount;
-      };
-      std::vector<AGENT_STATE>   m_aAgent_State;
-
-      // Cleanup queue
-      mutable std::mutex         m_mxCleanup;
-      std::vector<std::string>   m_aCleanupPath;
-      bool                       m_bCleanupPending;
+      ::SNEEZE::ENGINE*              m_pEngine;
+      std::vector<POOL*>   m_apPool;
    };
 
-   // ---------------------------------------------------------------------------
+   // ========================================================================
    // AGENT -- abstract base for engine agent threads
-   // ---------------------------------------------------------------------------
+   // ========================================================================
 
    class AGENT : public THREAD
    {
    public:
       class COMPOSITOR;
-      class SCRUBBER;
+      class SCRUB;
+      class FETCH;
       class C;
-      class D;
-      class E;
 
-      AGENT (CONTROL* pControl, int nAgentIndex);
+      AGENT (POOL* pPool, int nAgentIz);
       virtual ~AGENT ();
 
       AGENT            (const AGENT&) = delete;
       AGENT& operator= (const AGENT&) = delete;
 
+      bool Busy ();
+
    protected:
       void Main () override = 0;
 
-      ENGINE* Engine () const;
+      ::SNEEZE::ENGINE* Engine () const;
 
-      CONTROL*                m_pControl;
-      int                     m_nAgentIndex;
+      POOL*                   m_pPool;
+      int                     m_nAgentIz;
+      std::atomic<bool>       m_bBusy;
    };
 
-   // ---------------------------------------------------------------------------
+   // ========================================================================
    // COMPOSITOR -- drives the render loop (frame timing, camera, scene submit)
-   // ---------------------------------------------------------------------------
+   // ========================================================================
 
    class AGENT::COMPOSITOR : public AGENT
    {
    public:
-      COMPOSITOR (CONTROL* pControl, int nAgentIndex);
+      COMPOSITOR (POOL* pPool, int nAgentIz);
       ~COMPOSITOR ();
 
    protected:
@@ -121,62 +304,58 @@ namespace SNEEZE
       double m_dAccumFlush;
    };
 
-   // ---------------------------------------------------------------------------
-   // SCRUBBER -- disk cleanup (folder deletion, future cache pruning)
-   // ---------------------------------------------------------------------------
+   // ========================================================================
+   // SCRUB -- disk cleanup (folder deletion, future cache pruning)
+   // ========================================================================
 
-   class AGENT::SCRUBBER : public AGENT
+   class AGENT::SCRUB : public AGENT
    {
    public:
-      SCRUBBER (CONTROL* pControl, int nAgentIndex);
-      ~SCRUBBER ();
-   
+      SCRUB (POOL* pPool, int nAgentIz);
+      ~SCRUB ();
+
    protected:
       void Main () override;
-   
+
    private:
-      bool DrainQueue ();
+      bool Job ();
    };
 
-   // ---------------------------------------------------------------------------
-   // Placeholder agents (C-E)
-   // ---------------------------------------------------------------------------
+   // ========================================================================
+   // FETCH -- network download agent (curl)
+   //
+   // Owns: curl download logic, temp file management, IsCancelled checks,
+   //       Result(), Complete() (completion + delete).
+   // Does NOT know about: NETWORK::ASSET, queue state, pool membership.
+   // ========================================================================
+
+   class AGENT::FETCH : public AGENT
+   {
+   public:
+      FETCH (POOL* pPool, int nAgentIz);
+      ~FETCH ();
+
+   protected:
+      void Main () override;
+
+   private:
+      bool Job ();
+      void Execute (IFETCH* pJob);
+   };
+
+   // ========================================================================
+   // C -- placeholder metronome agent
+   // ========================================================================
 
    class AGENT::C : public AGENT
    {
    public:
-      C (CONTROL* pControl, int nAgentIndex);
+      C (POOL* pPool, int nAgentIz);
       ~C ();
-   
-   protected:
-      void Main () override;
-   
-   private:
-      bool Tick ();
-   };
 
-   class AGENT::D : public AGENT
-   {
-   public:
-      D (CONTROL* pControl, int nAgentIndex);
-      ~D ();
-   
    protected:
       void Main () override;
-   
-   private:
-      bool Tick ();
-   };
 
-   class AGENT::E : public AGENT
-   {
-   public:
-      E (CONTROL* pControl, int nAgentIndex);
-      ~E ();
-   
-   protected:
-      void Main () override;
-   
    private:
       bool Tick ();
    };

@@ -145,7 +145,7 @@ m_pPersona = new persona::PERSONA (m_pEngine);
          while (Viewport_Close (nullptr));
 
          if (!m_sPath_Transitory_Session.empty ())
-            Cleanup_Queue (m_sPath_Transitory_Session);
+            Scrub (m_sPath_Transitory_Session);
       }
 
       delete m_pControl;
@@ -277,7 +277,7 @@ m_pPersona = new persona::PERSONA (m_pEngine);
                   std::string sEntry = entry.path ().generic_string ();
                   if (IsValidTransitoryPath (sEntry))
                   {
-                     m_pControl->Cleanup_Queue (sEntry);
+                     Scrub (sEntry);
                      nCount++;
                   }
                }
@@ -307,11 +307,18 @@ m_pPersona = new persona::PERSONA (m_pEngine);
    // Cleanup queue (delegates to CONTROL)
    // -----------------------------------------------------------------------
 
-   void Cleanup_Queue (const std::string& sPath)
+   void Queue_Post_Fetch (IFETCH* pFetch)
+   {
+      m_pControl->Queue_Post_Fetch (pFetch);
+   }
+
+   void Scrub (const std::string& sPath)
    {
       if (IsValidTransitoryPath (sPath))
       {
-         m_pControl->Cleanup_Queue (sPath);
+         auto* pJob_Scrub = new JOB_SCRUB (sPath);
+
+         m_pControl->Queue_Post_Scrub (pJob_Scrub);
       }
       else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "REJECTED cleanup path -- failed validation: " + sPath);
    }
@@ -350,7 +357,7 @@ m_pPersona = new persona::PERSONA (m_pEngine);
             delete pViewport;
             pViewport = nullptr;
 
-            Cleanup_Queue (sPath_Temporary);
+            Scrub (sPath_Temporary);
          }
       }
 
@@ -383,7 +390,7 @@ m_pPersona = new persona::PERSONA (m_pEngine);
          delete pViewport;
          bResult = true;
 
-         Cleanup_Queue (sPath_Temporary);
+         Scrub (sPath_Temporary);
       }
 
       return bResult;
@@ -494,6 +501,11 @@ const std::string& SNEEZE::ENGINE::sPath_Session    () const  { return m_pImpl->
 SNEEZE::NETWORK*           SNEEZE::ENGINE::Network () const   { return m_pImpl->m_pNetwork;   }
 SNEEZE::STORAGE*           SNEEZE::ENGINE::Storage () const   { return m_pImpl->m_pStorage;   }
 SNEEZE::persona::PERSONA*  SNEEZE::ENGINE::Persona () const   { return m_pImpl->m_pPersona;   }
+
+void SNEEZE::ENGINE::Queue_Post_Fetch (IFETCH* pFetch)
+{
+   m_pImpl->Queue_Post_Fetch (pFetch);
+}
 
 // ---------------------------------------------------------------------------
 // Logging and notifications

@@ -17,6 +17,8 @@
 
 namespace SNEEZE
 {
+   class IFETCH;
+
    // ---------------------------------------------------------------------------
    // NETWORK — the network resource system.
    //
@@ -90,8 +92,6 @@ namespace SNEEZE
       // Owned by NETWORK, never exposed to callers directly. One ASSET per URL.
       // Multiple FILE handles may reference the same ASSET.
       // -----------------------------------------------------------------------
-
-      class FETCH;
 
       class ASSET
       {
@@ -285,6 +285,8 @@ namespace SNEEZE
       void File_Enum (IENUM* pEnum, VIEWPORT* pViewport);
 
       void Rules_Add (const std::string& sContentType, const std::string& sOlderThan);
+
+      void Queue_Post_Fetch (IFETCH* pFetch);
 
    private:
       class Impl;

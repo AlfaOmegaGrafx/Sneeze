@@ -42,7 +42,7 @@ namespace SNEEZE
          explicit THREAD_POOL (ENGINE* pEngine);
          ~THREAD_POOL ();
 
-         bool Initialize (int nThreads = 0);
+         bool Initialize (int nAgents = 0);
          void Shutdown ();
 
          void Submit (std::function<void ()> pfnWork);

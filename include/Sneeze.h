@@ -22,6 +22,7 @@
 namespace SNEEZE
 {
    class ENGINE;
+   class IFETCH;
    class IVIEWPORT;
 }
 
@@ -129,6 +130,8 @@ namespace SNEEZE
       NETWORK*                 Network () const;
       STORAGE*                 Storage () const;
       persona::PERSONA*        Persona () const;
+
+      void                     Queue_Post_Fetch (IFETCH* pFetch);
 
    private:
       class Impl;

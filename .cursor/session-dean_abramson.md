@@ -574,7 +574,7 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 - **Worker ownership: ENGINE → CONTROLLER** — Changed all worker constructors from `ENGINE*` to `CONTROLLER*`. WORKER base class stores `m_pController` (owner) and caches `m_pEngine` (via `pController->Engine()`) for convenience. Factory table lambdas updated to take `CONTROLLER*`.
 - **CONTROLLER defined first in Worker.h** — Moved CONTROLLER class definition before WORKER (with `class WORKER;` forward declaration). Owner comes first conceptually; eliminates the previous `class CONTROLLER;` forward decl.
 - **Cleanup queue removed from ENGINE public API** — `QueueCleanup`, `HasCleanupWork`, `SwapCleanupQueue` all removed from `Sneeze.h`. Cleanup queue lives exclusively in CONTROLLER. `Impl::QueueCleanup` remains as internal validation gate.
-- **Scrubber calls CONTROLLER directly** — `HasWork()` and `DrainQueue()` now call `m_pController->HasCleanupWork()` / `m_pController->SwapCleanupQueue()` directly.
+- **Scrubber calls CONTROLLER directly** — `HasWork()` and `Job()` now call `m_pController->HasCleanupWork()` / `m_pController->SwapCleanupQueue()` directly.
 - **InitializePaths hardened** — All `create_directories` calls now use `std::error_code` (never throws). Returns false if any directory creation or session folder creation fails. Orphan scan moved before session folder creation (eliminates self-exclusion check).
 - **`m_sPath_Transitory` promoted to member** — Transitory root is now a member alongside `m_sPath_Persistent` and `m_sPath_Transitory_Session`. `Viewport_Open` uses it directly instead of deriving from `m_sPath_Session.parent_path()`.
 - **`m_sPath_Session` renamed to `m_sPath_Transitory_Session`** — Clearer naming.
@@ -628,7 +628,7 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 
 ## 2026-05-11 (Monday) — session log
 
-- **THREAD / CONTROL / AGENT** — Confirmed design: `THREAD::Wait` overloads have **no** `m_bShutdown` / `IsShutdown()` inside `Thread.cpp`; predicates live in `Tick()` / `DrainQueue()`; `CONTROL::Cleanup_Queue` calls `Signal()` after releasing `m_mxCleanup` to wake the metronome.
+- **THREAD / CONTROL / AGENT** — Confirmed design: `THREAD::Wait` overloads have **no** `m_bShutdown` / `IsShutdown()` inside `Thread.cpp`; predicates live in `Tick()` / `Job()`; `CONTROL::Cleanup_Queue` calls `Signal()` after releasing `m_mxCleanup` to wake the metronome.
 - **Read-only code review** — Walked `Control.cpp` metronome (`if (!IsShutdown()) … else break`, timed `Wait`, cleanup relay), `Scrubber.cpp`, `AgentC`–`E`, `Thread.cpp` at user request (no edits during review).
 - **Q&A** — `m_cvThread.wait(lock, fnWork)` vs redundant lambda; assignment-in-`if` requires parentheses around `(p = …)` when combined with `&&`.
 - **Friction** — Prior multi-file edits over-applied `IsShutdown` and ignored repeated STOP; user restored intended design. **project.mdc** updated with authoritative **THREAD / CONTROL / AGENT wait and shutdown contract** subsection + corrected `CONTROL` / `THREAD` Key Classes rows to match current `Control.cpp`.
@@ -748,4 +748,14 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 - **Updated test expectations:** Tests 7, 18, 23 updated to match new deferred-reset and passive-open behavior. All 9 suites passing (69 network, 44 storage, 246 total across all suites).
 - **Updated `project.mdc`:** NETWORK, ASSET, FILE, PERSONA class descriptions; network and storage test suite descriptions; module table.
 - **Next session:** Fetch thread cleanup; move NETWORK and STORAGE under VIEWPORT.
+
+## 2026-05-17 (Sat–Sun overnight) ~afternoon – 7:30 PM PDT
+
+- **Persona hash truncation fix in `Node.cpp`:** Replaced hardcoded base64 CID strings with proper hex values — `sPersonaHash` from `pEngine->Persona()->Hash()` (12 hex chars, or `"012PERSONABC"` placeholder when not logged in), `sFingerprint` as a 64-char hex placeholder (`"0123456789FINGERPRINT012..."`). Fixed two cache path issues: untruncated base64 path and empty persona hash when not logged in.
+- **FetchComplete lifecycle fix in `Network_Asset.cpp`:** Raw counter decrements (`m_nCount_Attach--`, `m_nCount_Open--`) in `ASSET::FetchComplete` replaced with `Detach(nullptr)` + `m_pNetwork->Asset_Close(this, nullptr)`. Routes through proper lifecycle methods so `Meta_Save`/`Meta_Reset`/`Evict` trigger when counts reach zero. This was the long-standing "temporary ungraceful solution" noted in earlier sessions.
+- **Simplified `NETWORK::Impl::Asset_Close`:** Now always uses `pAsset->Pathname()` for map erasure instead of branching on `pFile->sPathname("")` — both are always equal, and `pAsset->Pathname()` works when `pFile` is nullptr (the FetchComplete case).
+- **Result:** Meta files now generated on disk, files cache correctly across restarts.
+- **Crosses off prior deferred items:** "FETCH thread cannot call Asset_Close" and "Replace per-ASSET FETCH threads with NETWORK-owned worker pool" are both resolved.
+- **Documentation updated:** `Network.md` (architecture diagram, concurrency model, deferred tasks, active refactoring status), `Control.md` (verified current), `project.mdc` (CONTROL/POOL/POOL_QUEUE/AGENT/NETWORK/ASSET class descriptions, module table, implementation backlog, naming section, THREAD contract).
+- **Next session:** Move NETWORK and STORAGE under VIEWPORT.
 

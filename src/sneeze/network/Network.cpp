@@ -18,9 +18,6 @@
 
 using namespace SNEEZE;
 
-// Legacy thread pool (retained, not currently used — FETCH threads are per-ASSET)
-static constexpr int kMAX_CONCURRENT_FETCHES = 16;
-
 /***********************************************************************************************************************************
 **  Impl Class
 ***********************************************************************************************************************************/
@@ -92,21 +89,6 @@ public:
             }
             m_umpAsset.clear ();
          }
-
-/*
-         {
-            std::lock_guard<std::recursive_mutex> guard (m_mutex);
-            while (!m_aFetchQueue.empty ())
-               m_aFetchQueue.pop ();
-         }
-
-         for (auto& t : m_aSlots)
-         {
-            if (t.joinable ())
-               t.join ();
-         }
-         m_aSlots.clear ();
-*/
 
          m_sCachePath.clear ();
       }
@@ -384,65 +366,8 @@ public:
    }
 
    // ---------------------------------------------------------------------------
-   // Fetch thread management (capped at kMAX_CONCURRENT_FETCHES)
-   // ---------------------------------------------------------------------------
-
-   void SweepCompletedThreads ()
-   {
-      auto it = m_aSlots.begin ();
-      while (it != m_aSlots.end ())
-      {
-         if (!(*it).joinable ())
-         {
-            it = m_aSlots.erase (it);
-         }
-         else
-         {
-            ++it;
-         }
-      }
-   }
-
-   void Worker (ASSET* pAsset)
-   {
-      (void) pAsset;
-   }
-
-   void DispatchFetch (ASSET* pAsset)
-   {
-      SweepCompletedThreads ();
-
-      if (static_cast<int> (m_aSlots.size ()) < kMAX_CONCURRENT_FETCHES)
-      {
-         m_aSlots.emplace_back (&Impl::Worker, this, pAsset);
-      }
-      else
-      {
-         m_aFetchQueue.push (pAsset);
-      }
-   }
-
-   // ---------------------------------------------------------------------------
    // Notification helpers (called under m_mutex -- recursive lock allows re-entry)
    // ---------------------------------------------------------------------------
-
-   void DispatchNextFromQueue ()
-   {
-      std::lock_guard<std::recursive_mutex> guard (m_mutex);
-
-      if (m_bShuttingDown)
-         return;
-
-      SweepCompletedThreads ();
-
-      if (!m_aFetchQueue.empty () && static_cast<int> (m_aSlots.size ()) < kMAX_CONCURRENT_FETCHES)
-      {
-         ASSET* pNext = m_aFetchQueue.front ();
-         m_aFetchQueue.pop ();
-
-         m_aSlots.emplace_back (&Impl::Worker, this, pNext);
-      }
-   }
 
    void NotifyFiles (const std::vector<NETWORK::FILE*>& apFiles, NETWORK::STATE bState)
    {
@@ -501,11 +426,9 @@ public:
 
    void Asset_Close (ASSET* pAsset, FILE* pFile)
    {
-      std::string sPathname = pFile->sPathname (""); // should be the same as pAsset->Pathname ()
-
       if (pAsset->Close (pFile) == 0)
       {
-         m_umpAsset.erase (sPathname);
+         m_umpAsset.erase (pAsset->Pathname ()); // should be the same as pFile->Pathname ()
 
          delete pAsset;
       }
@@ -526,9 +449,6 @@ public:
    std::unordered_map<std::string, ASSET*> m_umpAsset;
 
    mutable std::recursive_mutex            m_mutex;
-
-   std::vector<std::thread>                m_aSlots;
-   std::queue<ASSET*>                      m_aFetchQueue;
 
    bool                                    m_bShuttingDown;
    bool                                    m_bCacheEnabled;
@@ -599,3 +519,5 @@ void NETWORK::Reset             ()                                              
 void NETWORK::Rules_Add         (const std::string& sContentType, const std::string& sOlderThan) { m_pImpl->Rules_Add (sContentType, sOlderThan); }
 void NETWORK::SetCacheEnabled   (bool b)                                                         { m_pImpl->SetCacheEnabled (b); }
 bool NETWORK::IsCacheEnabled    ()                                                         const { return m_pImpl->IsCacheEnabled (); }
+
+void NETWORK::Queue_Post_Fetch  (IFETCH* pFetch)                                                 { m_pImpl->Engine ()->Queue_Post_Fetch (pFetch); }

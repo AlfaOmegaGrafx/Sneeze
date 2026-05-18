@@ -508,10 +508,12 @@ set (CORE_SOURCES
    sneeze/control/Agent.cpp
    sneeze/control/Control.cpp
    sneeze/control/Compositor.cpp
-   sneeze/control/Scrubber.cpp
+   sneeze/control/IJob.cpp
+   sneeze/control/Scrub.cpp
    sneeze/control/AgentC.cpp
-   sneeze/control/AgentD.cpp
-   sneeze/control/AgentE.cpp)
+   sneeze/control/Pool.cpp
+   sneeze/control/Pool_Queue.cpp
+   sneeze/control/Fetch.cpp)
 set (CORE_HEADERS
    sneeze/Pch.h
    sneeze/Types.h
@@ -553,11 +555,10 @@ set (SOM_HEADERS
 
 set (NETWORK_SOURCES
    sneeze/network/Network_Asset.cpp
-   sneeze/network/Fetch.cpp
    sneeze/network/File.cpp
    sneeze/network/Network.cpp)
 set (NETWORK_HEADERS
-   sneeze/network/Fetch.h)
+   )
 
 # Embed Mozilla's CA bundle (cacert.pem) as a string blob so libcurl can
 # verify HTTPS certificates on platforms whose system has no libcurl-

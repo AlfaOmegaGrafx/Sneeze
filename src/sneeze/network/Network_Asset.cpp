@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Fetch.h"
+#include <Sneeze.h>
+#include "control/Control.h"
 #include <fstream>
 #include <filesystem>
 #include <chrono>
@@ -25,6 +26,36 @@
 #include <nlohmann/json.hpp>
 
 using namespace SNEEZE;
+
+// ---------------------------------------------------------------------------
+// ASSET_FETCH -- local job class bridging the control-layer fetch pool
+//                back to NETWORK::ASSET::FetchComplete.
+// ---------------------------------------------------------------------------
+
+class ASSET_FETCH : public JOB_FETCH
+{
+public:
+   ASSET_FETCH (NETWORK::ASSET* pAsset, const std::string& sUrl, const std::string& sPath_Temp, const std::string& sPath_Data, const std::string& sHash)
+      : JOB_FETCH (sUrl, sPath_Temp, sPath_Data, sHash),
+        m_pAsset (pAsset)
+   {}
+
+   void OnFetch_Complete (const FETCH_RESULT& result) override
+   {
+      NETWORK::FETCH_RESULT nr;
+      nr.bSuccess    = result.bSuccess;
+      nr.nSizeBytes  = result.nSizeBytes;
+      nr.nHttpStatus = result.nHttpStatus;
+      nr.mapHeaders  = result.mapHeaders;
+
+      m_pAsset->FetchComplete (nr);
+   }
+
+private:
+   NETWORK::ASSET* m_pAsset;
+};
+
+// ---------------------------------------------------------------------------
 
 class NETWORK::ASSET::Impl
 {
@@ -45,7 +76,7 @@ public:
       m_bReset (false),
       m_nCount_Open (0),
       m_nCount_Attach (0),
-      m_pFetch (nullptr)
+      m_pAsset_Fetch (nullptr)
    {
       m_sCreatedAt      = NowIso8601 ();
       m_sLastAccessedAt = m_sCreatedAt;
@@ -316,7 +347,7 @@ public:
    uint32_t                   m_nCount_Open;
    uint32_t                   m_nCount_Attach;
 
-   FETCH*                     m_pFetch;
+   IJOB*                      m_pAsset_Fetch;
 
    std::vector<FILE*>         m_apFiles;
 
@@ -336,7 +367,12 @@ NETWORK::ASSET::ASSET (NETWORK* pNetwork, const std::string& sUrl, const std::st
 
 NETWORK::ASSET::~ASSET ()
 {
-   delete m_pImpl->m_pFetch;
+   if (m_pImpl->m_pAsset_Fetch)
+   {
+      m_pImpl->m_pAsset_Fetch->Cancel ();
+      m_pImpl->m_pAsset_Fetch = nullptr;
+   }
+
    delete m_pImpl;
 }
 
@@ -462,17 +498,23 @@ bool NETWORK::ASSET::Attach (FILE* pFile, bool bFetch_Allowed)
 
       if (bFetch  &&  bFetch_Allowed)
       {
+         if (m_pImpl->m_pAsset_Fetch)
+         {
+            m_pImpl->m_pAsset_Fetch->Cancel ();
+            m_pImpl->m_pAsset_Fetch = nullptr;
+         }
+
          m_pImpl->m_bState = STATE_FETCHING;
          m_pImpl->m_dFetchStartTime = m_pImpl->m_pNetwork->SecondsSinceEpoch ();
          pFile->SnapshotProgress ();
 
-         delete m_pImpl->m_pFetch;
-
-         m_pImpl->m_pFetch = new FETCH (this, m_pImpl->m_sUrl, m_pImpl->Path (DISKFILE_TEMP), m_pImpl->Path (DISKFILE_DATA), m_pImpl->m_sHash);
-         m_pImpl->m_pFetch->Initialize ();
-
          m_pImpl->m_nCount_Open++;
          m_pImpl->m_nCount_Attach++;
+
+         auto* pJob = new ASSET_FETCH (this, m_pImpl->m_sUrl, m_pImpl->Path (DISKFILE_TEMP), m_pImpl->Path (DISKFILE_DATA), m_pImpl->m_sHash);
+
+         m_pImpl->m_pAsset_Fetch = pJob;
+         m_pImpl->m_pNetwork->Queue_Post_Fetch (pJob);
       }
       else if (bReady)
       {
@@ -576,12 +618,10 @@ void NETWORK::ASSET::FetchComplete (const FETCH_RESULT& result)
 
    m_pImpl->m_pNetwork->Engine ()->Log (IENGINE::kLOGLEVEL_Trace, "NETWORK", (result.bSuccess ? "Cached " : "Failed ") + m_pImpl->m_sUrl + " (" + std::to_string (result.nSizeBytes) + " bytes)");
 
-   // TODO: fetch thread pool redesign — this runs on the FETCH thread, so we
-   // cannot decrement counters or call Asset_Close here.  When NETWORK owns a
-   // persistent worker pool (curl_multi, non-blocking), cleanup will happen on
-   // the worker thread after delivery.  Until then, counters stay inflated.
-   m_pImpl->m_nCount_Attach--;
-   m_pImpl->m_nCount_Open--;
+   m_pImpl->m_pAsset_Fetch = nullptr;
+
+   Detach (nullptr);
+   m_pImpl->m_pNetwork->Asset_Close (this, nullptr);
 }
 
 void NETWORK::ASSET::Resolve (uint64_t nSizeBytes, long nHttpStatus, double dFetchEndTime, const std::unordered_map<std::string, std::string>& mapHeaders)

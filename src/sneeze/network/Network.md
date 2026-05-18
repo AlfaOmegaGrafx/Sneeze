@@ -14,13 +14,13 @@ All files are stored on disk, never solely in memory. Fetches stream to a tempor
 ```
 NETWORK (singleton)
  ├── ASSET_MAP: pathname -> ASSET*                (keyed by FILE::sPathname(""), only assets with active FILE handles)
- ├── Legacy thread pool (capped at 16) + overflow queue (to be replaced)
  ├── History list: all FILE* handles ever created (m_apFile)
  ├── m_nNextFileIx: monotonic FILE index counter
  ├── m_nNextAssetIx: monotonic ASSET index counter (persisted in rules.json)
  ├── rules.json: staleness rules + nNextMetaIx counter
  ├── Sidecar .meta files per ASSET (replaces manifest.json)
  ├── SecondsSinceEpoch(): public accessor for timing (ASSET uses for fetch start/end)
+ ├── Queue_Post_Fetch(IFETCH*): routes through ENGINE -> CONTROL
  └── Epoch (steady_clock time point)
 
 ASSET (internal shared state, one per URL, pImpl)
@@ -30,7 +30,7 @@ ASSET (internal shared state, one per URL, pImpl)
  │   ├── STATE lifecycle (plain enum)
  │   ├── m_nCount_Open: how many FILEs reference this ASSET (structural)
  │   ├── m_nCount_Attach: how many FILEs have active listeners (triggers fetch)
- │   ├── m_pFetch: current FETCH thread (one per ASSET, replaced on re-fetch)
+ │   ├── m_pAsset_Fetch: IJOB* (current fetch job, cancelled on re-fetch or destruction)
  │   ├── nAssetIx: monotonic content-version index (persisted in .meta)
  │   ├── Disk path, headers, metadata
  │   ├── HTTP status, fetch queued/start/end times, served-from-cache flag
@@ -38,13 +38,9 @@ ASSET (internal shared state, one per URL, pImpl)
  │   └── m_apFiles: vector<FILE*> attached handles
  └── Meta_Load/Meta_Save/Meta_Reset (private Impl methods)
 
-FETCH (per-ASSET download thread, inherits THREAD)
- ├── Impl* m_pImpl
- │   ├── NETWORK* + ASSET* back-pointers
- │   ├── URL, cache path, hash, flags
- │   └── curl easy handle (blocking curl_easy_perform)
- ├── Main(): performs download, calls ASSET::FetchComplete on completion
- └── ~FETCH(): calls Join() before member destruction
+ASSET_FETCH (file-local class in Network_Asset.cpp, derives from JOB_FETCH)
+ ├── ASSET* m_pAsset (back-pointer)
+ └── OnFetch_Complete(): converts SNEEZE::FETCH_RESULT -> NETWORK::FETCH_RESULT, calls ASSET::FetchComplete
 
 FILE (per-caller handle, pImpl)
  ├── Impl* m_pImpl
@@ -78,9 +74,8 @@ Types in `SNEEZE::NETWORK` and related namespaces:
 
 | Type            | Role                                              |
 |-----------------|---------------------------------------------------|
-| NETWORK         | Singleton network manager. Owns assets and threads.|
+| NETWORK         | Singleton network manager. Owns assets.            |
 | NETWORK::ASSET  | Internal shared state per URL. Not exposed. pImpl. |
-| NETWORK::FETCH  | Per-ASSET download thread. Inherits THREAD. pImpl. |
 | NETWORK::FILE   | Per-caller handle. Returned by File_Open(). pImpl. |
 | NETWORK::IFILE  | Observer interface (OnFileReady, OnFileFailed).    |
 | NETWORK::IENUM  | Enumeration callback interface (OnAsset).          |
@@ -88,7 +83,8 @@ Types in `SNEEZE::NETWORK` and related namespaces:
 | NETWORK::REQUEST| Flags: REQUEST_CREATE.                             |
 | NETWORK::DISKFILE| Enum: DISKFILE_DATA, DISKFILE_TEMP, DISKFILE_META.|
 | NETWORK::RULE   | Staleness rule (content-type + olderThan).         |
-| NETWORK::FETCH_RESULT | Result struct delivered by FETCH to ASSET.   |
+| NETWORK::FETCH_RESULT | Result struct delivered by fetch to ASSET.   |
+| ASSET_FETCH     | File-local bridge (JOB_FETCH -> ASSET::FetchComplete). |
 | SNEEZE::VIEWPORT::CONTAINER::CID | Identity record for a container.   |
 
 ## Usage
@@ -523,13 +519,13 @@ This means only assets with active FILE handles live in memory. Re-opening a pre
 
 ## Concurrency Model
 
-### Current: Per-ASSET FETCH Thread (Legacy)
+### Current: Pooled Fetch via CONTROL
 
-Each ASSET spawns its own `FETCH` thread (inherits `THREAD`) when first attached. FETCH performs a blocking `curl_easy_perform()`, then calls `ASSET::FetchComplete()` with the result. The thread is joined on the next attach (when the old FETCH is replaced) or in FETCH's destructor.
+Fetches are dispatched as `JOB_FETCH` jobs through the engine's thread pool infrastructure. `ASSET::Attach` creates an `ASSET_FETCH` (a file-local class in `Network_Asset.cpp` deriving from `JOB_FETCH`) and posts it via `NETWORK::Queue_Post_Fetch` -> `ENGINE::Queue_Post_Fetch` -> `CONTROL::Queue_Post_Fetch` -> `POOL_QUEUE<IFETCH*>::Post`. The job is picked up by one of 16 `AGENT::FETCH` workers in `CONTROL`'s fetch pool.
 
-Legacy infrastructure (capped 16 FETCH_SLOTs + overflow queue) still exists and is functional but is targeted for replacement.
+ASSET stores `IJOB* m_pAsset_Fetch` (not a typed FETCH pointer). On re-fetch, the existing job is cancelled (`Cancel()`) and the pointer nulled before creating a new job. On fetch completion, `ASSET_FETCH::OnFetch_Complete` converts `SNEEZE::FETCH_RESULT` to `NETWORK::FETCH_RESULT` and calls `ASSET::FetchComplete`. The destructor cancels any outstanding job.
 
-`FetchWriteCallback` and `FetchHeaderCallback` are static methods on FETCH's Impl. `GetEvpMd` remains a file-local static in `Encoding.cpp`.
+The ASSET increments `m_nCount_Open` and `m_nCount_Attach` before posting the job (implicit counts that keep the ASSET alive during the fetch). `FetchComplete` releases these via `Detach(nullptr)` and `Asset_Close(this, nullptr)` — routing through the proper lifecycle methods so `Meta_Save`/`Meta_Reset`/`Evict` trigger when counts reach zero. `Close(nullptr)` was designed for this case (comment at line 394: "if pFile == nullptr, the fetch thread is releasing its implicit lock").
 
 ### Race Condition Mitigations
 
@@ -541,36 +537,11 @@ Three specific concerns and their mitigations:
 
 3. **`.meta` files are written only on last detach or shutdown** — sidecar files are saved when the last FILE detaches (ASSET::Detach calls Meta_Save if READY) or during `Shutdown()`. No concurrent fetch activity exists at shutdown (all threads are joined first).
 
-4. **FETCH thread count release** — `ASSET::FetchComplete()` is called on the FETCH thread and now decrements both `m_nCount_Attach` and `m_nCount_Open` to release the FETCH's implicit counts. This allows `Detach` to reach zero when the last real FILE detaches, triggering `Meta_Save`/`Meta_Reset`/`Evict` synchronously. `Asset_Close` is still not called on the FETCH thread (requires the NETWORK mutex); that cleanup happens when the FILE is destroyed.
+4. **Fetch job count release** — `ASSET::FetchComplete()` is called on an `AGENT::FETCH` worker thread. It releases the fetch's implicit counts via `Detach(nullptr)` (triggers `Meta_Save`/`Meta_Reset`/`Evict` when attach count reaches zero) and `m_pNetwork->Asset_Close(this, nullptr)` (removes the ASSET from the map and deletes it when open count reaches zero). Both methods accept `nullptr` for `pFile` — `Detach` ignores it, `Close(nullptr)` skips the file-list erase, and `Asset_Close` uses `pAsset->Pathname()` for the map key.
 
-### Deferred: Non-Blocking I/O Thread Pool
+### Future: Non-Blocking I/O (curl_multi)
 
-The current model spawns one `FETCH` thread per ASSET. While only one FETCH exists per ASSET at a time, this is still inefficient — each thread blocks in `curl_easy_perform()` waiting for network I/O. A proper implementation would use non-blocking I/O to handle hundreds of concurrent requests with far fewer threads.
-
-**Target Architecture:**
-
-1. **Fixed worker pool (4-8 THREAD subclass workers)** — a small number of long-lived worker threads (inheriting from `THREAD`), each in a persistent wait loop. Thread count would be configurable but default to `min(4, hardware_concurrency - 2)`.
-
-2. **`curl_multi` interface** — each worker uses `curl_multi_init()` to manage multiple transfers simultaneously. The event loop calls `curl_multi_poll()` (blocks until activity or timeout) followed by `curl_multi_perform()` (drives transfers forward). When a transfer completes, `curl_multi_info_read()` retrieves the result.
-
-3. **Dispatch queue** — incoming requests from `File_Open()` are pushed to a thread-safe queue. Workers check the queue after each poll cycle and add new `curl_easy` handles to their multi handle via `curl_multi_add_handle()`.
-
-4. **Load balancing** — round-robin or least-loaded assignment of new requests to workers. Each worker could handle 50-100+ concurrent transfers, so 4 workers could manage 200-400 simultaneous requests.
-
-5. **Completion on worker thread** — when a transfer completes, the worker calls `ASSET::FetchComplete()` directly on its own thread. Since the worker is NETWORK-owned, it can safely call `Asset_Close()` and decrement counters — no scrubber relay needed.
-
-6. **No spawn/join per fetch** — workers are created at `NETWORK::Initialize()` and destroyed at `Shutdown()`. When not fetching, they sleep (wait on condition variable). FETCH objects and the `m_pFetch` per-ASSET member are eliminated entirely.
-
-**References:**
-- libcurl multi interface: https://curl.se/libcurl/c/libcurl-multi.html
-- `curl_multi_poll`: https://curl.se/libcurl/c/curl_multi_poll.html
-- libuv (cross-platform event loop): https://libuv.org/
-- Boost.Asio (C++ async I/O): https://www.boost.org/doc/libs/release/libs/asio/
-
-**Implementation notes:**
-- The `FETCH` class and per-ASSET `m_pFetch` member are replaced by the worker pool — no per-ASSET thread objects.
-- `curl_easy` handle setup (URL, write callback, header callback, timeout) remains unchanged — it's already compatible with both easy and multi modes.
-- The `FETCH_RESULT` struct delivered by `FetchComplete()` is unchanged — only the delivery mechanism changes (worker thread instead of dedicated FETCH thread).
+The current pooled model uses 16 `AGENT::FETCH` workers, each performing a blocking `curl_easy_perform()`. This is a significant improvement over the old per-ASSET thread model (no thread spawn/join per fetch, fixed worker count, proper lifecycle management), but each worker still blocks on a single transfer at a time. A future optimization could use `curl_multi` for non-blocking concurrent downloads, allowing each worker to handle multiple simultaneous transfers. The `curl_easy` handle setup (URL, write callback, header callback, timeout) is already compatible with both easy and multi modes.
 
 ## Shutdown
 
@@ -670,18 +641,21 @@ This would enable UI progress bars for large file downloads.
 
 ## Active Refactoring — Status
 
-The NETWORK module completed a multi-session bottom-up refactoring. Build errors are resolved, all 67 network tests pass. **Constraint: `NETWORK::Asset_Open`, `NETWORK::Asset_Close`, and `NETWORK::Asset_Index` must not be edited.**
+The NETWORK module completed a multi-session bottom-up refactoring. Build errors are resolved, all 68 network tests pass.
 
 ### Completed
 
 - FILE now owns all path computation (m_sPath_Permanent, m_sDiskKey, sPath/sFilename/sPathname accessors). ASSET stores the pathname but does not compute it.
 - ASSET map keyed by pathname (FILE::sPathname("")) instead of URL — supports per-viewport, per-CID scoping.
-- FetchComplete decrements FETCH's implicit m_nCount_Attach and m_nCount_Open, so Detach reaches zero and triggers Meta_Save/Meta_Reset synchronously.
 - Close() calls Detach() immediately — listener disconnected, ASSET attach count decremented on close rather than deferred to destructor.
 - Fetch timing: m_dFetchStartTime set in ASSET::Attach when spawning fetch, m_dFetchEndTime set in FetchComplete via NETWORK::SecondsSinceEpoch().
 - File_Open with null listener returns null for uncached URLs (cache probe path).
 - curl_global_init/cleanup moved from NETWORK to ENGINE (truly global, reference-counted).
 - ASSET::Attach branches documented with state comments.
+- **Per-ASSET FETCH threads replaced with pooled JOB_FETCH jobs.** `m_pFetch` (FETCH*) replaced by `m_pAsset_Fetch` (IJOB*). ASSET_FETCH bridge class in Network_Asset.cpp converts SNEEZE::FETCH_RESULT to NETWORK::FETCH_RESULT. Legacy thread pool (16 FETCH_SLOTs + overflow queue) removed from Network.cpp.
+- **FetchComplete lifecycle fix.** Raw counter decrements (`m_nCount_Attach--`, `m_nCount_Open--`) replaced by `Detach(nullptr)` + `m_pNetwork->Asset_Close(this, nullptr)`. This routes through the proper lifecycle methods, triggering Meta_Save when attach count reaches zero. Fixes the long-standing "temporary ungraceful solution" noted in the architecture docs.
+- **Asset_Close simplified.** Uses `pAsset->Pathname()` unconditionally instead of branching on `pFile ? pFile->sPathname("") : pAsset->Pathname()` — both are always equal.
+- **Queue_Post_Fetch routing.** `NETWORK::Queue_Post_Fetch(IFETCH*)` -> `ENGINE::Queue_Post_Fetch` -> `ENGINE::Impl::Queue_Post_Fetch` -> `CONTROL::Queue_Post_Fetch` -> `POOL_QUEUE<IFETCH*>::Post`. ENGINE::Impl keeps `m_pControl` private; the forwarding method provides controlled access.
 
 ### Deferred Tasks
 
@@ -690,6 +664,5 @@ The NETWORK module completed a multi-session bottom-up refactoring. Build errors
 | 1 | **Move NETWORK from ENGINE to VIEWPORT** | Each viewport gets its own NETWORK instance. Removes singleton scoping of rules and cache. Architectural change — deferred until current refactoring is stable. |
 | 2 | **Remove m_sCachePath from Network::Impl** | NETWORK still derives its own cache path. Should use ENGINE's sPath_Persistent() once NETWORK moves to VIEWPORT. |
 | 3 | **Remove DISKFILE enum from Network.h** | FILE's sPathname(ext) replaces DiskKeyToPath(). DISKFILE enum only used inside ASSET::Impl::Path() — can be made private or replaced. |
-| 4 | **Thread pool redesign** | Replace per-ASSET FETCH objects with NETWORK-owned worker threads using `curl_multi` for non-blocking concurrent downloads. See "Deferred: Non-Blocking I/O Thread Pool" section above. |
-| 5 | **Audit `Node.cpp`** | NODE implements `NETWORK::IFILE` — verify it uses the renamed API (`File_Open`/`Close` instead of `Request`/`Release`). |
-| 6 | **Leaked FILE/ASSET messages** | Per-test NETWORK instances log "Leaked" on teardown because OnNetworkFileCreated returns true (files aren't auto-cleared). Tests need explicit Clear+Close or the destructor needs a clean teardown path. |
+| 4 | **Non-blocking I/O (curl_multi)** | Current pooled model uses blocking curl_easy_perform per worker. Future optimization: curl_multi for concurrent transfers per worker. See "Future: Non-Blocking I/O" section above. |
+| 5 | **Leaked FILE/ASSET messages** | Per-test NETWORK instances log "Leaked" on teardown because OnNetworkFileCreated returns true (files aren't auto-cleared). Tests need explicit Clear+Close or the destructor needs a clean teardown path. |

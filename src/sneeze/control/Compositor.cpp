@@ -82,17 +82,16 @@ static void ColorFromU32 (uint32_t nColor, float& r, float& g, float& b)
 
 // ---------------------------------------------------------------------------
 
-AGENT::COMPOSITOR::COMPOSITOR (CONTROL* pControl, int nAgentIndex)
-   : AGENT (pControl, nAgentIndex)
-   , m_tmNow (0)
-   , m_nFrameCount (0)
-   , m_dFpsAccum (0.0)
-   , m_dAccumInput (0.0)
-   , m_dAccumScene (0.0)
-   , m_dAccumSubmit (0.0)
-   , m_dAccumRender (0.0)
-   , m_dAccumPublish (0.0)
-   , m_dAccumFlush (0.0)
+AGENT::COMPOSITOR::COMPOSITOR (POOL* pPool, int nAgentIz) : AGENT (pPool, nAgentIz),
+   m_tmNow         (0),
+   m_nFrameCount   (0),
+   m_dFpsAccum     (0.0),
+   m_dAccumInput   (0.0),
+   m_dAccumScene   (0.0),
+   m_dAccumSubmit  (0.0),
+   m_dAccumRender  (0.0),
+   m_dAccumPublish (0.0),
+   m_dAccumFlush   (0.0)
 {
    double dJD_Now     = EPOCH::NowTT ();
    double dJD_J2000   = 2451545.0;

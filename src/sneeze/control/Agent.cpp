@@ -15,10 +15,10 @@
 #include <Sneeze.h>
 #include "Control.h"
 
-SNEEZE::AGENT::AGENT (CONTROL* pControl, int nAgentIndex)
-   : THREAD ()
-   , m_pControl (pControl)
-   , m_nAgentIndex (nAgentIndex)
+SNEEZE::AGENT::AGENT (POOL* pPool, int nAgentIz) : THREAD (),
+   m_pPool    (pPool),
+   m_nAgentIz (nAgentIz),
+   m_bBusy    (false)
 {
 }
 
@@ -29,5 +29,12 @@ SNEEZE::AGENT::~AGENT ()
 
 SNEEZE::ENGINE* SNEEZE::AGENT::Engine () const
 {
-   return m_pControl->Engine ();
+   return m_pPool->Engine ();
+}
+
+bool SNEEZE::AGENT::Busy ()
+{
+   bool bExpected = false;
+
+   return m_bBusy.compare_exchange_strong (bExpected, true, std::memory_order_acq_rel, std::memory_order_relaxed);
 }
