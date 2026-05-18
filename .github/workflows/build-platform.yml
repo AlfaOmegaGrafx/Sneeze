@@ -351,6 +351,7 @@ jobs:
           CMAKE_ARGS="${CMAKE_ARGS//cmake\/toolchain/${{ github.workspace }}/cmake/toolchain}"
           cmake -S src -B build-sneeze -GNinja \
             -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} \
+            -DSNEEZE_PLATFORM=${{ inputs.platform }} \
             -DSNEEZE_ENABLE_WASM=ON \
             $CMAKE_ARGS
           cmake --build build-sneeze --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
