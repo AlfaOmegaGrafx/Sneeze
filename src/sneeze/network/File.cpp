@@ -335,8 +335,8 @@ void NETWORK::FILE::SnapshotFinal    () { m_pImpl->SnapshotFinal (); }
 // ---------------------------------------------------------------------------
 
 std::string                                        NETWORK::FILE::Header            (const std::string& sName) const { return m_pImpl->m_pAsset->Header (sName); }
+void                                               NETWORK::FILE::ReadData          (std::vector<uint8_t>& aData) const { return m_pImpl->m_pAsset->ReadData (aData); }
 
-std::vector<uint8_t>                               NETWORK::FILE::ReadData          () const { return m_pImpl->m_pAsset->ReadData (); }
 std::string                                        NETWORK::FILE::DiskPath          () const { return m_pImpl->m_pAsset->DiskPath (); }
 std::string                                        NETWORK::FILE::CreatedTime       () const { return m_pImpl->m_pAsset->CreatedTime (); }
 std::string                                        NETWORK::FILE::LastAccessTime    () const { return m_pImpl->m_pAsset->LastAccessTime (); }

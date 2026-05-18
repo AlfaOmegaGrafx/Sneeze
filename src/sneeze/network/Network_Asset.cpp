@@ -650,11 +650,11 @@ void NETWORK::ASSET::Fail (long nHttpStatus, double dFetchEndTime, const std::un
 // Data access
 // ---------------------------------------------------------------------------
 
-std::vector<uint8_t> NETWORK::ASSET::ReadData () const
+void NETWORK::ASSET::ReadData (std::vector<uint8_t>& aData) const
 {
-   std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
+   aData.clear ();
 
-   std::vector<uint8_t> aData;
+   std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
 
    if (m_pImpl->m_bState == STATE_READY)
    {
@@ -670,8 +670,6 @@ std::vector<uint8_t> NETWORK::ASSET::ReadData () const
          }
       }
    }
-
-   return aData;
 }
 
 std::string NETWORK::ASSET::Header (const std::string& sName) const

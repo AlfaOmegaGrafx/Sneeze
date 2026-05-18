@@ -248,7 +248,7 @@ void NODE::OnFileReady (NETWORK::FILE* pFile)
    std::vector<uint8_t> aData;
 
    if (m_pMapObject)
-      aData = pFile->ReadData ();
+      pFile->ReadData (aData);
 
    pFile->Close ();
    m_pFile = nullptr;
