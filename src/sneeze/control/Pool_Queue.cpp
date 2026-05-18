@@ -59,5 +59,8 @@ bool POOL_QUEUE<JOB_PTR>::Grab (JOB_PTR& pJob)
    return bResult;
 }
 
-template class POOL_QUEUE<ISCRUB*>;
-template class POOL_QUEUE<IFETCH*>;
+namespace SNEEZE
+{
+   template class POOL_QUEUE<ISCRUB*>;
+   template class POOL_QUEUE<IFETCH*>;
+}
