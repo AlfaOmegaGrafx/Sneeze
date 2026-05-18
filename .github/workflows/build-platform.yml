@@ -74,6 +74,7 @@ jobs:
             vox)           DIR=Vox ;;
             anari-sdk)     DIR=ANARI-SDK ;;
             openxr-sdk)    DIR=OpenXR-SDK ;;
+            freetype)      DIR=FreeType ;;
             rmlui)         DIR=RmlUi ;;
             wasmtime)      DIR=Wasmtime ;;
             halogen)       DIR=Halogen ;;

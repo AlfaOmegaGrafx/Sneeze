@@ -50,7 +50,8 @@ DEPS_ORDERED=(
    openxr-sdk            # no deps (skipped if XR=OFF)
    boringssl             # no deps (src/jws/ crypto + Android curl TLS)
    curl                  # -> boringssl (Android only; native TLS elsewhere)
-   rmlui                 # no deps
+   freetype              # no deps (RmlUi + FindSneezeFreeType)
+   rmlui                 # -> freetype
    nlohmann-json         # no deps
    jwt-cpp               # header-only (JWS library used by src/jws/)
    spirv-cross           # no deps (SPIR-V -> HLSL / MSL for Vox)

@@ -145,7 +145,8 @@ $DepsOrdered = @(
    'openxr-sdk'      # no deps (skipped if XR=OFF)
    'boringssl'       # no deps (src/jws/ crypto)
    'curl'            # -> boringssl (Android only; Schannel on Windows)
-   'rmlui'           # no deps
+   'freetype'        # no deps (RmlUi + FindSneezeFreeType)
+   'rmlui'           # -> freetype
    'nlohmann-json'   # no deps
    'jwt-cpp'         # header-only
    'spirv-cross'     # no deps (SPIR-V -> HLSL for Vox)
