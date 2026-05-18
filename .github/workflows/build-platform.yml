@@ -146,7 +146,7 @@ jobs:
             libs-${{ inputs.platform }}/**
             !libs-${{ inputs.platform }}/*/build/**
             libs-${{ inputs.platform }}/filament/build/tools/**
-          retention-days: 3
+          retention-days: 14
 
   tier1:
     needs: tier0
@@ -235,7 +235,7 @@ jobs:
             libs-${{ inputs.platform }}/**
             !libs-${{ inputs.platform }}/*/build/**
             libs-${{ inputs.platform }}/filament/build/tools/**
-          retention-days: 3
+          retention-days: 14
 
   tier2:
     needs: tier1
@@ -293,7 +293,7 @@ jobs:
             libs-${{ inputs.platform }}/**
             !libs-${{ inputs.platform }}/*/build/**
             libs-${{ inputs.platform }}/filament/build/tools/**
-          retention-days: 3
+          retention-days: 14
 
   sneeze:
     needs: [tier0, tier1, tier2]
@@ -361,3 +361,11 @@ jobs:
         run: |
           cd build-sneeze
           ctest --output-on-failure --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu) || true
+
+      # One bundle per platform so the parent Build run exposes linux-libs, etc.
+      - name: Upload platform libs bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.platform }}-libs
+          path: libs-${{ inputs.platform }}/
+          retention-days: 14
