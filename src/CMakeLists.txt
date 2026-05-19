@@ -834,4 +834,8 @@ endif ()
 # Tests (separate directory, nested build output under build/tests/)
 # ---------------------------------------------------------------------------
 
-add_subdirectory ("${CMAKE_CURRENT_SOURCE_DIR}/../tests" "${CMAKE_CURRENT_BINARY_DIR}/tests")
+option (SNEEZE_BUILD_TESTS "Build SneezeTest and GenCerts" ON)
+
+if (SNEEZE_BUILD_TESTS)
+   add_subdirectory ("${CMAKE_CURRENT_SOURCE_DIR}/../tests" "${CMAKE_CURRENT_BINARY_DIR}/tests")
+endif ()
