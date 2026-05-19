@@ -508,11 +508,14 @@ set (CORE_SOURCES
    sneeze/control/Agent.cpp
    sneeze/control/Control.cpp
    sneeze/control/Compositor.cpp
-   sneeze/control/Scrubber.cpp
+   sneeze/control/IJob.cpp
+   sneeze/control/Scrub.cpp
    sneeze/control/AgentC.cpp
-   sneeze/control/AgentD.cpp
-   sneeze/control/AgentE.cpp)
+   sneeze/control/Pool.cpp
+   sneeze/control/Pool_Queue.cpp
+   sneeze/control/Fetch.cpp)
 set (CORE_HEADERS
+   sneeze/Pch.h
    sneeze/Types.h
    sneeze/Engine.h
    sneeze/control/Control.h)
@@ -551,15 +554,67 @@ set (SOM_HEADERS
    viewport/scene/SpatialIndex.h)
 
 set (NETWORK_SOURCES
-   sneeze/network/Asset.cpp
+   sneeze/network/Network_Asset.cpp
    sneeze/network/File.cpp
    sneeze/network/Network.cpp)
-set (NETWORK_HEADERS)
+set (NETWORK_HEADERS
+   )
+
+# Embed Mozilla's CA bundle (cacert.pem) as a string blob so libcurl can
+# verify HTTPS certificates on platforms whose system has no libcurl-
+# readable CA store (Android NDK + BoringSSL, in particular). Win32 uses
+# SChannel + the Windows store; Apple uses SecureTransport + Keychain;
+# both ignore CAINFO_BLOB, but compiling the symbol unconditionally
+# avoids a per-platform link surface.
+set (SNEEZE_CACERT_PEM "${CMAKE_CURRENT_BINARY_DIR}/cacert.pem")
+if (NOT EXISTS "${SNEEZE_CACERT_PEM}")
+   message (STATUS "Fetching cacert.pem from curl.se")
+   file (DOWNLOAD https://curl.se/ca/cacert.pem "${SNEEZE_CACERT_PEM}"
+         TIMEOUT 30
+         TLS_VERIFY ON
+         STATUS _cacert_status)
+   list (GET _cacert_status 0 _cacert_code)
+   if (NOT _cacert_code EQUAL 0)
+      file (REMOVE "${SNEEZE_CACERT_PEM}")
+      message (FATAL_ERROR "Failed to download cacert.pem: ${_cacert_status}")
+   endif ()
+endif ()
+file (READ "${SNEEZE_CACERT_PEM}" _cacert_raw)
+string (LENGTH "${_cacert_raw}" _cacert_len)
+
+set (_cacert_cpp "${CMAKE_CURRENT_BINARY_DIR}/cacert_data.cpp")
+set (_chunk_size 8000)
+file (WRITE "${_cacert_cpp}"
+   "// Auto-generated — do not edit. Mozilla NSS CA bundle for CURLOPT_CAINFO_BLOB.\n"
+   "namespace SNEEZE {\n"
+   "   extern const char* const g_szCaCertPem;\n"
+   "   extern const unsigned long g_nCaCertPemLen;\n"
+   "}\n"
+   "namespace SNEEZE {\n"
+   "   static const char s_data[] =\n")
+set (_off 0)
+while (_off LESS _cacert_len)
+   string (SUBSTRING "${_cacert_raw}" ${_off} ${_chunk_size} _chunk)
+   string (REPLACE "\\" "\\\\" _chunk "${_chunk}")
+   string (REPLACE "\"" "\\\"" _chunk "${_chunk}")
+   string (REPLACE "\n" "\\n\"\n      \"" _chunk "${_chunk}")
+   file (APPEND "${_cacert_cpp}" "      \"${_chunk}\"\n")
+   math (EXPR _off "${_off} + ${_chunk_size}")
+endwhile ()
+file (APPEND "${_cacert_cpp}"
+   "      ;\n"
+   "   const char* const g_szCaCertPem = s_data;\n"
+   "   const unsigned long g_nCaCertPemLen = sizeof(s_data) - 1;\n"
+   "}\n")
+# Kept out of NETWORK_SOURCES because that list also feeds source_group(TREE),
+# which requires every file to live under CMAKE_CURRENT_SOURCE_DIR. The
+# generated source is added directly to the Sneeze target below instead.
+set (NETWORK_GENERATED_SOURCES "${CMAKE_CURRENT_BINARY_DIR}/cacert_data.cpp")
 
 set (CONTAINER_HEADERS)
 
-set (STORAGE_SOURCES  sneeze/storage/Storage.cpp sneeze/storage/Unit.cpp sneeze/storage/Silo.cpp)
-set (STORAGE_HEADERS)
+set (STORAGE_SOURCES  sneeze/storage/Storage.cpp sneeze/storage/Storage_Asset.cpp sneeze/storage/Unit.cpp)
+set (STORAGE_HEADERS  sneeze/storage/Storage_Asset.h)
 
 set (PERSONA_SOURCES  persona/Persona.cpp)
 set (PERSONA_HEADERS)
@@ -585,9 +640,15 @@ endif ()
 set (SPIRV_SOURCES   deps/spirv/SpvPipeline.cpp)
 set (SPIRV_HEADERS   deps/spirv/SpvPipeline.h)
 
+set (XR_HEADERS deps/xr/XrRuntime.h)
 if (SNEEZE_ENABLE_XR)
-   set (XR_SOURCES      deps/xr/XrRuntime.cpp)
-   set (XR_HEADERS      deps/xr/XrRuntime.h)
+   # Real OpenXR loader. Pulls in libopenxr_loader via OPENXR_LOADER_LIB.
+   set (XR_SOURCES deps/xr/XrRuntime.cpp)
+else ()
+   # No-op stub for builds without OpenXR (e.g. iOS). Same XR_RUNTIME class,
+   # HasRuntime () returns false, Initialize () succeeds silently. Lets
+   # Engine.cpp drop its #ifdef SNEEZE_HAS_XR guards entirely.
+   set (XR_SOURCES deps/xr/XrRuntime_Stub.cpp)
 endif ()
 
 set (UI_SOURCES      deps/ui/UiContext.cpp)
@@ -635,8 +696,18 @@ add_library (Sneeze STATIC
    ${STB_SOURCES}       ${STB_HEADERS}
    ${INCLUDE_HEADERS}
    ${KERNEL_EMBED_FILES}
+   ${NETWORK_GENERATED_SOURCES}
 )
 add_dependencies (Sneeze CompileKernels)
+
+# ---------------------------------------------------------------------------
+# Precompiled header (MSVC: speeds up rebuilds by ~3-5x; same gain on
+# Clang/GCC via -include). CMake synthesizes cmake_pch.cxx and force-includes
+# Pch.h ahead of every Sneeze .cpp -- no per-file edits required. Guard on
+# CXX so the C embed file and Windows .rc resource skip the PCH.
+# ---------------------------------------------------------------------------
+target_precompile_headers (Sneeze PRIVATE
+   "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/sneeze/Pch.h>")
 
 # On Windows, .res objects inside static libraries don't get pulled into the
 # final executable by the linker. Expose the .rc as an INTERFACE source so
@@ -674,9 +745,8 @@ target_compile_definitions (Sneeze PUBLIC
 if (SNEEZE_ENABLE_WASM)
    target_compile_definitions (Sneeze PUBLIC SNEEZE_HAS_WASM WASM_API_EXTERN= WASI_API_EXTERN=)
 endif ()
-if (SNEEZE_ENABLE_XR)
-   target_compile_definitions (Sneeze PUBLIC SNEEZE_HAS_XR)
-endif ()
+# SNEEZE_HAS_XR compile def is gone — XR_RUNTIME class is always present, the
+# real-vs-stub .cpp selection above is what gates the OpenXR linkage.
 
 target_link_libraries (Sneeze PUBLIC
    anari::anari_static
@@ -764,8 +834,4 @@ endif ()
 # Tests (separate directory, nested build output under build/tests/)
 # ---------------------------------------------------------------------------
 
-option (SNEEZE_BUILD_TESTS "Build SneezeTest and GenCerts" ON)
-
-if (SNEEZE_BUILD_TESTS)
-   add_subdirectory ("${CMAKE_CURRENT_SOURCE_DIR}/../tests" "${CMAKE_CURRENT_BINARY_DIR}/tests")
-endif ()
+add_subdirectory ("${CMAKE_CURRENT_SOURCE_DIR}/../tests" "${CMAKE_CURRENT_BINARY_DIR}/tests")
