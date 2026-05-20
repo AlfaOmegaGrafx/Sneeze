@@ -24,8 +24,8 @@ jobs:
     with:
       platform: macos
       runs-on: macos-14
-      cmake-args: "-DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0"
-      rust-targets: "aarch64-apple-darwin"
+      cmake-args: "-DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 -DWASMTIME_MACOS_UNIVERSAL=ON"
+      rust-targets: "aarch64-apple-darwin,x86_64-apple-darwin"
 
   # Android/iOS need Filament host tools from the native platform build
   ios:
