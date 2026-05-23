@@ -20,7 +20,7 @@ NETWORK (singleton)
  ├── rules.json: staleness rules + nNextMetaIx counter
  ├── Sidecar .meta files per ASSET (replaces manifest.json)
  ├── SecondsSinceEpoch(): public accessor for timing (ASSET uses for fetch start/end)
- ├── Queue_Post_Fetch(IFETCH*): routes through ENGINE -> CONTROL
+ ├── Queue_Post_Fetch(JOB_FETCH*): routes through ENGINE -> CONTROL
  └── Epoch (steady_clock time point)
 
 ASSET (internal shared state, one per URL, pImpl)
@@ -40,7 +40,7 @@ ASSET (internal shared state, one per URL, pImpl)
 
 ASSET_FETCH (file-local class in Network_Asset.cpp, derives from JOB_FETCH)
  ├── ASSET* m_pAsset (back-pointer)
- └── OnFetch_Complete(): converts SNEEZE::FETCH_RESULT -> NETWORK::FETCH_RESULT, calls ASSET::FetchComplete
+ └── OnFetch_Complete(): calls ASSET::FetchComplete (real fetch) or ASSET::FetchComplete(FILE*, STATE) (notify-only)
 
 FILE (per-caller handle, pImpl)
  ├── Impl* m_pImpl
@@ -83,7 +83,7 @@ Types in `SNEEZE::NETWORK` and related namespaces:
 | NETWORK::REQUEST| Flags: REQUEST_CREATE.                             |
 | NETWORK::DISKFILE| Enum: DISKFILE_DATA, DISKFILE_TEMP, DISKFILE_META.|
 | NETWORK::RULE   | Staleness rule (content-type + olderThan).         |
-| NETWORK::FETCH_RESULT | Result struct delivered by fetch to ASSET.   |
+| SNEEZE::FETCH_RESULT  | Result struct delivered by fetch to ASSET (declared in `Control.h`, shared by both layers). |
 | ASSET_FETCH     | File-local bridge (JOB_FETCH -> ASSET::FetchComplete). |
 | SNEEZE::CONTEXT::CONTAINER::CID | Identity record for a container.   |
 
@@ -521,9 +521,11 @@ This means only assets with active FILE handles live in memory. Re-opening a pre
 
 ### Current: Pooled Fetch via CONTROL
 
-Fetches are dispatched as `JOB_FETCH` jobs through the engine's thread pool infrastructure. `ASSET::Attach` creates an `ASSET_FETCH` (a file-local class in `Network_Asset.cpp` deriving from `JOB_FETCH`) and posts it via `NETWORK::Queue_Post_Fetch` -> `ENGINE::Queue_Post_Fetch` -> `CONTROL::Queue_Post_Fetch` -> `POOL_QUEUE<IFETCH*>::Post`. The job is picked up by one of 16 `AGENT::FETCH` workers in `CONTROL`'s fetch pool.
+Fetches are dispatched as `JOB_FETCH` jobs through the engine's thread pool infrastructure. `ASSET::Attach` creates an `ASSET_FETCH` (a file-local class in `Network_Asset.cpp` deriving from `JOB_FETCH`) and posts it via `NETWORK::Queue_Post_Fetch` -> `ENGINE::Queue_Post_Fetch` -> `CONTROL::Queue_Post_Fetch` -> `POOL_QUEUE<JOB_FETCH*>::Post`. The job is picked up by one of 16 `AGENT::FETCH` workers in `CONTROL`'s fetch pool.
 
-ASSET stores `IJOB* m_pAsset_Fetch` (not a typed FETCH pointer). On re-fetch, the existing job is cancelled (`Cancel()`) and the pointer nulled before creating a new job. On fetch completion, `ASSET_FETCH::OnFetch_Complete` converts `SNEEZE::FETCH_RESULT` to `NETWORK::FETCH_RESULT` and calls `ASSET::FetchComplete`. The destructor cancels any outstanding job.
+`ASSET_FETCH` has two constructors: (1) real fetch (`IsFetch()==true`) with URL/paths/hash for HTTP downloads, and (2) notify-only (`IsFetch()==false`) with `FILE*` and `STATE` for asynchronous notifications of cached/failed files. All FILE notifications (OnFileReady/OnFileFailed) go through the fetch pool — even for already-cached files — preventing re-entrancy bugs where synchronous OnFileReady during `File_Open`/`Initialize` could destroy the FILE mid-initialization.
+
+ASSET stores `IJOB* m_pAsset_Fetch` (not a typed FETCH pointer). On re-fetch, the existing job is cancelled (`Cancel()`) and the pointer nulled before creating a new job. On fetch completion, `ASSET_FETCH::OnFetch_Complete` checks `IsFetch()`: if true, calls `ASSET::FetchComplete(FETCH_RESULT)` (real fetch — sets state fields, notifies all attached FILEs); if false, calls `ASSET::FetchComplete(FILE*, STATE)` (notify-only — notifies single FILE's listener). Both overloads null `m_pAsset_Fetch` and release implicit counts. The destructor cancels any outstanding job.
 
 The ASSET increments `m_nCount_Open` and `m_nCount_Attach` before posting the job (implicit counts that keep the ASSET alive during the fetch). `FetchComplete` releases these via `Detach(nullptr)` and `Asset_Close(this, nullptr)` — routing through the proper lifecycle methods so `Meta_Save`/`Meta_Reset`/`Evict` trigger when counts reach zero. `Close(nullptr)` was designed for this case (comment at line 394: "if pFile == nullptr, the fetch thread is releasing its implicit lock").
 
@@ -652,10 +654,13 @@ The NETWORK module completed a multi-session bottom-up refactoring. Build errors
 - File_Open with null listener returns null for uncached URLs (cache probe path).
 - curl_global_init/cleanup moved from NETWORK to ENGINE (truly global, reference-counted).
 - ASSET::Attach branches documented with state comments.
-- **Per-ASSET FETCH threads replaced with pooled JOB_FETCH jobs.** `m_pFetch` (FETCH*) replaced by `m_pAsset_Fetch` (IJOB*). ASSET_FETCH bridge class in Network_Asset.cpp converts SNEEZE::FETCH_RESULT to NETWORK::FETCH_RESULT. Legacy thread pool (16 FETCH_SLOTs + overflow queue) removed from Network.cpp.
+- **Per-ASSET FETCH threads replaced with pooled JOB_FETCH jobs.** `m_pJob_Fetch` (FETCH*) replaced by `m_pAsset_Fetch` (IJOB*). ASSET_FETCH bridge class in Network_Asset.cpp passes `SNEEZE::FETCH_RESULT` directly (no conversion — `NETWORK::FETCH_RESULT` was eliminated). Legacy thread pool (16 FETCH_SLOTs + overflow queue) removed from Network.cpp.
 - **FetchComplete lifecycle fix.** Raw counter decrements (`m_nCount_Attach--`, `m_nCount_Open--`) replaced by `Detach(nullptr)` + `m_pNetwork->Asset_Close(this, nullptr)`. This routes through the proper lifecycle methods, triggering Meta_Save when attach count reaches zero. Fixes the long-standing "temporary ungraceful solution" noted in the architecture docs.
 - **Asset_Close simplified.** Uses `pAsset->Pathname()` unconditionally instead of branching on `pFile ? pFile->sPathname("") : pAsset->Pathname()` — both are always equal.
-- **Queue_Post_Fetch routing.** `NETWORK::Queue_Post_Fetch(IFETCH*)` -> `ENGINE::Queue_Post_Fetch` -> `ENGINE::Impl::Queue_Post_Fetch` -> `CONTROL::Queue_Post_Fetch` -> `POOL_QUEUE<IFETCH*>::Post`. ENGINE::Impl keeps `m_pControl` private; the forwarding method provides controlled access.
+- **Queue_Post_Fetch routing.** `NETWORK::Queue_Post_Fetch(JOB_FETCH*)` -> `ENGINE::Queue_Post_Fetch` -> `ENGINE::Impl::Queue_Post_Fetch` -> `CONTROL::Queue_Post_Fetch` -> `POOL_QUEUE<JOB_FETCH*>::Post`. ENGINE::Impl keeps `m_pControl` private; the forwarding method provides controlled access.
+- **All FILE notifications are asynchronous.** Even for already-cached files, OnFileReady/OnFileFailed are delivered via notify-only `ASSET_FETCH` jobs (`IsFetch()==false`) posted to the fetch pool. This eliminates re-entrancy bugs where synchronous notification during `File_Open`/`Initialize`/`Attach` could destroy the FILE mid-initialization.
+- **`IFETCH`/`ISCRUB` interfaces eliminated.** `JOB_FETCH` and `JOB_SCRUB` now inherit directly from `IJOB`. `JOB_FETCH` carries `bool m_bFetch` (set via constructor) to distinguish real fetch jobs from notify-only jobs.
+- **`ASSET::Resolve()` and `ASSET::Fail()` eliminated.** Single-caller methods inlined into `FetchComplete`. Field assignments for `m_nHttpStatus`, `m_dFetchEndTime`, `m_nSizeBytes`, `m_mapHeaders`, `m_bState` now live directly in the two `FetchComplete` overloads.
 
 ### Deferred Tasks
 

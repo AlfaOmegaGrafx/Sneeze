@@ -17,7 +17,8 @@
 
 namespace SNEEZE
 {
-   class IFETCH;
+   struct FETCH_RESULT;
+   class JOB_FETCH;
 
    // ---------------------------------------------------------------------------
    // NETWORK — the network resource system.
@@ -77,15 +78,6 @@ namespace SNEEZE
          virtual void OnAsset (FILE* pFile) = 0;
       };
 
-      // Result delivered by a completed FETCH to its owning ASSET.
-      struct FETCH_RESULT
-      {
-         bool        bSuccess;
-         uint64_t    nSizeBytes;
-         long        nHttpStatus;
-         std::unordered_map<std::string, std::string> mapHeaders;
-      };
-
       // -----------------------------------------------------------------------
       // ASSET — internal shared state for a single cached URL.
       //
@@ -106,12 +98,9 @@ namespace SNEEZE
          bool        Attach (FILE* pFile, bool bFetch_Allowed);
          void        Detach (FILE* pFile);
 
-         // State transitions
-         void        Resolve (uint64_t nSizeBytes, long nHttpStatus, double dFetchEndTime, const std::unordered_map<std::string, std::string>& mapHeaders);
-         void        Fail (long nHttpStatus, double dFetchEndTime, const std::unordered_map<std::string, std::string>& mapHeaders);
-
          // Fetch completion (called by FETCH thread)
-         void        FetchComplete (const FETCH_RESULT& result);
+         void        FetchComplete (const FETCH_RESULT& Fetch_Result);
+         void        FetchComplete (FILE* pFile, NETWORK::STATE bState);
 
          // Hash verification
          bool        VerifyHash (const std::string& sFilePath, const std::string& sHash) const;
@@ -284,7 +273,7 @@ namespace SNEEZE
 
       void Rules_Add (const std::string& sContentType, const std::string& sOlderThan);
 
-      void Queue_Post_Fetch (IFETCH* pFetch);
+      void Queue_Post_Fetch (JOB_FETCH* pJob_Fetch);
 
    private:
       class Impl;

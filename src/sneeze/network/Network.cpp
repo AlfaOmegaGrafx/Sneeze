@@ -527,4 +527,4 @@ void NETWORK::Rules_Add         (const std::string& sContentType, const std::str
 void NETWORK::SetCacheEnabled   (bool b)                                                         { m_pImpl->SetCacheEnabled (b); }
 bool NETWORK::IsCacheEnabled    ()                                                         const { return m_pImpl->IsCacheEnabled (); }
 
-void NETWORK::Queue_Post_Fetch  (IFETCH* pFetch)                                                 { m_pImpl->Context ()->Engine ()->Queue_Post_Fetch (pFetch); }
+void NETWORK::Queue_Post_Fetch  (JOB_FETCH* pJob_Fetch)                                          { m_pImpl->Context ()->Engine ()->Queue_Post_Fetch (pJob_Fetch); }

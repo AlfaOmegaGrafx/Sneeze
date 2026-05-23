@@ -286,9 +286,9 @@ m_pPersona = new persona::PERSONA (m_pEngine);
    // Post-fetch queue (delegates to CONTROL)
    // -----------------------------------------------------------------------
 
-   void Queue_Post_Fetch (IFETCH* pFetch)
+   void Queue_Post_Fetch (JOB_FETCH* pJob_Fetch)
    {
-      m_pControl->Queue_Post_Fetch (pFetch);
+      m_pControl->Queue_Post_Fetch (pJob_Fetch);
    }
 
    void Scrub (const std::string& sPath)
@@ -476,9 +476,9 @@ const std::string& SNEEZE::ENGINE::sPath_Session    () const  { return m_pImpl->
 
 SNEEZE::persona::PERSONA*  SNEEZE::ENGINE::Persona () const   { return m_pImpl->m_pPersona;   }
 
-void SNEEZE::ENGINE::Queue_Post_Fetch (IFETCH* pFetch)
+void SNEEZE::ENGINE::Queue_Post_Fetch (JOB_FETCH* pJob_Fetch)
 {
-   m_pImpl->Queue_Post_Fetch (pFetch);
+   m_pImpl->Queue_Post_Fetch (pJob_Fetch);
 }
 
 // ---------------------------------------------------------------------------

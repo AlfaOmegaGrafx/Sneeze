@@ -797,3 +797,16 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 - **Build status:** Compiles clean. Artemis verified working. Known issue: `ORBIT` stores raw data that may be unnecessary for persistence — deferred.
 - **project.mdc updated:** astro module description, MAP_OBJECT_CELESTIAL class, ORBIT/CELESTIAL class entries, SCENE description, Phase 1/2/3 backlog items, namespace notes, ENGINE description.
 
+---
+
+### Session — Saturday May 23, 2026 (afternoon)
+
+**Dean Abramson** — FETCH_RESULT consolidation, IFETCH/ISCRUB elimination, Resolve/Fail inlining, async notification cleanup.
+
+- **`FETCH_RESULT` consolidated:** Removed duplicate `NETWORK::FETCH_RESULT` struct from `Network.h`. Both control layer and network now use the single `SNEEZE::FETCH_RESULT` from `Control.h`. Forward-declared in `Network.h`. Copy in `ASSET_FETCH::OnFetch_Complete` eliminated (passes `FETCH_RESULT` straight through).
+- **`m_bFetch` flag added to `JOB_FETCH`:** Passed via constructor (first parameter). Replaces the fragile "empty URL" sentinel for distinguishing real fetch jobs from notify-only jobs. Both `Execute()` and `OnFetch_Complete` now check `IsFetch()` consistently.
+- **`IFETCH` and `ISCRUB` eliminated:** Folded into `JOB_FETCH : public IJOB` and `JOB_SCRUB : public IJOB` respectively. Virtual methods (`OnFetch_Complete`, `OnScrub_Complete`) moved into the concrete classes. All references updated across 11 files (Control.h, Control.cpp, Fetch.cpp, Scrub.cpp, Pool_Queue.cpp, Engine.cpp, Network.cpp, Network_Asset.cpp, Sneeze.h, Network.h). The `static_cast<JOB_FETCH*>` in `Execute` eliminated — parameter is now directly `JOB_FETCH*`.
+- **`Resolve()` and `Fail()` inlined:** Single-caller methods removed from `ASSET`. Field assignments now inline in `FetchComplete`, with common fields (`m_nHttpStatus`, `m_dFetchEndTime`) factored out. Declarations removed from `Network.h`.
+- **Dean's manual cleanup:** Rewrote `Execute` to wrap fetch body in `if (IsFetch())` guard (no early return), cleaned up redundant code in `FetchComplete` and `Attach`, added second `FetchComplete(FILE*, STATE)` overload for notify-only path.
+- **Build status:** Compiles clean. All 9 test suites pass (251 assertions). Artemis verified working.
+

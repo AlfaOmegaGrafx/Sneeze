@@ -28,8 +28,8 @@ namespace SNEEZE
    class POOL;
    template <typename JOB_PTR> class POOL_QUEUE;
    class IJOB;
-   class IFETCH;
-   class ISCRUB;
+   class JOB_FETCH;
+   class JOB_SCRUB;
 
    // ========================================================================
    // IJOB -- base interface for all jobs submitted to agent pools.
@@ -67,58 +67,30 @@ namespace SNEEZE
    };
 
    // ========================================================================
-   // IFETCH -- interface for fetch jobs.
+   // JOB_FETCH -- fetch job. Heap-allocated, self-cleaning.
    //
-   // Owns: fetch parameter accessors, fetch completion callback.
+   // Owns: concrete storage of URL, paths, hash, fetch completion callback.
    // Knows about: FETCH_RESULT (plain struct) for OnFetch_Complete only.
    // ========================================================================
 
-   class IFETCH : public IJOB
+   class JOB_FETCH : public IJOB
    {
    public:
-      virtual const std::string& Url ()       = 0;
-      virtual const std::string& Path_Temp () = 0;
-      virtual const std::string& Path_Data () = 0;
-      virtual const std::string& Hash ()      = 0;
+      JOB_FETCH (bool bFetch, const std::string& sUrl, const std::string& sPath_Temp, const std::string& sPath_Data, const std::string& sHash);
+
+      const std::string& Url ()       const { return m_sUrl; }
+      const std::string& Path_Temp () const { return m_sPath_Temp; }
+      const std::string& Path_Data () const { return m_sPath_Data; }
+      const std::string& Hash ()      const { return m_sHash; }
+
+      bool IsFetch () const { return m_bFetch; }
 
       virtual void OnFetch_Complete (const FETCH_RESULT& result) {}
-   };
-
-   // ========================================================================
-   // ISCRUB -- interface for cleanup jobs.
-   //
-   // Owns: cleanup parameter accessor, cleanup completion callback.
-   // Knows about: nothing else.
-   // ========================================================================
-
-   class ISCRUB : public IJOB
-   {
-   public:
-      virtual const std::string& Path () = 0;
-
-      virtual void OnScrub_Complete () {}
-   };
-
-   // ========================================================================
-   // JOB_FETCH -- concrete fetch job. Heap-allocated, self-cleaning.
-   //
-   // Owns: concrete storage of URL, paths, hash.
-   // Knows about: nothing else (no ASSET, no NETWORK, no ENGINE).
-   // ========================================================================
-
-   class JOB_FETCH : public IFETCH
-   {
-   public:
-      JOB_FETCH (const std::string& sUrl, const std::string& sPath_Temp, const std::string& sPath_Data, const std::string& sHash);
-
-      const std::string& Url ()       override { return m_sUrl; }
-      const std::string& Path_Temp () override { return m_sPath_Temp; }
-      const std::string& Path_Data () override { return m_sPath_Data; }
-      const std::string& Hash ()      override { return m_sHash; }
 
       void Result (const FETCH_RESULT& result);
 
    private:
+      bool m_bFetch;
       std::string m_sUrl;
       std::string m_sPath_Temp;
       std::string m_sPath_Data;
@@ -129,18 +101,20 @@ namespace SNEEZE
    };
 
    // ========================================================================
-   // JOB_SCRUB -- concrete cleanup job. Heap-allocated, self-cleaning.
+   // JOB_SCRUB -- cleanup job. Heap-allocated, self-cleaning.
    //
-   // Owns: concrete storage of path.
+   // Owns: concrete storage of path, cleanup completion callback.
    // Knows about: nothing else.
    // ========================================================================
 
-   class JOB_SCRUB : public ISCRUB
+   class JOB_SCRUB : public IJOB
    {
    public:
       explicit JOB_SCRUB (const std::string& sPath);
 
-      const std::string& Path () override { return m_sPath; }
+      const std::string& Path () const { return m_sPath; }
+
+      virtual void OnScrub_Complete () {}
 
    private:
       std::string m_sPath;
@@ -191,7 +165,7 @@ namespace SNEEZE
    // Knows about: POOL::m_apAgent (inherited), AGENT (for Signal(), Busy()).
    // Does NOT know about: job contents, curl, paths, ASSET, ENGINE.
    //
-   // Definitions in Pool_Queue.cpp; explicit instantiations for IFETCH* and ISCRUB* only.
+   // Definitions in Pool_Queue.cpp; explicit instantiations for JOB_FETCH* and JOB_SCRUB* only.
    // ========================================================================
 
    template <typename JOB_PTR>
@@ -223,13 +197,13 @@ namespace SNEEZE
 
       bool Initialize (int& nAgentCount);
 
-      void Queue_Post_Fetch (IFETCH* pFetch);
-      void Queue_Post_Scrub (ISCRUB* pScrub);
+      void Queue_Post_Fetch (JOB_FETCH* pJob_Fetch);
+      void Queue_Post_Scrub (JOB_SCRUB* pJob_Scrub);
 
       ::SNEEZE::ENGINE* Engine () const;
 
-      POOL_QUEUE<ISCRUB*>& Pool_Scrub ();
-      POOL_QUEUE<IFETCH*>& Pool_Fetch ();
+      POOL_QUEUE<JOB_SCRUB*>& Pool_Scrub ();
+      POOL_QUEUE<JOB_FETCH*>& Pool_Fetch ();
 
       CONTROL (const CONTROL&) = delete;
       CONTROL& operator= (const CONTROL&) = delete;
@@ -340,7 +314,7 @@ namespace SNEEZE
 
    private:
       bool Job ();
-      void Execute (IFETCH* pJob);
+      void Execute (JOB_FETCH* pJob);
    };
 
    // ========================================================================

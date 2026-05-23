@@ -49,37 +49,37 @@ void AGENT::SCRUB::Main ()
 bool AGENT::SCRUB::Job ()
 {
    bool bResult, bJob;
-   ISCRUB* pJob = nullptr;
-   auto* pQueue = static_cast<POOL_QUEUE<ISCRUB*>*> (m_pPool);
+   JOB_SCRUB* pJob_Scrub = nullptr;
+   auto* pQueue = static_cast<POOL_QUEUE<JOB_SCRUB*>*> (m_pPool);
 
    while (true)
    {
       bResult = IsShutdown ();
-      bJob    = pQueue->Grab (pJob);
+      bJob    = pQueue->Grab (pJob_Scrub);
 
       m_bBusy.store (bJob, std::memory_order_release);
 
       if (bJob)  // flush out all jobs before shutdown
       {
-         if (!pJob->IsCancelled ())
+         if (!pJob_Scrub->IsCancelled ())
          {
             std::string sMarker = std::string ("/") + ENGINE::sFOLDER_TRANSITORY + "/";
 
-            if (pJob->Path ().find (sMarker) != std::string::npos)
+            if (pJob_Scrub->Path ().find (sMarker) != std::string::npos)
             {
                std::error_code ec;
-               std::filesystem::remove_all (pJob->Path (), ec);
+               std::filesystem::remove_all (pJob_Scrub->Path (), ec);
 
                if (!ec)
                {
-                  Engine ()->Log (IENGINE::kLOGLEVEL_Trace, "SCRUB", "Removed " + pJob->Path ());
+                  Engine ()->Log (IENGINE::kLOGLEVEL_Trace, "SCRUB", "Removed " + pJob_Scrub->Path ());
                }
-               else Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "SCRUB", "Failed to remove " + pJob->Path () + ": " + ec.message ());
+               else Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "SCRUB", "Failed to remove " + pJob_Scrub->Path () + ": " + ec.message ());
             }
-            else Engine ()->Log (IENGINE::kLOGLEVEL_Error, "SCRUB", "REJECTED -- path is not under " + std::string (ENGINE::sFOLDER_TRANSITORY) + "/: " + pJob->Path ());
+            else Engine ()->Log (IENGINE::kLOGLEVEL_Error, "SCRUB", "REJECTED -- path is not under " + std::string (ENGINE::sFOLDER_TRANSITORY) + "/: " + pJob_Scrub->Path ());
          }
 
-         pJob->Complete ();
+         pJob_Scrub->Complete ();
       }
       else break;
    }

@@ -24,8 +24,8 @@ POOL_QUEUE<JOB_PTR> (template, inherits POOL)
 AGENT (inherits THREAD, abstract base)
  ├── m_bBusy (atomic; queue workers and Post reserve / release around work)
  ├── COMPOSITOR  (self-paced, DwmFlush / 16ms sleep)
- ├── SCRUB       (queue-driven, drains ISCRUB jobs)
- ├── FETCH       (queue-driven, drains IFETCH jobs)
+ ├── SCRUB       (queue-driven, drains JOB_SCRUB jobs)
+ ├── FETCH       (queue-driven, drains JOB_FETCH jobs)
  └── C           (signal-driven, 30 Hz placeholder)
 ```
 
@@ -43,10 +43,10 @@ All jobs derive from `IJOB` (base interface with `Cancel()`, `IsCancelled()`, `R
 
 | Interface | Concrete | Agent | Accessors | Callback |
 |-----------|----------|-------|-----------|----------|
-| `IFETCH` | `JOB_FETCH` | `AGENT::FETCH` | `Url()`, `Path_Temp()`, `Path_Data()`, `Hash()` | `OnFetch_Complete(FETCH_RESULT)` |
-| `ISCRUB` | `JOB_SCRUB` | `AGENT::SCRUB` | `Path()` | `OnScrub_Complete()` |
+| `JOB_FETCH` | (self) | `AGENT::FETCH` | `Url()`, `Path_Temp()`, `Path_Data()`, `Hash()`, `IsFetch()` | `OnFetch_Complete(FETCH_RESULT)` |
+| `JOB_SCRUB` | (self) | `AGENT::SCRUB` | `Path()` | `OnScrub_Complete()` |
 
-Naming is symmetric: `JOB_FETCH -> IFETCH -> AGENT::FETCH`, `JOB_SCRUB -> ISCRUB -> AGENT::SCRUB`.
+Both `JOB_FETCH` and `JOB_SCRUB` inherit directly from `IJOB` (the intermediate `IFETCH`/`ISCRUB` interfaces were eliminated). `JOB_FETCH` carries a `bool m_bFetch` flag (set via constructor) to distinguish real fetches from notify-only jobs.
 
 ### Cancellation
 
@@ -107,7 +107,7 @@ Template subclass of POOL. Adds a typed, thread-safe job queue.
 - `Post(JOB_PTR pJob)` - appends to queue under `m_mxQueue`, then `Busy()` on each agent in order until one returns `true` (idle→busy via CAS); that agent is `Signal()`d. If every `Busy()` returns `false` (already busy), no signal — workers self-schedule on the next `Grab`.
 - `Grab(JOB_PTR& pJob)` - under `m_mxQueue`, pops front if available and returns `true`. On empty queue returns `false` and assigns `pJob = nullptr` (for pointer job types). The caller updates `m_bBusy` from the boolean result while draining (`release` stores).
 
-Implementations and explicit instantiations (`IFETCH*`, `ISCRUB*`) live in `Pool_Queue.cpp`.
+Implementations and explicit instantiations (`JOB_FETCH*`, `JOB_SCRUB*`) live in `Pool_Queue.cpp`.
 
 ## CONTROL
 
@@ -131,16 +131,16 @@ Inherits THREAD. Constructor takes `ENGINE*`. Owns the engine thread, pool vecto
 | Index | Pool Type | Agent | Pool Size | Hz | Behavior |
 |-------|-----------|-------|-----------|----|----------|
 | 0 | POOL | COMPOSITOR | 1 | 0 | Self-paced (DwmFlush) |
-| 1 | POOL_QUEUE\<ISCRUB*\> | SCRUB | 2 | 0 | Queue-driven (disk cleanup) |
-| 2 | POOL_QUEUE\<IFETCH*\> | FETCH | 16 | 0 | Queue-driven (HTTP downloads) |
+| 1 | POOL_QUEUE\<JOB_SCRUB*\> | SCRUB | 2 | 0 | Queue-driven (disk cleanup) |
+| 2 | POOL_QUEUE\<JOB_FETCH*\> | FETCH | 16 | 0 | Queue-driven (HTTP downloads) |
 | 3 | POOL | C | 1 | 30 | Metronome-driven placeholder |
 
 ### Public API
 
 | Method | Delegates to |
 |--------|-------------|
-| `Queue_Post_Fetch(IFETCH*)` | `Pool_Fetch().Post(pFetch)` |
-| `Queue_Post_Scrub(ISCRUB*)` | `Pool_Scrub().Post(pScrub)` |
+| `Queue_Post_Fetch(JOB_FETCH*)` | `Pool_Fetch().Post(pJob_Fetch)` |
+| `Queue_Post_Scrub(JOB_SCRUB*)` | `Pool_Scrub().Post(pJob_Scrub)` |
 | `Engine()` | Returns `m_pEngine` |
 
 ### Members
@@ -207,15 +207,15 @@ Thread affinity: both renderer creation (`InitializeRenderer()`) and destruction
 
 ## AGENT::SCRUB
 
-Disk cleanup agent. Queue-driven via `POOL_QUEUE<ISCRUB*>`.
+Disk cleanup agent. Queue-driven via `POOL_QUEUE<JOB_SCRUB*>`.
 
-`Job()` dequeues `ISCRUB*` jobs, validates each path contains the Transitory marker, then calls `std::filesystem::remove_all`. Calls `OnScrub_Complete()` and `Release()` on each job. Returns `IsShutdown()`.
+`Job()` dequeues `JOB_SCRUB*` jobs, validates each path contains the Transitory marker, then calls `std::filesystem::remove_all`. Calls `OnScrub_Complete()` and `Release()` on each job. Returns `IsShutdown()`.
 
 ## AGENT::FETCH
 
-HTTP download agent. Queue-driven via `POOL_QUEUE<IFETCH*>`.
+HTTP download agent. Queue-driven via `POOL_QUEUE<JOB_FETCH*>`.
 
-`Job()` dequeues `IFETCH*` jobs. `Execute()` performs the blocking curl download: streams response to a temp file, captures HTTP headers and status, verifies SRI hash if provided, renames temp to final path on success. Calls `OnFetch_Complete(FETCH_RESULT)` and `Release()` on each job. Returns `IsShutdown()`.
+`Job()` dequeues `JOB_FETCH*` jobs. `Execute(JOB_FETCH*)` checks `IsFetch()` — if true, performs blocking curl download (streams response to a temp file, captures HTTP headers and status, verifies SRI hash if provided, renames temp to final path on success); if false (notify-only job), skips all network work. After `Execute` returns, `Complete_Deliver()` calls `OnFetch_Complete(FETCH_RESULT)` then `Release()`. Returns `IsShutdown()`.
 
 Curl progress callback checks `IsCancelled()` to abort in-flight downloads.
 
@@ -227,10 +227,10 @@ Placeholder agent. Signal-driven at 30 Hz with empty `Tick()` that returns `IsSh
 
 | File | Contents |
 |------|----------|
-| `Control.h` | Declarations: IJOB, IFETCH, ISCRUB, JOB_FETCH, JOB_SCRUB, POOL, POOL_QUEUE, CONTROL, AGENT, COMPOSITOR, SCRUB, FETCH, C |
+| `Control.h` | Declarations: IJOB, JOB_FETCH, JOB_SCRUB, FETCH_RESULT, POOL, POOL_QUEUE, CONTROL, AGENT, COMPOSITOR, SCRUB, FETCH, C |
 | `Control.cpp` | CONTROL implementation, pool factory table, metronome loop |
 | `Pool.cpp` | POOL implementation |
-| `Pool_Queue.cpp` | `POOL_QUEUE` method bodies + explicit instantiations for `IFETCH*` / `ISCRUB*` |
+| `Pool_Queue.cpp` | `POOL_QUEUE` method bodies + explicit instantiations for `JOB_FETCH*` / `JOB_SCRUB*` |
 | `Agent.cpp` | AGENT base class (constructor, destructor, Engine() accessor) |
 | `Compositor.cpp` | COMPOSITOR (render loop, viewport iteration, timing) |
 | `Scrub.cpp` | SCRUB (Job, path validation, remove_all) |

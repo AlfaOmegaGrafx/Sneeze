@@ -23,7 +23,7 @@ namespace SNEEZE
 {
    class ENGINE;
    class CONTEXT;
-   class IFETCH;
+   class JOB_FETCH;
    class ICONTEXT;
    class IVIEWPORT;
 }
@@ -149,7 +149,7 @@ namespace SNEEZE
 
       persona::PERSONA*        Persona () const;
 
-      void                     Queue_Post_Fetch (IFETCH* pFetch);
+      void                     Queue_Post_Fetch (JOB_FETCH* pJob_Fetch);
 
    private:
       class Impl;

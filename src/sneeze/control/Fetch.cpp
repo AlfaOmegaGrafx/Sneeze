@@ -33,7 +33,8 @@ void JOB_FETCH::Complete_Deliver ()
    OnFetch_Complete (m_ResultComplete);
 }
 
-JOB_FETCH::JOB_FETCH (const std::string& sUrl, const std::string& sPath_Temp, const std::string& sPath_Data, const std::string& sHash) :
+JOB_FETCH::JOB_FETCH (bool bFetch, const std::string& sUrl, const std::string& sPath_Temp, const std::string& sPath_Data, const std::string& sHash) :
+   m_bFetch         (bFetch),
    m_sUrl           (sUrl),
    m_sPath_Temp     (sPath_Temp),
    m_sPath_Data     (sPath_Data),
@@ -182,14 +183,14 @@ static size_t HeaderCallback (char* pData, size_t nSize, size_t nMembers, void* 
 
 struct PROGRESS_DATA
 {
-   IFETCH* pFetch;
+   JOB_FETCH* pJob_Fetch;
 };
 
 static int ProgressCallback (void* pClientData, curl_off_t, curl_off_t, curl_off_t, curl_off_t)
 {
    auto* pProgress = static_cast<PROGRESS_DATA*> (pClientData);
 
-   if (pProgress->pFetch->IsCancelled ())
+   if (pProgress->pJob_Fetch->IsCancelled ())
       return 1;
 
    return 0;
@@ -320,24 +321,24 @@ void AGENT::FETCH::Main ()
 bool AGENT::FETCH::Job ()
 {
    bool bResult, bJob;
-   IFETCH* pJob = nullptr;
-   auto* pQueue = static_cast<POOL_QUEUE<IFETCH*>*> (m_pPool);
+   JOB_FETCH* pJob_Fetch = nullptr;
+   auto* pQueue = static_cast<POOL_QUEUE<JOB_FETCH*>*> (m_pPool);
 
    while (true)
    {
       bResult = IsShutdown ();
-      bJob    = pQueue->Grab (pJob);
+      bJob    = pQueue->Grab (pJob_Fetch);
 
       m_bBusy.store (bJob, std::memory_order_release);
 
       if (bJob)  // flush out all jobs before shutdown
       {
-         if (!pJob->IsCancelled ())
+         if (!pJob_Fetch->IsCancelled ())
          {
-            Execute (pJob);
+            Execute (pJob_Fetch);
          }
 
-         pJob->Complete ();
+         pJob_Fetch->Complete ();
       }
       else break;
    }
@@ -346,111 +347,112 @@ bool AGENT::FETCH::Job ()
 }
 
 // ---------------------------------------------------------------------------
-// Execute -- the blocking curl download. Reads params from the IFETCH
-// interface. Stores results in a local FETCH_RESULT; copies them onto the job via
-// JOB_FETCH::Result(). Does NOT call Complete() -- Job does that once after return.
+// Execute -- the blocking curl download. Reads params from the JOB_FETCH.
+// Stores results via JOB_FETCH::Result(). Does NOT call Complete() -- Job
+// does that once after return.
 // ---------------------------------------------------------------------------
 
-void AGENT::FETCH::Execute (IFETCH* pJob)
+void AGENT::FETCH::Execute (JOB_FETCH* pJob_Fetch)
 {
-   JOB_FETCH* pFetch = static_cast<JOB_FETCH*> (pJob);
-
-   FETCH_RESULT result = {};
-   result.bSuccess    = false;
-   result.nSizeBytes  = 0;
-   result.nHttpStatus = 0;
-
-   if (!pFetch->IsCancelled ())
+   if (pJob_Fetch->IsFetch ())
    {
-      std::filesystem::create_directories (std::filesystem::path (pFetch->Path_Temp ()).parent_path ());
+      FETCH_RESULT result = {};
+      result.bSuccess    = false;
+      result.nSizeBytes  = 0;
+      result.nHttpStatus = 0;
 
-      CURL* pCurl = curl_easy_init ();
-
-      if (pCurl)
+      if (!pJob_Fetch->IsCancelled ())
       {
-         std::ofstream out (pFetch->Path_Temp (), std::ios::binary);
+         std::filesystem::create_directories (std::filesystem::path (pJob_Fetch->Path_Temp ()).parent_path ());
 
-         if (out.is_open ())
+         CURL* pCurl = curl_easy_init ();
+
+         if (pCurl)
          {
-            curl_easy_setopt (pCurl, CURLOPT_URL, pFetch->Url ().c_str ());
-            curl_easy_setopt (pCurl, CURLOPT_WRITEFUNCTION, WriteCallback);
-            curl_easy_setopt (pCurl, CURLOPT_WRITEDATA, &out);
+            std::ofstream out (pJob_Fetch->Path_Temp (), std::ios::binary);
 
-            curl_easy_setopt (pCurl, CURLOPT_HEADERFUNCTION, HeaderCallback);
-            curl_easy_setopt (pCurl, CURLOPT_HEADERDATA, &result.mapHeaders);
+            if (out.is_open ())
+            {
+               curl_easy_setopt (pCurl, CURLOPT_URL, pJob_Fetch->Url ().c_str ());
+               curl_easy_setopt (pCurl, CURLOPT_WRITEFUNCTION, WriteCallback);
+               curl_easy_setopt (pCurl, CURLOPT_WRITEDATA, &out);
 
-            curl_easy_setopt (pCurl, CURLOPT_FOLLOWLOCATION, 1L);
-            curl_easy_setopt (pCurl, CURLOPT_TIMEOUT, 300L);
+               curl_easy_setopt (pCurl, CURLOPT_HEADERFUNCTION, HeaderCallback);
+               curl_easy_setopt (pCurl, CURLOPT_HEADERDATA, &result.mapHeaders);
 
-            PROGRESS_DATA progress = { pFetch };
-            curl_easy_setopt (pCurl, CURLOPT_XFERINFOFUNCTION, ProgressCallback);
-            curl_easy_setopt (pCurl, CURLOPT_XFERINFODATA, &progress);
-            curl_easy_setopt (pCurl, CURLOPT_NOPROGRESS, 0L);
+               curl_easy_setopt (pCurl, CURLOPT_FOLLOWLOCATION, 1L);
+               curl_easy_setopt (pCurl, CURLOPT_TIMEOUT, 300L);
+
+               PROGRESS_DATA progress = { pJob_Fetch };
+               curl_easy_setopt (pCurl, CURLOPT_XFERINFOFUNCTION, ProgressCallback);
+               curl_easy_setopt (pCurl, CURLOPT_XFERINFODATA, &progress);
+               curl_easy_setopt (pCurl, CURLOPT_NOPROGRESS, 0L);
 
 #if !defined(_WIN32) && !defined(__APPLE__)
-            extern const char*        const g_szCaCertPem;
-            extern const unsigned long       g_nCaCertPemLen;
-            curl_blob caBlob;
-            caBlob.data  = const_cast<void*> (static_cast<const void*> (g_szCaCertPem));
-            caBlob.len   = g_nCaCertPemLen;
-            caBlob.flags = CURL_BLOB_NOCOPY;
-            curl_easy_setopt (pCurl, CURLOPT_CAINFO_BLOB, &caBlob);
+               extern const char*        const g_szCaCertPem;
+               extern const unsigned long       g_nCaCertPemLen;
+               curl_blob caBlob;
+               caBlob.data  = const_cast<void*> (static_cast<const void*> (g_szCaCertPem));
+               caBlob.len   = g_nCaCertPemLen;
+               caBlob.flags = CURL_BLOB_NOCOPY;
+               curl_easy_setopt (pCurl, CURLOPT_CAINFO_BLOB, &caBlob);
 #endif
 
-            CURLcode nCode = curl_easy_perform (pCurl);
+               CURLcode nCode = curl_easy_perform (pCurl);
 
-            out.close ();
+               out.close ();
 
-            long nHttpCode = 0;
-            if (nCode == CURLE_OK)
-               curl_easy_getinfo (pCurl, CURLINFO_RESPONSE_CODE, &nHttpCode);
-            result.nHttpStatus = nHttpCode;
+               long nHttpCode = 0;
+               if (nCode == CURLE_OK)
+                  curl_easy_getinfo (pCurl, CURLINFO_RESPONSE_CODE, &nHttpCode);
+               result.nHttpStatus = nHttpCode;
 
-            if (pFetch->IsCancelled ())
-            {
-            }
-            else if (nCode == CURLE_ABORTED_BY_CALLBACK)
-            {
-            }
-            else if (nCode != CURLE_OK  ||  nHttpCode < 200  ||  nHttpCode >= 300)
-            {
-               std::string sErr = "Fetch failed for " + pFetch->Url () + " (HTTP " + std::to_string (nHttpCode) + ")";
-               if (nCode != CURLE_OK)
-                  sErr += " curl=" + std::to_string (nCode) + " (" + curl_easy_strerror (nCode) + ")";
-               Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", sErr);
-            }
-            else
-            {
-               if (VerifyHash (pFetch->Path_Temp (), pFetch->Hash ()))
+               if (pJob_Fetch->IsCancelled ())
                {
-                  std::error_code ec;
-                  std::filesystem::rename (pFetch->Path_Temp (), pFetch->Path_Data (), ec);
-                  if (!ec)
+               }
+               else if (nCode == CURLE_ABORTED_BY_CALLBACK)
+               {
+               }
+               else if (nCode != CURLE_OK  ||  nHttpCode < 200  ||  nHttpCode >= 300)
+               {
+                  std::string sErr = "Fetch failed for " + pJob_Fetch->Url () + " (HTTP " + std::to_string (nHttpCode) + ")";
+                  if (nCode != CURLE_OK)
+                     sErr += " curl=" + std::to_string (nCode) + " (" + curl_easy_strerror (nCode) + ")";
+                  Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", sErr);
+               }
+               else
+               {
+                  if (VerifyHash (pJob_Fetch->Path_Temp (), pJob_Fetch->Hash ()))
                   {
-                     auto nFsSize = std::filesystem::file_size (pFetch->Path_Data (), ec);
+                     std::error_code ec;
+                     std::filesystem::rename (pJob_Fetch->Path_Temp (), pJob_Fetch->Path_Data (), ec);
                      if (!ec)
                      {
-                        result.nSizeBytes = static_cast<uint64_t> (nFsSize);
-                        result.bSuccess = true;
+                        auto nFsSize = std::filesystem::file_size (pJob_Fetch->Path_Data (), ec);
+                        if (!ec)
+                        {
+                           result.nSizeBytes = static_cast<uint64_t> (nFsSize);
+                           result.bSuccess = true;
+                        }
                      }
+                     else Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to rename " + pJob_Fetch->Path_Temp () + " -> " + pJob_Fetch->Path_Data () + ": " + ec.message ());
                   }
-                  else Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to rename " + pFetch->Path_Temp () + " -> " + pFetch->Path_Data () + ": " + ec.message ());
+                  else Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Hash mismatch for " + pJob_Fetch->Url ());
                }
-               else Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Hash mismatch for " + pFetch->Url ());
             }
+            else Engine ()->Log (IENGINE::kLOGLEVEL_Error, "NETWORK", "Failed to open temp file: " + pJob_Fetch->Path_Temp ());
+
+            curl_easy_cleanup (pCurl);
          }
-         else Engine ()->Log (IENGINE::kLOGLEVEL_Error, "NETWORK", "Failed to open temp file: " + pFetch->Path_Temp ());
-
-         curl_easy_cleanup (pCurl);
+         else Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Curl failed to initialize");
       }
-      else Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Curl failed to initialize");
-   }
 
-   if (!result.bSuccess)
-   {
-      std::error_code ec;
-      std::filesystem::remove (pFetch->Path_Temp (), ec);
-   }
+      if (!result.bSuccess)
+      {
+         std::error_code ec;
+         std::filesystem::remove (pJob_Fetch->Path_Temp (), ec);
+      }
 
-   pFetch->Result (result);
+      pJob_Fetch->Result (result);
+   }
 }

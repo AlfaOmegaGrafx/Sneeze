@@ -18,7 +18,7 @@
 namespace SNEEZE
 {
    // =========================================================================
-   // POOL_QUEUE (explicit instantiation: IFETCH*, ISCRUB* only)
+   // POOL_QUEUE (explicit instantiation: JOB_FETCH*, JOB_SCRUB* only)
    // =========================================================================
 
    template <typename JOB_PTR>
@@ -59,6 +59,6 @@ namespace SNEEZE
       return bResult;
    }
 
-   template class POOL_QUEUE<ISCRUB*>;
-   template class POOL_QUEUE<IFETCH*>;
+   template class POOL_QUEUE<JOB_SCRUB*>;
+   template class POOL_QUEUE<JOB_FETCH*>;
 }

@@ -36,23 +36,30 @@ class ASSET_FETCH : public JOB_FETCH
 {
 public:
    ASSET_FETCH (NETWORK::ASSET* pAsset, const std::string& sUrl, const std::string& sPath_Temp, const std::string& sPath_Data, const std::string& sHash)
-      : JOB_FETCH (sUrl, sPath_Temp, sPath_Data, sHash),
-        m_pAsset (pAsset)
+      : JOB_FETCH (true, sUrl, sPath_Temp, sPath_Data, sHash),
+        m_pAsset  (pAsset),
+        m_pFile   (nullptr),
+        m_bState  (NETWORK::STATE_FETCHING)
    {}
 
-   void OnFetch_Complete (const FETCH_RESULT& result) override
-   {
-      NETWORK::FETCH_RESULT nr;
-      nr.bSuccess    = result.bSuccess;
-      nr.nSizeBytes  = result.nSizeBytes;
-      nr.nHttpStatus = result.nHttpStatus;
-      nr.mapHeaders  = result.mapHeaders;
+   ASSET_FETCH (NETWORK::ASSET* pAsset, NETWORK::FILE* pFile, NETWORK::STATE bState)
+      : JOB_FETCH (false, "", "", "", ""),
+        m_pAsset  (pAsset),
+        m_pFile   (pFile),
+        m_bState  (bState)
+   {}
 
-      m_pAsset->FetchComplete (nr);
+   void OnFetch_Complete (const FETCH_RESULT& Fetch_Result) override
+   {
+      if (IsFetch ())
+         m_pAsset->FetchComplete (Fetch_Result);
+      else m_pAsset->FetchComplete (m_pFile, m_bState);
    }
 
 private:
-   NETWORK::ASSET* m_pAsset;
+   NETWORK::ASSET*  m_pAsset;
+   NETWORK::FILE*   m_pFile;
+   NETWORK::STATE   m_bState;
 };
 
 // ---------------------------------------------------------------------------
@@ -516,21 +523,17 @@ bool NETWORK::ASSET::Attach (FILE* pFile, bool bFetch_Allowed)
          m_pImpl->m_pAsset_Fetch = pJob;
          m_pImpl->m_pNetwork->Queue_Post_Fetch (pJob);
       }
-      else if (bReady)
+      else if (bReady  ||  bFailed)
       {
          pFile->SnapshotFinal ();
 
-         IFILE* pListener = pFile->Listener ();
-         if (pListener)
-            pListener->OnFileReady (pFile);
-      }
-      else if (bFailed)
-      {
-         pFile->SnapshotFinal ();
+         m_pImpl->m_nCount_Open++;
+         m_pImpl->m_nCount_Attach++;
 
-         IFILE* pListener = pFile->Listener ();
-         if (pListener)
-            pListener->OnFileFailed (pFile);
+         auto* pJob = new ASSET_FETCH (this, pFile, bState);
+
+         m_pImpl->m_pAsset_Fetch = pJob;
+         m_pImpl->m_pNetwork->Queue_Post_Fetch (pJob);
       }
 
       bResult = true;
@@ -577,47 +580,44 @@ void NETWORK::ASSET::Reset ()
 // Fetch
 // ---------------------------------------------------------------------------
 
-void NETWORK::ASSET::FetchComplete (const FETCH_RESULT& result)
+void NETWORK::ASSET::FetchComplete (const FETCH_RESULT& Fetch_Result)
 {
    {
       std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
 
-      double dEndTime = m_pImpl->m_pNetwork->SecondsSinceEpoch ();
+      m_pImpl->m_nHttpStatus   = Fetch_Result.nHttpStatus;
+      m_pImpl->m_dFetchEndTime = m_pImpl->m_pNetwork->SecondsSinceEpoch ();
 
-      if (result.bSuccess)
+      if (Fetch_Result.bSuccess)
       {
-         Resolve (result.nSizeBytes, result.nHttpStatus, dEndTime, result.mapHeaders);
-
-         for (auto* pFile : m_pImpl->m_apFiles)
-         {
-            pFile->SnapshotFinal ();
-            pFile->Notify_Changed ();
-
-            IFILE* pListener = pFile->Listener ();
-            if (pListener)
-               pListener->OnFileReady (pFile);
-
-            // the listener may close the file, so it may not be referenced after the notification is called
-         }
+         m_pImpl->m_nSizeBytes = Fetch_Result.nSizeBytes;
+         m_pImpl->m_mapHeaders = Fetch_Result.mapHeaders;
+         m_pImpl->m_bState     = STATE_READY;
       }
       else
       {
-         Fail (result.nHttpStatus, dEndTime, result.mapHeaders);
-
-         for (auto* pFile : m_pImpl->m_apFiles)
-         {
-            pFile->SnapshotFinal ();
-            pFile->Notify_Changed ();
-
-            IFILE* pListener = pFile->Listener ();
-            if (pListener)
-               pListener->OnFileFailed (pFile);
-
-            // the listener may close the file, so it may not be referenced after the notification is called
-         }
+         if (!Fetch_Result.mapHeaders.empty ())
+            m_pImpl->m_mapHeaders = Fetch_Result.mapHeaders;
+         m_pImpl->m_bState     = STATE_FAILED;
       }
 
-      m_pImpl->m_pNetwork->Context ()->Engine ()->Log (IENGINE::kLOGLEVEL_Trace, "NETWORK", (result.bSuccess ? "Cached " : "Failed ") + m_pImpl->m_sUrl + " (" + std::to_string (result.nSizeBytes) + " bytes)");
+      for (auto* pFile : m_pImpl->m_apFiles)
+      {
+         pFile->SnapshotFinal ();
+         pFile->Notify_Changed ();
+
+         IFILE* pListener = pFile->Listener ();
+         if (pListener)
+         {
+            if (Fetch_Result.bSuccess)
+               pListener->OnFileReady (pFile);
+            else pListener->OnFileFailed (pFile);
+         }   
+
+         // the listener may close the file, so it may not be referenced after the notification is called
+      }
+
+      m_pImpl->m_pNetwork->Context ()->Engine ()->Log (IENGINE::kLOGLEVEL_Trace, "NETWORK", (Fetch_Result.bSuccess ? "Cached " : "Failed ") + m_pImpl->m_sUrl + " (" + std::to_string (Fetch_Result.nSizeBytes) + " bytes)");
 
       m_pImpl->m_pAsset_Fetch = nullptr;
    }
@@ -626,27 +626,28 @@ void NETWORK::ASSET::FetchComplete (const FETCH_RESULT& result)
    m_pImpl->m_pNetwork->Asset_Close (this, nullptr);
 }
 
-void NETWORK::ASSET::Resolve (uint64_t nSizeBytes, long nHttpStatus, double dFetchEndTime, const std::unordered_map<std::string, std::string>& mapHeaders)
+void NETWORK::ASSET::FetchComplete (FILE* pFile, NETWORK::STATE bState)
 {
-   std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
 
-   m_pImpl->m_nSizeBytes      = nSizeBytes;
-   m_pImpl->m_nHttpStatus     = nHttpStatus;
-   m_pImpl->m_dFetchEndTime   = dFetchEndTime;
-   m_pImpl->m_mapHeaders      = mapHeaders;
-   m_pImpl->m_bState = STATE_READY;
+      NETWORK::IFILE* pListener = pFile->Listener ();
+      if (pListener)
+      {
+         if (bState == NETWORK::STATE_READY)
+            pListener->OnFileReady (pFile);
+         else pListener->OnFileFailed (pFile);
+
+         // the listener may close the file, so it may not be referenced after the notification is called
+      }
+
+      m_pImpl->m_pAsset_Fetch = nullptr;
+   }
+   
+   Detach (nullptr);
+   m_pImpl->m_pNetwork->Asset_Close (this, nullptr);
 }
 
-void NETWORK::ASSET::Fail (long nHttpStatus, double dFetchEndTime, const std::unordered_map<std::string, std::string>& mapHeaders)
-{
-   std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
-
-   m_pImpl->m_nHttpStatus     = nHttpStatus;
-   m_pImpl->m_dFetchEndTime   = dFetchEndTime;
-   if (!mapHeaders.empty ())
-      m_pImpl->m_mapHeaders   = mapHeaders;
-   m_pImpl->m_bState = STATE_FAILED;
-}
 
 // ---------------------------------------------------------------------------
 // Data access
