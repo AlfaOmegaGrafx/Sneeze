@@ -31,10 +31,10 @@ static constexpr float PI_F = 3.14159265358979f;
 class VIEWPORT::Impl
 {
 public:
-   Impl (VIEWPORT* pViewport, ENGINE* pEngine, IVIEWPORT* pHost) :
+   Impl (VIEWPORT* pViewport, CONTEXT* pContext) :
       m_pViewport (pViewport),
-      m_pEngine (pEngine),
-      m_pHost (pHost),
+      m_pContext (pContext),
+      m_pHost (nullptr),
       m_eInitState (kINIT_NONE),
       m_bReady (false),
       m_pScene (nullptr),
@@ -45,47 +45,68 @@ public:
       m_nFbWidth (0),
       m_nFbHeight (0),
       m_nWidth (0),
-      m_nHeight (0),
-      m_bResizePending (false),
-      m_nResizeWidth (0),
-      m_nResizeHeight (0),
-      m_eSession (kSESSION_PERSISTENT)
+      m_nHeight (0)
    {
    }
 
-   ~Impl ()
-   {
-   }
-
-   bool Initialize (const std::string& sUrl, eSESSION eSession, const std::string& sPath_Permanent, const std::string& sPath_Temporary)
+   bool Initialize (const std::string& sUrl)
    {
       bool bResult = false;
-
-      m_eSession = eSession;
-      m_sPath_Permanent = sPath_Permanent;
-      m_sPath_Temporary = sPath_Temporary;
-
-      m_pHost->FrameSize (m_nWidth, m_nHeight);
-
-      std::string sLibrary = m_pEngine->Host ()->sRenderer ();
-      if (!sLibrary.empty () && m_pHost->FrameWindow ())
-         m_bRendererPending = true;
 
       m_pScene = new SCENE (m_pViewport);
 
       if (m_pScene->Initialize (sUrl))
       {
          m_eInitState = kINIT_SCENE;
-         m_bReady = true;
          bResult = true;
-         m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "VIEWPORT", "Initialized");
+         m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "VIEWPORT", "Initialized");
       }
       else
       {
-         m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "VIEWPORT", "Failed to initialize scene");
+         m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "VIEWPORT", "Failed to initialize scene");
       }
 
       return bResult;
+   }
+
+   ~Impl ()
+   {
+      Detach ();
+
+      delete m_pScene;
+      m_pScene = nullptr;
+
+      m_eInitState = kINIT_NONE;
+   }
+
+   void Attach (IVIEWPORT* pHost)
+   {
+      if (!m_pHost  &&  pHost  &&  m_eInitState >= kINIT_SCENE)
+      {
+         m_pHost = pHost;
+
+         m_pHost->FrameSize (m_nWidth, m_nHeight);
+
+         std::string sLibrary = m_pContext->Engine ()->Host ()->sRenderer ();
+         if (!sLibrary.empty ()  &&  m_pHost->FrameWindow ())
+            m_bRendererPending = true;
+
+         m_bReady = true;
+      }
+   }
+
+   void Detach ()
+   {
+      if (m_pHost)
+      {
+         if (m_eInitState >= kINIT_RENDERER)
+         {
+            RequestRendererShutdown ();
+         }
+
+         m_bReady = false;
+         m_pHost = nullptr;
+      }
    }
 
    bool InitializeRenderer ()
@@ -96,8 +117,8 @@ public:
       {
          m_bRendererPending = false;
 
-         std::string sLibrary = m_pEngine->Host ()->sRenderer ();
-         auto* pRenderer = new RENDERER::ANARI (m_pEngine, sLibrary);
+         std::string sLibrary = m_pContext->Engine ()->Host ()->sRenderer ();
+         auto* pRenderer = new RENDERER::ANARI (m_pContext->Engine (), sLibrary);
 
          void* pNativeWindow = m_pHost->FrameWindow ();
          if (pNativeWindow)
@@ -108,12 +129,12 @@ public:
             m_pRenderer = pRenderer;
             m_eInitState = kINIT_RENDERER;
             bResult = true;
-            m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "VIEWPORT", "Renderer initialized on compositor thread");
+            m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "VIEWPORT", "Renderer initialized on compositor thread");
          }
          else
          {
             delete pRenderer;
-            m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "VIEWPORT", "Renderer unavailable -- headless mode");
+            m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "VIEWPORT", "Renderer unavailable -- headless mode");
          }
       }
       else
@@ -124,24 +145,6 @@ public:
       return bResult;
    }
 
-   void Shutdown ()
-   {
-      if (m_eInitState >= kINIT_SCENE)
-      {
-         if (m_eInitState >= kINIT_RENDERER)
-         {
-            RequestRendererShutdown ();
-         }
-
-         m_pScene->Shutdown ();
-      }
-
-      delete m_pScene;
-      m_pScene = nullptr;
-
-      m_eInitState = kINIT_NONE;
-   }
-
    void ShutdownRenderer ()
    {
       if (m_pRenderer)
@@ -149,6 +152,8 @@ public:
          m_pRenderer->Shutdown ();
          delete m_pRenderer;
          m_pRenderer = nullptr;
+
+         m_eInitState = kINIT_SCENE;
       }
    }
 
@@ -159,6 +164,8 @@ public:
          m_bRendererShutdownRequested.store (true);
          std::unique_lock<std::mutex> lock (m_rendererMutex);
          m_rendererCondVar.wait (lock, [this] { return m_bRendererShutdownComplete; });
+         m_bRendererShutdownRequested.store (false);
+         m_bRendererShutdownComplete = false;
       }
    }
 
@@ -175,16 +182,6 @@ public:
          m_rendererCondVar.notify_one ();
       }
       return bResult;
-   }
-
-   std::string sViewportId ()
-   {
-      std::string sResult;
-
-      if (!m_sPath_Temporary.empty ())
-         sResult = std::filesystem::path (m_sPath_Temporary).filename ().generic_string ();
-
-      return sResult;
    }
 
    // ---------------------------------------------------------------------------
@@ -246,38 +243,11 @@ public:
       m_fbMutex.unlock ();
    }
 
-   // ---------------------------------------------------------------------------
-   // Resize
-   // ---------------------------------------------------------------------------
-
-   void Resize (int nWidth, int nHeight)
-   {
-      std::lock_guard<std::mutex> guard (m_resizeMutex);
-      m_bResizePending = true;
-      m_nResizeWidth = nWidth;
-      m_nResizeHeight = nHeight;
-   }
-
-   bool ConsumePendingResize (int& nWidth, int& nHeight)
-   {
-      std::lock_guard<std::mutex> guard (m_resizeMutex);
-      bool bResult = m_bResizePending;
-      if (m_bResizePending)
-      {
-         nWidth = m_nResizeWidth;
-         nHeight = m_nResizeHeight;
-         m_nWidth = nWidth;
-         m_nHeight = nHeight;
-         m_bResizePending = false;
-      }
-      return bResult;
-   }
-
    friend class VIEWPORT;
 
 protected:
    VIEWPORT*               m_pViewport;
-   ENGINE*                 m_pEngine;
+   CONTEXT*                m_pContext;
    IVIEWPORT*              m_pHost;
    eINIT_STATE             m_eInitState;
    bool                    m_bReady;
@@ -303,17 +273,6 @@ protected:
    int                     m_nWidth;
    int                     m_nHeight;
 
-   // Resize request
-   std::mutex              m_resizeMutex;
-   bool                    m_bResizePending;
-   int                     m_nResizeWidth;
-   int                     m_nResizeHeight;
-
-   // Paths
-   eSESSION                m_eSession;
-   std::string             m_sPath_Permanent;
-   std::string             m_sPath_Temporary;
-
    // Camera
    VIEW                    m_View;
 };
@@ -323,31 +282,24 @@ protected:
 // VIEWPORT
 // ===========================================================================
 
-VIEWPORT::VIEWPORT (ENGINE* pEngine, IVIEWPORT* pHost) :
-   m_pImpl (new Impl (this, pEngine, pHost))
+VIEWPORT::VIEWPORT (CONTEXT* pContext) :
+   m_pImpl (new Impl (this, pContext))
 {
 }
 
 VIEWPORT::~VIEWPORT ()
 {
-   Shutdown ();
-
    delete m_pImpl;
 }
 
-bool VIEWPORT::Initialize (const std::string& sUrl, eSESSION eSession, const std::string& sPath_Permanent, const std::string& sPath_Temporary)
+bool VIEWPORT::Initialize (const std::string& sUrl)
 {
-   return m_pImpl->Initialize (sUrl, eSession, sPath_Permanent, sPath_Temporary);
+   return m_pImpl->Initialize (sUrl);
 }
 
 bool VIEWPORT::InitializeRenderer ()
 {
    return m_pImpl->InitializeRenderer ();
-}
-
-void VIEWPORT::Shutdown ()
-{
-   m_pImpl->Shutdown ();
 }
 
 void VIEWPORT::ShutdownRenderer ()
@@ -365,22 +317,35 @@ bool VIEWPORT::ServiceRendererShutdown ()
    return m_pImpl->ServiceRendererShutdown ();
 }
 
+void VIEWPORT::Attach (IVIEWPORT* pHost)
+{
+   m_pImpl->Attach (pHost);
+}
+
+void VIEWPORT::Detach ()
+{
+   m_pImpl->Detach ();
+}
+
 // ---------------------------------------------------------------------------
 // Accessors
 // ---------------------------------------------------------------------------
 
-SNEEZE::ENGINE*      VIEWPORT::Sneeze          () const { return m_pImpl->m_pEngine;         }
-IVIEWPORT*           VIEWPORT::Host            () const { return m_pImpl->m_pHost;           }
-VIEWPORT::SCENE*     VIEWPORT::Scene           () const { return m_pImpl->m_pScene;          }
-VIEWPORT::eSESSION   VIEWPORT::Session         () const { return m_pImpl->m_eSession;        }
-const std::string&   VIEWPORT::sPath_Permanent () const { return m_pImpl->m_sPath_Permanent; }
-const std::string&   VIEWPORT::sPath_Temporary () const { return m_pImpl->m_sPath_Temporary; }
-std::string          VIEWPORT::sViewportId     () const { return m_pImpl->sViewportId ();    }
-bool                 VIEWPORT::IsReady         () const { return m_pImpl->m_bReady;          }
-int                  VIEWPORT::Width           () const { return m_pImpl->m_nWidth;          }
-int                  VIEWPORT::Height          () const { return m_pImpl->m_nHeight;         }
-VIEWPORT::VIEW&      VIEWPORT::View            ()       { return m_pImpl->m_View;            }
-VIEWPORT::RENDERER*  VIEWPORT::Renderer        () const { return m_pImpl->m_pRenderer;       }
+SNEEZE::ENGINE*      VIEWPORT::Engine          () const { return m_pImpl->m_pContext->Engine (); }
+SNEEZE::CONTEXT*     VIEWPORT::Context         () const { return m_pImpl->m_pContext;            }
+IVIEWPORT*           VIEWPORT::Host            () const { return m_pImpl->m_pHost;               }
+VIEWPORT::SCENE*     VIEWPORT::Scene           () const { return m_pImpl->m_pScene;              }
+bool                 VIEWPORT::IsReady         () const { return m_pImpl->m_bReady;              }
+int                  VIEWPORT::Width           () const { return m_pImpl->m_nWidth;              }
+int                  VIEWPORT::Height          () const { return m_pImpl->m_nHeight;             }
+VIEWPORT::VIEW&      VIEWPORT::View            ()       { return m_pImpl->m_View;                }
+VIEWPORT::RENDERER*  VIEWPORT::Renderer        () const { return m_pImpl->m_pRenderer;           }
+
+void VIEWPORT::SetDimensions (int nWidth, int nHeight)
+{
+   m_pImpl->m_nWidth = nWidth;
+   m_pImpl->m_nHeight = nHeight;
+}
 
 // ---------------------------------------------------------------------------
 // Input
@@ -418,20 +383,6 @@ const uint32_t* VIEWPORT::LockFrameBuffer (int& nWidth, int& nHeight)
 void VIEWPORT::UnlockFrameBuffer ()
 {
    m_pImpl->UnlockFrameBuffer ();
-}
-
-// ---------------------------------------------------------------------------
-// Resize
-// ---------------------------------------------------------------------------
-
-void VIEWPORT::Resize (int nWidth, int nHeight)
-{
-   m_pImpl->Resize (nWidth, nHeight);
-}
-
-bool VIEWPORT::ConsumePendingResize (int& nWidth, int& nHeight)
-{
-   return m_pImpl->ConsumePendingResize (nWidth, nHeight);
 }
 
 // ---------------------------------------------------------------------------

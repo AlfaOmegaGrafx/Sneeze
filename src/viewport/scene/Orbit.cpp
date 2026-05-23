@@ -15,7 +15,7 @@
 #include <Sneeze.h>
 #include "Orbit.h"
 
-using namespace SNEEZE::astro;
+using namespace SNEEZE;
 
 // ---------------------------------------------------------------------------
 
@@ -27,32 +27,34 @@ ORBIT::ORBIT ()
 {
 }
 
-ORBIT::ORBIT (const ORBIT_PROPS& props)
-   : dSemiMajorAU      (props.dSemiMajorAU)
-   , dEccentricity     (props.dEccentricity)
-   , dInclination      (props.dInclination)
-   , dLonAscNode       (props.dLonAscNode)
-   , dLonPerihelion    (props.dLonPerihelion)
-   , dMeanLongitude    (props.dMeanLongitude)
-   , dArgPerihelion    (props.dArgPerihelion)
-   , dMeanAnomaly      (props.dMeanAnomaly)
-   , dPerihelionAU     (props.dPerihelionAU)
-   , dSemiMajorAUDot   (props.dSemiMajorAUDot)
-   , dEccentricityDot  (props.dEccentricityDot)
-   , dInclinationDot   (props.dInclinationDot)
-   , dLonAscNodeDot    (props.dLonAscNodeDot)
-   , dLonPerihelionDot (props.dLonPerihelionDot)
-   , dMeanLongitudeDot (props.dMeanLongitudeDot)
-   , dArgPerihelionDot (props.dArgPerihelionDot)
-   , dLaplacePoleRA    (props.dLaplacePoleRA)
-   , dLaplacePoleDec   (props.dLaplacePoleDec)
-   , sFrame            (props.sFrame)
-   , dRefPlaneRA       (props.dRefPlaneRA)
-   , dRefPlaneDec      (props.dRefPlaneDec)
-   , dPeriodDays       (props.dPeriodDays)
-   , pEpoch            (props.pEpoch ? props.pEpoch : &EPOCH_J2000)
-   , dA (0.0), dB (0.0)
-   , tmPeriod (0), tmStart (0)
+ORBIT::ORBIT (const ORBIT_PROPS& props) :
+   dSemiMajorAU      (props.dSemiMajorAU),
+   dEccentricity     (props.dEccentricity),
+   dInclination      (props.dInclination),
+   dLonAscNode       (props.dLonAscNode),
+   dLonPerihelion    (props.dLonPerihelion),
+   dMeanLongitude    (props.dMeanLongitude),
+   dArgPerihelion    (props.dArgPerihelion),
+   dMeanAnomaly      (props.dMeanAnomaly),
+   dPerihelionAU     (props.dPerihelionAU),
+   dSemiMajorAUDot   (props.dSemiMajorAUDot),
+   dEccentricityDot  (props.dEccentricityDot),
+   dInclinationDot   (props.dInclinationDot),
+   dLonAscNodeDot    (props.dLonAscNodeDot),
+   dLonPerihelionDot (props.dLonPerihelionDot),
+   dMeanLongitudeDot (props.dMeanLongitudeDot),
+   dArgPerihelionDot (props.dArgPerihelionDot),
+   dLaplacePoleRA    (props.dLaplacePoleRA),
+   dLaplacePoleDec   (props.dLaplacePoleDec),
+   sFrame            (props.sFrame),
+   dRefPlaneRA       (props.dRefPlaneRA),
+   dRefPlaneDec      (props.dRefPlaneDec),
+   dPeriodDays       (props.dPeriodDays),
+   pEpoch            (props.pEpoch ? props.pEpoch : &EPOCH_J2000),
+   dA                (0.0), 
+   dB                (0.0),
+   tmPeriod          (0),
+   tmStart           (0)
 {
 }
 

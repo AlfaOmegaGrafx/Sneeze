@@ -15,6 +15,8 @@
 #ifndef SNEEZE_SOM_MAPOBJECT_H
 #define SNEEZE_SOM_MAPOBJECT_H
 
+#include "Orbit.h"
+
 namespace SNEEZE
 {
    // ---------------------------------------------------------------------------
@@ -27,6 +29,26 @@ namespace SNEEZE
       MAP_OBJECT_TYPE_CELESTIAL   = 1,
       MAP_OBJECT_TYPE_TERRESTRIAL = 2,
       MAP_OBJECT_TYPE_PHYSICAL    = 3,
+   };
+
+   // ---------------------------------------------------------------------------
+   // Celestial body type identifiers
+   // ---------------------------------------------------------------------------
+
+   enum CELESTIAL_TYPE
+   {
+      CELESTIAL_TYPE_NONE           = 0,
+      CELESTIAL_TYPE_UNIVERSE       = 1,
+      CELESTIAL_TYPE_STARSYSTEM     = 9,
+      CELESTIAL_TYPE_STAR           = 10,
+      CELESTIAL_TYPE_PLANETSYSTEM   = 11,
+      CELESTIAL_TYPE_PLANET         = 12,
+      CELESTIAL_TYPE_MOONSYSTEM     = 125,
+      CELESTIAL_TYPE_MOON           = 13,
+      CELESTIAL_TYPE_DEBRISSYSTEM   = 135,
+      CELESTIAL_TYPE_DEBRIS         = 14,
+      CELESTIAL_TYPE_SATELLITE      = 15,
+      CELESTIAL_TYPE_SURFACE        = 17,
    };
 
    // ---------------------------------------------------------------------------
@@ -88,7 +110,27 @@ namespace SNEEZE
    public:
       MAP_OBJECT_CELESTIAL () : MAP_OBJECT (MAP_OBJECT_TYPE_CELESTIAL) {}
 
-      double m_dRadius = 0.0;
+      bool HasOrbit () const { return m_orbit.dA != 0.0  &&  m_orbit.tmPeriod != 0  &&  m_orbit.bHasQuat; }
+
+      // Identity
+      std::string    m_sName;
+      CELESTIAL_TYPE m_bCelestialType = CELESTIAL_TYPE_NONE;
+
+      // Physical
+      double                m_dRadius        = 0.0;
+      std::optional<double> m_dMass;
+      std::optional<double> m_dGM;
+      std::optional<double> m_dSystemRadiusKm;
+      std::optional<double> m_dPoleRA;
+      std::optional<double> m_dPoleDec;
+      std::optional<double> m_dObliquity;
+
+      // Color variants (base m_nColor on MAP_OBJECT serves as normal)
+      uint32_t m_nColorDim    = 0x666666;
+      uint32_t m_nColorBright = 0xffffff;
+
+      // Orbital mechanics
+      ORBIT m_orbit;
    };
 
    class MAP_OBJECT_TERRESTRIAL : public MAP_OBJECT

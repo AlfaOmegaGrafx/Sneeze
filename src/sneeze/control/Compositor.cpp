@@ -40,7 +40,7 @@
 //
 // Desired behavior once fixed:
 //   Remove the deferred init/shutdown dance entirely. Create the renderer
-//   wherever convenient (e.g. during Viewport_Open on the main thread),
+//   wherever convenient (e.g. during Context_Open on the main thread),
 //   call the transfer API before shutdown, and destroy it on the main
 //   thread alongside the rest of the viewport teardown.
 // ---------------------------------------------------------------------------
@@ -50,9 +50,6 @@
 #include "Types.h"
 #include "renderer/Renderer.h"
 #include "scene/Epoch.h"
-#include "astro/AstroService.h"
-#include "astro/RMCObject.h"
-#include "astro/Orbit.h"
 #include "scene/Node.h"
 #include "scene/Fabric.h"
 #include "scene/MapObject.h"
@@ -144,11 +141,12 @@ void AGENT::COMPOSITOR::Main ()
 
       bool bNeedFlush = false;
 
-      Engine ()->Viewport_Capture ();
+      Engine ()->Context_Capture ();
       {
-         for (VIEWPORT* pViewport : Engine ()->Viewport_GetList ())
+         for (CONTEXT* pContext : Engine ()->Context_GetList ())
          {
-            if (!pViewport->IsReady ())
+            VIEWPORT* pViewport = pContext->Viewport ();
+            if (!pViewport  ||  !pViewport->IsReady ())
                continue;
 
             if (pViewport->ServiceRendererShutdown ())
@@ -165,7 +163,7 @@ void AGENT::COMPOSITOR::Main ()
                bNeedFlush = true;
          }
 
-         Engine ()->Viewport_Release ();
+         Engine ()->Context_Release ();
       }
 
       // --- Pace to display refresh (outside lock) ---
@@ -198,11 +196,15 @@ void AGENT::COMPOSITOR::Viewport_Render (VIEWPORT* pViewport, std::chrono::stead
    {
    IVIEWPORT* pVPHost = pViewport->Host ();
 
-   // --- Consume pending resize ---
+   // --- Poll host for resize ---
 
-   int nNewW, nNewH;
-   if (pViewport->ConsumePendingResize (nNewW, nNewH))
-      pRenderer->Resize (nNewW, nNewH);
+   int nHostW, nHostH;
+   pVPHost->FrameSize (nHostW, nHostH);
+   if (nHostW != pViewport->Width ()  ||  nHostH != pViewport->Height ())
+   {
+      pViewport->SetDimensions (nHostW, nHostH);
+      pRenderer->Resize (nHostW, nHostH);
+   }
 
    // --- Camera ---
 
@@ -249,7 +251,7 @@ void AGENT::COMPOSITOR::Viewport_Render (VIEWPORT* pViewport, std::chrono::stead
 
    if (pSomRoot)
    {
-      astro::ORBIT_POSITION pos;
+      ORBIT_POSITION pos;
 
       for (VIEWPORT::SCENE::FABRIC::NODE* pNode : pSomRoot->Node_Children ())
       {
@@ -257,12 +259,12 @@ void AGENT::COMPOSITOR::Viewport_Render (VIEWPORT* pViewport, std::chrono::stead
          if (!pObj  ||  pObj->GetType () != MAP_OBJECT_TYPE_CELESTIAL)
             continue;
 
-         auto* pCelestial = static_cast<astro::CELESTIAL_MAP_OBJECT*> (pObj);
+         auto* pCelestial = static_cast<MAP_OBJECT_CELESTIAL*> (pObj);
 
          float dBodyX, dBodyY, dBodyZ;
-         if (pCelestial->m_pOrbit)
+         if (pCelestial->HasOrbit ())
          {
-            astro::ORBIT_POSITION* pPos = pCelestial->m_pOrbit->PositionAtTick (m_tmNow, pos);
+            ORBIT_POSITION* pPos = pCelestial->m_orbit.PositionAtTick (m_tmNow, pos);
             if (!pPos) continue;
             dBodyX = static_cast<float> (pPos->x * METERS_TO_AU);
             dBodyY = static_cast<float> (pPos->y * METERS_TO_AU);
@@ -277,14 +279,14 @@ void AGENT::COMPOSITOR::Viewport_Render (VIEWPORT* pViewport, std::chrono::stead
 
          float dRadius = static_cast<float> (pCelestial->m_dRadius * METERS_TO_AU);
          if (dRadius < MIN_SPHERE_RADIUS) dRadius = MIN_SPHERE_RADIUS;
-         if (!pCelestial->m_pOrbit) dRadius *= SUN_RADIUS_SCALE;
+         if (!pCelestial->HasOrbit ()) dRadius *= SUN_RADIUS_SCALE;
 
          SPHERE_DATA sphere;
          sphere.x         = dBodyX;
          sphere.y         = dBodyY;
          sphere.z         = dBodyZ;
          sphere.dRadius   = dRadius;
-         sphere.bEmissive = !pCelestial->m_pOrbit;
+         sphere.bEmissive = !pCelestial->HasOrbit ();
          ColorFromU32 (pCelestial->m_nColor, sphere.r, sphere.g, sphere.b);
 
          if (pCelestial->m_bTextureReady.load ())
@@ -300,7 +302,7 @@ void AGENT::COMPOSITOR::Viewport_Render (VIEWPORT* pViewport, std::chrono::stead
 
          // --- Orbit trail ---
 
-         if (pCelestial->m_pOrbit)
+         if (pCelestial->HasOrbit ())
          {
             CURVE_DATA curve;
             ColorFromU32 (pCelestial->m_nColor, curve.r, curve.g, curve.b);
@@ -317,14 +319,14 @@ void AGENT::COMPOSITOR::Viewport_Render (VIEWPORT* pViewport, std::chrono::stead
             cpHead.dRadius = 0.002f;
             curve.aPoints.push_back (cpHead);
 
-            astro::ORBIT_POSITION* pPos = pCelestial->m_pOrbit->PositionAtTick (m_tmNow, pos);
+            ORBIT_POSITION* pPos = pCelestial->m_orbit.PositionAtTick (m_tmNow, pos);
             if (pPos)
             {
                double dE_planet = pPos->dE;
                for (int i = 1; i <= nTrailPoints; i++)
                {
                   double dE = dE_planet - (static_cast<double> (i) / TRAIL_SEGMENTS) * TWO_PI;
-                  VEC3 vPt = pCelestial->m_pOrbit->PointOnOrbit (dE, m_tmNow);
+                  VEC3 vPt = pCelestial->m_orbit.PointOnOrbit (dE, m_tmNow);
 
                   CURVE_POINT cp;
                   cp.x       = static_cast<float> (vPt.x * METERS_TO_AU);

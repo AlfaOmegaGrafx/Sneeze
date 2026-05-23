@@ -13,7 +13,7 @@ STORAGE (singleton, constructor takes ENGINE*)
 
 UNIT (one per JSON file on disk, keyed by full path)
  ├── nlohmann::json document (in-memory cache)
- ├── .meta sidecar (SNEEZE::VIEWPORT::CONTAINER::NAME, statistics)
+ ├── .meta sidecar (SNEEZE::CONTEXT::CONTAINER::NAME, statistics)
  ├── .log changelog (JSONL write-ahead log for crash durability)
  ├── m_nCount_Open (lifetime: how many UNITs reference this UNIT)
  ├── m_nCount_Load (cache: how many consumers have data loaded)
@@ -22,7 +22,7 @@ UNIT (one per JSON file on disk, keyed by full path)
  └── m_mutex (recursive_mutex, per-UNIT)
 
 UNIT (groups four UNITs for a specific container)
- ├── shared_ptr<SNEEZE::VIEWPORT::CONTAINER::NAME>
+ ├── shared_ptr<SNEEZE::CONTEXT::CONTAINER::NAME>
  ├── UNIT* m_apUnits[4] indexed by SCOPE
  ├── m_nCount_Load (tracks active attachments)
  ├── m_bPendingClear (deferred history removal)
@@ -124,7 +124,7 @@ Directory creation happens in `UNIT::Load()` — when a UNIT's JSON data is firs
 #include "storage/Storage.h"
 
 // Open storage for a container (typically called by WASM runtime)
-auto pName = std::make_shared<SNEEZE::VIEWPORT::CONTAINER::NAME> ();
+auto pName = std::make_shared<SNEEZE::CONTEXT::CONTAINER::NAME> ();
 pName->sFingerprint   = "abc123def456abc123def456abc123def456abc123def456abc123def456abcd";
 pName->sOrganization  = "Metaversal";
 pName->sCommonName    = "Metaversal";
@@ -281,7 +281,7 @@ The host downcasts `NOTIFICATION*` to `STORAGE::UNIT*`.
 
 Each storage unit has a companion `.meta` sidecar — same pattern as NETWORK:
 
-- Contains SNEEZE::VIEWPORT::CONTAINER::NAME fields (fingerprint, organization, commonName,
+- Contains SNEEZE::CONTEXT::CONTAINER::NAME fields (fingerprint, organization, commonName,
   containerName, personaHash, bValidated)
 - Contains scope identifier and statistics (createdAt, lastAccessedAt,
   accessCount, sizeBytes)

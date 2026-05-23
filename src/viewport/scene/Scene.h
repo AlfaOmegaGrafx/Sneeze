@@ -17,14 +17,12 @@
 
 namespace SNEEZE
 {
-   namespace astro { class ASTRO_SERVICE; }
-
    // ---------------------------------------------------------------------------
    // VIEWPORT::SCENE — root container for the scene object model.
    //
    // Owned by VIEWPORT. Every FABRIC in the scene holds a back-pointer to
    // the SCENE, giving any NODE a path to engine services:
-   //     NODE -> FABRIC -> SCENE -> SNEEZE -> Network(), etc.
+   //     NODE -> FABRIC -> SCENE -> Engine() / Network()
    // ---------------------------------------------------------------------------
 
    class VIEWPORT::SCENE
@@ -36,12 +34,12 @@ namespace SNEEZE
       ~SCENE ();
 
       bool Initialize (const std::string& sUrl);
-      void Shutdown ();
 
-      VIEWPORT* Viewport () const;
-      ENGINE*   Sneeze () const;
-      FABRIC* Fabric_Root () const;
-      FABRIC* Fabric_Primary () const;
+      ENGINE*   Engine         () const;
+      NETWORK*  Network        () const;
+      VIEWPORT* Viewport       () const;
+      FABRIC*   Fabric_Root    () const;
+      FABRIC*   Fabric_Primary () const;
 
    private:
       bool Fabric_Open_Primary (const std::string& sUrl);
@@ -49,7 +47,6 @@ namespace SNEEZE
       VIEWPORT*             m_pViewport;
       FABRIC*               m_pFabric_Root;
       FABRIC*               m_pFabric_Primary;
-      astro::ASTRO_SERVICE* m_pAstroService;
    };
 }
 #endif // SNEEZE_VIEWPORT_SCENE_H

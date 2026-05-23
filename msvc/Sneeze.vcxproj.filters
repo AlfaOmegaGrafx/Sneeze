@@ -16,6 +16,9 @@
     <Filter Include="src\sneeze\storage">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000004}</UniqueIdentifier>
     </Filter>
+    <Filter Include="src\sneeze\console">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000012}</UniqueIdentifier>
+    </Filter>
     <Filter Include="src\astro">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000005}</UniqueIdentifier>
     </Filter>
@@ -88,6 +91,9 @@
     <ClCompile Include="..\src\sneeze\Engine.cpp">
       <Filter>src\sneeze</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\sneeze\Context.cpp">
+      <Filter>src\sneeze</Filter>
+    </ClCompile>
     <ClCompile Include="..\src\sneeze\Thread.cpp">
       <Filter>src\sneeze</Filter>
     </ClCompile>
@@ -133,23 +139,23 @@
     <ClCompile Include="..\src\sneeze\storage\Unit.cpp">
       <Filter>src\sneeze\storage</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\sneeze\console\Console.cpp">
+      <Filter>src\sneeze\console</Filter>
+    </ClCompile>
     <ClCompile Include="..\src\astro\BodyData.cpp">
-      <Filter>src\astro</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\astro\Celestial.cpp">
-      <Filter>src\astro</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\astro\Orbit.cpp">
       <Filter>src\astro</Filter>
     </ClCompile>
     <ClCompile Include="..\src\astro\RMCObject.cpp">
       <Filter>src\astro</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\astro\AstroService.cpp">
-      <Filter>src\astro</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\viewport\Viewport.cpp">
       <Filter>src\viewport</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\viewport\scene\Celestial.cpp">
+      <Filter>src\viewport\scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\viewport\scene\Orbit.cpp">
+      <Filter>src\viewport\scene</Filter>
     </ClCompile>
     <ClCompile Include="..\src\viewport\scene\Epoch.cpp">
       <Filter>src\viewport\scene</Filter>
@@ -244,17 +250,14 @@
     <ClInclude Include="..\src\astro\BodyData.h">
       <Filter>src\astro</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\astro\Celestial.h">
-      <Filter>src\astro</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\astro\Orbit.h">
-      <Filter>src\astro</Filter>
-    </ClInclude>
     <ClInclude Include="..\src\astro\RMCObject.h">
       <Filter>src\astro</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\astro\AstroService.h">
-      <Filter>src\astro</Filter>
+    <ClInclude Include="..\src\viewport\scene\Celestial.h">
+      <Filter>src\viewport\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\viewport\scene\Orbit.h">
+      <Filter>src\viewport\scene</Filter>
     </ClInclude>
     <ClInclude Include="..\src\viewport\scene\Epoch.h">
       <Filter>src\viewport\scene</Filter>
@@ -329,6 +332,9 @@
     <ClInclude Include="..\include\Sneeze.h">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\Context.h">
+      <Filter>include</Filter>
+    </ClInclude>
     <ClInclude Include="..\include\Persona.h">
       <Filter>include</Filter>
     </ClInclude>
@@ -342,6 +348,9 @@
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="..\include\Storage.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Console.h">
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="..\src\sneeze\storage\Storage_Asset.h">

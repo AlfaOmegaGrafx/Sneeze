@@ -240,7 +240,7 @@ public:
          Load (); 
    }
 
-   void Detach (const VIEWPORT::CONTAINER::CID& CID)
+   void Detach (const CONTEXT::CONTAINER::CID& CID)
    {
       if (m_nCount_Load > 0 && --m_nCount_Load == 0)
       {
@@ -340,7 +340,7 @@ public:
       m_nAccessCount++;
    }
 
-   void SaveMeta (const VIEWPORT::CONTAINER::CID& CID)
+   void SaveMeta (const CONTEXT::CONTAINER::CID& CID)
    {
       std::string sMetaPath = m_sPathname + ".meta";
 
@@ -563,7 +563,7 @@ uint32_t ASSET::Open ()  { return ++m_pImpl->m_nCount_Open; }
 uint32_t ASSET::Close () { return --m_pImpl->m_nCount_Open; }
 
 void ASSET::Attach ()    { m_pImpl->Attach (); }
-void ASSET::Detach (const VIEWPORT::CONTAINER::CID& CID) { m_pImpl->Detach (CID); }
+void ASSET::Detach (const CONTEXT::CONTAINER::CID& CID) { m_pImpl->Detach (CID); }
 void ASSET::Load ()      { m_pImpl->Load ();   }
 void ASSET::Save ()      { m_pImpl->Save ();   }
 void ASSET::Evict ()     { m_pImpl->Evict ();  }
@@ -573,4 +573,4 @@ void ASSET::Evict ()     { m_pImpl->Evict ();  }
 // ---------------------------------------------------------------------------
 
 void ASSET::TouchAccess ()                                   { m_pImpl->TouchAccess (); }
-void ASSET::SaveMeta (const VIEWPORT::CONTAINER::CID& CID)   { m_pImpl->SaveMeta (CID); }
+void ASSET::SaveMeta (const CONTEXT::CONTAINER::CID& CID)   { m_pImpl->SaveMeta (CID); }

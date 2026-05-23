@@ -22,14 +22,18 @@
 namespace SNEEZE
 {
    class ENGINE;
+   class CONTEXT;
    class IFETCH;
+   class ICONTEXT;
    class IVIEWPORT;
 }
 
-#include "Viewport.h"
-#include "Persona.h"
+#include "Context.h"
+#include "Console.h"
 #include "Network.h"
 #include "Storage.h"
+#include "Viewport.h"
+#include "Persona.h"
 
 namespace SNEEZE
 {
@@ -37,29 +41,6 @@ namespace SNEEZE
    // IENGINE -- interface between the host application and the engine.
    // Engine-level only: logging, data paths, renderer selection.
    // ------------------------------------------------------------------------
-
-   class IVIEWPORT
-   {
-   public:
-      virtual ~IVIEWPORT () = default;
-
-      // --- Callbacks (host must implement) ---
-
-      virtual void* FrameWindow () = 0;
-      virtual void  FrameSize (int& nWidth, int& nHeight) = 0;
-
-      virtual void  OnFrameReady (const uint32_t* pFB, int nFbW, int nFbH) = 0;
-
-      // --- Inspector callbacks (optional) ---
-
-      virtual bool OnNetworkFileCreated (NETWORK::FILE*) { return true; }
-      virtual void OnNetworkFileChanged (NETWORK::FILE*) {}
-      virtual void OnNetworkFileDeleted (NETWORK::FILE*) {}
-
-      virtual void OnStorageUnitCreated (STORAGE::UNIT*) {}
-      virtual void OnStorageUnitChanged (STORAGE::UNIT*, STORAGE::eSCOPE eScope, const std::string&) {}
-      virtual void OnStorageUnitDeleted (STORAGE::UNIT*) {}
-   };
 
    class IENGINE
    {
@@ -83,6 +64,45 @@ namespace SNEEZE
       virtual void Log (eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage) = 0;
    };
 
+   // ------------------------------------------------------------------------
+   // ICONTEXT -- per-context session interface.
+   // Passed to ENGINE::Context_Open(). Inspector callbacks only.
+   // ------------------------------------------------------------------------
+
+   class ICONTEXT
+   {
+   public:
+      virtual ~ICONTEXT () = default;
+
+      virtual bool OnNetworkFileCreated (NETWORK::FILE*) { return true; }
+      virtual void OnNetworkFileChanged (NETWORK::FILE*) {}
+      virtual void OnNetworkFileDeleted (NETWORK::FILE*) {}
+
+      virtual void OnStorageUnitCreated (STORAGE::UNIT*) {}
+      virtual void OnStorageUnitChanged (STORAGE::UNIT*, STORAGE::eSCOPE eScope, const std::string&) {}
+      virtual void OnStorageUnitDeleted (STORAGE::UNIT*) {}
+   };
+
+   // ------------------------------------------------------------------------
+   // IVIEWPORT -- per-viewport rendering interface.
+   // Passed to CONTEXT::Viewport_Attach(). Rendering callbacks only.
+   // ------------------------------------------------------------------------
+
+   class IVIEWPORT
+   {
+   public:
+      virtual ~IVIEWPORT () = default;
+
+      virtual void* FrameWindow () = 0;
+      virtual void  FrameSize (int& nWidth, int& nHeight) = 0;
+
+      virtual void  OnFrameReady (const uint32_t* pFB, int nFbW, int nFbH) = 0;
+   };
+
+   // ------------------------------------------------------------------------
+   // ENGINE
+   // ------------------------------------------------------------------------
+
    class ENGINE
    {
    public:
@@ -102,13 +122,13 @@ namespace SNEEZE
 
       bool Initialize ();
 
-      // --- Viewport management ---
+      // --- Context management ---
 
-      VIEWPORT*                      Viewport_Open    (IVIEWPORT* pHost, const std::string& sUrl = "", VIEWPORT::eSESSION kSession = VIEWPORT::kSESSION_PERSISTENT);
-      bool                           Viewport_Close   (VIEWPORT* pViewport);
-      void                           Viewport_Capture ();
-      const std::vector<VIEWPORT*>&  Viewport_GetList () const;
-      void                           Viewport_Release ();
+      CONTEXT*                       Context_Open    (ICONTEXT* pHost, const std::string& sUrl = "", CONTEXT::eSESSION kSession = CONTEXT::kSESSION_PERSISTENT);
+      bool                           Context_Close   (CONTEXT* pContext);
+      void                           Context_Capture ();
+      const std::vector<CONTEXT*>&   Context_GetList () const;
+      void                           Context_Release ();
 
       // --- Shared services ---
 
@@ -127,8 +147,6 @@ namespace SNEEZE
 
       // --- Subsystems ---
 
-      NETWORK*                 Network () const;
-      STORAGE*                 Storage () const;
       persona::PERSONA*        Persona () const;
 
       void                     Queue_Post_Fetch (IFETCH* pFetch);

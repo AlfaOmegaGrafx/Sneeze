@@ -20,27 +20,19 @@ using namespace SNEEZE;
 class STORAGE::Impl
 {
 public:
-   Impl (STORAGE* pStorage, ENGINE* pEngine) :
+   Impl (STORAGE* pStorage, CONTEXT* pContext) :
       m_pStorage (pStorage),
-      m_pEngine (pEngine)
+      m_pContext (pContext),
+      m_sPath_Permanent ((std::filesystem::path (pContext->sPath_Permanent ()) / "Storage").string ()),
+      m_sPath_Temporary ((std::filesystem::path (pContext->sPath_Temporary ()) / "Storage").string ())
    {
    }
 
    bool Initialize ()
    {
-      bool bResult = false;
+      m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "STORAGE", "Initialized");
 
-      IENGINE* pHost = m_pEngine->Host ();
-
-      if (pHost && !pHost->sAppDataPath ().empty ())
-      {
-         bResult = true;
-
-         m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "STORAGE", "Initialized");
-      }
-      else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "STORAGE", "Host configuration incomplete (sAppDataPath required)");
-
-      return bResult;
+      return true;
    }
 
    ~Impl ()
@@ -48,7 +40,7 @@ public:
       std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
 
       while (!m_apUnit.empty ())
-         Unit_Close (m_apUnit.front ()->Viewport (), m_apUnit.front ());
+         Unit_Close (m_apUnit.front ());
 
       for (auto& pair : m_umpAsset)
          delete pair.second;
@@ -58,33 +50,33 @@ public:
 
 public:
 
-   STORAGE::UNIT* Unit_Open (VIEWPORT* pViewport, const VIEWPORT::CONTAINER::CID* pCID)
+   STORAGE::UNIT* Unit_Open (const CONTEXT::CONTAINER::CID* pCID)
    {
       UNIT* pUnit = nullptr;
 
-      if (pCID && pViewport)
+      if (pCID)
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
 
-         pUnit = new UNIT (m_pStorage, pViewport, pCID);
+         pUnit = new UNIT (m_pStorage, pCID);
 
          m_apUnit.push_back (pUnit);
 
          pUnit->Initialize ();
 
-         pViewport->Host ()->OnStorageUnitCreated (pUnit);
+         m_pContext->Host ()->OnStorageUnitCreated (pUnit);
       }
 
       return pUnit;
    }
 
-   void Unit_Close (VIEWPORT* pViewport, UNIT* pUnit)
+   void Unit_Close (UNIT* pUnit)
    {
       if (pUnit)
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
 
-         pViewport->Host ()->OnStorageUnitDeleted (pUnit);
+         m_pContext->Host ()->OnStorageUnitDeleted (pUnit);
 
          auto it = std::find (m_apUnit.begin (), m_apUnit.end (), pUnit);
          if (it != m_apUnit.end ())
@@ -94,17 +86,14 @@ public:
       }
    }
 
-   void Unit_Enum (VIEWPORT* pViewport, IENUM* pEnum)
+   void Unit_Enum (IENUM* pEnum)
    {
       if (pEnum)
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
 
          for (UNIT* pUnit : m_apUnit)
-         {
-            if (pUnit->Viewport () == pViewport)
-               pEnum->OnUnit (pUnit);
-         }
+            pEnum->OnUnit (pUnit);
       }
    }
 
@@ -141,7 +130,9 @@ public:
    }
 
    STORAGE*                                m_pStorage;
-   ENGINE*                                 m_pEngine;
+   CONTEXT*                                m_pContext;
+   std::string                             m_sPath_Permanent;
+   std::string                             m_sPath_Temporary;
 
    std::recursive_mutex                    m_mxStorage;
    std::vector<UNIT*>                      m_apUnit;
@@ -152,12 +143,15 @@ public:
 // STORAGE
 // ===========================================================================
 
-STORAGE::STORAGE (ENGINE* pEngine) :
-   m_pImpl (new Impl (this, pEngine))
+STORAGE::STORAGE (CONTEXT* pContext) :
+   m_pImpl (new Impl (this, pContext))
 {
 }
 
-bool STORAGE::Initialize () { return m_pImpl->Initialize (); }
+bool              STORAGE::Initialize ()              { return m_pImpl->Initialize (); }
+SNEEZE::CONTEXT*  STORAGE::Context    ()        const { return m_pImpl->m_pContext; }
+const std::string& STORAGE::sPath_Permanent () const { return m_pImpl->m_sPath_Permanent; }
+const std::string& STORAGE::sPath_Temporary () const { return m_pImpl->m_sPath_Temporary; }
 
 STORAGE::~STORAGE ()
 {
@@ -168,8 +162,8 @@ STORAGE::~STORAGE ()
 // Container lifecycle
 // ---------------------------------------------------------------------------
 
-STORAGE::UNIT* STORAGE::Unit_Open   (VIEWPORT* pViewport, const VIEWPORT::CONTAINER::CID* pCID) { return m_pImpl->Unit_Open  (pViewport, pCID); }
-void           STORAGE::Unit_Close  (VIEWPORT* pViewport, UNIT* pUnit)                          {        m_pImpl->Unit_Close (pViewport, pUnit); }
-void           STORAGE::Unit_Enum   (VIEWPORT* pViewport, IENUM* pEnum)                         {        m_pImpl->Unit_Enum  (pViewport, pEnum); }
-ASSET*         STORAGE::Asset_Open  (eSCOPE eScope, const std::string& sPathname)               { return m_pImpl->Asset_Open  (eScope, sPathname); }
-void           STORAGE::Asset_Close (ASSET* pAsset)                                             {        m_pImpl->Asset_Close (pAsset); }
+STORAGE::UNIT* STORAGE::Unit_Open   (const CONTEXT::CONTAINER::CID* pCID)        { return m_pImpl->Unit_Open   (pCID); }
+void           STORAGE::Unit_Close  (UNIT* pUnit)                                 {        m_pImpl->Unit_Close  (pUnit); }
+void           STORAGE::Unit_Enum   (IENUM* pEnum)                                {        m_pImpl->Unit_Enum   (pEnum); }
+ASSET*         STORAGE::Asset_Open  (eSCOPE eScope, const std::string& sPathname) { return m_pImpl->Asset_Open  (eScope, sPathname); }
+void           STORAGE::Asset_Close (ASSET* pAsset)                               {        m_pImpl->Asset_Close (pAsset); }

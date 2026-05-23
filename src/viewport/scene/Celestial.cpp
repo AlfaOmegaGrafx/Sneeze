@@ -14,14 +14,19 @@
 
 #include "Celestial.h"
 
-using namespace SNEEZE::astro;
+using namespace SNEEZE;
 
 // ---------------------------------------------------------------------------
 
-CELESTIAL::CELESTIAL ()
-   : dQx (0.0), dQy (0.0), dQz (0.0), dQw (1.0)
-   , bHasQuat (false)
-   , dPrecX (0.0), dPrecY (0.0), dPrecZ (0.0)
+CELESTIAL::CELESTIAL () : 
+   dQx      (0.0), 
+   dQy      (0.0),
+   dQz      (0.0),
+   dQw      (1.0),
+   bHasQuat (false),
+   dPrecX   (0.0),
+   dPrecY   (0.0),
+   dPrecZ   (0.0)
 {
 }
 
@@ -32,22 +37,26 @@ CELESTIAL::CELESTIAL ()
 QUAT CELESTIAL::QuatMultiply (const QUAT& q1, const QUAT& q2)
 {
    QUAT r;
+
    r.dX = q1.dW*q2.dX + q1.dX*q2.dW + q1.dY*q2.dZ - q1.dZ*q2.dY;
    r.dY = q1.dW*q2.dY - q1.dX*q2.dZ + q1.dY*q2.dW + q1.dZ*q2.dX;
    r.dZ = q1.dW*q2.dZ + q1.dX*q2.dY - q1.dY*q2.dX + q1.dZ*q2.dW;
    r.dW = q1.dW*q2.dW - q1.dX*q2.dX - q1.dY*q2.dY - q1.dZ*q2.dZ;
+
    return r;
 }
 
 QUAT CELESTIAL::QuatRotZ (double dDeg)
 {
    double dRad = dDeg * DEG_TO_RAD * 0.5;
+
    return { 0.0, 0.0, std::sin (dRad), std::cos (dRad) };
 }
 
 QUAT CELESTIAL::QuatRotX (double dDeg)
 {
    double dRad = dDeg * DEG_TO_RAD * 0.5;
+
    return { std::sin (dRad), 0.0, 0.0, std::cos (dRad) };
 }
 
@@ -56,8 +65,7 @@ QUAT CELESTIAL::QuatConjugate (const QUAT& q)
    return { -q.dX, -q.dY, -q.dZ, q.dW };
 }
 
-VEC3 CELESTIAL::RotateByQuat (double qx, double qy, double qz, double qw,
-                               double vx, double vy, double vz)
+VEC3 CELESTIAL::RotateByQuat (double qx, double qy, double qz, double qw, double vx, double vy, double vz)
 {
    double cx1 = qy * vz - qz * vy;
    double cy1 = qz * vx - qx * vz;
@@ -145,9 +153,7 @@ VEC3 CELESTIAL::EquatorialToEclipticVec (double dRA, double dDec)
 //  MatrixToQuat - Shepperd's method
 // ---------------------------------------------------------------------------
 
-QUAT CELESTIAL::MatrixToQuat (double m00, double m01, double m02,
-                               double m10, double m11, double m12,
-                               double m20, double m21, double m22)
+QUAT CELESTIAL::MatrixToQuat (double m00, double m01, double m02, double m10, double m11, double m12, double m20, double m21, double m22)
 {
    double dTrace = m00 + m11 + m22;
    double dX, dY, dZ, dW;
@@ -204,7 +210,8 @@ QUAT CELESTIAL::PrecessionQuat (int64_t tmElapsed) const
       double dHalf    = dAngle * 0.5;
       double dSinHalf = std::sin (dHalf) / dRate;
 
-      pResult = {
+      pResult =
+      {
          dPrecX * dSinHalf,
          dPrecY * dSinHalf,
          dPrecZ * dSinHalf,

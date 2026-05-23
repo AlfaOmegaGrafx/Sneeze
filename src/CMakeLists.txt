@@ -504,6 +504,7 @@ endif ()
 
 set (CORE_SOURCES
    sneeze/Engine.cpp
+   sneeze/Context.cpp
    sneeze/Thread.cpp
    sneeze/control/Agent.cpp
    sneeze/control/Control.cpp
@@ -522,19 +523,15 @@ set (CORE_HEADERS
 
 set (ASTRO_SOURCES
    astro/BodyData.cpp
-   astro/Celestial.cpp
-   astro/Orbit.cpp
-   astro/RMCObject.cpp
-   astro/AstroService.cpp)
+   astro/RMCObject.cpp)
 set (ASTRO_HEADERS
    astro/BodyData.h
-   astro/Celestial.h
-   astro/Orbit.h
-   astro/RMCObject.h
-   astro/AstroService.h)
+   astro/RMCObject.h)
 
 set (SOM_SOURCES
    viewport/Viewport.cpp
+   viewport/scene/Celestial.cpp
+   viewport/scene/Orbit.cpp
    viewport/scene/Epoch.cpp
    viewport/scene/Node.cpp
    viewport/scene/Fabric.cpp
@@ -544,6 +541,8 @@ set (SOM_SOURCES
    viewport/scene/Events.cpp
    viewport/scene/SpatialIndex.cpp)
 set (SOM_HEADERS
+   viewport/scene/Celestial.h
+   viewport/scene/Orbit.h
    viewport/scene/Epoch.h
    viewport/scene/Node.h
    viewport/scene/Fabric.h
@@ -552,13 +551,6 @@ set (SOM_HEADERS
    viewport/scene/AccessControl.h
    viewport/scene/Events.h
    viewport/scene/SpatialIndex.h)
-
-set (NETWORK_SOURCES
-   sneeze/network/Network_Asset.cpp
-   sneeze/network/File.cpp
-   sneeze/network/Network.cpp)
-set (NETWORK_HEADERS
-   )
 
 # Embed Mozilla's CA bundle (cacert.pem) as a string blob so libcurl can
 # verify HTTPS certificates on platforms whose system has no libcurl-
@@ -613,7 +605,13 @@ set (NETWORK_GENERATED_SOURCES "${CMAKE_CURRENT_BINARY_DIR}/cacert_data.cpp")
 
 set (CONTAINER_HEADERS)
 
-set (STORAGE_SOURCES  sneeze/storage/Storage.cpp sneeze/storage/Storage_Asset.cpp sneeze/storage/Unit.cpp)
+set (CONSOLE_SOURCES  sneeze/console/Console.cpp)
+set (CONSOLE_HEADERS)
+
+set (NETWORK_SOURCES  sneeze/network/Network.cpp sneeze/network/File.cpp sneeze/network/Network_Asset.cpp)
+set (NETWORK_HEADERS)
+
+set (STORAGE_SOURCES  sneeze/storage/Storage.cpp sneeze/storage/Unit.cpp sneeze/storage/Storage_Asset.cpp)
 set (STORAGE_HEADERS  sneeze/storage/Storage_Asset.h)
 
 set (PERSONA_SOURCES  persona/Persona.cpp)
@@ -668,11 +666,13 @@ set (STB_HEADERS  deps/stb/stb_image.h)
 
 set (INCLUDE_HEADERS
    ../include/Sneeze.h
+   ../include/Context.h
    ../include/Persona.h
    ../include/Network.h
    ../include/Container.h
    ../include/Viewport.h
-   ../include/Storage.h)
+   ../include/Storage.h
+   ../include/Console.h)
 
 # ---------------------------------------------------------------------------
 # Static library
@@ -685,6 +685,7 @@ add_library (Sneeze STATIC
    ${NETWORK_SOURCES}   ${NETWORK_HEADERS}
    ${CONTAINER_HEADERS}
    ${STORAGE_SOURCES}   ${STORAGE_HEADERS}
+   ${CONSOLE_SOURCES}   ${CONSOLE_HEADERS}
    ${PERSONA_SOURCES}   ${PERSONA_HEADERS}
    ${RENDERER_SOURCES}  ${RENDERER_HEADERS}
    ${WASM_SOURCES}      ${WASM_HEADERS}
@@ -803,6 +804,7 @@ source_group (TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
    ${NETWORK_SOURCES}   ${NETWORK_HEADERS}
    ${CONTAINER_HEADERS}
    ${STORAGE_SOURCES}   ${STORAGE_HEADERS}
+   ${CONSOLE_SOURCES}   ${CONSOLE_HEADERS}
    ${PERSONA_SOURCES}   ${PERSONA_HEADERS}
    ${RENDERER_SOURCES}  ${RENDERER_HEADERS}
    ${WASM_SOURCES}      ${WASM_HEADERS}

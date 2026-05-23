@@ -24,12 +24,9 @@ using namespace SNEEZE;
 class STORAGE::UNIT::Impl
 {
 public:
-   Impl (STORAGE* pStorage, VIEWPORT* pViewport, const VIEWPORT::CONTAINER::CID* pCID) :
+   Impl (STORAGE* pStorage, const CONTEXT::CONTAINER::CID* pCID) :
       m_pStorage (pStorage),
-      m_pViewport (pViewport),
       m_CID (*pCID),
-      m_sPath_Permanent ((std::filesystem::path (pViewport->sPath_Permanent ()) / "Storage").string ()),
-      m_sPath_Temporary ((std::filesystem::path (pViewport->sPath_Temporary ()) / "Storage").string ()),
       m_bAttached (false),
       m_bPendingClear (false)
    {
@@ -64,7 +61,7 @@ public:
 
    std::string sPath (eSCOPE eScope) const
    {
-      const std::string& sBasePath = (eScope == kSCOPE_TEMPORARY_ORG || eScope == kSCOPE_TEMPORARY_COMPANY) ? m_sPath_Temporary : m_sPath_Permanent;
+      const std::string& sBasePath = (eScope == kSCOPE_TEMPORARY_ORG || eScope == kSCOPE_TEMPORARY_COMPANY) ? m_pStorage->sPath_Temporary () : m_pStorage->sPath_Permanent ();
 
       return (std::filesystem::path (sBasePath) / m_CID.sPersonaHash / m_CID.sFingerprint.substr (0, 2) / m_CID.sFingerprint.substr (2, 22)).string ();
    }
@@ -111,10 +108,7 @@ public:
    }
 public:
    STORAGE*                 m_pStorage;
-   VIEWPORT*                m_pViewport;
-   VIEWPORT::CONTAINER::CID m_CID;
-   std::string              m_sPath_Permanent;
-   std::string              m_sPath_Temporary;
+   CONTEXT::CONTAINER::CID  m_CID;
    ASSET*                   m_apAsset[STORAGE::kSCOPE_COUNT];
    std::mutex               m_mxUnit;
    bool                     m_bAttached;
@@ -125,8 +119,8 @@ public:
 // STORAGE::UNIT
 // ===========================================================================
 
-STORAGE::UNIT::UNIT (STORAGE* pStorage, VIEWPORT* pViewport, const VIEWPORT::CONTAINER::CID* pCID) :
-   m_pImpl (new STORAGE::UNIT::Impl (pStorage, pViewport, pCID))
+STORAGE::UNIT::UNIT (STORAGE* pStorage, const CONTEXT::CONTAINER::CID* pCID) :
+   m_pImpl (new STORAGE::UNIT::Impl (pStorage, pCID))
 {
 }
 
@@ -137,12 +131,9 @@ STORAGE::UNIT::~UNIT ()             { delete m_pImpl;          }
 // Accessors
 // ---------------------------------------------------------------------------
 
-VIEWPORT*                       STORAGE::UNIT::Viewport        () const { return m_pImpl->m_pViewport; }
-const VIEWPORT::CONTAINER::CID& STORAGE::UNIT::CID             () const { return m_pImpl->m_CID; }
-std::string                     STORAGE::UNIT::DisplayName     () const { return m_pImpl->m_CID.DisplayName (); }
-const std::string&              STORAGE::UNIT::sPath_Permanent () const { return m_pImpl->m_sPath_Permanent; }
-const std::string&              STORAGE::UNIT::sPath_Temporary () const { return m_pImpl->m_sPath_Temporary; }
-bool                            STORAGE::UNIT::IsPendingClear  () const { return m_pImpl->m_bPendingClear; }
+const SNEEZE::CONTEXT::CONTAINER::CID& STORAGE::UNIT::CID             () const { return m_pImpl->m_CID; }
+std::string                            STORAGE::UNIT::DisplayName     () const { return m_pImpl->m_CID.DisplayName (); }
+bool                                   STORAGE::UNIT::IsPendingClear  () const { return m_pImpl->m_bPendingClear; }
 
 // ---------------------------------------------------------------------------
 // Modifiers
@@ -174,14 +165,14 @@ void STORAGE::UNIT::Set (eSCOPE eScope, const std::string& sPath, const nlohmann
 {
    m_pImpl->m_apAsset[eScope]->Set (sPath, jValue);
 
-   m_pImpl->m_pViewport->Host ()->OnStorageUnitChanged (this, eScope, sPath);
+   m_pImpl->m_pStorage->Context ()->Host ()->OnStorageUnitChanged (this, eScope, sPath);
 }
 
 void STORAGE::UNIT::Remove (eSCOPE eScope, const std::string& sPath)
 {
    m_pImpl->m_apAsset[eScope]->Remove (sPath);
 
-   m_pImpl->m_pViewport->Host ()->OnStorageUnitChanged (this, eScope, sPath);
+   m_pImpl->m_pStorage->Context ()->Host ()->OnStorageUnitChanged (this, eScope, sPath);
 }
 
 bool STORAGE::UNIT::Has (eSCOPE eScope, const std::string& sPath) const
@@ -197,6 +188,6 @@ std::string STORAGE::UNIT::Json (eSCOPE eScope) const
 void STORAGE::UNIT::Json (eSCOPE eScope, const std::string& sJson)
 {
    m_pImpl->m_apAsset[eScope]->Json (sJson);
-   m_pImpl->m_pViewport->Host ()->OnStorageUnitChanged (this, eScope, "");
+   m_pImpl->m_pStorage->Context ()->Host ()->OnStorageUnitChanged (this, eScope, "");
 }
 

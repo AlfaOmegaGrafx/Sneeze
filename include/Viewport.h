@@ -25,37 +25,6 @@ namespace SNEEZE
       class RENDERER;
 
    public:
-      // ---------------------------------------------------------------------------
-      // VIEWPORT::CONTAINER - the runtime manifestation of an MSF file.
-      //
-      // CID is the identity record for a container. Uniqueness is determined by
-      // the tuple (persona hash, fingerprint, container name).
-      // ---------------------------------------------------------------------------
-
-      class CONTAINER
-      {
-      public:
-         class CID
-         {
-         public:
-            std::string sFingerprint;
-            std::string sOrganization;
-            std::string sCommonName;
-            std::string sContainerName;
-            std::string sPersonaHash;
-            bool        bValidated;
-
-            std::string DisplayName () const { return sCommonName + "/" + sContainerName; }
-         };
-      };
-
-   public:
-      enum eSESSION
-      {
-         kSESSION_PERSISTENT,
-         kSESSION_TRANSITORY
-      };
-
       enum eINIT_STATE
       {
          kINIT_NONE,
@@ -95,23 +64,22 @@ namespace SNEEZE
 
       // ------------------------------------------------------------------------
 
-      explicit VIEWPORT (ENGINE* pEngine, IVIEWPORT* pHost);
+      explicit VIEWPORT (CONTEXT* pContext);
       ~VIEWPORT ();
 
-      bool Initialize (const std::string& sUrl, eSESSION eSession, const std::string& sPath_Permanent, const std::string& sPath_Temporary);
+      bool Initialize (const std::string& sUrl);
       bool InitializeRenderer ();
-      void Shutdown ();
       void ShutdownRenderer ();
       void RequestRendererShutdown ();
       bool ServiceRendererShutdown ();
 
-      ENGINE*              Sneeze () const;
+      void Attach (IVIEWPORT* pHost);
+      void Detach ();
+
+      ENGINE*              Engine () const;
+      CONTEXT*             Context () const;
       IVIEWPORT*           Host () const;
       SCENE*               Scene () const;
-      eSESSION             Session () const;
-      const std::string&   sPath_Permanent () const;
-      const std::string&   sPath_Temporary () const;
-      std::string          sViewportId () const;
       bool                 IsReady () const;
 
       // --- Input (called by application) ---
@@ -130,8 +98,7 @@ namespace SNEEZE
 
       int  Width () const;
       int  Height () const;
-      void Resize (int nWidth, int nHeight);
-      bool ConsumePendingResize (int& nWidth, int& nHeight);
+      void SetDimensions (int nWidth, int nHeight);
 
       // --- Camera ---
 

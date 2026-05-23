@@ -15,6 +15,9 @@
 #include <Sneeze.h>
 #include "BodyData.h"
 #include "RMCObject.h"
+#include "scene/Fabric.h"
+#include "scene/Node.h"
+#include "scene/MapObject.h"
 
 namespace SNEEZE
 {
@@ -33,33 +36,54 @@ namespace SNEEZE
          return { nNormal, nDim, nBright };
       }
 
-      void CreateSolarSystem ()
+      static CELESTIAL_TYPE MapCelestialType (RMCOBJECT_TYPE bType)
       {
-      /*
-      https://cdn.rp1.com/res/texture/celestial/sun.jpg
-      https://cdn.rp1.com/res/texture/celestial/sun_yellow.jpg
-      https://cdn.rp1.com/res/texture/celestial/sun_orange.jpg
+         switch (bType)
+         {
+            case RMCOBJECT_TYPE_UNIVERSE:       return CELESTIAL_TYPE_UNIVERSE;
+            case RMCOBJECT_TYPE_STARSYSTEM:     return CELESTIAL_TYPE_STARSYSTEM;
+            case RMCOBJECT_TYPE_STAR:           return CELESTIAL_TYPE_STAR;
+            case RMCOBJECT_TYPE_PLANETSYSTEM:   return CELESTIAL_TYPE_PLANETSYSTEM;
+            case RMCOBJECT_TYPE_PLANET:         return CELESTIAL_TYPE_PLANET;
+            case RMCOBJECT_TYPE_MOONSYSTEM:     return CELESTIAL_TYPE_MOONSYSTEM;
+            case RMCOBJECT_TYPE_MOON:           return CELESTIAL_TYPE_MOON;
+            case RMCOBJECT_TYPE_DEBRISSYSTEM:   return CELESTIAL_TYPE_DEBRISSYSTEM;
+            case RMCOBJECT_TYPE_DEBRIS:         return CELESTIAL_TYPE_DEBRIS;
+            case RMCOBJECT_TYPE_SATELLITE:      return CELESTIAL_TYPE_SATELLITE;
+            case RMCOBJECT_TYPE_SURFACE:        return CELESTIAL_TYPE_SURFACE;
+            default:                            return CELESTIAL_TYPE_NONE;
+         }
+      }
 
-      https://cdn.rp1.com/res/texture/celestial/mercury.jpg
-      https://cdn.rp1.com/res/texture/celestial/venus.jpg
-      https://cdn.rp1.com/res/texture/celestial/earth.jpg
-      https://cdn.rp1.com/res/texture/celestial/mars.jpg
-      https://cdn.rp1.com/res/texture/celestial/jupiter.jpg
-      https://cdn.rp1.com/res/texture/celestial/saturn.jpg
-      https://cdn.rp1.com/res/texture/celestial/uranus.jpg
-      https://cdn.rp1.com/res/texture/celestial/neptune.jpg
-      https://cdn.rp1.com/res/texture/celestial/pluto.jpg
+      // -----------------------------------------------------------------------
+      // CreateBodies -- populate local RMCOBJECT list with solar system data.
+      // All objects are heap-allocated; caller owns the returned vector.
+      // Parent/child wiring is done via the local registry map.
+      // -----------------------------------------------------------------------
 
-      https://cdn.rp1.com/res/texture/celestial/saturn_ring.png
+      static void CreateBodies (std::vector<RMCOBJECT*>& aBodies, std::map<std::string, RMCOBJECT*>& registry)
+      {
+         auto Add = [&] (const RMCOBJECT_PROPS& props) -> RMCOBJECT*
+         {
+            auto* pBody = new RMCOBJECT (props);
+            aBodies.push_back (pBody);
 
-      https://cdn.rp1.com/res/texture/celestial/moon.jpg
+            if (!pBody->sId.empty ())
+               registry[pBody->sId] = pBody;
 
-      https://cdn.rp1.com/res/texture/celestial/generic_moon-0.png
-      https://cdn.rp1.com/res/texture/celestial/generic_moon-1.png
-      https://cdn.rp1.com/res/texture/celestial/generic_moon-2.png
-      https://cdn.rp1.com/res/texture/celestial/generic_moon-3.png
-      https://cdn.rp1.com/res/texture/celestial/generic_moon-4.png
-      */   
+            if (!props.sId_Parent.empty ())
+            {
+               auto it = registry.find (props.sId_Parent);
+               if (it != registry.end ())
+               {
+                  pBody->pParent = it->second;
+                  it->second->aChildren.push_back (pBody);
+               }
+            }
+
+            return pBody;
+         };
+
          {
             RMCOBJECT_PROPS props;
             props.sName       = "Solar System";
@@ -67,7 +91,7 @@ namespace SNEEZE
             props.sId_Parent  = "";
             props.bType       = RMCOBJECT_TYPE_STARSYSTEM;
             props.bHasOrbit   = false;
-            new RMCOBJECT (props);
+            Add (props);
          }
          {
             RMCOBJECT_PROPS props;
@@ -80,7 +104,7 @@ namespace SNEEZE
             props.pColor      = MakeColor (0xff, 0xdd, 0x66);
             props.sTexture    = "https://cdn.rp1.com/res/texture/celestial/sun.jpg";
             props.bHasOrbit   = false;
-            new RMCOBJECT (props);
+            Add (props);
          }
          {
             RMCOBJECT_PROPS props;
@@ -103,7 +127,7 @@ namespace SNEEZE
             props.orbit.dLonAscNodeDot    = -0.12532166264209366;
             props.orbit.dLonPerihelionDot = 0.15719664460245042;
             props.orbit.dMeanLongitudeDot = 149472.6767390384;
-            new RMCOBJECT (props);
+            Add (props);
          }
          {
             RMCOBJECT_PROPS props;
@@ -116,7 +140,7 @@ namespace SNEEZE
             props.pColor      = MakeColor (0xaa, 0xaa, 0xaa);
             props.sTexture    = "https://cdn.rp1.com/res/texture/celestial/mercury.jpg";
             props.bHasOrbit   = false;
-            new RMCOBJECT (props);
+            Add (props);
          }
          {
             RMCOBJECT_PROPS props;
@@ -139,7 +163,7 @@ namespace SNEEZE
             props.orbit.dLonAscNodeDot    = -0.2779654255936208;
             props.orbit.dLonPerihelionDot = -0.3222704575383375;
             props.orbit.dMeanLongitudeDot = 58517.81682084849;
-            new RMCOBJECT (props);
+            Add (props);
          }
          {
             RMCOBJECT_PROPS props;
@@ -152,7 +176,7 @@ namespace SNEEZE
             props.pColor      = MakeColor (0xee, 0xcc, 0x88);
             props.sTexture    = "https://cdn.rp1.com/res/texture/celestial/venus.jpg";
             props.bHasOrbit   = false;
-            new RMCOBJECT (props);
+            Add (props);
          }
          {
             RMCOBJECT_PROPS props;
@@ -176,7 +200,7 @@ namespace SNEEZE
             props.orbit.dLonAscNodeDot    = 34.107178971976;
             props.orbit.dLonPerihelionDot = 0.2945490099604058;
             props.orbit.dMeanLongitudeDot = 35999.37371093485;
-            new RMCOBJECT (props);
+            Add (props);
          }
          {
             RMCOBJECT_PROPS props;
@@ -189,7 +213,7 @@ namespace SNEEZE
             props.pColor      = MakeColor (0x44, 0x88, 0xff);
             props.sTexture    = "https://cdn.rp1.com/res/texture/celestial/earth.jpg";
             props.bHasOrbit   = false;
-            new RMCOBJECT (props);
+            Add (props);
          }
          {
             RMCOBJECT_PROPS props;
@@ -213,7 +237,7 @@ namespace SNEEZE
             props.orbit.dLonAscNodeDot    = -0.30416632268770627;
             props.orbit.dLonPerihelionDot = 0.45333392020074825;
             props.orbit.dMeanLongitudeDot = 19140.28503673707;
-            new RMCOBJECT (props);
+            Add (props);
          }
          {
             RMCOBJECT_PROPS props;
@@ -226,7 +250,7 @@ namespace SNEEZE
             props.pColor      = MakeColor (0xff, 0x66, 0x44);
             props.sTexture    = "https://cdn.rp1.com/res/texture/celestial/mars.jpg";
             props.bHasOrbit   = false;
-            new RMCOBJECT (props);
+            Add (props);
          }
          {
             RMCOBJECT_PROPS props;
@@ -250,7 +274,7 @@ namespace SNEEZE
             props.orbit.dLonAscNodeDot    = 0.17640633739979705;
             props.orbit.dLonPerihelionDot = -0.7348520016954012;
             props.orbit.dMeanLongitudeDot = 3034.7452956513416;
-            new RMCOBJECT (props);
+            Add (props);
          }
          {
             RMCOBJECT_PROPS props;
@@ -263,7 +287,7 @@ namespace SNEEZE
             props.pColor      = MakeColor (0xdd, 0xaa, 0x66);
             props.sTexture    = "https://cdn.rp1.com/res/texture/celestial/jupiter.jpg";
             props.bHasOrbit   = false;
-            new RMCOBJECT (props);
+            Add (props);
          }
          {
             RMCOBJECT_PROPS props;
@@ -287,7 +311,7 @@ namespace SNEEZE
             props.orbit.dLonAscNodeDot    = -0.26331205921039214;
             props.orbit.dLonPerihelionDot = 5.970605449839184;
             props.orbit.dMeanLongitudeDot = 1222.5058143877384;
-            new RMCOBJECT (props);
+            Add (props);
          }
          {
             RMCOBJECT_PROPS props;
@@ -300,7 +324,7 @@ namespace SNEEZE
             props.pColor      = MakeColor (0xcc, 0xbb, 0x77);
             props.sTexture    = "https://cdn.rp1.com/res/texture/celestial/saturn.jpg";
             props.bHasOrbit   = false;
-            new RMCOBJECT (props);
+            Add (props);
          }
          {
             RMCOBJECT_PROPS props;
@@ -324,7 +348,7 @@ namespace SNEEZE
             props.orbit.dLonAscNodeDot    = -0.048966734082526386;
             props.orbit.dLonPerihelionDot = 1.9503989253083773;
             props.orbit.dMeanLongitudeDot = 428.3399609965;
-            new RMCOBJECT (props);
+            Add (props);
          }
          {
             RMCOBJECT_PROPS props;
@@ -337,7 +361,7 @@ namespace SNEEZE
             props.pColor      = MakeColor (0x66, 0xcc, 0xdd);
             props.sTexture    = "https://cdn.rp1.com/res/texture/celestial/uranus.jpg";
             props.bHasOrbit   = false;
-            new RMCOBJECT (props);
+            Add (props);
          }
          {
             RMCOBJECT_PROPS props;
@@ -361,7 +385,7 @@ namespace SNEEZE
             props.orbit.dLonAscNodeDot    = -0.05091932961559564;
             props.orbit.dLonPerihelionDot = 53.518515451649876;
             props.orbit.dMeanLongitudeDot = 218.2404178632974;
-            new RMCOBJECT (props);
+            Add (props);
          }
          {
             RMCOBJECT_PROPS props;
@@ -374,7 +398,7 @@ namespace SNEEZE
             props.pColor      = MakeColor (0x44, 0x66, 0xff);
             props.sTexture    = "https://cdn.rp1.com/res/texture/celestial/neptune.jpg";
             props.bHasOrbit   = false;
-            new RMCOBJECT (props);
+            Add (props);
          }
          {
             RMCOBJECT_PROPS props;
@@ -398,7 +422,7 @@ namespace SNEEZE
             props.orbit.dLonAscNodeDot    = 0.05175840871099524;
             props.orbit.dLonPerihelionDot = -0.4573939302094061;
             props.orbit.dMeanLongitudeDot = 145.1572129622987;
-            new RMCOBJECT (props);
+            Add (props);
          }
          {
             RMCOBJECT_PROPS props;
@@ -411,8 +435,113 @@ namespace SNEEZE
             props.pColor      = MakeColor (0xcc, 0xaa, 0x88);
             props.sTexture    = "https://cdn.rp1.com/res/texture/celestial/pluto.jpg";
             props.bHasOrbit   = false;
-            new RMCOBJECT (props);
+            Add (props);
          }
+      }
+
+      // -----------------------------------------------------------------------
+      // InjectSolarSystem -- stateless injection of solar system test data.
+      //
+      // Creates RMCOBJECT body data locally, computes orbital mechanics,
+      // populates MAP_OBJECT_CELESTIAL instances, injects NODEs into the
+      // fabric, then cleans up all temporary RMCOBJECT data before returning.
+      // -----------------------------------------------------------------------
+
+      void InjectSolarSystem (VIEWPORT::SCENE::FABRIC* pFabric)
+      {
+         if (!pFabric  ||  !pFabric->Node_Root ())
+            return;
+
+         VIEWPORT::SCENE::FABRIC::NODE* pRoot = pFabric->Node_Root ();
+
+         std::vector<RMCOBJECT*>            aBodies;
+         std::map<std::string, RMCOBJECT*>  registry;
+
+         CreateBodies (aBodies, registry);
+
+         for (auto* pBody : aBodies)
+            pBody->ComputeRaw ();
+         for (auto* pBody : aBodies)
+            pBody->ConvertToOutput ();
+
+         // --- Sun node (no orbit, sits at origin) ---
+
+         auto itSun = registry.find ("sun");
+         {
+            auto* pMapObj = new MAP_OBJECT_CELESTIAL ();
+            pMapObj->m_sName           = "Sun";
+            pMapObj->m_bCelestialType  = CELESTIAL_TYPE_STAR;
+            pMapObj->m_dPosX           = 0.0;
+            pMapObj->m_dPosY           = 0.0;
+            pMapObj->m_dPosZ           = 0.0;
+            pMapObj->m_dRadius         = 695700.0 * 1000.0;
+            pMapObj->m_nColor          = 0xFFE666;
+            pMapObj->m_nColorDim       = 0x7F7333;
+            pMapObj->m_nColorBright    = 0xFFFF9A;
+            pMapObj->m_dMass           = 1.98841e30;
+            pMapObj->m_sTextureUrl     = (itSun != registry.end ()) ? itSun->second->sTexture : "";
+
+            auto* pNode = new VIEWPORT::SCENE::FABRIC::NODE (pFabric);
+            pNode->MapObject_Set (pMapObj);
+            pRoot->Node_Add (pNode);
+         }
+
+         // --- Orbit bodies ---
+
+         for (auto* pBody : aBodies)
+         {
+            if (!pBody->pOrbit)
+               continue;
+
+            RMCOBJECT* pChildBody = nullptr;
+            for (auto* pChild : pBody->aChildren)
+            {
+               if (pChild->bType == RMCOBJECT_TYPE_PLANET  ||
+                   pChild->bType == RMCOBJECT_TYPE_STAR)
+               {
+                  pChildBody = pChild;
+                  break;
+               }
+            }
+
+            double dRadius = 100.0 * 1000.0;
+            uint32_t nColor = pBody->GetColor ();
+            uint32_t nColorDim = pBody->pColor.nDim;
+            uint32_t nColorBright = pBody->pColor.nBright;
+            if (pChildBody)
+            {
+               dRadius = pChildBody->dRadius.value_or (100.0) * 1000.0;
+               nColor = pChildBody->GetColor ();
+               nColorDim = pChildBody->pColor.nDim;
+               nColorBright = pChildBody->pColor.nBright;
+            }
+
+            std::string sTexture;
+            if (pChildBody  &&  !pChildBody->sTexture.empty ())
+               sTexture = pChildBody->sTexture;
+
+            auto* pMapObj = new MAP_OBJECT_CELESTIAL ();
+            pMapObj->m_sName           = pChildBody ? pChildBody->sName : pBody->sName;
+            pMapObj->m_bCelestialType  = MapCelestialType (pChildBody ? pChildBody->bType : pBody->bType);
+            pMapObj->m_dRadius         = dRadius;
+            pMapObj->m_nColor          = nColor;
+            pMapObj->m_nColorDim       = nColorDim;
+            pMapObj->m_nColorBright    = nColorBright;
+            pMapObj->m_dMass           = pBody->dMass;
+            pMapObj->m_dGM             = pBody->dGM;
+            pMapObj->m_dSystemRadiusKm = pBody->dSystemRadiusKm;
+            pMapObj->m_sTextureUrl     = sTexture;
+            pMapObj->m_orbit           = *pBody->pOrbit;
+
+            auto* pNode = new VIEWPORT::SCENE::FABRIC::NODE (pFabric);
+            pNode->MapObject_Set (pMapObj);
+            pRoot->Node_Add (pNode);
+         }
+
+         // --- Clean up all temporary body data ---
+
+         for (auto* pBody : aBodies)
+            delete pBody;
       }
    }
 }

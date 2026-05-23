@@ -16,9 +16,7 @@
 #include "scene/Scene.h"
 #include "scene/Fabric.h"
 #include "scene/Node.h"
-#include "astro/AstroService.h"
 #include "astro/BodyData.h"
-#include "astro/RMCObject.h"
 
 using namespace SNEEZE;
 
@@ -30,21 +28,9 @@ using VIEWPORT = VIEWPORT;
 SCENE::SCENE (VIEWPORT* pViewport) :
    m_pViewport       (pViewport),
    m_pFabric_Root    (nullptr),
-   m_pFabric_Primary (nullptr),
-   m_pAstroService   (nullptr)
+   m_pFabric_Primary (nullptr)
 {
 }
-
-SCENE::~SCENE ()
-{
-   Shutdown ();
-}
-
-VIEWPORT* SCENE::Viewport () const   { return m_pViewport; }
-
-SNEEZE::ENGINE* SCENE::Sneeze () const         { return m_pViewport ? m_pViewport->Sneeze () : nullptr; }
-FABRIC*         SCENE::Fabric_Root () const    { return m_pFabric_Root; }
-FABRIC*         SCENE::Fabric_Primary () const { return m_pFabric_Primary; }
 
 bool SCENE::Initialize (const std::string& sUrl)
 {
@@ -64,20 +50,13 @@ bool SCENE::Initialize (const std::string& sUrl)
    pNode_Attach->Fabric_Set_Attached (m_pFabric_Primary);
    m_pFabric_Root->Fabric_Add (m_pFabric_Primary);
 
-   Sneeze ()->Log (IENGINE::kLOGLEVEL_Info, "SCENE", "Initialized (root fabric + primary fabric)");
+   Engine ()->Log (IENGINE::kLOGLEVEL_Info, "SCENE", "Initialized (root fabric + primary fabric)");
 
    return Fabric_Open_Primary (sUrl);
 }
 
-void SCENE::Shutdown ()
+SCENE::~SCENE ()
 {
-   if (m_pAstroService)
-   {
-      m_pAstroService->Shutdown ();
-      delete m_pAstroService;
-      m_pAstroService = nullptr;
-   }
-
    if (m_pFabric_Primary)
    {
       delete m_pFabric_Primary->Node_Root ();
@@ -99,20 +78,16 @@ void SCENE::Shutdown ()
    }
 }
 
+VIEWPORT*        SCENE::Viewport       () const { return m_pViewport; }
+
+SNEEZE::ENGINE*  SCENE::Engine         () const { return m_pViewport->Engine (); }
+SNEEZE::NETWORK* SCENE::Network        () const { return m_pViewport->Context ()->Network (); }
+FABRIC*          SCENE::Fabric_Root    () const { return m_pFabric_Root; }
+FABRIC*          SCENE::Fabric_Primary () const { return m_pFabric_Primary; }
+
 bool SCENE::Fabric_Open_Primary (const std::string& /*sUrl*/)
 {
-   SNEEZE::astro::CreateSolarSystem ();
-   auto& aBodies = astro::RMCOBJECT::All ();
-
-   for (auto* pBody : aBodies)
-      pBody->ComputeRaw ();
-   for (auto* pBody : aBodies)
-      pBody->ConvertToOutput ();
-
-   Sneeze ()->Log (IENGINE::kLOGLEVEL_Info, "SCENE", "Created " + std::to_string (aBodies.size ()) + " bodies");
-
-   m_pAstroService = new astro::ASTRO_SERVICE (Sneeze ());
-   m_pAstroService->Initialize (m_pFabric_Primary);
+   astro::InjectSolarSystem (m_pFabric_Primary);
 
    return true;
 }

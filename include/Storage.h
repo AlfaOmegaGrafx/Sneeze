@@ -62,18 +62,15 @@ namespace SNEEZE
       class UNIT
       {
       public:
-         UNIT (STORAGE* pStorage, VIEWPORT* pViewport, const VIEWPORT::CONTAINER::CID* pCID);
+         UNIT (STORAGE* pStorage, const CONTEXT::CONTAINER::CID* pCID);
         ~UNIT ();
 
          void Initialize ();
 
          // --- Identity ---
 
-         VIEWPORT* Viewport () const;
-         const VIEWPORT::CONTAINER::CID&  CID () const;
+         const CONTEXT::CONTAINER::CID&  CID () const;
          std::string  DisplayName () const;
-         const std::string& sPath_Permanent () const;
-         const std::string& sPath_Temporary () const;
 
          // --- Path-based API ---
 
@@ -124,16 +121,20 @@ namespace SNEEZE
       // STORAGE public API
       // -----------------------------------------------------------------------
 
-      explicit STORAGE (ENGINE* pEngine);
+      explicit STORAGE (CONTEXT* pContext);
       ~STORAGE ();
 
       bool Initialize ();
 
+      CONTEXT*            Context () const;
+      const std::string&  sPath_Permanent () const;
+      const std::string&  sPath_Temporary () const;
+
       // --- Container lifecycle ---
 
-      UNIT*   Unit_Open  (VIEWPORT* pViewport, const VIEWPORT::CONTAINER::CID* pCID);
-      void    Unit_Close (VIEWPORT* pViewport, UNIT* pUnit);
-      void    Unit_Enum  (VIEWPORT* pViewport, IENUM* pEnum);
+      UNIT*   Unit_Open  (const CONTEXT::CONTAINER::CID* pCID);
+      void    Unit_Close (UNIT* pUnit);
+      void    Unit_Enum  (IENUM* pEnum);
 
    private:
       class Impl;

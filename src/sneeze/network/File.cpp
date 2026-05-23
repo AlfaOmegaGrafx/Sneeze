@@ -28,16 +28,14 @@ using namespace SNEEZE;
 class NETWORK::FILE::Impl
 {
 public:
-   Impl (FILE* pFile, NETWORK* pNetwork, VIEWPORT* pViewport, VIEWPORT::CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
+   Impl (FILE* pFile, NETWORK* pNetwork, CONTEXT::CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
       m_pFile            (pFile),
       m_pNetwork         (pNetwork),
-      m_pViewport        (pViewport),
       m_CID              (*pCID),
       m_nFileIx          (nFileIx),
       m_sUrl             (sUrl),
       m_sOpenHash        (sHash),
       m_bCacheEnabled    (bCacheEnabled),
-      m_sPath_Permanent  ((std::filesystem::path (pViewport->sPath_Permanent ()) / "Network").string ()),
       m_sDiskKey         (ComputeDiskKey (sUrl)),
       m_pAsset           (nullptr),
       m_pListener        (nullptr),
@@ -73,19 +71,26 @@ public:
 
    bool Initialize (IFILE* pListener)
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mxFile);
+      bool bClear = false;
 
-      m_pAsset = m_pNetwork->Asset_Open (m_pFile);
-
-      if (m_pAsset)
       {
-         m_pListener = pListener;
+         std::lock_guard<std::recursive_mutex> guard (m_mxFile);
 
-         if (m_pListener)
-            Attach (true);
+         m_pAsset = m_pNetwork->Asset_Open (m_pFile);
 
-         m_bPending_Clear = !m_pViewport->Host ()->OnNetworkFileCreated (m_pFile);
+         if (m_pAsset)
+         {
+            m_pListener = pListener;
+
+            if (m_pListener)
+               Attach (true);
+
+            bClear = !m_pNetwork->Context ()->Host ()->OnNetworkFileCreated (m_pFile);
+         }
       }
+
+      if (bClear)
+         m_pNetwork->File_Clear (m_pFile);
 
       return (m_pAsset != nullptr);
    }
@@ -142,7 +147,7 @@ public:
       {
          m_bPending_Clear = true;
 
-         m_pViewport->Host ()->OnNetworkFileDeleted (m_pFile);
+         m_pNetwork->Context ()->Host ()->OnNetworkFileDeleted (m_pFile);
 
          bChanged = true;
       }
@@ -178,7 +183,7 @@ public:
       std::lock_guard<std::recursive_mutex> guard (m_mxFile);
 
       if (!m_bPending_Clear)
-         m_pViewport->Host ()->OnNetworkFileChanged (m_pFile);
+         m_pNetwork->Context ()->Host ()->OnNetworkFileChanged (m_pFile);
    }
 
    // ---------------------------------------------------------------------------
@@ -231,7 +236,7 @@ public:
 
    std::string sPath () const
    {
-      return (std::filesystem::path (m_sPath_Permanent) / m_CID.sPersonaHash / m_CID.sFingerprint.substr (0, 2) / m_CID.sFingerprint.substr (2, 22) / m_CID.sContainerName / m_sDiskKey.substr (0, 2)).string ();
+      return (std::filesystem::path (m_pNetwork->sPath_Permanent ()) / m_CID.sPersonaHash / m_CID.sFingerprint.substr (0, 2) / m_CID.sFingerprint.substr (2, 22) / m_CID.sContainerName / m_sDiskKey.substr (0, 2)).string ();
    }
 
    std::string sFilename (const std::string& sExt) const
@@ -252,14 +257,12 @@ public:
 public:
    FILE*                    m_pFile;
    NETWORK*                 m_pNetwork;
-   VIEWPORT*                m_pViewport;
-   VIEWPORT::CONTAINER::CID m_CID;
+   CONTEXT::CONTAINER::CID  m_CID;
    ASSET*                   m_pAsset;
    IFILE*                   m_pListener;
    uint32_t                 m_nCount_Attach;
    std::recursive_mutex     m_mxFile;
 
-   std::string              m_sPath_Permanent;
    std::string              m_sDiskKey;
    std::string              m_sUrl;
    std::string              m_sOpenHash;
@@ -286,8 +289,8 @@ public:
 // Constructor / Destructor
 // ---------------------------------------------------------------------------
 
-NETWORK::FILE::FILE (NETWORK* pNetwork, VIEWPORT* pViewport, VIEWPORT::CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
-   m_pImpl (new Impl (this, pNetwork, pViewport, pCID, nFileIx, sUrl, sHash, bCacheEnabled))
+NETWORK::FILE::FILE (NETWORK* pNetwork, CONTEXT::CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
+   m_pImpl (new Impl (this, pNetwork, pCID, nFileIx, sUrl, sHash, bCacheEnabled))
 {
 }
 
@@ -361,10 +364,6 @@ uint64_t                                           NETWORK::FILE::SizeBytes     
 
 bool                                               NETWORK::FILE::IsPending_Clear   () const { return m_pImpl->m_bPending_Clear; }
 bool                                               NETWORK::FILE::IsPending_Close   () const { return m_pImpl->m_bPending_Close; }
-
-VIEWPORT*                                          NETWORK::FILE::Viewport          () const { return m_pImpl->m_pViewport; }
-
-const std::string&                                 NETWORK::FILE::sPath_Permanent   () const { return m_pImpl->m_sPath_Permanent; }
 std::string                                        NETWORK::FILE::sPath             () const { return m_pImpl->sPath (); }
 std::string                                        NETWORK::FILE::sFilename         (const std::string& sExt) const { return m_pImpl->sFilename (sExt); }
 std::string                                        NETWORK::FILE::sPathname         (const std::string& sExt) const { return m_pImpl->sPathname (sExt); }

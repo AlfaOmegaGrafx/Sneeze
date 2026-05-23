@@ -120,7 +120,6 @@ namespace SNEEZE
          std::string Header (const std::string& sName) const;
 
          // Accessors
-         ENGINE*              Engine            () const;
          bool                 IsShuttingDown    () const;
          STATE                State             () const;
          bool                 IsReset           () const;
@@ -165,7 +164,7 @@ namespace SNEEZE
       class FILE
       {
       public:
-         FILE (NETWORK* pNetwork, VIEWPORT* pViewport, VIEWPORT::CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled);
+         FILE (NETWORK* pNetwork, CONTEXT::CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled);
          ~FILE ();
 
          // --- Snapshot fields (always available, even after Close) ---
@@ -202,11 +201,9 @@ namespace SNEEZE
          // --- Container ---
 
          std::string ContainerName () const;
-         VIEWPORT* Viewport () const;
 
          // --- Paths ---
 
-         const std::string& sPath_Permanent () const;
          std::string        sPath () const;
          std::string        sFilename (const std::string& sExt = "") const;
          std::string        sPathname (const std::string& sExt = "") const;
@@ -254,23 +251,24 @@ namespace SNEEZE
       // NETWORK public API
       // -----------------------------------------------------------------------
 
-      explicit NETWORK (ENGINE* pEngine);
+      explicit NETWORK (CONTEXT* pContext);
       ~NETWORK ();
-
-      ENGINE*     Engine () const;
-      bool        IsShuttingDown () const;
-      double      SecondsSinceEpoch () const;
-      uint32_t    Asset_Index ();
-      bool        Rules_Stale (ASSET* pAsset) const;
-      ASSET*      Asset_Open  (FILE* pFile);
-      void        Asset_Close (ASSET* pAsset, FILE* pFile);
 
       bool Initialize ();
 
+      CONTEXT*           Context () const;
+      const std::string& sPath_Permanent () const;
+      bool               IsShuttingDown () const;
+      double             SecondsSinceEpoch () const;
+      uint32_t           Asset_Index ();
+      bool               Rules_Stale (ASSET* pAsset) const;
+      ASSET*             Asset_Open  (FILE* pFile);
+      void               Asset_Close (ASSET* pAsset, FILE* pFile);
+
       // --- Primary API ---
 
-      FILE* File_Open (VIEWPORT* pViewport, VIEWPORT::CONTAINER::CID* pCID, const std::string& sUrl, IFILE* pListener);
-      FILE* File_Open (VIEWPORT* pViewport, VIEWPORT::CONTAINER::CID* pCID, const std::string& sUrl, const std::string& sHash, uint32_t nAssetIx = 0, IFILE* pListener = nullptr);
+      FILE* File_Open (CONTEXT::CONTAINER::CID* pCID, const std::string& sUrl, IFILE* pListener);
+      FILE* File_Open (CONTEXT::CONTAINER::CID* pCID, const std::string& sUrl, const std::string& sHash, uint32_t nAssetIx = 0, IFILE* pListener = nullptr);
       void  File_Clear (FILE* pFile);
       void  File_Close (FILE* pFile);
       void  File_Reset (FILE* pFile);
@@ -282,7 +280,7 @@ namespace SNEEZE
 
       void Clear ();
       void Reset ();
-      void File_Enum (IENUM* pEnum, VIEWPORT* pViewport);
+      void File_Enum (IENUM* pEnum);
 
       void Rules_Add (const std::string& sContentType, const std::string& sOlderThan);
 

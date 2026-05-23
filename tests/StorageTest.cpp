@@ -66,40 +66,27 @@ public:
    }
 };
 
-class STORAGE_TEST_VIEWPORT_HOST : public IVIEWPORT
+class STORAGE_TEST_CONTEXT_HOST : public ICONTEXT
 {
 public:
    int m_nCreatedCount = 0;
    int m_nChangedCount = 0;
    int m_nDeletedCount = 0;
 
-   void* FrameWindow () override
-   {
-      return nullptr;
-   }
-
-   void FrameSize (int& nWidth, int& nHeight) override
-   {
-      nWidth = 0;
-      nHeight = 0;
-   }
-
-   void OnFrameReady (const uint32_t*, int, int) override {}
-
    void OnStorageUnitCreated (STORAGE::UNIT*) override { m_nCreatedCount++; }
    void OnStorageUnitChanged (STORAGE::UNIT*, STORAGE::eSCOPE, const std::string&) override { m_nChangedCount++; }
    void OnStorageUnitDeleted (STORAGE::UNIT*) override { m_nDeletedCount++; }
 };
 
-static STORAGE_TEST_HOST*          s_pHost     = nullptr;
-static STORAGE_TEST_VIEWPORT_HOST* s_pVPHost   = nullptr;
-static ENGINE*                     s_pSneeze   = nullptr;
-static STORAGE*                    s_pStorage  = nullptr;
-static VIEWPORT*                   s_pViewport = nullptr;
+static STORAGE_TEST_HOST*          s_pHost        = nullptr;
+static STORAGE_TEST_CONTEXT_HOST*  s_pContextHost = nullptr;
+static ENGINE*                     s_pSneeze      = nullptr;
+static STORAGE*                    s_pStorage     = nullptr;
+static CONTEXT*                    s_pContext     = nullptr;
 
-static VIEWPORT::CONTAINER::CID MakeTestCID (const std::string& sContainer = "poker")
+static CONTEXT::CONTAINER::CID MakeTestCID (const std::string& sContainer = "poker")
 {
-   VIEWPORT::CONTAINER::CID CID;
+   CONTEXT::CONTAINER::CID CID;
    CID.sFingerprint   = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
    CID.sOrganization  = "TestOrg";
    CID.sCommonName    = "TestOrg";
@@ -127,7 +114,7 @@ static void TestInitializeAndOpenClose ()
    Check (pStorage != nullptr, "Storage exists");
 
    auto CID = MakeTestCID ();
-   STORAGE::UNIT* pUnit = pStorage->Unit_Open (s_pViewport, &CID);
+   STORAGE::UNIT* pUnit = pStorage->Unit_Open (&CID);
    Check (pUnit != nullptr, "Open returns UNIT");
    Check (pUnit->CID ().sFingerprint == CID.sFingerprint, "UNIT holds correct CID");
    Check (pUnit != nullptr, "Unit opened successfully");
@@ -135,10 +122,10 @@ static void TestInitializeAndOpenClose ()
    pUnit->Attach ();
    Check (pUnit->CID ().sFingerprint == CID.sFingerprint, "CID preserved after Attach");
 
-   Check (s_pVPHost->m_nCreatedCount == 1, "OnStorageUnitCreated fired");
+   Check (s_pContextHost->m_nCreatedCount == 1, "OnStorageUnitCreated fired");
 
    pUnit->Detach ();
-   pStorage->Unit_Close (s_pViewport, pUnit);
+   pStorage->Unit_Close (pUnit);
 }
 
 // ---------------------------------------------------------------------------
@@ -151,13 +138,13 @@ static void TestBasicOperations ()
 
    STORAGE* pStorage = s_pStorage;
    auto CID = MakeTestCID ();
-   STORAGE::UNIT* pUnit = pStorage->Unit_Open (s_pViewport, &CID);
+   STORAGE::UNIT* pUnit = pStorage->Unit_Open (&CID);
    pUnit->Attach ();
 
-   s_pVPHost->m_nChangedCount = 0;
+   s_pContextHost->m_nChangedCount = 0;
 
    pUnit->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "player.name", "Dean");
-   Check (s_pVPHost->m_nChangedCount == 1, "OnStorageUnitChanged fired on Set");
+   Check (s_pContextHost->m_nChangedCount == 1, "OnStorageUnitChanged fired on Set");
 
    auto jValue = pUnit->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "player.name");
    Check (jValue.is_string (), "Get returns string type");
@@ -170,7 +157,7 @@ static void TestBasicOperations ()
    Check (!pUnit->Has (STORAGE::kSCOPE_PERMANENT_COMPANY, "player.name"), "Remove deletes key");
 
    pUnit->Detach ();
-   pStorage->Unit_Close (s_pViewport, pUnit);
+   pStorage->Unit_Close (pUnit);
 }
 
 // ---------------------------------------------------------------------------
@@ -183,7 +170,7 @@ static void TestPathNavigation ()
 
    STORAGE* pStorage = s_pStorage;
    auto CID = MakeTestCID ();
-   STORAGE::UNIT* pUnit = pStorage->Unit_Open (s_pViewport, &CID);
+   STORAGE::UNIT* pUnit = pStorage->Unit_Open (&CID);
    pUnit->Attach ();
 
    pUnit->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "game.poker.table.color", "green");
@@ -199,7 +186,7 @@ static void TestPathNavigation ()
    Check (!pUnit->Has (STORAGE::kSCOPE_PERMANENT_COMPANY, "game.poker.table.missing"), "Has fails for missing deep path");
 
    pUnit->Detach ();
-   pStorage->Unit_Close (s_pViewport, pUnit);
+   pStorage->Unit_Close (pUnit);
 }
 
 // ---------------------------------------------------------------------------
@@ -212,7 +199,7 @@ static void TestArrayAccess ()
 
    STORAGE* pStorage = s_pStorage;
    auto CID = MakeTestCID ();
-   STORAGE::UNIT* pUnit = pStorage->Unit_Open (s_pViewport, &CID);
+   STORAGE::UNIT* pUnit = pStorage->Unit_Open (&CID);
    pUnit->Attach ();
 
    pUnit->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "scores[0]", 100);
@@ -237,7 +224,7 @@ static void TestArrayAccess ()
    Check (jBob.is_string ()  &&  jBob.get<std::string> () == "Bob", "Nested array object [1]");
 
    pUnit->Detach ();
-   pStorage->Unit_Close (s_pViewport, pUnit);
+   pStorage->Unit_Close (pUnit);
 }
 
 // ---------------------------------------------------------------------------
@@ -252,16 +239,16 @@ static void TestPersistence ()
    auto CID = MakeTestCID ("persist-test");
 
    {
-      STORAGE::UNIT* pUnit = pStorage->Unit_Open (s_pViewport, &CID);
+      STORAGE::UNIT* pUnit = pStorage->Unit_Open (&CID);
       pUnit->Attach ();
       pUnit->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "saved.value", 42);
       pUnit->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "saved.text", "hello");
       pUnit->Detach ();
-      pStorage->Unit_Close (s_pViewport, pUnit);
+      pStorage->Unit_Close (pUnit);
    }
 
    {
-      STORAGE::UNIT* pUnit = pStorage->Unit_Open (s_pViewport, &CID);
+      STORAGE::UNIT* pUnit = pStorage->Unit_Open (&CID);
       pUnit->Attach ();
       auto jValue = pUnit->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "saved.value");
       auto jText  = pUnit->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "saved.text");
@@ -270,7 +257,7 @@ static void TestPersistence ()
       Check (jText.is_string ()  &&  jText.get<std::string> () == "hello", "String persisted across Open/Close");
 
       pUnit->Detach ();
-      pStorage->Unit_Close (s_pViewport, pUnit);
+      pStorage->Unit_Close (pUnit);
    }
 }
 
@@ -286,11 +273,11 @@ static void TestOrgSharing ()
    auto CID_A = MakeTestCID ("container-a");
    auto CID_B = MakeTestCID ("container-b");
 
-   STORAGE::UNIT* pUnitA = pStorage->Unit_Open (s_pViewport, &CID_A);
+   STORAGE::UNIT* pUnitA = pStorage->Unit_Open (&CID_A);
    pUnitA->Attach ();
    pUnitA->Set (STORAGE::kSCOPE_PERMANENT_ORG, "org.setting", "shared-value");
 
-   STORAGE::UNIT* pUnitB = pStorage->Unit_Open (s_pViewport, &CID_B);
+   STORAGE::UNIT* pUnitB = pStorage->Unit_Open (&CID_B);
    pUnitB->Attach ();
    auto jOrgB = pUnitB->Get (STORAGE::kSCOPE_PERMANENT_ORG, "org.setting");
 
@@ -299,9 +286,9 @@ static void TestOrgSharing ()
 
 
    pUnitA->Detach ();
-   pStorage->Unit_Close (s_pViewport, pUnitA);
+   pStorage->Unit_Close (pUnitA);
    pUnitB->Detach ();
-   pStorage->Unit_Close (s_pViewport, pUnitB);
+   pStorage->Unit_Close (pUnitB);
 }
 
 // ---------------------------------------------------------------------------
@@ -314,7 +301,7 @@ static void TestScopeIsolation ()
 
    STORAGE* pStorage = s_pStorage;
    auto CID = MakeTestCID ("scope-test");
-   STORAGE::UNIT* pUnit = pStorage->Unit_Open (s_pViewport, &CID);
+   STORAGE::UNIT* pUnit = pStorage->Unit_Open (&CID);
    pUnit->Attach ();
 
    pUnit->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "key", "permanent");
@@ -333,7 +320,7 @@ static void TestScopeIsolation ()
    Check (j4.get<std::string> () == "org-temporary", "TEMPORARY_ORG isolated");
 
    pUnit->Detach ();
-   pStorage->Unit_Close (s_pViewport, pUnit);
+   pStorage->Unit_Close (pUnit);
 }
 
 // ---------------------------------------------------------------------------
@@ -350,7 +337,7 @@ static void TestCrashRecovery ()
    // Compute the actual path that STORAGE will use
    std::string sFp2  = CID.sFingerprint.substr (0, 2);
    std::string sFp22 = CID.sFingerprint.substr (2, 22);
-   std::filesystem::path sDir = std::filesystem::path (s_pViewport->sPath_Permanent ()) / "Storage" / CID.sPersonaHash / (sFp2 + "/" + sFp22);
+   std::filesystem::path sDir = std::filesystem::path (s_pContext->sPath_Permanent ()) / "Storage" / CID.sPersonaHash / (sFp2 + "/" + sFp22);
    std::filesystem::path sJsonPath = sDir / "container-crash-test.json";
    std::filesystem::path sLogPath  = sDir / "container-crash-test.log";
 
@@ -370,7 +357,7 @@ static void TestCrashRecovery ()
       f << "[\"Remove\",\"will-remove\"]\n";
    }
 
-   STORAGE::UNIT* pUnit = pStorage->Unit_Open (s_pViewport, &CID);
+   STORAGE::UNIT* pUnit = pStorage->Unit_Open (&CID);
    pUnit->Attach ();
 
    auto jRecovered = pUnit->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "recovered");
@@ -387,7 +374,7 @@ static void TestCrashRecovery ()
    Check (!std::filesystem::exists (sLogPath), "Log file deleted after recovery");
 
    pUnit->Detach ();
-   pStorage->Unit_Close (s_pViewport, pUnit);
+   pStorage->Unit_Close (pUnit);
 }
 
 // ---------------------------------------------------------------------------
@@ -400,7 +387,7 @@ static void TestBulkJson ()
 
    STORAGE* pStorage = s_pStorage;
    auto CID = MakeTestCID ("bulk-test");
-   STORAGE::UNIT* pUnit = pStorage->Unit_Open (s_pViewport, &CID);
+   STORAGE::UNIT* pUnit = pStorage->Unit_Open (&CID);
    pUnit->Attach ();
 
    pUnit->Json (STORAGE::kSCOPE_PERMANENT_COMPANY,
@@ -418,7 +405,7 @@ static void TestBulkJson ()
    Check (sJson.find ("\"bulk\"") != std::string::npos, "Json contains data");
 
    pUnit->Detach ();
-   pStorage->Unit_Close (s_pViewport, pUnit);
+   pStorage->Unit_Close (pUnit);
 }
 
 // ---------------------------------------------------------------------------
@@ -432,14 +419,14 @@ static void TestMetaSidecar ()
    STORAGE* pStorage = s_pStorage;
    auto CID = MakeTestCID ("meta-test");
 
-   STORAGE::UNIT* pUnit = pStorage->Unit_Open (s_pViewport, &CID);
+   STORAGE::UNIT* pUnit = pStorage->Unit_Open (&CID);
    pUnit->Attach ();
    pUnit->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "data", "value");
 
    std::string sMetaPath = pUnit->sPathname (STORAGE::kSCOPE_PERMANENT_COMPANY, "meta");
 
    pUnit->Detach ();
-   pStorage->Unit_Close (s_pViewport, pUnit);
+   pStorage->Unit_Close (pUnit);
 
    Check (std::filesystem::exists (sMetaPath), "Meta sidecar file created on Close");
 
@@ -472,18 +459,18 @@ int RunStorageTests (int nArgc, char** aArgv)
 
    s_pHost = new STORAGE_TEST_HOST ();
    s_pSneeze = new ENGINE (s_pHost);
-   s_pVPHost = new STORAGE_TEST_VIEWPORT_HOST ();
+   s_pContextHost = new STORAGE_TEST_CONTEXT_HOST ();
 
    bool bEngineInit = s_pSneeze->Initialize ();
    Check (bEngineInit, "Engine initialized");
 
-   s_pViewport = s_pSneeze->Viewport_Open (s_pVPHost);
-   Check (s_pViewport != nullptr, "Viewport opened");
+   s_pContext = s_pSneeze->Context_Open (s_pContextHost);
+   Check (s_pContext != nullptr, "Context opened");
 
-   s_pStorage = s_pSneeze->Storage ();
-   Check (s_pStorage != nullptr, "Engine storage exists");
+   s_pStorage = s_pContext->Storage ();
+   Check (s_pStorage != nullptr, "Context storage exists");
 
-   bool bRun = bEngineInit  &&  s_pViewport  &&  s_pStorage;
+   bool bRun = bEngineInit  &&  s_pContext  &&  s_pStorage;
 
    if (bRun)
    {
@@ -500,12 +487,12 @@ int RunStorageTests (int nArgc, char** aArgv)
    }
 
    s_pStorage = nullptr;
-   s_pSneeze->Viewport_Close (s_pViewport);
-   s_pViewport = nullptr;
+   s_pSneeze->Context_Close (s_pContext);
+   s_pContext = nullptr;
    delete s_pSneeze;
    s_pSneeze = nullptr;
-   delete s_pVPHost;
-   s_pVPHost = nullptr;
+   delete s_pContextHost;
+   s_pContextHost = nullptr;
    delete s_pHost;
    s_pHost = nullptr;
 

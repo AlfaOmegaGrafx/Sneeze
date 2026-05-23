@@ -15,7 +15,7 @@
 #ifndef SNEEZE_ASTRO_RMCOBJECT_H
 #define SNEEZE_ASTRO_RMCOBJECT_H
 
-#include "Orbit.h"
+#include "scene/Orbit.h"
 #include "Types.h"
 
 namespace SNEEZE
@@ -77,7 +77,7 @@ namespace SNEEZE
          std::string    sId;
          RMCOBJECT_TYPE bType;
 
-         // Hierarchy
+         // Hierarchy (wired by caller via local map)
          RMCOBJECT*              pParent;
          std::vector<RMCOBJECT*> aChildren;
 
@@ -96,22 +96,11 @@ namespace SNEEZE
          // Composition
          std::unique_ptr<ORBIT>  pOrbit;
 
-         // --- Registry ---
-
-         static RMCOBJECT*                     Find (const std::string& sId);
-         static std::vector<RMCOBJECT*>&       All ();
-         static RMCOBJECT*                     Root ();
-
          // --- Computation ---
 
          void ComputeRaw ();
          void ConvertToOutput ();
          uint32_t GetColor () const;
-
-      private:
-         static std::map<std::string, RMCOBJECT*>  s_pRegistry;
-         static std::vector<RMCOBJECT*>            s_aAll;
-         static RMCOBJECT*                         s_pRoot;
       };
    } // namespace astro
 }

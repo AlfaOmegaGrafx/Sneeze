@@ -46,7 +46,7 @@ FILE (per-caller handle, pImpl)
  ├── Impl* m_pImpl
  │   ├── NETWORK* (parent back-pointer)
  │   ├── ASSET* (attached while live)
- │   ├── VIEWPORT::CONTAINER::CID m_CID (by value, copied from CID*)
+ │   ├── CONTEXT::CONTAINER::CID m_CID (by value, copied from CID*)
  │   ├── VIEWPORT* m_pViewport (for notification routing)
  │   ├── IFILE* m_pListener
  │   ├── m_mxFile (std::mutex, protects control flags)
@@ -85,7 +85,7 @@ Types in `SNEEZE::NETWORK` and related namespaces:
 | NETWORK::RULE   | Staleness rule (content-type + olderThan).         |
 | NETWORK::FETCH_RESULT | Result struct delivered by fetch to ASSET.   |
 | ASSET_FETCH     | File-local bridge (JOB_FETCH -> ASSET::FetchComplete). |
-| SNEEZE::VIEWPORT::CONTAINER::CID | Identity record for a container.   |
+| SNEEZE::CONTEXT::CONTAINER::CID | Identity record for a container.   |
 
 ## Usage
 
@@ -112,7 +112,7 @@ public:
 
 // Open a file (no hash, default flags)
 MY_LISTENER listener;
-SNEEZE::VIEWPORT::CONTAINER::CID cid;
+SNEEZE::CONTEXT::CONTAINER::CID cid;
 cid.sCommonName    = "Metaversal";
 cid.sContainerName = "Solar System";
 cid.bValidated     = true;
@@ -165,7 +165,7 @@ SNEEZE::NETWORK::FILE* pFile2 = pNetwork->File_Open (pViewport, &cid, url, sSri,
 
 ### Container Identity
 
-Every `File_Open()` call includes a `VIEWPORT::CONTAINER::CID*` identifying which container originated the request. FILE stores the CID by value (copied from the pointer at construction). CID holds: `sFingerprint` (SHA-256 of cert public key), `sOrganization`, `sCommonName`, `sContainerName`, `sPersonaHash`, and `bValidated`. The display name is `sCommonName + "/" + sContainerName` via `DisplayName()`.
+Every `File_Open()` call includes a `CONTEXT::CONTAINER::CID*` identifying which container originated the request. FILE stores the CID by value (copied from the pointer at construction). CID holds: `sFingerprint` (SHA-256 of cert public key), `sOrganization`, `sCommonName`, `sContainerName`, `sPersonaHash`, and `bValidated`. The display name is `sCommonName + "/" + sContainerName` via `DisplayName()`.
 
 ```cpp
 // FILE exposes the container identity

@@ -670,7 +670,7 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
   - Storage.cpp is now ~143 lines — thin orchestrator, no reach-ins.
 - **Remaining:** Silo.cpp review (small, should be quick), Unit.cpp review (mechanics are fine, compartmentalization already pushed down).
 - **Thread.cpp refinement:** Moved `delete m_pthThread; m_pthThread = nullptr;` from `Join()` into `~THREAD()` for constructor/destructor symmetry. `Join()` now uses `joinable()` guard instead of null check — safe for multiple calls since a joined thread is no longer joinable.
-- **VIEWPORT::CONTAINER::NAME -> CID rename:** Renamed the container identity class and all corresponding variables (`m_pName`->`m_pCID`, `m_Name`->`m_CID`, `pName`->`pCID`, `Name()`->`CID()`, `MakeTestName`->`MakeTestCID`, `s_pTestName`->`s_pTestCID`). 11 files touched, zero stale references.
+- **CONTEXT::CONTAINER::NAME -> CID rename:** Renamed the container identity class and all corresponding variables (`m_pName`->`m_pCID`, `m_Name`->`m_CID`, `pName`->`pCID`, `Name()`->`CID()`, `MakeTestName`->`MakeTestCID`, `s_pTestName`->`s_pTestCID`). 11 files touched, zero stale references.
 
 ## 2026-05-13 (Wednesday) ~8:11 PM – 8:35 PM PDT
 
@@ -758,4 +758,42 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 - **Crosses off prior deferred items:** "FETCH thread cannot call Asset_Close" and "Replace per-ASSET FETCH threads with NETWORK-owned worker pool" are both resolved.
 - **Documentation updated:** `Network.md` (architecture diagram, concurrency model, deferred tasks, active refactoring status), `Control.md` (verified current), `project.mdc` (CONTROL/POOL/POOL_QUEUE/AGENT/NETWORK/ASSET class descriptions, module table, implementation backlog, naming section, THREAD contract).
 - **Next session:** Move NETWORK and STORAGE under VIEWPORT.
+
+---
+
+### Session — Friday May 22–Saturday May 23, 2026 (late evening)
+
+**Dean Abramson** — Path ownership consolidation and dead code cleanup following the CONTEXT refactor.
+
+- **NETWORK `m_sPath_Permanent`:** Added `m_sPath_Permanent` to NETWORK (computed once in constructor as `Context()->sPath_Permanent() / "Network"`). FILE no longer copies this path — reads it from `m_pNetwork->sPath_Permanent()`. Removed `FILE::sPath_Permanent()` public accessor (zero external callers).
+- **STORAGE `m_sPath_Permanent` / `m_sPath_Temporary`:** Same pattern applied. STORAGE owns both paths (computed in constructor). UNIT delegates to `m_pStorage->sPath_Permanent()` / `sPath_Temporary()`. Removed `UNIT::sPath_Permanent()` / `UNIT::sPath_Temporary()` public accessors (zero callers).
+- **`CachePath()` rewritten:** Old implementation reached up to `ENGINE->Host()->sAppDataPath()` to compute a shared cache path. Replaced with `return m_sPath_Permanent;`. Detailed REVISIT comment added documenting the open design questions around per-container `rules.json` placement.
+- **rules.json design discussion (unresolved):** rules.json currently lives at `m_sPath_Permanent` level (shared across all contexts of the same session type). "Clear cache" should be per-context, but the cert-based identity model means the natural boundary is per-container, not per-context. Open issues: containers can appear in multiple contexts; non-live containers are unreachable for cache clearing; `nNextAssetIx` counter placement TBD. Deferred — comment in `Network.cpp` captures full discussion.
+- **Dead code removed:** `m_sCachePath.empty()` guards (three), `m_sCachePath.clear()` in destructor, `sViewportId()` from `Viewport.cpp` (not in header, zero callers). Dean did most of the cleanup manually.
+- **`delete pContext` ordering confirmed:** ENGINE's `Context_Close` uses delete-before-erase (project convention). Verified pointer value survives delete for `std::find` matching.
+- **project.mdc updated:** Added CONTEXT, ICONTEXT class entries. Updated ENGINE (context management, no NETWORK/STORAGE), NETWORK (per-context, m_sPath_Permanent), STORAGE (per-context, owns paths), FILE (no m_sPath_Permanent, no Viewport()) descriptions.
+- **Build status:** Compiles clean. Tests not yet run — deferred to next session.
+
+---
+
+### Session — Friday May 23, 2026
+
+**Dean Abramson** — Astro module refactor: stateless injection, CONTEXT multi-tab fixes, Console stub, test validation.
+
+- **Multi-tab deadlock fix:** `Viewport::Impl::Detach()` reordered — `RequestRendererShutdown()` now called before `m_bReady = false` (was after, causing compositor to skip `ServiceRendererShutdown()`, deadlocking the main thread).
+- **Console.h/cpp stub:** Created minimal `CONSOLE` class stub. Added to MSVC project and CMakeLists.txt. Integrated into CONTEXT (init order: Console -> Network -> Storage).
+- **CID moved:** `CONTAINER::CID` moved from `Viewport.h` to `Context.h`.
+- **Tests validated:** All 9 suites passing (246 total assertions). Artemis verified working with multi-tab.
+- **Astro module refactored to stateless injection:**
+  - `ORBIT` and `CELESTIAL` (pure math) moved from `src/astro/` to `src/viewport/scene/`, namespace changed from `astro` to `SNEEZE`.
+  - `MAP_OBJECT_CELESTIAL` expanded: embedded `ORBIT m_orbit` by value, added `CELESTIAL_TYPE` enum, `m_sName`, physical properties (mass, GM, pole, obliquity as optionals), color variants (`m_nColorDim`, `m_nColorBright`), `HasOrbit()` accessor.
+  - `ASTRO_SERVICE` and `CELESTIAL_MAP_OBJECT` deleted.
+  - `RMCOBJECT` stripped of static globals (`s_aAll`, `s_pRegistry`, `s_pRoot`, `Find`, `All`, `Root`). Now used only as transient local data during injection.
+  - `CreateSolarSystem()` rewritten as `InjectSolarSystem(FABRIC*)` — stateless one-shot function creating transient RMCOBJECTs, populating MAP_OBJECT_CELESTIALs, injecting NODEs, then cleaning up all temporaries.
+  - `SCENE::Fabric_Open_Primary()` calls `astro::InjectSolarSystem()` directly — no `m_pAstroService` member, no persistent astro state.
+  - `Compositor.cpp` updated: removed astro includes, uses `MAP_OBJECT_CELESTIAL` and `m_orbit` directly for animation.
+  - `Engine.cpp` cleaned: removed dead astro includes.
+  - Build system updated: CMakeLists.txt and vcxproj/filters for all file moves and deletions.
+- **Build status:** Compiles clean. Artemis verified working. Known issue: `ORBIT` stores raw data that may be unnecessary for persistence — deferred.
+- **project.mdc updated:** astro module description, MAP_OBJECT_CELESTIAL class, ORBIT/CELESTIAL class entries, SCENE description, Phase 1/2/3 backlog items, namespace notes, ENGINE description.
 

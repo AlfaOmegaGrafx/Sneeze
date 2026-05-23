@@ -26,7 +26,7 @@ using namespace SNEEZE;
 
 using FABRIC    = VIEWPORT::SCENE::FABRIC;
 using NODE      = VIEWPORT::SCENE::FABRIC::NODE;
-using CONTAINER = VIEWPORT::CONTAINER;
+using CONTAINER = SNEEZE::CONTEXT::CONTAINER;
 
 // ---------------------------------------------------------------------------
 // SEQLOCK
@@ -199,14 +199,14 @@ void NODE::MapObject_Set (MAP_OBJECT* pMapObject)
 
 // ---------------------------------------------------------------------------
 // Texture_Request -- if the map object has a texture URL, request it from the
-// network via NODE -> FABRIC -> SCENE -> SNEEZE -> Network().
+// network via NODE -> FABRIC -> SCENE -> Network().
 // ---------------------------------------------------------------------------
 
 void NODE::Texture_Request ()
 {
    if (m_pMapObject  &&  !m_pMapObject->m_sTextureUrl.empty ())
    {
-      ENGINE* pEngine = m_pFabric->Scene ()->Sneeze ();
+      ENGINE* pEngine = m_pFabric->Scene ()->Engine ();
 
       std::string sPersonaHash = (pEngine->Persona ()  &&  pEngine->Persona ()->IsLoggedIn ())
          ? pEngine->Persona ()->Hash ()
@@ -220,9 +220,9 @@ void NODE::Texture_Request ()
       CID.sPersonaHash   = sPersonaHash;
       CID.bValidated     = true;
 
-      NETWORK* pNetwork = pEngine->Network ();
+      NETWORK* pNetwork = m_pFabric->Scene ()->Network ();
       if (pNetwork)
-         m_pFile = pNetwork->File_Open (m_pFabric->Scene ()->Viewport (), &CID, m_pMapObject->m_sTextureUrl, this);
+         m_pFile = pNetwork->File_Open (&CID, m_pMapObject->m_sTextureUrl, this);
    }
 }
 

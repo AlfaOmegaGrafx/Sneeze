@@ -18,7 +18,7 @@
 namespace SNEEZE
 {
    // -----------------------------------------------------------------------
-// ASSET — one per JSON file on disk. The core data wrapper.
+// ASSET -- one per JSON file on disk. The core data wrapper.
 //
 // Caches an nlohmann::json document in memory, manages a .meta sidecar
 // file for inspector metadata, and provides the JSONL changelog for crash
@@ -54,7 +54,7 @@ namespace SNEEZE
       uint32_t            Open ();
       uint32_t            Close ();
       void                Attach ();
-      void                Detach (const VIEWPORT::CONTAINER::CID& CID);
+      void                Detach (const CONTEXT::CONTAINER::CID& CID);
       void                Load ();
       void                Save ();
       void                Evict ();
@@ -68,7 +68,7 @@ namespace SNEEZE
       uint32_t           AccessCount () const;
 
       void  TouchAccess ();
-      void  SaveMeta (const VIEWPORT::CONTAINER::CID& CID);
+      void  SaveMeta (const CONTEXT::CONTAINER::CID& CID);
 
    private:
       class Impl;

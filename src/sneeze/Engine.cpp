@@ -16,7 +16,6 @@
 
 #include "Types.h"
 #include "control/Control.h"
-#include "astro/RMCObject.h"
 #include "wasm/WasmRuntime.h"
 #include "spirv/SpvPipeline.h"
 #include "xr/XrRuntime.h"
@@ -61,8 +60,6 @@ public:
       m_pUiContext   (nullptr),
       m_nCurlInit    (CURLE_FAILED_INIT),
       m_pControl     (nullptr),
-      m_pNetwork     (nullptr),
-      m_pStorage     (nullptr),
       m_pPersona     (nullptr)
    {
    }
@@ -97,31 +94,19 @@ m_pPersona = new persona::PERSONA (m_pEngine);
 
                      if (m_nCurlInit == CURLE_OK)
                      {
-                        m_pNetwork = new NETWORK (m_pEngine);
+                        m_pControl = new CONTROL (m_pEngine);
 
-                        if (m_pNetwork->Initialize ())
+                        if (m_pControl->Initialize (nAgentCount))
                         {
-                           m_pStorage = new STORAGE (m_pEngine);
-
-                           if (m_pStorage->Initialize ())
+                           if (InitializePaths ())
                            {
-                              m_pControl = new CONTROL (m_pEngine);
+                              m_bInitialized = true;
 
-                              if (m_pControl->Initialize (nAgentCount))
-                              {
-                                 if (InitializePaths ())
-                                 {
-                                    m_bInitialized = true;
-
-                                    m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SNEEZE", "Initialized (1 engine thread + " + std::to_string (nAgentCount) + " agents)");
-                                 }
-                                 else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize paths");
-                              }
-                              else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize control");
+                              m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SNEEZE", "Initialized (1 engine thread + " + std::to_string (nAgentCount) + " agents)");
                            }
-                           else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize storage");
+                           else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize paths");
                         }
-                        else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize network");
+                        else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize control");
                      }
                      else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "curl_global_init failed (code " + std::to_string (static_cast<int> (m_nCurlInit)) + ")");
                   }
@@ -142,7 +127,7 @@ m_pPersona = new persona::PERSONA (m_pEngine);
    {
       if (m_bInitialized)
       {
-         while (Viewport_Close (nullptr));
+         while (Context_Close (nullptr));
 
          if (!m_sPath_Transitory_Session.empty ())
             Scrub (m_sPath_Transitory_Session);
@@ -150,12 +135,6 @@ m_pPersona = new persona::PERSONA (m_pEngine);
 
       delete m_pControl;
       m_pControl = nullptr;
-
-      delete m_pStorage;
-      m_pStorage = nullptr;
-
-      delete m_pNetwork;
-      m_pNetwork = nullptr;
 
       if (m_nCurlInit == CURLE_OK)
          curl_global_cleanup ();
@@ -304,7 +283,7 @@ m_pPersona = new persona::PERSONA (m_pEngine);
    }
 
    // -----------------------------------------------------------------------
-   // Cleanup queue (delegates to CONTROL)
+   // Post-fetch queue (delegates to CONTROL)
    // -----------------------------------------------------------------------
 
    void Queue_Post_Fetch (IFETCH* pFetch)
@@ -324,98 +303,95 @@ m_pPersona = new persona::PERSONA (m_pEngine);
    }
 
   // -----------------------------------------------------------------------
-   // Viewport management
+   // Context management
    // -----------------------------------------------------------------------
 
-   VIEWPORT* Viewport_Open (IVIEWPORT* pHost, const std::string& sUrl, VIEWPORT::eSESSION kSession)
+   CONTEXT* Context_Open (ICONTEXT* pHost, const std::string& sUrl, CONTEXT::eSESSION kSession)
    {
-      VIEWPORT* pViewport = nullptr;
+      CONTEXT* pContext = nullptr;
       std::string sPath_Temporary;
 
       sPath_Temporary = CreateTransitoryFolder (m_sPath_Transitory, kTRANSITORY_VIEWPORT);
 
       if (!sPath_Temporary.empty ())
       {
-         std::string sPath_Permanent = (kSession == VIEWPORT::kSESSION_PERSISTENT) ? m_sPath_Persistent : m_sPath_Transitory_Session;
+         std::string sPath_Permanent = (kSession == CONTEXT::kSESSION_PERSISTENT) ? m_sPath_Persistent : m_sPath_Transitory_Session;
 
-         pViewport = new VIEWPORT (m_pEngine, pHost);
+         pContext = new CONTEXT (m_pEngine, pHost);
 
          {
-            std::lock_guard<std::mutex> guard (m_mutexViewport);
-            m_apViewport.push_back (pViewport);
+            std::lock_guard<std::mutex> guard (m_mxContext);
+            m_apContext.push_back (pContext);
          }
 
-         if (!pViewport->Initialize (sUrl, kSession, sPath_Permanent, sPath_Temporary))
+         if (!pContext->Initialize (sUrl, kSession, sPath_Permanent, sPath_Temporary))
          {
-            m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize viewport");
+            m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize context");
 
             {
-               std::lock_guard<std::mutex> guard (m_mutexViewport);
-               m_apViewport.erase (std::find (m_apViewport.begin (), m_apViewport.end (), pViewport));
+               std::lock_guard<std::mutex> guard (m_mxContext);
+               m_apContext.erase (std::find (m_apContext.begin (), m_apContext.end (), pContext));
             }
 
-            delete pViewport;
-            pViewport = nullptr;
+            delete pContext;
+            pContext = nullptr;
 
             Scrub (sPath_Temporary);
          }
       }
 
-      return pViewport;
+      return pContext;
    }
 
-   bool Viewport_Close (VIEWPORT* pViewport)
+   bool Context_Close (CONTEXT* pContext)
    {
       bool bResult = false;
       std::string sPath_Temporary;
 
       {
-         std::lock_guard<std::mutex> guard (m_mutexViewport);
+         std::lock_guard<std::mutex> guard (m_mxContext);
 
-         if (!pViewport  &&  !m_apViewport.empty ())
-            pViewport = m_apViewport.back ();
+         if (!pContext  &&  !m_apContext.empty ())
+            pContext = m_apContext.back ();
       }
 
-      if (pViewport)
+      if (pContext)
       {
-         sPath_Temporary = pViewport->sPath_Temporary ();
+         sPath_Temporary = pContext->sPath_Temporary ();
 
-         pViewport->Shutdown ();
+         delete pContext;
 
          {
-            std::lock_guard<std::mutex> guard (m_mutexViewport);
-            m_apViewport.erase (std::find (m_apViewport.begin (), m_apViewport.end (), pViewport));
+            std::lock_guard<std::mutex> guard (m_mxContext);
+            m_apContext.erase (std::find (m_apContext.begin (), m_apContext.end (), pContext));
          }
 
-         delete pViewport;
-         bResult = true;
-
          Scrub (sPath_Temporary);
+
+         bResult = true;
       }
 
       return bResult;
    }
 
-   void Viewport_Capture ()
+   void Context_Capture ()
    {
-      m_mutexViewport.lock ();
+      m_mxContext.lock ();
    }
 
-   const std::vector<VIEWPORT*>& Viewport_GetList () const
+   const std::vector<CONTEXT*>& Context_GetList () const
    {
-      return m_apViewport;
+      return m_apContext;
    }
 
-   void Viewport_Release ()
+   void Context_Release ()
    {
-      m_mutexViewport.unlock ();
+      m_mxContext.unlock ();
    }
 
 public:
    // Subsystems
    IENGINE*                   m_pHost;
-   NETWORK*                   m_pNetwork;
-   STORAGE*                   m_pStorage;
    persona::PERSONA*          m_pPersona;
 
    // Paths
@@ -436,9 +412,9 @@ private:
    // Control (owns engine thread, agents, metronome, cleanup queue)
    CONTROL*                   m_pControl;
 
-   // Viewports
-   std::mutex                 m_mutexViewport;
-   std::vector<VIEWPORT*>     m_apViewport;
+   // Contexts
+   std::mutex                 m_mxContext;
+   std::vector<CONTEXT*>      m_apContext;
 };
 
 /***********************************************************************************************************************************
@@ -450,56 +426,54 @@ SNEEZE::ENGINE::ENGINE (IENGINE* pHost) :
 {
 }
 
-SNEEZE::ENGINE::~ENGINE ()
-{
-   delete m_pImpl;
-}
-
 bool SNEEZE::ENGINE::Initialize ()
 {
    return m_pImpl->Initialize ();
 }
 
-// ---------------------------------------------------------------------------
-// Viewport management
-// ---------------------------------------------------------------------------
-
-SNEEZE::VIEWPORT* SNEEZE::ENGINE::Viewport_Open (IVIEWPORT* pHost, const std::string& sUrl, VIEWPORT::eSESSION kSession)
+SNEEZE::ENGINE::~ENGINE ()
 {
-   return m_pImpl->Viewport_Open (pHost, sUrl, kSession);
+   delete m_pImpl;
 }
 
-bool SNEEZE::ENGINE::Viewport_Close (VIEWPORT* pViewport)
+// ---------------------------------------------------------------------------
+// Context management
+// ---------------------------------------------------------------------------
+
+SNEEZE::CONTEXT* SNEEZE::ENGINE::Context_Open (ICONTEXT* pHost, const std::string& sUrl, CONTEXT::eSESSION kSession)
+{
+   return m_pImpl->Context_Open (pHost, sUrl, kSession);
+}
+
+bool SNEEZE::ENGINE::Context_Close (CONTEXT* pContext)
 {
    bool bResult = false;
 
-   if (pViewport)
-      bResult = m_pImpl->Viewport_Close (pViewport);
+   if (pContext)
+      bResult = m_pImpl->Context_Close (pContext);
 
    return bResult;
 }
 
-void SNEEZE::ENGINE::Viewport_Capture ()
+void SNEEZE::ENGINE::Context_Capture ()
 {
-   m_pImpl->Viewport_Capture ();
+   m_pImpl->Context_Capture ();
 }
 
-const std::vector<SNEEZE::VIEWPORT*>& SNEEZE::ENGINE::Viewport_GetList () const
-{ 
-   return m_pImpl->Viewport_GetList ();
+const std::vector<SNEEZE::CONTEXT*>& SNEEZE::ENGINE::Context_GetList () const
+{
+   return m_pImpl->Context_GetList ();
 }
 
-void SNEEZE::ENGINE::Viewport_Release ()
+void SNEEZE::ENGINE::Context_Release ()
 {
-   m_pImpl->Viewport_Release ();
+   m_pImpl->Context_Release ();
 }
 
 SNEEZE::IENGINE* SNEEZE::ENGINE::Host () const                { return m_pImpl->m_pHost;      }
 const std::string& SNEEZE::ENGINE::sPath_Persistent () const  { return m_pImpl->m_sPath_Persistent; }
 const std::string& SNEEZE::ENGINE::sPath_Session    () const  { return m_pImpl->m_sPath_Transitory_Session; }
 
-SNEEZE::NETWORK*           SNEEZE::ENGINE::Network () const   { return m_pImpl->m_pNetwork;   }
-SNEEZE::STORAGE*           SNEEZE::ENGINE::Storage () const   { return m_pImpl->m_pStorage;   }
 SNEEZE::persona::PERSONA*  SNEEZE::ENGINE::Persona () const   { return m_pImpl->m_pPersona;   }
 
 void SNEEZE::ENGINE::Queue_Post_Fetch (IFETCH* pFetch)
@@ -532,10 +506,14 @@ void SNEEZE::ENGINE::Logout ()
    Log (IENGINE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 1 (signal)");
    Log (IENGINE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 2 (communicate)");
    Log (IENGINE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 3 (shutdown)");
-///   s_pWasmRuntime.DestroyAllStores ();
 
-   if (m_pImpl->m_pNetwork)
-      m_pImpl->m_pNetwork->Clear ();
+   m_pImpl->Context_Capture ();
+   for (auto* pContext : m_pImpl->Context_GetList ())
+   {
+      if (pContext->Network ())
+         pContext->Network ()->Clear ();
+   }
+   m_pImpl->Context_Release ();
 
    Log (IENGINE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 4 (destroy)");
 

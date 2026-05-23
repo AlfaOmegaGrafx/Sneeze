@@ -114,7 +114,7 @@ public:
          }
          catch (...)
          {
-            m_pNetwork->Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to parse sidecar: " + sMetaPath);
+            m_pNetwork->Context ()->Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to parse sidecar: " + sMetaPath);
          }
 
          if (bParsed)
@@ -178,7 +178,7 @@ public:
          }
          catch (const nlohmann::json::exception& ex)
          {
-            m_pNetwork->Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Meta_Save dump failed for " + m_sUrl + ": " + ex.what ());
+            m_pNetwork->Context ()->Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Meta_Save dump failed for " + m_sUrl + ": " + ex.what ());
             file.close ();
             std::error_code ec;
             std::filesystem::remove (sTmpPath, ec);
@@ -192,7 +192,7 @@ public:
             std::error_code ec;
             std::filesystem::rename (sTmpPath, sMetaPath, ec);
             if (ec)
-               m_pNetwork->Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to rename meta temp: " + ec.message ());
+               m_pNetwork->Context ()->Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to rename meta temp: " + ec.message ());
          }
       }
    }
@@ -617,7 +617,7 @@ void NETWORK::ASSET::FetchComplete (const FETCH_RESULT& result)
          }
       }
 
-      m_pImpl->m_pNetwork->Engine ()->Log (IENGINE::kLOGLEVEL_Trace, "NETWORK", (result.bSuccess ? "Cached " : "Failed ") + m_pImpl->m_sUrl + " (" + std::to_string (result.nSizeBytes) + " bytes)");
+      m_pImpl->m_pNetwork->Context ()->Engine ()->Log (IENGINE::kLOGLEVEL_Trace, "NETWORK", (result.bSuccess ? "Cached " : "Failed ") + m_pImpl->m_sUrl + " (" + std::to_string (result.nSizeBytes) + " bytes)");
 
       m_pImpl->m_pAsset_Fetch = nullptr;
    }
@@ -713,7 +713,6 @@ bool NETWORK::ASSET::VerifyHash (const std::string& sFilePath, const std::string
 // Accessors
 // ---------------------------------------------------------------------------
 
-SNEEZE::ENGINE*      NETWORK::ASSET::Engine ()              const { return m_pImpl->m_pNetwork->Engine (); }
 bool                 NETWORK::ASSET::IsShuttingDown ()      const { return m_pImpl->m_pNetwork->IsShuttingDown (); }
 NETWORK::STATE       NETWORK::ASSET::State ()               const { return m_pImpl->m_bState;            }
 bool                 NETWORK::ASSET::IsReset ()             const { return m_pImpl->m_bReset;            }

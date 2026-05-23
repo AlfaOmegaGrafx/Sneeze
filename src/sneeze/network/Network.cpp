@@ -32,14 +32,15 @@ public:
    };
 
 public:
-   Impl (NETWORK* pNetwork, ENGINE* pEngine) :
-      m_pNetwork (pNetwork),
-      m_pEngine (pEngine),
-      m_bShuttingDown (false),
-      m_bCacheEnabled (true),
-      m_nNextAssetIx (1),
-      m_nNextFileIx (1),
-      m_tpEpoch (std::chrono::steady_clock::now ())
+   Impl (NETWORK* pNetwork, CONTEXT* pContext) :
+      m_pNetwork        (pNetwork),
+      m_pContext        (pContext),
+      m_sPath_Permanent ((std::filesystem::path (pContext->sPath_Permanent ()) / "Network").string ()),
+      m_bShuttingDown   (false),
+      m_bCacheEnabled   (true),
+      m_nNextAssetIx    (1),
+      m_nNextFileIx     (1),
+      m_tpEpoch         (std::chrono::steady_clock::now ())
    {
    }
 
@@ -48,49 +49,40 @@ public:
       bool bResult = false;
 
       m_tpEpoch = std::chrono::steady_clock::now ();
-         
+
       m_sCachePath = CachePath ();
 
-      if (!m_sCachePath.empty ())
-      {
-         std::filesystem::create_directories (m_sCachePath);
+      std::filesystem::create_directories (m_sCachePath);
 
-         Rules_Load ();
+      Rules_Load ();
 
-         bResult = true;
+      bResult = true;
 
-         m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "NETWORK", "Initialized (path: " + m_sCachePath + ", rules: " + std::to_string (m_aRules.size ()) + ", nAssetIx: " + std::to_string (m_nNextAssetIx) + ")");
-      }
-      else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "NETWORK", "Failed to determine cache path");
+      m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "NETWORK", "Initialized (path: " + m_sCachePath + ", rules: " + std::to_string (m_aRules.size ()) + ", nAssetIx: " + std::to_string (m_nNextAssetIx) + ")");
 
       return bResult;
    }
 
    ~Impl ()
    {
-      if (!m_sCachePath.empty ())
+      m_bShuttingDown = true;
+
       {
-         m_bShuttingDown = true;
+         std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
+         for (auto* pFile : m_apFile)
          {
-            std::lock_guard<std::recursive_mutex> guard (m_mutex);
-
-            for (auto* pFile : m_apFile)
-            {
-               m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "NETWORK", "Leaked File: " + pFile->Url ());
-               delete pFile;
-            }
-            m_apFile.clear ();
-
-            for (auto& [sUrl, pAsset] : m_umpAsset)
-            {
-               m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "NETWORK", "Leaked ASSET: " + pAsset->Url ());
-               delete pAsset;
-            }
-            m_umpAsset.clear ();
+            m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "NETWORK", "Leaked File: " + pFile->Url ());
+            delete pFile;
          }
+         m_apFile.clear ();
 
-         m_sCachePath.clear ();
+         for (auto& [sUrl, pAsset] : m_umpAsset)
+         {
+            m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "NETWORK", "Leaked ASSET: " + pAsset->Url ());
+            delete pAsset;
+         }
+         m_umpAsset.clear ();
       }
    }
 
@@ -98,21 +90,40 @@ public:
    // Accessors
    // ---------------------------------------------------------------------------
 
-   ENGINE*  Engine () const { return m_pEngine; }
-   bool     IsShuttingDown () const { return m_bShuttingDown; }
+   CONTEXT*            Context () const { return m_pContext; }
+   const std::string&  sPath_Permanent () const { return m_sPath_Permanent; }
+   bool                IsShuttingDown () const { return m_bShuttingDown; }
 
    // ---------------------------------------------------------------------------
    // Path helpers
+   //
+   // REVISIT: rules.json placement.
+   //
+   // CachePath() currently returns m_sPath_Permanent, which is shared across
+   // all contexts of the same session type (persistent or transitory). This
+   // means rules.json is shared too — but "clear cache" should be per-context.
+   //
+   // The metaverse browser identifies origins by certificate, not domain, so
+   // the natural per-identity boundary is the container (CID). Ideally each
+   // container would have its own rules file at the persona/fingerprint/container
+   // level. "Clear cache for this tab" would then iterate the live containers
+   // in the context and update each one's rules.
+   //
+   // Open issues:
+   //   - A container can appear in multiple contexts (different MSF files
+   //     referencing the same service), so there is no 1:1 context-to-container
+   //     mapping on disk.
+   //   - Containers not currently loaded are unreachable — "clear cache" can
+   //     only affect live containers. Whether this should be best-effort or a
+   //     guarantee that affects future loads is undecided.
+   //   - nNextAssetIx (monotonic ASSET index) is currently stored in rules.json.
+   //     If rules become per-container, the counter needs a new home or needs
+   //     to become per-container as well.
    // ---------------------------------------------------------------------------
 
    std::string CachePath () const
    {
-      std::string sResult;
-      std::string sAppDataPath = m_pEngine->Host ()->sAppDataPath ();
-      if (!sAppDataPath.empty ())
-         sResult = (std::filesystem::path (sAppDataPath) / "Persistent" / "Cache").string ();
-
-      return sResult;
+      return m_sPath_Permanent;
    }
 
    // ---------------------------------------------------------------------------
@@ -137,7 +148,7 @@ public:
          }
          catch (...)
          {
-            m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to parse rules.json -- defaulting to stale");
+            m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to parse rules.json -- defaulting to stale");
          }
 
          if (bParsed)
@@ -158,7 +169,7 @@ public:
       }
       else
       {
-         m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "NETWORK", "No rules.json -- creating fresh");
+         m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "NETWORK", "No rules.json -- creating fresh");
 
          Rules_Save ();
       }
@@ -168,33 +179,30 @@ public:
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-      if (!m_sCachePath.empty ())
+      nlohmann::json jDoc;
+      jDoc["nNextMetaIx"] = m_nNextAssetIx;
+
+      nlohmann::json jRules = nlohmann::json::array ();
+      for (auto& rule : m_aRules)
       {
-         nlohmann::json jDoc;
-         jDoc["nNextMetaIx"] = m_nNextAssetIx;
+         nlohmann::json jRule;
+         jRule["contentType"] = rule.sContentType;
+         jRule["olderThan"] = rule.sOlderThan;
+         jRules.push_back (jRule);
+      }
+      jDoc["rules"] = jRules;
 
-         nlohmann::json jRules = nlohmann::json::array ();
-         for (auto& rule : m_aRules)
-         {
-            nlohmann::json jRule;
-            jRule["contentType"] = rule.sContentType;
-            jRule["olderThan"] = rule.sOlderThan;
-            jRules.push_back (jRule);
-         }
-         jDoc["rules"] = jRules;
+      std::string sRulesPath = (std::filesystem::path (m_sCachePath) / "rules.json").string ();
+      std::string sTmpPath = (std::filesystem::path (m_sCachePath) / "rules.json.temp").string ();
 
-         std::string sRulesPath = (std::filesystem::path (m_sCachePath) / "rules.json").string ();
-         std::string sTmpPath = (std::filesystem::path (m_sCachePath) / "rules.json.temp").string ();
+      std::ofstream file (sTmpPath, std::ios::trunc);
+      if (file.is_open ())
+      {
+         file << jDoc.dump (2);
+         file.close ();
 
-         std::ofstream file (sTmpPath, std::ios::trunc);
-         if (file.is_open ())
-         {
-            file << jDoc.dump (2);
-            file.close ();
-
-            std::error_code ec;
-            std::filesystem::rename (sTmpPath, sRulesPath, ec);
-         }
+         std::error_code ec;
+         std::filesystem::rename (sTmpPath, sRulesPath, ec);
       }
    }
 
@@ -241,14 +249,14 @@ public:
    // File operations
    // ---------------------------------------------------------------------------
 
-   NETWORK::FILE* File_Open (VIEWPORT* pViewport, VIEWPORT::CONTAINER::CID* pCID, const std::string& sUrl, const std::string& sHash, uint32_t nAssetIx, IFILE* pListener)
+   NETWORK::FILE* File_Open (CONTEXT::CONTAINER::CID* pCID, const std::string& sUrl, const std::string& sHash, uint32_t nAssetIx, IFILE* pListener)
    {
       FILE* pFile = nullptr;
 
       {
          std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-         pFile = new NETWORK::FILE (m_pNetwork, pViewport, pCID, m_nNextFileIx++, sUrl, sHash, m_bCacheEnabled);
+         pFile = new NETWORK::FILE (m_pNetwork, pCID, m_nNextFileIx++, sUrl, sHash, m_bCacheEnabled);
 
          m_apFile.push_back (pFile);
 
@@ -312,15 +320,12 @@ public:
       }
    }
 
-   void File_Enum  (IENUM* pEnum, VIEWPORT* pViewport)
+   void File_Enum (IENUM* pEnum)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
       for (FILE* pFile : m_apFile)
-      {
-         if (pFile->Viewport () == pViewport)
-            pEnum->OnAsset (pFile);
-      }
+         pEnum->OnAsset (pFile);
    }
 
    // ---------------------------------------------------------------------------
@@ -443,7 +448,8 @@ public:
 
    private:
    NETWORK*                                m_pNetwork;
-   ENGINE*                                 m_pEngine;
+   CONTEXT*                                m_pContext;
+   std::string                             m_sPath_Permanent;
    std::string                             m_sCachePath;
 
    std::unordered_map<std::string, ASSET*> m_umpAsset;
@@ -467,8 +473,8 @@ public:
 // NETWORK
 // ---------------------------------------------------------------------------
 
-NETWORK::NETWORK (ENGINE* pEngine) :
-   m_pImpl (new Impl (this, pEngine))
+NETWORK::NETWORK (CONTEXT* pContext) :
+   m_pImpl (new Impl (this, pContext))
 {
 }
 
@@ -482,33 +488,34 @@ NETWORK::~NETWORK ()
    delete m_pImpl;
 }
 
-SNEEZE::ENGINE*  NETWORK::Engine            ()                                     const { return m_pImpl->Engine (); }
-bool             NETWORK::IsShuttingDown    ()                                     const { return m_pImpl->IsShuttingDown (); }
-double           NETWORK::SecondsSinceEpoch ()                                     const { return m_pImpl->SecondsSinceEpoch (); }
-uint32_t         NETWORK::Asset_Index       ()                                           { return m_pImpl->Asset_Index (); }
-bool             NETWORK::Rules_Stale       (ASSET* pAsset)                        const { return m_pImpl->Rules_Stale (pAsset); }
-NETWORK::ASSET*  NETWORK::Asset_Open        (FILE* pFile)                                { return m_pImpl->Asset_Open (pFile); }
-void             NETWORK::Asset_Close       (ASSET* pAsset, FILE* pFile)                 {        m_pImpl->Asset_Close (pAsset, pFile); }
+SNEEZE::CONTEXT*   NETWORK::Context           ()                                     const { return m_pImpl->Context (); }
+const std::string& NETWORK::sPath_Permanent   ()                                     const { return m_pImpl->sPath_Permanent (); }
+bool               NETWORK::IsShuttingDown    ()                                     const { return m_pImpl->IsShuttingDown (); }
+double             NETWORK::SecondsSinceEpoch ()                                     const { return m_pImpl->SecondsSinceEpoch (); }
+uint32_t           NETWORK::Asset_Index       ()                                           { return m_pImpl->Asset_Index (); }
+bool               NETWORK::Rules_Stale       (ASSET* pAsset)                        const { return m_pImpl->Rules_Stale (pAsset); }
+NETWORK::ASSET*    NETWORK::Asset_Open        (FILE* pFile)                                { return m_pImpl->Asset_Open (pFile); }
+void               NETWORK::Asset_Close       (ASSET* pAsset, FILE* pFile)                 {        m_pImpl->Asset_Close (pAsset, pFile); }
 
 // ---------------------------------------------------------------------------
 // File_Open / File_Close
 // ---------------------------------------------------------------------------
 
-NETWORK::FILE* NETWORK::File_Open (VIEWPORT* pViewport, VIEWPORT::CONTAINER::CID* pCID, const std::string& sUrl, IFILE* pListener)
+NETWORK::FILE* NETWORK::File_Open (CONTEXT::CONTAINER::CID* pCID, const std::string& sUrl, IFILE* pListener)
 {
-   return File_Open (pViewport, pCID, sUrl, std::string (), 0, pListener);
+   return File_Open (pCID, sUrl, std::string (), 0, pListener);
 }
 
-NETWORK::FILE* NETWORK::File_Open (VIEWPORT* pViewport, VIEWPORT::CONTAINER::CID* pCID, const std::string& sUrl, const std::string& sHash, uint32_t nAssetIx, IFILE* pListener)
+NETWORK::FILE* NETWORK::File_Open (CONTEXT::CONTAINER::CID* pCID, const std::string& sUrl, const std::string& sHash, uint32_t nAssetIx, IFILE* pListener)
 {
-   return m_pImpl->File_Open (pViewport, pCID, sUrl, sHash, nAssetIx, pListener);
+   return m_pImpl->File_Open (pCID, sUrl, sHash, nAssetIx, pListener);
 }
 
 void NETWORK::File_Close (FILE* pFile) { m_pImpl->File_Close (pFile); }
 void NETWORK::File_Clear (FILE* pFile) { m_pImpl->File_Clear (pFile); }
 void NETWORK::File_Reset (FILE* pFile) { m_pImpl->File_Reset (pFile); }
 
-void NETWORK::File_Enum  (IENUM* pEnum, VIEWPORT* pViewport) { m_pImpl->File_Enum (pEnum, pViewport); }
+void NETWORK::File_Enum  (IENUM* pEnum) { m_pImpl->File_Enum (pEnum); }
 
 // ---------------------------------------------------------------------------
 // Cache management
@@ -520,4 +527,4 @@ void NETWORK::Rules_Add         (const std::string& sContentType, const std::str
 void NETWORK::SetCacheEnabled   (bool b)                                                         { m_pImpl->SetCacheEnabled (b); }
 bool NETWORK::IsCacheEnabled    ()                                                         const { return m_pImpl->IsCacheEnabled (); }
 
-void NETWORK::Queue_Post_Fetch  (IFETCH* pFetch)                                                 { m_pImpl->Engine ()->Queue_Post_Fetch (pFetch); }
+void NETWORK::Queue_Post_Fetch  (IFETCH* pFetch)                                                 { m_pImpl->Context ()->Engine ()->Queue_Post_Fetch (pFetch); }

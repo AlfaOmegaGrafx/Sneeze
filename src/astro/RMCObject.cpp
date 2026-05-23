@@ -17,11 +17,6 @@
 
 using namespace SNEEZE::astro;
 
-// Static members
-std::map<std::string, RMCOBJECT*>  RMCOBJECT::s_pRegistry;
-std::vector<RMCOBJECT*>            RMCOBJECT::s_aAll;
-RMCOBJECT*                         RMCOBJECT::s_pRoot = nullptr;
-
 // ---------------------------------------------------------------------------
 
 RMCOBJECT::RMCOBJECT (const RMCOBJECT_PROPS& props)
@@ -38,56 +33,10 @@ RMCOBJECT::RMCOBJECT (const RMCOBJECT_PROPS& props)
    , pColor       (props.pColor)
    , sTexture     (props.sTexture)
 {
-   // Parent wiring
-   if (!props.sId_Parent.empty ())
-   {
-      pParent = RMCOBJECT::Find (props.sId_Parent);
-   }
-
-   if (pParent)
-   {
-      pParent->aChildren.push_back (this);
-   }
-
-   // Register
-   if (!sId.empty ())
-   {
-      s_pRegistry[sId] = this;
-   }
-   s_aAll.push_back (this);
-
-   // Track root
-   if (!pParent  &&  s_pRoot == nullptr)
-   {
-      s_pRoot = this;
-   }
-
-   // Compose orbit
    if (props.bHasOrbit)
    {
       pOrbit = std::make_unique<ORBIT> (props.orbit);
    }
-}
-
-// ---------------------------------------------------------------------------
-//  Registry
-// ---------------------------------------------------------------------------
-
-RMCOBJECT* RMCOBJECT::Find (const std::string& sId)
-{
-   auto it = s_pRegistry.find (sId);
-   RMCOBJECT* pResult = (it != s_pRegistry.end ()) ? it->second : nullptr;
-   return pResult;
-}
-
-std::vector<RMCOBJECT*>& RMCOBJECT::All ()
-{
-   return s_aAll;
-}
-
-RMCOBJECT* RMCOBJECT::Root ()
-{
-   return s_pRoot;
 }
 
 // ---------------------------------------------------------------------------
