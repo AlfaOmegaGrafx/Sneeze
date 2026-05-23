@@ -579,47 +579,49 @@ void NETWORK::ASSET::Reset ()
 
 void NETWORK::ASSET::FetchComplete (const FETCH_RESULT& result)
 {
-   std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
-
-   double dEndTime = m_pImpl->m_pNetwork->SecondsSinceEpoch ();
-
-   if (result.bSuccess)
    {
-      Resolve (result.nSizeBytes, result.nHttpStatus, dEndTime, result.mapHeaders);
+      std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
 
-      for (auto* pFile : m_pImpl->m_apFiles)
+      double dEndTime = m_pImpl->m_pNetwork->SecondsSinceEpoch ();
+
+      if (result.bSuccess)
       {
-         pFile->SnapshotFinal ();
-         pFile->Notify_Changed ();
+         Resolve (result.nSizeBytes, result.nHttpStatus, dEndTime, result.mapHeaders);
 
-         IFILE* pListener = pFile->Listener ();
-         if (pListener)
-            pListener->OnFileReady (pFile);
+         for (auto* pFile : m_pImpl->m_apFiles)
+         {
+            pFile->SnapshotFinal ();
+            pFile->Notify_Changed ();
 
-         // the listener may close the file, so it may not be referenced after the notification is called
+            IFILE* pListener = pFile->Listener ();
+            if (pListener)
+               pListener->OnFileReady (pFile);
+
+            // the listener may close the file, so it may not be referenced after the notification is called
+         }
       }
-   }
-   else
-   {
-      Fail (result.nHttpStatus, dEndTime, result.mapHeaders);
-
-      for (auto* pFile : m_pImpl->m_apFiles)
+      else
       {
-         pFile->SnapshotFinal ();
-         pFile->Notify_Changed ();
+         Fail (result.nHttpStatus, dEndTime, result.mapHeaders);
 
-         IFILE* pListener = pFile->Listener ();
-         if (pListener)
-            pListener->OnFileFailed (pFile);
+         for (auto* pFile : m_pImpl->m_apFiles)
+         {
+            pFile->SnapshotFinal ();
+            pFile->Notify_Changed ();
 
-         // the listener may close the file, so it may not be referenced after the notification is called
+            IFILE* pListener = pFile->Listener ();
+            if (pListener)
+               pListener->OnFileFailed (pFile);
+
+            // the listener may close the file, so it may not be referenced after the notification is called
+         }
       }
+
+      m_pImpl->m_pNetwork->Engine ()->Log (IENGINE::kLOGLEVEL_Trace, "NETWORK", (result.bSuccess ? "Cached " : "Failed ") + m_pImpl->m_sUrl + " (" + std::to_string (result.nSizeBytes) + " bytes)");
+
+      m_pImpl->m_pAsset_Fetch = nullptr;
    }
-
-   m_pImpl->m_pNetwork->Engine ()->Log (IENGINE::kLOGLEVEL_Trace, "NETWORK", (result.bSuccess ? "Cached " : "Failed ") + m_pImpl->m_sUrl + " (" + std::to_string (result.nSizeBytes) + " bytes)");
-
-   m_pImpl->m_pAsset_Fetch = nullptr;
-
+   
    Detach (nullptr);
    m_pImpl->m_pNetwork->Asset_Close (this, nullptr);
 }
