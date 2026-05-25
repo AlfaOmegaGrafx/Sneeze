@@ -810,3 +810,19 @@ Dean ran `.\scripts\build-windows.ps1 -rebuild -Config Debug` several times (bot
 - **Dean's manual cleanup:** Rewrote `Execute` to wrap fetch body in `if (IsFetch())` guard (no early return), cleaned up redundant code in `FetchComplete` and `Attach`, added second `FetchComplete(FILE*, STATE)` overload for notify-only path.
 - **Build status:** Compiles clean. All 9 test suites pass (251 assertions). Artemis verified working.
 
+---
+
+### 2026-05-24 (Saturday evening into Sunday morning)
+
+**Dean Abramson** — Compositor redesign (self-paced to job-based), POOL_CYCLE, JOB_COMPOSITOR, network shutdown race fix, tab-switching deadlock fix, viewport diagnostics refactoring.
+
+- **Compositor redesign:** Replaced the old single-threaded self-paced compositor loop (DwmFlush-regulated) with a job-based, multi-agent system. New classes: `JOB_COMPOSITOR` (perpetual viewport rendering job with state machine: CREATE -> RENDER -> PRESENT -> DESTROY), `POOL_CYCLE` (perpetual job pool with round-robin scheduling and Filament thread affinity routing to agent 0). Compositor pool now has 2 agents. `AGENT::COMPOSITOR` changed from self-paced `Main()` loop to queue-driven `Wait([this] { return Job(); })`.
+- **Viewport Activate/Deactivate:** `VIEWPORT::Activate(IVIEWPORT*)` creates `JOB_COMPOSITOR` and posts to `POOL_CYCLE`. `Deactivate()` calls `Cancel()` (blocks until renderer destroyed on agent 0), then deletes the job. Replaces the old `IsReady()` / `ServiceRendererShutdown()` pattern.
+- **Viewport diagnostics refactoring:** Created `VIEWPORT::Accumulate()` (two overloads: time_point and double) and `VIEWPORT::Diagnostics()`. Per-viewport frame timing accumulators moved from compositor to viewport. `Diagnostics()` called by `Execute_Present`. `m_tpLastFrame` set in `Renderer_Initialize()` and updated at end of `Diagnostics()`.
+- **Network shutdown race fix:** `NETWORK::Impl::~Impl()` deletes leaked FILEs, then waits for `m_umpAsset` to drain via `while (m_umpAsset.size() > 0) sleep_for(1ms)` outside the mutex scope. Empty `while` loop was optimized away by compiler in Release — `sleep_for` added as side effect + CPU yield. Root cause: in-flight fetch jobs null `m_pAsset_Fetch` before the destructor can cancel.
+- **Tab-switching deadlock fix:** `JOB_COMPOSITOR::Cancel()` / `Complete()` used `std::mutex` initially — recursive acquisition caused deadlock when `Execute_Destroy` called `Complete()` while `Capture()` held the mutex. Fixed by changing to `std::recursive_mutex` + `std::condition_variable_any`. Then starvation issue (fast compositor re-acquisition starved `Cancel()`) fixed by removing `Capture()`/`Release()` around Execute calls entirely — state machine + `Return()` handle transitions, `Cancel()` proceeds between Grab cycles.
+- **Execute_Destroy non-zero agent routing:** Non-zero agents receiving `kSTATE_DESTROY` now call `Return(kSTATE_DESTROY)` to bounce the job back for agent 0 pickup.
+- **Cleanup relay eliminated:** Old `CONTROL::Cleanup_Queue`/`Cleanup_SwapQueue`/`m_bCleanupPending` relay removed. `ENGINE::Impl::Scrub()` now directly posts `JOB_SCRUB` to `CONTROL::Queue_Post_Scrub()`.
+- **Rendering timing investigation:** ~55 FPS, 17ms render dominated by Filament's implicit vsync wait in FIFO swapchain. `ANARI_WAIT` vs `ANARI_NO_WAIT` has no effect — block is upstream in Filament's `beginFrame()`.
+- **Build status:** Compiles clean. All network/storage tests pass. Artemis working with single tab. Multi-tab functional after deadlock fixes.
+

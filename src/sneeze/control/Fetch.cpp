@@ -322,12 +322,12 @@ bool AGENT::FETCH::Job ()
 {
    bool bResult, bJob;
    JOB_FETCH* pJob_Fetch = nullptr;
-   auto* pQueue = static_cast<POOL_QUEUE<JOB_FETCH*>*> (m_pPool);
+   auto* pPool_Queue = static_cast<POOL_QUEUE<JOB_FETCH*>*> (m_pPool);
 
    while (true)
    {
       bResult = IsShutdown ();
-      bJob    = pQueue->Grab (pJob_Fetch);
+      bJob    = pPool_Queue->Grab (pJob_Fetch);
 
       m_bBusy.store (bJob, std::memory_order_release);
 

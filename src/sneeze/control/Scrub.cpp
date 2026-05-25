@@ -50,12 +50,12 @@ bool AGENT::SCRUB::Job ()
 {
    bool bResult, bJob;
    JOB_SCRUB* pJob_Scrub = nullptr;
-   auto* pQueue = static_cast<POOL_QUEUE<JOB_SCRUB*>*> (m_pPool);
+   auto* pPool_Queue = static_cast<POOL_QUEUE<JOB_SCRUB*>*> (m_pPool);
 
    while (true)
    {
       bResult = IsShutdown ();
-      bJob    = pQueue->Grab (pJob_Scrub);
+      bJob    = pPool_Queue->Grab (pJob_Scrub);
 
       m_bBusy.store (bJob, std::memory_order_release);
 

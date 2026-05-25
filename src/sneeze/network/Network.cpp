@@ -77,13 +77,24 @@ public:
          }
          m_apFile.clear ();
 
-         for (auto& [sUrl, pAsset] : m_umpAsset)
-         {
-            m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "NETWORK", "Leaked ASSET: " + pAsset->Url ());
-            delete pAsset;
-         }
-         m_umpAsset.clear ();
+      // See note below
+      //
+      // for (auto& [sUrl, pAsset] : m_umpAsset)
+      // {
+      //    m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "NETWORK", "Leaked ASSET: " + pAsset->Url ());
+      //    delete pAsset;
+      // }
+      // m_umpAsset.clear ();
+
       }
+
+      // There is a race condition in which fetch jobs in flight will set m_pAsset_Fetch to nullptr before
+      // an asset being deleted has a chance to close it. There is no other known way to handle this, other 
+      // than to wait for the assets to drain naturally. If all [leaked or otherwise] files have been deleted, 
+      // then all of the assets should eventually drain unless there is a bug in the asset code.
+
+      while (m_umpAsset.size() > 0)
+         std::this_thread::sleep_for(std::chrono::milliseconds(1));
    }
 
    // ---------------------------------------------------------------------------
@@ -410,6 +421,8 @@ public:
 
    ASSET* Asset_Open (FILE* pFile)
    {
+      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+
       ASSET* pAsset = nullptr;
 
       std::string sUrl      = pFile->Url ();
@@ -431,6 +444,8 @@ public:
 
    void Asset_Close (ASSET* pAsset, FILE* pFile)
    {
+      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+
       if (pAsset->Close (pFile) == 0)
       {
          m_umpAsset.erase (pAsset->Pathname ()); // should be the same as pFile->Pathname ()

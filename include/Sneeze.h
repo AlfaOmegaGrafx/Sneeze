@@ -24,6 +24,7 @@ namespace SNEEZE
    class ENGINE;
    class CONTEXT;
    class JOB_FETCH;
+   class JOB_COMPOSITOR;
    class ICONTEXT;
    class IVIEWPORT;
 }
@@ -85,7 +86,7 @@ namespace SNEEZE
 
    // ------------------------------------------------------------------------
    // IVIEWPORT -- per-viewport rendering interface.
-   // Passed to CONTEXT::Viewport_Attach(). Rendering callbacks only.
+   // Passed to VIEWPORT::Activate(). Rendering callbacks only.
    // ------------------------------------------------------------------------
 
    class IVIEWPORT
@@ -126,9 +127,6 @@ namespace SNEEZE
 
       CONTEXT*                       Context_Open    (ICONTEXT* pHost, const std::string& sUrl = "", CONTEXT::eSESSION kSession = CONTEXT::kSESSION_PERSISTENT);
       bool                           Context_Close   (CONTEXT* pContext);
-      void                           Context_Capture ();
-      const std::vector<CONTEXT*>&   Context_GetList () const;
-      void                           Context_Release ();
 
       // --- Shared services ---
 
@@ -149,7 +147,8 @@ namespace SNEEZE
 
       persona::PERSONA*        Persona () const;
 
-      void                     Queue_Post_Fetch (JOB_FETCH* pJob_Fetch);
+      void                     Queue_Post_Fetch      (JOB_FETCH* pJob_Fetch);
+      void                     Queue_Post_Compositor (JOB_COMPOSITOR* pJob_Compositor);
 
    private:
       class Impl;

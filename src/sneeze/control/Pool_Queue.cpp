@@ -44,19 +44,15 @@ namespace SNEEZE
    {
       std::lock_guard<std::mutex> guard (m_mxQueue);
 
-      bool bResult = false;
-
       if (!m_apJob.empty ())
       {
          pJob = m_apJob.front ();
 
          m_apJob.erase (m_apJob.begin ());
-
-         bResult = true;
       }
-      else pJob = JOB_PTR{};
+      else pJob = nullptr;
 
-      return bResult;
+      return (pJob != nullptr);
    }
 
    template class POOL_QUEUE<JOB_SCRUB*>;

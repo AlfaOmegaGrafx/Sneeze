@@ -66,7 +66,6 @@ namespace SNEEZE
 
       virtual bool Initialize (int nWidth, int nHeight) = 0;
       virtual void Resize (int nWidth, int nHeight) = 0;
-      virtual void Shutdown () = 0;
 
       virtual void SetCamera (const CAMERA_DATA& pCamera) = 0;
       virtual void BeginFrame () = 0;

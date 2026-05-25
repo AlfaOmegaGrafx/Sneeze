@@ -93,7 +93,42 @@ RENDERER::ANARI::ANARI (ENGINE* pEngine, const std::string& sLibrary)
 
 RENDERER::ANARI::~ANARI ()
 {
-   Shutdown ();
+   if (m_pDevice)
+   {
+      if (m_pFrame)
+      {
+         anariRelease (m_pDevice, m_pFrame);
+         m_pFrame = nullptr;
+      }
+      if (m_pNativeSurface)
+      {
+         anariRelease (m_pDevice, reinterpret_cast<ANARIObject> (m_pNativeSurface));
+         m_pNativeSurface = nullptr;
+      }
+      if (m_pRenderer)
+      {
+         anariRelease (m_pDevice, m_pRenderer);
+         m_pRenderer = nullptr;
+      }
+      if (m_pCamera)
+      {
+         anariRelease (m_pDevice, m_pCamera);
+         m_pCamera = nullptr;
+      }
+      if (m_pWorld)
+      {
+         anariRelease (m_pDevice, m_pWorld);
+         m_pWorld = nullptr;
+      }
+      anariRelease (m_pDevice, m_pDevice);
+      m_pDevice = nullptr;
+   }
+   if (m_pLibrary)
+   {
+      anariUnloadLibrary (m_pLibrary);
+      m_pLibrary = nullptr;
+   }
+   m_bNativeSurface = false;
 }
 
 void RENDERER::ANARI::SetNativeWindow (void* pHandle)
@@ -285,46 +320,6 @@ void RENDERER::ANARI::Resize (int nWidth, int nHeight)
       anariSetParameter (m_pDevice, m_pFrame, "size", ANARI_UINT32_VEC2, aSize);
       anariCommitParameters (m_pDevice, m_pFrame);
    }
-}
-
-void RENDERER::ANARI::Shutdown ()
-{
-   if (m_pDevice)
-   {
-      if (m_pFrame)
-      {
-         anariRelease (m_pDevice, m_pFrame);
-         m_pFrame = nullptr;
-      }
-      if (m_pNativeSurface)
-      {
-         anariRelease (m_pDevice, reinterpret_cast<ANARIObject> (m_pNativeSurface));
-         m_pNativeSurface = nullptr;
-      }
-      if (m_pRenderer)
-      {
-         anariRelease (m_pDevice, m_pRenderer);
-         m_pRenderer = nullptr;
-      }
-      if (m_pCamera)
-      {
-         anariRelease (m_pDevice, m_pCamera);
-         m_pCamera = nullptr;
-      }
-      if (m_pWorld)
-      {
-         anariRelease (m_pDevice, m_pWorld);
-         m_pWorld = nullptr;
-      }
-      anariRelease (m_pDevice, m_pDevice);
-      m_pDevice = nullptr;
-   }
-   if (m_pLibrary)
-   {
-      anariUnloadLibrary (m_pLibrary);
-      m_pLibrary = nullptr;
-   }
-   m_bNativeSurface = false;
 }
 
 // ---------------------------------------------------------------------------

@@ -514,6 +514,7 @@ set (CORE_SOURCES
    sneeze/control/AgentC.cpp
    sneeze/control/Pool.cpp
    sneeze/control/Pool_Queue.cpp
+   sneeze/control/Pool_Cycle.cpp
    sneeze/control/Fetch.cpp)
 set (CORE_HEADERS
    sneeze/Pch.h

@@ -112,6 +112,9 @@
     <ClCompile Include="..\src\sneeze\control\Pool_Queue.cpp">
       <Filter>src\sneeze\control</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\sneeze\control\Pool_Cycle.cpp">
+      <Filter>src\sneeze\control</Filter>
+    </ClCompile>
     <ClCompile Include="..\src\sneeze\control\Compositor.cpp">
       <Filter>src\sneeze\control</Filter>
     </ClCompile>

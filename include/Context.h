@@ -61,7 +61,7 @@ namespace SNEEZE
          kSESSION_TRANSITORY,
       };
 
-      explicit CONTEXT (ENGINE* pEngine, ICONTEXT* pHost);
+      CONTEXT (ENGINE* pEngine, ICONTEXT* pHost, eSESSION kSession, const std::string& sPath_Permanent, const std::string& sPath_Temporary);
 
       CONTEXT & operator= (CONTEXT const  & rhs)   = delete;
       CONTEXT & operator= (CONTEXT       && rhs)   = delete;
@@ -69,17 +69,16 @@ namespace SNEEZE
       CONTEXT             (CONTEXT       && other) = delete;
       ~CONTEXT            ();
 
-      bool Initialize (const std::string& sUrl, eSESSION kSession, const std::string& sPath_Permanent, const std::string& sPath_Temporary);
+      bool Initialize (const std::string& sUrl);
+      void Logout ();
 
       ENGINE*    Engine   () const;
       ICONTEXT*  Host     () const;
+
       CONSOLE*   Console  () const;
       NETWORK*   Network  () const;
       STORAGE*   Storage  () const;
       VIEWPORT*  Viewport () const;
-
-      void Viewport_Attach (IVIEWPORT* pHost);
-      void Viewport_Detach ();
 
       const std::string& sPath_Permanent () const;
       const std::string& sPath_Temporary () const;

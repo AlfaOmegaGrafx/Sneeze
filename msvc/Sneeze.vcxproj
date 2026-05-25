@@ -134,6 +134,7 @@
     <ClCompile Include="..\src\sneeze\control\AgentC.cpp" />
     <ClCompile Include="..\src\sneeze\control\Pool.cpp" />
     <ClCompile Include="..\src\sneeze\control\Pool_Queue.cpp" />
+    <ClCompile Include="..\src\sneeze\control\Pool_Cycle.cpp" />
     <ClCompile Include="..\src\sneeze\control\Fetch.cpp" />
     <!-- astro -->
     <ClCompile Include="..\src\astro\BodyData.cpp" />

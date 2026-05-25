@@ -37,7 +37,7 @@ struct AGENT_INIT
 
 static const std::vector<AGENT_INIT> aAgent_Init =
 {
-   {  0,  1, [] (SNEEZE::CONTROL* pControl)->SNEEZE::POOL* { return new SNEEZE::POOL                           (pControl); }, [] (SNEEZE::POOL* pPool, int nAgentIz)->SNEEZE::AGENT* { return new SNEEZE::AGENT::COMPOSITOR (pPool, nAgentIz); } },
+   {  0,  2, [] (SNEEZE::CONTROL* pControl)->SNEEZE::POOL* { return new SNEEZE::POOL_CYCLE                     (pControl); }, [] (SNEEZE::POOL* pPool, int nAgentIz)->SNEEZE::AGENT* { return new SNEEZE::AGENT::COMPOSITOR (pPool, nAgentIz); } },
    {  0,  2, [] (SNEEZE::CONTROL* pControl)->SNEEZE::POOL* { return new SNEEZE::POOL_QUEUE<SNEEZE::JOB_SCRUB*> (pControl); }, [] (SNEEZE::POOL* pPool, int nAgentIz)->SNEEZE::AGENT* { return new SNEEZE::AGENT::SCRUB      (pPool, nAgentIz); } },
    {  0, 16, [] (SNEEZE::CONTROL* pControl)->SNEEZE::POOL* { return new SNEEZE::POOL_QUEUE<SNEEZE::JOB_FETCH*> (pControl); }, [] (SNEEZE::POOL* pPool, int nAgentIz)->SNEEZE::AGENT* { return new SNEEZE::AGENT::FETCH      (pPool, nAgentIz); } },
    { 30,  1, [] (SNEEZE::CONTROL* pControl)->SNEEZE::POOL* { return new SNEEZE::POOL                           (pControl); }, [] (SNEEZE::POOL* pPool, int nAgentIz)->SNEEZE::AGENT* { return new SNEEZE::AGENT::C          (pPool, nAgentIz); } },
@@ -78,6 +78,11 @@ SNEEZE::ENGINE* SNEEZE::CONTROL::Engine () const
 // Public API -- delegates immediately to pool methods
 // ---------------------------------------------------------------------------
 
+SNEEZE::POOL_CYCLE& SNEEZE::CONTROL::Pool_Compositor ()
+{
+   return static_cast<POOL_CYCLE&> (*m_apPool[kPOOL_COMPOSITOR]);
+}
+
 SNEEZE::POOL_QUEUE<SNEEZE::JOB_SCRUB*>& SNEEZE::CONTROL::Pool_Scrub ()
 {
    return static_cast<POOL_QUEUE<JOB_SCRUB*>&> (*m_apPool[kPOOL_SCRUB]);
@@ -88,14 +93,19 @@ SNEEZE::POOL_QUEUE<SNEEZE::JOB_FETCH*>& SNEEZE::CONTROL::Pool_Fetch ()
    return static_cast<POOL_QUEUE<JOB_FETCH*>&> (*m_apPool[kPOOL_FETCH]);
 }
 
-void SNEEZE::CONTROL::Queue_Post_Scrub (JOB_SCRUB* pIScrub)
+void SNEEZE::CONTROL::Queue_Post_Compositor (JOB_COMPOSITOR* pJob_Compositor)
 {
-   Pool_Scrub ().Post (pIScrub);
+   Pool_Compositor ().Post (pJob_Compositor);
 }
 
-void SNEEZE::CONTROL::Queue_Post_Fetch (JOB_FETCH* pIFetch)
+void SNEEZE::CONTROL::Queue_Post_Scrub (JOB_SCRUB* pJob_Scrub)
 {
-   Pool_Fetch ().Post (pIFetch);
+   Pool_Scrub ().Post (pJob_Scrub);
+}
+
+void SNEEZE::CONTROL::Queue_Post_Fetch (JOB_FETCH* pJob_Fetch)
+{
+   Pool_Fetch ().Post (pJob_Fetch);
 }
 
 // ---------------------------------------------------------------------------

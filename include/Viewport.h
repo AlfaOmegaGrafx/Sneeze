@@ -25,24 +25,18 @@ namespace SNEEZE
       class RENDERER;
 
    public:
-      enum eINIT_STATE
-      {
-         kINIT_NONE,
-         kINIT_SCENE,
-         kINIT_RENDERER,
-      };
 
       // --- Camera orbit state ---
 
       class VIEW
       {
       public:
-         float dTheta    = 0.3f;
-         float dPhi      = 0.4f;
-         float dDistance = 10.0f;
-         float dTargetX  = 0.0f;
-         float dTargetY  = 0.0f;
-         float dTargetZ  = 0.0f;
+         float m_dTheta    = 0.3f;
+         float m_dPhi      = 0.4f;
+         float m_dDistance = 10.0f;
+         float m_dTargetX  = 0.0f;
+         float m_dTargetY  = 0.0f;
+         float m_dTargetZ  = 0.0f;
 
          void Update (int nDX, int nDY, float dScrollY, bool bMouseLeft, bool bMouseRight);
       };
@@ -68,31 +62,29 @@ namespace SNEEZE
       ~VIEWPORT ();
 
       bool Initialize (const std::string& sUrl);
-      bool InitializeRenderer ();
-      void ShutdownRenderer ();
-      void RequestRendererShutdown ();
-      bool ServiceRendererShutdown ();
+      bool Renderer_Initialize ();
+      void Renderer_Shutdown ();
 
-      void Attach (IVIEWPORT* pHost);
-      void Detach ();
+      void Activate (IVIEWPORT* pHost);
+      void Deactivate ();
 
       ENGINE*              Engine () const;
       CONTEXT*             Context () const;
       IVIEWPORT*           Host () const;
       SCENE*               Scene () const;
-      bool                 IsReady () const;
+      bool                 IsActive () const;
 
       // --- Input (called by application) ---
 
-      void  SetMouseInput (int nDX, int nDY, float dScrollY, bool bMouseLeft, bool bMouseRight);
-      void  SetKeyInput (bool bKeySpace, bool bKeyPlus, bool bKeyMinus);
-      INPUT ConsumeInput ();
+      void  Input_Mouse (int nDX, int nDY, float dScrollY, bool bMouseLeft, bool bMouseRight);
+      void  Input_Key (bool bKeySpace, bool bKeyPlus, bool bKeyMinus);
+      INPUT Input_Consume ();
 
       // --- Framebuffer ---
 
-      void            WriteFrameBuffer (const uint32_t* pPixels, int nWidth, int nHeight);
-      const uint32_t* LockFrameBuffer (int& nWidth, int& nHeight);
-      void            UnlockFrameBuffer ();
+      void            FrameBuffer_Write (const uint32_t* pPixels, int nWidth, int nHeight);
+      const uint32_t* FrameBuffer_Capture (int& nWidth, int& nHeight);
+      void            FrameBuffer_Release ();
 
       // --- Dimensions ---
 
@@ -107,6 +99,32 @@ namespace SNEEZE
       // --- Renderer ---
 
       RENDERER* Renderer () const;
+
+      // --- Frame timing (written by compositor, per-viewport) ---
+
+      enum eACCUMULATE
+      {
+         kACCUMULATE_INPUT,
+         kACCUMULATE_SCENE,
+         kACCUMULATE_SUBMIT,
+         kACCUMULATE_RENDER,
+         kACCUMULATE_PUBLISH,
+      };
+
+      void Accumulate  (eACCUMULATE eType, std::chrono::steady_clock::time_point tpStart);
+      void Accumulate  (eACCUMULATE eType, double dSeconds);
+      void Diagnostics ();
+
+      std::chrono::steady_clock::time_point     m_tpLastFrame;
+      int64_t                                   m_tmNow;
+
+      int    m_nFrameCount;
+      double m_dFpsAccum;
+      double m_dAccumInput;
+      double m_dAccumScene;
+      double m_dAccumSubmit;
+      double m_dAccumRender;
+      double m_dAccumPublish;
 
    private:
       class Impl;

@@ -15,6 +15,7 @@
 #include <Sneeze.h>
 #include "scene/Scene.h"
 #include "renderer/AnariRenderer.h"
+#include "sneeze/control/Control.h"
 
 using namespace SNEEZE;
 
@@ -32,20 +33,16 @@ class VIEWPORT::Impl
 {
 public:
    Impl (VIEWPORT* pViewport, CONTEXT* pContext) :
-      m_pViewport (pViewport),
-      m_pContext (pContext),
-      m_pHost (nullptr),
-      m_eInitState (kINIT_NONE),
-      m_bReady (false),
-      m_pScene (nullptr),
-      m_pRenderer (nullptr),
-      m_bRendererPending (false),
-      m_bRendererShutdownRequested (false),
-      m_bRendererShutdownComplete (false),
-      m_nFbWidth (0),
-      m_nFbHeight (0),
-      m_nWidth (0),
-      m_nHeight (0)
+      m_pViewport        (pViewport),
+      m_pContext         (pContext),
+      m_pScene           (nullptr),
+      m_pHost            (nullptr),
+      m_pJob_Compositor  (nullptr),
+      m_pRenderer        (nullptr),
+      m_nFbWidth         (0),
+      m_nFbHeight        (0),
+      m_nWidth           (0),
+      m_nHeight          (0)
    {
    }
 
@@ -57,140 +54,115 @@ public:
 
       if (m_pScene->Initialize (sUrl))
       {
-         m_eInitState = kINIT_SCENE;
          bResult = true;
+
          m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "VIEWPORT", "Initialized");
       }
-      else
-      {
-         m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "VIEWPORT", "Failed to initialize scene");
-      }
+      else m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "VIEWPORT", "Failed to initialize scene");
 
       return bResult;
    }
 
    ~Impl ()
    {
-      Detach ();
+      Deactivate ();
 
       delete m_pScene;
       m_pScene = nullptr;
-
-      m_eInitState = kINIT_NONE;
    }
 
-   void Attach (IVIEWPORT* pHost)
+   void Activate (IVIEWPORT* pHost)
    {
-      if (!m_pHost  &&  pHost  &&  m_eInitState >= kINIT_SCENE)
+      std::lock_guard<std::mutex> guard (m_mxViewport);
+
+      if (!m_pHost  &&  pHost)
       {
          m_pHost = pHost;
 
          m_pHost->FrameSize (m_nWidth, m_nHeight);
 
-         std::string sLibrary = m_pContext->Engine ()->Host ()->sRenderer ();
-         if (!sLibrary.empty ()  &&  m_pHost->FrameWindow ())
-            m_bRendererPending = true;
-
-         m_bReady = true;
+         m_pJob_Compositor = new JOB_COMPOSITOR (m_pViewport);
+         m_pContext->Engine ()->Queue_Post_Compositor (m_pJob_Compositor);
       }
    }
 
-   void Detach ()
+   void Deactivate ()
    {
+      std::lock_guard<std::mutex> guard (m_mxViewport);
+
       if (m_pHost)
       {
-         if (m_eInitState >= kINIT_RENDERER)
-         {
-            RequestRendererShutdown ();
-         }
+         m_pJob_Compositor->Cancel (); // blocks until renderer is destroyed
+         
+         delete m_pJob_Compositor;
+         m_pJob_Compositor = nullptr;
 
-         m_bReady = false;
          m_pHost = nullptr;
       }
    }
 
-   bool InitializeRenderer ()
+   // ---------------------------------------------------------------------------
+   // Renderer
+   // ---------------------------------------------------------------------------
+
+   bool Renderer_Initialize ()
    {
-      bool bResult = false;
+      // Filament requires that the thread that creates the rendering device is the
+      // same thread that renders with it. This method is called from the compositor
+      // thread rather than during Viewport::Initialize() to satisfy that constraint.
 
-      if (m_bRendererPending)
+      if (!m_pRenderer)
       {
-         m_bRendererPending = false;
-
-         std::string sLibrary = m_pContext->Engine ()->Host ()->sRenderer ();
-         auto* pRenderer = new RENDERER::ANARI (m_pContext->Engine (), sLibrary);
-
-         void* pNativeWindow = m_pHost->FrameWindow ();
-         if (pNativeWindow)
-            pRenderer->SetNativeWindow (pNativeWindow);
-
-         if (pRenderer->Initialize (m_nWidth, m_nHeight))
+         if (m_pHost)
          {
-            m_pRenderer = pRenderer;
-            m_eInitState = kINIT_RENDERER;
-            bResult = true;
-            m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "VIEWPORT", "Renderer initialized on compositor thread");
-         }
-         else
-         {
-            delete pRenderer;
-            m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "VIEWPORT", "Renderer unavailable -- headless mode");
+            std::string sLibrary = m_pContext->Engine ()->Host ()->sRenderer ();
+   
+            if (!sLibrary.empty ())
+            {
+               auto* pRenderer = new RENDERER::ANARI (m_pContext->Engine (), sLibrary);
+   
+               void* pNativeWindow = m_pHost->FrameWindow ();
+               if (pNativeWindow)
+                  pRenderer->SetNativeWindow (pNativeWindow);
+   
+               if (pRenderer->Initialize (m_nWidth, m_nHeight))
+               {
+                  m_pRenderer = pRenderer;
+
+                  m_pViewport->m_tpLastFrame = std::chrono::steady_clock::now ();
+
+                  m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "VIEWPORT", "Renderer initialized on compositor thread");
+               }
+               else
+               {
+                  delete pRenderer;
+
+                  m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "VIEWPORT", "Failed to initialize renderer");
+               }
+            }
          }
       }
-      else
-      {
-         bResult = (m_pRenderer != nullptr);
-      }
 
-      return bResult;
+      return (m_pRenderer != nullptr);
    }
 
-   void ShutdownRenderer ()
+   void Renderer_Shutdown ()
    {
       if (m_pRenderer)
       {
-         m_pRenderer->Shutdown ();
          delete m_pRenderer;
          m_pRenderer = nullptr;
-
-         m_eInitState = kINIT_SCENE;
       }
-   }
-
-   void RequestRendererShutdown ()
-   {
-      if (m_pRenderer)
-      {
-         m_bRendererShutdownRequested.store (true);
-         std::unique_lock<std::mutex> lock (m_rendererMutex);
-         m_rendererCondVar.wait (lock, [this] { return m_bRendererShutdownComplete; });
-         m_bRendererShutdownRequested.store (false);
-         m_bRendererShutdownComplete = false;
-      }
-   }
-
-   bool ServiceRendererShutdown ()
-   {
-      bool bResult = m_bRendererShutdownRequested.load ();
-      if (bResult)
-      {
-         ShutdownRenderer ();
-         {
-            std::lock_guard<std::mutex> guard (m_rendererMutex);
-            m_bRendererShutdownComplete = true;
-         }
-         m_rendererCondVar.notify_one ();
-      }
-      return bResult;
    }
 
    // ---------------------------------------------------------------------------
    // Input
    // ---------------------------------------------------------------------------
 
-   void SetMouseInput (int nDX, int nDY, float dScrollY, bool bMouseLeft, bool bMouseRight)
+   void Input_Mouse (int nDX, int nDY, float dScrollY, bool bMouseLeft, bool bMouseRight)
    {
-      std::lock_guard<std::mutex> guard (m_inputMutex);
+      std::lock_guard<std::mutex> guard (m_mxInput);
+
       m_Input.nMouseDX += nDX;
       m_Input.nMouseDY += nDY;
       m_Input.dScrollY += dScrollY;
@@ -198,21 +170,24 @@ public:
       m_Input.bMouseRight = bMouseRight;
    }
 
-   void SetKeyInput (bool bKeySpace, bool bKeyPlus, bool bKeyMinus)
+   void Input_Key (bool bKeySpace, bool bKeyPlus, bool bKeyMinus)
    {
-      std::lock_guard<std::mutex> guard (m_inputMutex);
+      std::lock_guard<std::mutex> guard (m_mxInput);
+
       m_Input.bKeySpace = bKeySpace;
       m_Input.bKeyPlus = bKeyPlus;
       m_Input.bKeyMinus = bKeyMinus;
    }
 
-   INPUT ConsumeInput ()
+   INPUT Input_Consume ()
    {
-      std::lock_guard<std::mutex> guard (m_inputMutex);
+      std::lock_guard<std::mutex> guard (m_mxInput);
+
       INPUT Input = m_Input;
       m_Input.nMouseDX = 0;
       m_Input.nMouseDY = 0;
       m_Input.dScrollY = 0.0f;
+
       return Input;
    }
 
@@ -220,27 +195,32 @@ public:
    // Framebuffer
    // ---------------------------------------------------------------------------
 
-   void WriteFrameBuffer (const uint32_t* pPixels, int nWidth, int nHeight)
+   void FrameBuffer_Write (const uint32_t* pPixels, int nWidth, int nHeight)
    {
-      std::lock_guard<std::mutex> guard (m_fbMutex);
+      std::lock_guard<std::mutex> guard (m_mxFrameBuffer);
+
       int nSize = nWidth * nHeight;
       m_aFrameBuffer.resize (nSize);
+
       std::memcpy (m_aFrameBuffer.data (), pPixels, nSize * sizeof (uint32_t));
+
       m_nFbWidth = nWidth;
       m_nFbHeight = nHeight;
    }
 
-   const uint32_t* LockFrameBuffer (int& nWidth, int& nHeight)
+   const uint32_t* FrameBuffer_Capture (int& nWidth, int& nHeight)
    {
-      m_fbMutex.lock ();
+      m_mxFrameBuffer.lock ();
+
       nWidth = m_nFbWidth;
       nHeight = m_nFbHeight;
+      
       return m_aFrameBuffer.empty () ? nullptr : m_aFrameBuffer.data ();
    }
 
-   void UnlockFrameBuffer ()
+   void FrameBuffer_Release ()
    {
-      m_fbMutex.unlock ();
+      m_mxFrameBuffer.unlock ();
    }
 
    friend class VIEWPORT;
@@ -248,23 +228,18 @@ public:
 protected:
    VIEWPORT*               m_pViewport;
    CONTEXT*                m_pContext;
-   IVIEWPORT*              m_pHost;
-   eINIT_STATE             m_eInitState;
-   bool                    m_bReady;
    SCENE*                  m_pScene;
+   IVIEWPORT*              m_pHost;
+   JOB_COMPOSITOR*         m_pJob_Compositor;
    RENDERER*               m_pRenderer;
-   bool                    m_bRendererPending;
-   std::atomic<bool>       m_bRendererShutdownRequested;
-   bool                    m_bRendererShutdownComplete;
-   std::mutex              m_rendererMutex;
-   std::condition_variable m_rendererCondVar;
+   std::mutex              m_mxViewport;
 
    // Input
-   std::mutex              m_inputMutex;
+   std::mutex              m_mxInput;
    INPUT                   m_Input;
 
    // Framebuffer
-   std::mutex              m_fbMutex;
+   std::mutex              m_mxFrameBuffer;
    std::vector<uint32_t>   m_aFrameBuffer;
    int                     m_nFbWidth;
    int                     m_nFbHeight;
@@ -283,13 +258,16 @@ protected:
 // ===========================================================================
 
 VIEWPORT::VIEWPORT (CONTEXT* pContext) :
-   m_pImpl (new Impl (this, pContext))
+   m_pImpl         (new Impl (this, pContext)),
+   m_tmNow         (0),
+   m_nFrameCount   (0),
+   m_dFpsAccum     (0.0),
+   m_dAccumInput   (0.0),
+   m_dAccumScene   (0.0),
+   m_dAccumSubmit  (0.0),
+   m_dAccumRender  (0.0),
+   m_dAccumPublish (0.0)
 {
-}
-
-VIEWPORT::~VIEWPORT ()
-{
-   delete m_pImpl;
 }
 
 bool VIEWPORT::Initialize (const std::string& sUrl)
@@ -297,34 +275,29 @@ bool VIEWPORT::Initialize (const std::string& sUrl)
    return m_pImpl->Initialize (sUrl);
 }
 
-bool VIEWPORT::InitializeRenderer ()
+VIEWPORT::~VIEWPORT ()
 {
-   return m_pImpl->InitializeRenderer ();
+   delete m_pImpl;
 }
 
-void VIEWPORT::ShutdownRenderer ()
+void VIEWPORT::Activate (IVIEWPORT* pHost)
 {
-   m_pImpl->ShutdownRenderer ();
+   m_pImpl->Activate (pHost);
 }
 
-void VIEWPORT::RequestRendererShutdown ()
+void VIEWPORT::Deactivate ()
 {
-   m_pImpl->RequestRendererShutdown ();
+   m_pImpl->Deactivate ();
 }
 
-bool VIEWPORT::ServiceRendererShutdown ()
+bool VIEWPORT::Renderer_Initialize ()
 {
-   return m_pImpl->ServiceRendererShutdown ();
+   return m_pImpl->Renderer_Initialize ();
 }
 
-void VIEWPORT::Attach (IVIEWPORT* pHost)
+void VIEWPORT::Renderer_Shutdown ()
 {
-   m_pImpl->Attach (pHost);
-}
-
-void VIEWPORT::Detach ()
-{
-   m_pImpl->Detach ();
+   m_pImpl->Renderer_Shutdown ();
 }
 
 // ---------------------------------------------------------------------------
@@ -335,7 +308,7 @@ SNEEZE::ENGINE*      VIEWPORT::Engine          () const { return m_pImpl->m_pCon
 SNEEZE::CONTEXT*     VIEWPORT::Context         () const { return m_pImpl->m_pContext;            }
 IVIEWPORT*           VIEWPORT::Host            () const { return m_pImpl->m_pHost;               }
 VIEWPORT::SCENE*     VIEWPORT::Scene           () const { return m_pImpl->m_pScene;              }
-bool                 VIEWPORT::IsReady         () const { return m_pImpl->m_bReady;              }
+bool                 VIEWPORT::IsActive        () const { return m_pImpl->m_pHost != nullptr;     }
 int                  VIEWPORT::Width           () const { return m_pImpl->m_nWidth;              }
 int                  VIEWPORT::Height          () const { return m_pImpl->m_nHeight;             }
 VIEWPORT::VIEW&      VIEWPORT::View            ()       { return m_pImpl->m_View;                }
@@ -351,38 +324,100 @@ void VIEWPORT::SetDimensions (int nWidth, int nHeight)
 // Input
 // ---------------------------------------------------------------------------
 
-void VIEWPORT::SetMouseInput (int nDX, int nDY, float dScrollY, bool bMouseLeft, bool bMouseRight)
+void VIEWPORT::Input_Mouse (int nDX, int nDY, float dScrollY, bool bMouseLeft, bool bMouseRight)
 {
-   m_pImpl->SetMouseInput (nDX, nDY, dScrollY, bMouseLeft, bMouseRight);
+   m_pImpl->Input_Mouse (nDX, nDY, dScrollY, bMouseLeft, bMouseRight);
 }
 
-void VIEWPORT::SetKeyInput (bool bKeySpace, bool bKeyPlus, bool bKeyMinus)
+void VIEWPORT::Input_Key (bool bKeySpace, bool bKeyPlus, bool bKeyMinus)
 {
-   m_pImpl->SetKeyInput (bKeySpace, bKeyPlus, bKeyMinus);
+   m_pImpl->Input_Key (bKeySpace, bKeyPlus, bKeyMinus);
 }
 
-VIEWPORT::INPUT VIEWPORT::ConsumeInput ()
+VIEWPORT::INPUT VIEWPORT::Input_Consume ()
 {
-   return m_pImpl->ConsumeInput ();
+   return m_pImpl->Input_Consume ();
 }
 
 // ---------------------------------------------------------------------------
 // Framebuffer
 // ---------------------------------------------------------------------------
 
-void VIEWPORT::WriteFrameBuffer (const uint32_t* pPixels, int nWidth, int nHeight)
+void VIEWPORT::FrameBuffer_Write (const uint32_t* pPixels, int nWidth, int nHeight)
 {
-   m_pImpl->WriteFrameBuffer (pPixels, nWidth, nHeight);
+   m_pImpl->FrameBuffer_Write (pPixels, nWidth, nHeight);
 }
 
-const uint32_t* VIEWPORT::LockFrameBuffer (int& nWidth, int& nHeight)
+const uint32_t* VIEWPORT::FrameBuffer_Capture (int& nWidth, int& nHeight)
 {
-   return m_pImpl->LockFrameBuffer (nWidth, nHeight);
+   return m_pImpl->FrameBuffer_Capture (nWidth, nHeight);
 }
 
-void VIEWPORT::UnlockFrameBuffer ()
+void VIEWPORT::FrameBuffer_Release ()
 {
-   m_pImpl->UnlockFrameBuffer ();
+   m_pImpl->FrameBuffer_Release ();
+}
+
+void VIEWPORT::Accumulate (eACCUMULATE eType, std::chrono::steady_clock::time_point tpStart)
+{
+   double dDuration = std::chrono::duration<double> (std::chrono::steady_clock::now () - tpStart).count ();
+
+   switch (eType)
+   {
+      case kACCUMULATE_INPUT:   m_dAccumInput   += dDuration;  break;
+      case kACCUMULATE_SCENE:   m_dAccumScene   += dDuration;  break;
+      case kACCUMULATE_SUBMIT:  m_dAccumSubmit  += dDuration;  break;
+      case kACCUMULATE_RENDER:  m_dAccumRender  += dDuration;  break;
+      case kACCUMULATE_PUBLISH: m_dAccumPublish += dDuration;  break;
+   }
+}
+
+void VIEWPORT::Accumulate (eACCUMULATE eType, double dSeconds)
+{
+   switch (eType)
+   {
+      case kACCUMULATE_INPUT:   m_dAccumInput   += dSeconds;  break;
+      case kACCUMULATE_SCENE:   m_dAccumScene   += dSeconds;  break;
+      case kACCUMULATE_SUBMIT:  m_dAccumSubmit  += dSeconds;  break;
+      case kACCUMULATE_RENDER:  m_dAccumRender  += dSeconds;  break;
+      case kACCUMULATE_PUBLISH: m_dAccumPublish += dSeconds;  break;
+   }
+}
+
+void VIEWPORT::Diagnostics ()
+{
+   auto tpNow  = std::chrono::steady_clock::now ();
+
+   m_nFrameCount++;
+   
+   m_dFpsAccum += std::chrono::duration<double> (tpNow - m_tpLastFrame).count ();
+
+   if (m_dFpsAccum >= 1.0)
+   {
+      double dAvgInput   = m_dAccumInput   / m_nFrameCount * 1000.0;
+      double dAvgScene   = m_dAccumScene   / m_nFrameCount * 1000.0;
+      double dAvgSubmit  = m_dAccumSubmit  / m_nFrameCount * 1000.0;
+      double dAvgRender  = m_dAccumRender  / m_nFrameCount * 1000.0;
+      double dAvgPublish = m_dAccumPublish / m_nFrameCount * 1000.0;
+      double dAvgFrame   = m_dFpsAccum     / m_nFrameCount * 1000.0;
+
+      char szFps[256];
+      std::snprintf (szFps, sizeof (szFps), "%d  (frame %.1f ms | input %.1f ms | scene %.1f ms | submit %.1f ms | render %.1f ms | publish %.1f ms)", m_nFrameCount, dAvgFrame, dAvgInput, dAvgScene, dAvgSubmit, dAvgRender, dAvgPublish);
+
+      Engine ()->Log (IENGINE::kLOGLEVEL_Trace, "FPS", std::string (szFps));
+
+      m_nFrameCount   = 0;
+
+      m_dFpsAccum    -= 1.0;
+
+      m_dAccumInput   = 0.0;
+      m_dAccumScene   = 0.0;
+      m_dAccumSubmit  = 0.0;
+      m_dAccumRender  = 0.0;
+      m_dAccumPublish = 0.0;
+   }
+
+   m_tpLastFrame = tpNow;
 }
 
 // ---------------------------------------------------------------------------
@@ -393,15 +428,15 @@ void VIEWPORT::VIEW::Update (int nDX, int nDY, float dScrollY, bool bMouseLeft, 
 {
    if (bMouseLeft)
    {
-      dTheta += nDX * MOUSE_SENSITIVITY;
-      dPhi   += nDY * MOUSE_SENSITIVITY;
-      dPhi = std::max (-PI_F * 0.49f, std::min (PI_F * 0.49f, dPhi));
+      m_dTheta += nDX * MOUSE_SENSITIVITY;
+      m_dPhi   += nDY * MOUSE_SENSITIVITY;
+      m_dPhi = std::max (-PI_F * 0.49f, std::min (PI_F * 0.49f, m_dPhi));
    }
 
    if (dScrollY != 0.0f)
    {
       float dFactor = (dScrollY > 0.0f) ? (1.0f / SCROLL_FACTOR) : SCROLL_FACTOR;
-      dDistance *= dFactor;
-      dDistance = std::max (MIN_DISTANCE, std::min (MAX_DISTANCE, dDistance));
+      m_dDistance *= dFactor;
+      m_dDistance = std::max (MIN_DISTANCE, std::min (MAX_DISTANCE, m_dDistance));
    }
 }

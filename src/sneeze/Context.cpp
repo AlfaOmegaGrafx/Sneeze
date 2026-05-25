@@ -24,25 +24,23 @@ class SNEEZE::CONTEXT::Impl
 {
 public:
 
-   Impl (ENGINE* pEngine, CONTEXT* pContext, ICONTEXT* pHost) :
-      m_pEngine   (pEngine),
-      m_pContext  (pContext),
-      m_pHost     (pHost),
-      m_pConsole  (nullptr),
-      m_pNetwork  (nullptr),
-      m_pStorage  (nullptr),
-      m_pViewport (nullptr),
-      m_kSession  (kSESSION_PERSISTENT)
+   Impl (CONTEXT* pContext, ENGINE* pEngine, ICONTEXT* pHost, eSESSION kSession, const std::string& sPath_Permanent, const std::string& sPath_Temporary) :
+      m_pContext        (pContext),
+      m_pEngine         (pEngine),
+      m_pHost           (pHost),
+      m_kSession        (kSession),
+      m_sPath_Permanent (sPath_Permanent),
+      m_sPath_Temporary (sPath_Temporary),
+      m_pConsole        (nullptr),
+      m_pNetwork        (nullptr),
+      m_pStorage        (nullptr),
+      m_pViewport       (nullptr)
    {
    }
 
-   bool Initialize (const std::string& sUrl, eSESSION kSession, const std::string& sPath_Permanent, const std::string& sPath_Temporary)
+   bool Initialize (const std::string& sUrl)
    {
       bool bResult = false;
-
-      m_kSession        = kSession;
-      m_sPath_Permanent = sPath_Permanent;
-      m_sPath_Temporary = sPath_Temporary;
 
       m_pConsole = new CONSOLE (m_pContext);
 
@@ -90,47 +88,44 @@ public:
       m_pConsole = nullptr;
    }
 
-   void Viewport_Attach (IVIEWPORT* pHost)
-   {
-      m_pViewport->Attach (pHost);
-   }
-
-   void Viewport_Detach ()
-   {
-      m_pViewport->Detach ();
-   }
-
 public:
-   ENGINE*     m_pEngine;
    CONTEXT*    m_pContext;
+   ENGINE*     m_pEngine;
    ICONTEXT*   m_pHost;
-   CONSOLE*    m_pConsole;
-   NETWORK*    m_pNetwork;
-   STORAGE*    m_pStorage;
-   VIEWPORT*   m_pViewport;
 
    eSESSION    m_kSession;
    std::string m_sPath_Permanent;
    std::string m_sPath_Temporary;
+
+   CONSOLE*    m_pConsole;
+   NETWORK*    m_pNetwork;
+   STORAGE*    m_pStorage;
+   VIEWPORT*   m_pViewport;
 };
 
 /***********************************************************************************************************************************
 **  CONTEXT Class
 ***********************************************************************************************************************************/
 
-SNEEZE::CONTEXT::CONTEXT (ENGINE* pEngine, ICONTEXT* pHost) :
-   m_pImpl (new Impl (pEngine, this, pHost))
+SNEEZE::CONTEXT::CONTEXT (ENGINE* pEngine, ICONTEXT* pHost, eSESSION kSession, const std::string& sPath_Permanent, const std::string& sPath_Temporary) :
+   m_pImpl (new Impl (this, pEngine, pHost, kSession, sPath_Permanent, sPath_Temporary))
 {
+}
+
+bool SNEEZE::CONTEXT::Initialize (const std::string& sUrl)
+{
+   return m_pImpl->Initialize (sUrl);
+}
+
+void SNEEZE::CONTEXT::Logout ()
+{
+   if (m_pImpl->m_pNetwork)
+      m_pImpl->m_pNetwork->Clear ();
 }
 
 SNEEZE::CONTEXT::~CONTEXT ()
 {
    delete m_pImpl;
-}
-
-bool SNEEZE::CONTEXT::Initialize (const std::string& sUrl, eSESSION kSession, const std::string& sPath_Permanent, const std::string& sPath_Temporary)
-{
-   return m_pImpl->Initialize (sUrl, kSession, sPath_Permanent, sPath_Temporary);
 }
 
 // ---------------------------------------------------------------------------
@@ -146,17 +141,3 @@ SNEEZE::VIEWPORT*  SNEEZE::CONTEXT::Viewport () const { return m_pImpl->m_pViewp
 
 const std::string& SNEEZE::CONTEXT::sPath_Permanent () const { return m_pImpl->m_sPath_Permanent; }
 const std::string& SNEEZE::CONTEXT::sPath_Temporary () const { return m_pImpl->m_sPath_Temporary; }
-
-// ---------------------------------------------------------------------------
-// Viewport host management
-// ---------------------------------------------------------------------------
-
-void SNEEZE::CONTEXT::Viewport_Attach (IVIEWPORT* pHost)
-{
-   m_pImpl->Viewport_Attach (pHost);
-}
-
-void SNEEZE::CONTEXT::Viewport_Detach ()
-{
-   m_pImpl->Viewport_Detach ();
-}

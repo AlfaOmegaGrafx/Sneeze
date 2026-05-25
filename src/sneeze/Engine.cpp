@@ -286,11 +286,6 @@ m_pPersona = new persona::PERSONA (m_pEngine);
    // Post-fetch queue (delegates to CONTROL)
    // -----------------------------------------------------------------------
 
-   void Queue_Post_Fetch (JOB_FETCH* pJob_Fetch)
-   {
-      m_pControl->Queue_Post_Fetch (pJob_Fetch);
-   }
-
    void Scrub (const std::string& sPath)
    {
       if (IsValidTransitoryPath (sPath))
@@ -300,6 +295,16 @@ m_pPersona = new persona::PERSONA (m_pEngine);
          m_pControl->Queue_Post_Scrub (pJob_Scrub);
       }
       else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "REJECTED cleanup path -- failed validation: " + sPath);
+   }
+
+   void Queue_Post_Fetch (JOB_FETCH* pJob_Fetch)
+   {
+      m_pControl->Queue_Post_Fetch (pJob_Fetch);
+   }
+
+   void Queue_Post_Compositor (JOB_COMPOSITOR* pJob_Compositor)
+   {
+      m_pControl->Queue_Post_Compositor (pJob_Compositor);
    }
 
   // -----------------------------------------------------------------------
@@ -317,14 +322,14 @@ m_pPersona = new persona::PERSONA (m_pEngine);
       {
          std::string sPath_Permanent = (kSession == CONTEXT::kSESSION_PERSISTENT) ? m_sPath_Persistent : m_sPath_Transitory_Session;
 
-         pContext = new CONTEXT (m_pEngine, pHost);
+         pContext = new CONTEXT (m_pEngine, pHost, kSession, sPath_Permanent, sPath_Temporary);
 
          {
             std::lock_guard<std::mutex> guard (m_mxContext);
             m_apContext.push_back (pContext);
          }
 
-         if (!pContext->Initialize (sUrl, kSession, sPath_Permanent, sPath_Temporary))
+         if (!pContext->Initialize (sUrl))
          {
             m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize context");
 
@@ -359,10 +364,11 @@ m_pPersona = new persona::PERSONA (m_pEngine);
       {
          sPath_Temporary = pContext->sPath_Temporary ();
 
-         delete pContext;
-
          {
             std::lock_guard<std::mutex> guard (m_mxContext);
+
+            delete pContext;
+            
             m_apContext.erase (std::find (m_apContext.begin (), m_apContext.end (), pContext));
          }
 
@@ -374,19 +380,32 @@ m_pPersona = new persona::PERSONA (m_pEngine);
       return bResult;
    }
 
-   void Context_Capture ()
+  // -----------------------------------------------------------------------
+   // Persona management
+   // -----------------------------------------------------------------------
+
+   void Login (const std::string& sFirst, const std::string& sSecond)
    {
-      m_mxContext.lock ();
+      if (m_pPersona)
+         m_pPersona->Login (sFirst, sSecond);
    }
 
-   const std::vector<CONTEXT*>& Context_GetList () const
+   void Logout ()
    {
-      return m_apContext;
-   }
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 1 (signal)");
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 2 (communicate)");
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 3 (shutdown)");
 
-   void Context_Release ()
-   {
-      m_mxContext.unlock ();
+      {
+         std::lock_guard<std::mutex> guard (m_mxContext);
+         for (auto* pContext : m_apContext)
+            pContext->Logout ();
+      }
+
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 4 (destroy)");
+
+      if (m_pPersona)
+         m_pPersona->Logout ();
    }
 
 public:
@@ -455,21 +474,6 @@ bool SNEEZE::ENGINE::Context_Close (CONTEXT* pContext)
    return bResult;
 }
 
-void SNEEZE::ENGINE::Context_Capture ()
-{
-   m_pImpl->Context_Capture ();
-}
-
-const std::vector<SNEEZE::CONTEXT*>& SNEEZE::ENGINE::Context_GetList () const
-{
-   return m_pImpl->Context_GetList ();
-}
-
-void SNEEZE::ENGINE::Context_Release ()
-{
-   m_pImpl->Context_Release ();
-}
-
 SNEEZE::IENGINE* SNEEZE::ENGINE::Host () const                { return m_pImpl->m_pHost;      }
 const std::string& SNEEZE::ENGINE::sPath_Persistent () const  { return m_pImpl->m_sPath_Persistent; }
 const std::string& SNEEZE::ENGINE::sPath_Session    () const  { return m_pImpl->m_sPath_Transitory_Session; }
@@ -479,6 +483,11 @@ SNEEZE::persona::PERSONA*  SNEEZE::ENGINE::Persona () const   { return m_pImpl->
 void SNEEZE::ENGINE::Queue_Post_Fetch (JOB_FETCH* pJob_Fetch)
 {
    m_pImpl->Queue_Post_Fetch (pJob_Fetch);
+}
+
+void SNEEZE::ENGINE::Queue_Post_Compositor (JOB_COMPOSITOR* pJob_Compositor)
+{
+   m_pImpl->Queue_Post_Compositor (pJob_Compositor);
 }
 
 // ---------------------------------------------------------------------------
@@ -497,32 +506,16 @@ void SNEEZE::ENGINE::Log (SNEEZE::IENGINE::eLOGLEVEL Level, const std::string& s
 
 void SNEEZE::ENGINE::Login (const std::string& sFirst, const std::string& sSecond)
 {
-   if (m_pImpl->m_pPersona)
-      m_pImpl->m_pPersona->Login (sFirst, sSecond);
+   m_pImpl->Login (sFirst, sSecond);
 }
 
 void SNEEZE::ENGINE::Logout ()
 {
-   Log (IENGINE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 1 (signal)");
-   Log (IENGINE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 2 (communicate)");
-   Log (IENGINE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 3 (shutdown)");
-
-   m_pImpl->Context_Capture ();
-   for (auto* pContext : m_pImpl->Context_GetList ())
-   {
-      if (pContext->Network ())
-         pContext->Network ()->Clear ();
-   }
-   m_pImpl->Context_Release ();
-
-   Log (IENGINE::kLOGLEVEL_Trace, "SNEEZE", "Teardown phase 4 (destroy)");
-
-   if (m_pImpl->m_pPersona)
-      m_pImpl->m_pPersona->Logout ();
+   m_pImpl->Logout ();
 }
 
 void SNEEZE::ENGINE::ChangePersona (const std::string& sFirst, const std::string& sSecond)
 {
-   Logout ();
-   Login (sFirst, sSecond);
+   m_pImpl->Logout ();
+   m_pImpl->Login (sFirst, sSecond);
 }

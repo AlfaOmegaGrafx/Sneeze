@@ -25,11 +25,15 @@ namespace SNEEZE
 {
    class AGENT;
    class CONTROL;
+
    class POOL;
    template <typename JOB_PTR> class POOL_QUEUE;
+   class POOL_CYCLE;
+
    class IJOB;
    class JOB_FETCH;
    class JOB_SCRUB;
+   class JOB_COMPOSITOR;
 
    // ========================================================================
    // IJOB -- base interface for all jobs submitted to agent pools.
@@ -42,9 +46,9 @@ namespace SNEEZE
    public:
       virtual ~IJOB () {}
 
-      bool IsCancelled () const;
-      void Cancel      ();
-      void Complete    ();
+      bool         IsCancelled () const;
+      virtual void Cancel      ();
+      virtual void Complete    ();
 
    protected:
       virtual void Complete_Deliver () = 0;
@@ -123,6 +127,57 @@ namespace SNEEZE
    };
 
    // ========================================================================
+   // JOB_COMPOSITOR -- perpetual viewport rendering job.
+   //
+   // Owns: state machine, frame mutex, destroy synchronization.
+   // Lifecycle: Create -> Ready -> Setup/Render/Present (loop) -> Destroy.
+   // Cancel() blocks until the compositor thread completes destruction.
+   // ========================================================================
+
+   class JOB_COMPOSITOR : public IJOB
+   {
+   public:
+      enum eSTATE
+      {
+         kSTATE_CREATE,
+         kSTATE_RENDER,
+         kSTATE_PRESENT,
+         kSTATE_DESTROY,
+      };
+
+      explicit JOB_COMPOSITOR (VIEWPORT* pViewport);
+
+      eSTATE    State    () const;
+      VIEWPORT* Viewport () const;
+
+      void Return (eSTATE eState);
+
+      bool Busy    ();
+      void Idle    ();
+      void Unlock  ();
+      void Capture ();
+      void Release ();
+
+      void Cancel   () override;
+      void Complete () override;
+
+      int64_t                                   m_nLastFrame;
+
+   protected:
+      void Complete_Deliver () override;
+
+   private:
+      VIEWPORT*                   m_pViewport;
+      eSTATE                      m_eState;
+      bool                        m_bBusy;
+
+      std::mutex                  m_mxJob;
+      std::recursive_mutex        m_mxCancel;
+      std::condition_variable_any m_cvCancel;
+      bool                        m_bCancelled;
+   };
+
+   // ========================================================================
    // POOL -- owns agent lifecycle (create, initialize, shutdown, delete)
    //         and metronome tick scheduling.
    //
@@ -183,6 +238,28 @@ namespace SNEEZE
    };
 
    // ========================================================================
+   // POOL_CYCLE -- perpetual job pool for compositor jobs.
+   //
+   // Jobs remain in the pool until explicitly Remove()'d. Grab() selects
+   // the best available job: Create/Destroy routed to agent 0 (Filament
+   // thread affinity), Ready jobs round-robin by longest-ago-rendered.
+   // ========================================================================
+
+   class POOL_CYCLE : public POOL
+   {
+   public:
+      using POOL::POOL;
+
+      void Post    (JOB_COMPOSITOR*  pJob);
+      bool Grab    (JOB_COMPOSITOR*& pJob, int nAgentIz);
+      void Remove  (JOB_COMPOSITOR*  pJob);
+
+   private:
+      mutable std::mutex              m_mxCycle;
+      std::vector<JOB_COMPOSITOR*>    m_apJob;
+   };
+
+   // ========================================================================
    // CONTROL -- owns the engine thread, pool lifecycle, and metronome.
    //
    // Owns: m_apPool vector, metronome loop, thin public API.
@@ -197,13 +274,15 @@ namespace SNEEZE
 
       bool Initialize (int& nAgentCount);
 
-      void Queue_Post_Fetch (JOB_FETCH* pJob_Fetch);
-      void Queue_Post_Scrub (JOB_SCRUB* pJob_Scrub);
+      void Queue_Post_Fetch      (JOB_FETCH* pJob_Fetch);
+      void Queue_Post_Scrub      (JOB_SCRUB* pJob_Scrub);
+      void Queue_Post_Compositor (JOB_COMPOSITOR* pJob_Compositor);
 
       ::SNEEZE::ENGINE* Engine () const;
 
-      POOL_QUEUE<JOB_SCRUB*>& Pool_Scrub ();
-      POOL_QUEUE<JOB_FETCH*>& Pool_Fetch ();
+      POOL_QUEUE<JOB_SCRUB*>& Pool_Scrub      ();
+      POOL_QUEUE<JOB_FETCH*>& Pool_Fetch      ();
+      POOL_CYCLE            & Pool_Compositor ();
 
       CONTROL (const CONTROL&) = delete;
       CONTROL& operator= (const CONTROL&) = delete;
@@ -262,20 +341,11 @@ namespace SNEEZE
       void Main () override;
 
    private:
-      void Viewport_Render (VIEWPORT* pViewport, std::chrono::steady_clock::time_point tpLoopStart);
-
-      int64_t m_tmNow;
-
-      std::chrono::steady_clock::time_point m_tpLastFrame;
-
-      int    m_nFrameCount;
-      double m_dFpsAccum;
-      double m_dAccumInput;
-      double m_dAccumScene;
-      double m_dAccumSubmit;
-      double m_dAccumRender;
-      double m_dAccumPublish;
-      double m_dAccumFlush;
+      bool Job ();
+      void Execute_Create  (JOB_COMPOSITOR* pJob);
+      void Execute_Render  (JOB_COMPOSITOR* pJob);
+      void Execute_Present (JOB_COMPOSITOR* pJob);
+      void Execute_Destroy (JOB_COMPOSITOR* pJob);
    };
 
    // ========================================================================
