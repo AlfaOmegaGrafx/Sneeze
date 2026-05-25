@@ -82,14 +82,20 @@ namespace SNEEZE
 
       std::vector<uint32_t> m_aPixels;
 
-      void RebuildWorld (const std::vector<SPHERE_DATA>& aSpheres, const std::vector<CURVE_DATA>& aCurves);
-
       std::vector<SPHERE_DATA> m_aSpheres;
       std::vector<CURVE_DATA>  m_aCurves;
 
       UV_SPHERE m_pUnitSphere;
       bool      m_bUnitSphereReady;
       std::unordered_map<const uint8_t*, std::vector<float>> m_pColorCache;
+
+      struct SCENE_STATE;
+      SCENE_STATE* m_pSceneState;
+
+      void ReleaseScene ();
+      void BuildScene (const std::vector<SPHERE_DATA>& aSpheres, const std::vector<CURVE_DATA>& aCurves);
+      void UpdateScene (const std::vector<SPHERE_DATA>& aSpheres, const std::vector<CURVE_DATA>& aCurves);
+      bool SceneNeedsRebuild (const std::vector<SPHERE_DATA>& aSpheres, const std::vector<CURVE_DATA>& aCurves) const;
 
       double m_dLastSubmitSeconds;
       double m_dLastRenderSeconds;
