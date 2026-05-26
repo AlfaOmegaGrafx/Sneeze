@@ -36,7 +36,6 @@
 //   thread before destruction.
 // ---------------------------------------------------------------------------
 
-#include <Sneeze.h>
 #include "Control.h"
 #include "Types.h"
 #include "renderer/Renderer.h"

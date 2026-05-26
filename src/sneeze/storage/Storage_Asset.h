@@ -24,12 +24,11 @@ namespace SNEEZE
 // file for inspector metadata, and provides the JSONL changelog for crash
 // durability. Also serves as the interface for flat file sandbox ops.
 // -----------------------------------------------------------------------
-
-   class ASSET
+   class SASSET
    {
    public:
-      ASSET (STORAGE* pStorage, STORAGE::eSCOPE eScope, const std::string& sPathname);
-      virtual ~ASSET ();
+      SASSET (STORAGE* pStorage, STORAGE::eSCOPE eScope, const std::string& sPathname);
+      virtual ~SASSET ();
 
       // --- State ---
 

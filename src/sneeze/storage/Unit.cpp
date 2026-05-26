@@ -109,7 +109,7 @@ public:
 public:
    STORAGE*                 m_pStorage;
    CONTEXT::CONTAINER::CID  m_CID;
-   ASSET*                   m_apAsset[STORAGE::kSCOPE_COUNT];
+   SASSET*                  m_apAsset[STORAGE::kSCOPE_COUNT];
    std::mutex               m_mxUnit;
    bool                     m_bAttached;
    bool                     m_bPendingClear;

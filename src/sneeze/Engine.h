@@ -15,12 +15,6 @@
 #ifndef SNEEZE_ENGINE_H
 #define SNEEZE_ENGINE_H
 
-#include <thread>
-#include <mutex>
-#include <condition_variable>
-#include <chrono>
-#include <functional>
-
 namespace SNEEZE
 {
    // ---------------------------------------------------------------------------

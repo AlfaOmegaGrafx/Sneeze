@@ -15,7 +15,6 @@
 #include "compute/EmbeddedKernels.h"
 #include "compute/ComputeDispatch.h"
 
-#include <cstdio>
 #include <cstdlib>
 #include <cstdint>
 #include <cstring>

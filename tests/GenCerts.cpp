@@ -24,7 +24,6 @@
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 
-#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>

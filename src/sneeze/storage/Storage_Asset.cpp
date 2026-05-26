@@ -21,7 +21,7 @@ using namespace SNEEZE;
 // Helpers
 // ===========================================================================
 
-class ASSET::Impl
+class SASSET::Impl
 {
 public:
    Impl (STORAGE* pStorage, STORAGE::eSCOPE eScope, const std::string& sPathname) :
@@ -397,12 +397,12 @@ public:
 // ASSET
 // ===========================================================================
 
-ASSET::ASSET (STORAGE* pStorage, STORAGE::eSCOPE eScope, const std::string& sPathname) :
+SASSET::SASSET (STORAGE* pStorage, STORAGE::eSCOPE eScope, const std::string& sPathname) :
    m_pImpl (new Impl (pStorage, eScope, sPathname))
 {
 }
 
-ASSET::~ASSET ()
+SASSET::~SASSET ()
 {
    delete m_pImpl;
 }
@@ -411,20 +411,20 @@ ASSET::~ASSET ()
 // Accessors
 // ---------------------------------------------------------------------------
 
-bool                 ASSET::IsLoaded       () const { return m_pImpl->m_bLoaded; }
-bool                 ASSET::IsDirty        () const { return m_pImpl->m_bDirty; }
-STORAGE::eSCOPE      ASSET::GetScope       () const { return m_pImpl->m_eScope; }
-const std::string&   ASSET::Pathname       () const { return m_pImpl->m_sPathname; }
-uint64_t             ASSET::SizeBytes      () const { return m_pImpl->m_nSizeBytes; }
-const std::string&   ASSET::CreatedTime    () const { return m_pImpl->m_sCreatedAt; }
-const std::string&   ASSET::LastAccessTime () const { return m_pImpl->m_sLastAccessedAt; }
-uint32_t             ASSET::AccessCount    () const { return m_pImpl->m_nAccessCount; }
+bool                    SASSET::IsLoaded       () const { return m_pImpl->m_bLoaded; }
+bool                    SASSET::IsDirty        () const { return m_pImpl->m_bDirty; }
+SNEEZE::STORAGE::eSCOPE SASSET::GetScope       () const { return m_pImpl->m_eScope; }
+const std::string&      SASSET::Pathname       () const { return m_pImpl->m_sPathname; }
+uint64_t                SASSET::SizeBytes      () const { return m_pImpl->m_nSizeBytes; }
+const std::string&      SASSET::CreatedTime    () const { return m_pImpl->m_sCreatedAt; }
+const std::string&      SASSET::LastAccessTime () const { return m_pImpl->m_sLastAccessedAt; }
+uint32_t                SASSET::AccessCount    () const { return m_pImpl->m_nAccessCount; }
 
 // ---------------------------------------------------------------------------
 // JSON access
 // ---------------------------------------------------------------------------
 
-nlohmann::json ASSET::Get (const std::string& sPath) const
+nlohmann::json SASSET::Get (const std::string& sPath) const
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mutex);
 
@@ -448,7 +448,7 @@ nlohmann::json ASSET::Get (const std::string& sPath) const
    return jResult;
 }
 
-void ASSET::Set (const std::string& sPath, const nlohmann::json& jValue)
+void SASSET::Set (const std::string& sPath, const nlohmann::json& jValue)
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mutex);
 
@@ -480,7 +480,7 @@ void ASSET::Set (const std::string& sPath, const nlohmann::json& jValue)
    }
 }
 
-void ASSET::Remove (const std::string& sPath)
+void SASSET::Remove (const std::string& sPath)
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mutex);
 
@@ -508,7 +508,7 @@ void ASSET::Remove (const std::string& sPath)
    }
 }
 
-bool ASSET::Has (const std::string& sPath) const
+bool SASSET::Has (const std::string& sPath) const
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mutex);
 
@@ -531,14 +531,14 @@ bool ASSET::Has (const std::string& sPath) const
    return bHas;
 }
 
-std::string ASSET::Json () const
+std::string SASSET::Json () const
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mutex);
 
    return m_pImpl->m_jData.dump (2);
 }
 
-void ASSET::Json (const std::string& sJson)
+void SASSET::Json (const std::string& sJson)
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mutex);
 
@@ -559,18 +559,18 @@ void ASSET::Json (const std::string& sJson)
 // Lifecycle
 // ---------------------------------------------------------------------------
 
-uint32_t ASSET::Open ()  { return ++m_pImpl->m_nCount_Open; }
-uint32_t ASSET::Close () { return --m_pImpl->m_nCount_Open; }
+uint32_t SASSET::Open ()  { return ++m_pImpl->m_nCount_Open; }
+uint32_t SASSET::Close () { return --m_pImpl->m_nCount_Open; }
 
-void ASSET::Attach ()    { m_pImpl->Attach (); }
-void ASSET::Detach (const CONTEXT::CONTAINER::CID& CID) { m_pImpl->Detach (CID); }
-void ASSET::Load ()      { m_pImpl->Load ();   }
-void ASSET::Save ()      { m_pImpl->Save ();   }
-void ASSET::Evict ()     { m_pImpl->Evict ();  }
+void SASSET::Attach ()    { m_pImpl->Attach (); }
+void SASSET::Detach (const CONTEXT::CONTAINER::CID& CID) { m_pImpl->Detach (CID); }
+void SASSET::Load ()      { m_pImpl->Load ();   }
+void SASSET::Save ()      { m_pImpl->Save ();   }
+void SASSET::Evict ()     { m_pImpl->Evict ();  }
 
 // ---------------------------------------------------------------------------
 // Meta sidecar
 // ---------------------------------------------------------------------------
 
-void ASSET::TouchAccess ()                                   { m_pImpl->TouchAccess (); }
-void ASSET::SaveMeta (const CONTEXT::CONTAINER::CID& CID)   { m_pImpl->SaveMeta (CID); }
+void SASSET::TouchAccess ()                                   { m_pImpl->TouchAccess (); }
+void SASSET::SaveMeta (const CONTEXT::CONTAINER::CID& CID)   { m_pImpl->SaveMeta (CID); }

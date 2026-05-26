@@ -15,7 +15,6 @@
 // Real OpenXR implementation. Compiled when SNEEZE_ENABLE_XR is ON. The
 // SDL-only / no-XR build picks XrRuntime_Stub.cpp instead.
 
-#include <Sneeze.h>
 #include "xr/XrRuntime.h"
 
 #include <openxr/openxr.h>

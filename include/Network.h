@@ -17,7 +17,7 @@
 
 namespace SNEEZE
 {
-   struct FETCH_RESULT;
+   class NASSET;
    class JOB_FETCH;
 
    // ---------------------------------------------------------------------------
@@ -76,70 +76,6 @@ namespace SNEEZE
       public:
          virtual ~IENUM () {}
          virtual void OnAsset (FILE* pFile) = 0;
-      };
-
-      // -----------------------------------------------------------------------
-      // ASSET — internal shared state for a single cached URL.
-      //
-      // Owned by NETWORK, never exposed to callers directly. One ASSET per URL.
-      // Multiple FILE handles may reference the same ASSET.
-      // -----------------------------------------------------------------------
-
-      class ASSET
-      {
-      public:
-         ASSET (NETWORK* pNetwork, const std::string& sUrl, const std::string& sPathname, uint32_t nAssetIx);
-         virtual ~ASSET ();
-
-         // Lifecycle
-         void        Open (FILE* pFile);
-         size_t      Close (FILE* pFile);
-
-         bool        Attach (FILE* pFile, bool bFetch_Allowed);
-         void        Detach (FILE* pFile);
-
-         // Fetch completion (called by FETCH thread)
-         void        FetchComplete (const FETCH_RESULT& Fetch_Result);
-         void        FetchComplete (FILE* pFile, NETWORK::STATE bState);
-
-         // Hash verification
-         bool        VerifyHash (const std::string& sFilePath, const std::string& sHash) const;
-
-         void ReadData (std::vector<uint8_t>& aData) const;
-         std::string Header (const std::string& sName) const;
-
-         // Accessors
-         bool                 IsShuttingDown    () const;
-         STATE                State             () const;
-         bool                 IsReset           () const;
-         size_t               File_Count        () const;
-         const std::string&   Url               () const;
-         uint64_t             SizeBytes         () const;
-         std::string          CreatedTime       () const;
-         std::string          LastAccessTime    () const;
-         uint32_t             AccessCount       () const;
-         uint32_t             AssetIx           () const;
-         const std::string&   Hash              () const;
-         bool                 IsHashed          () const;
-         std::string          DiskPath          () const;
-         const std::string&   Pathname          () const;
-         std::string          Path              (DISKFILE eType) const;
-         long                 HttpStatus        () const;
-         double               FetchStartTime    () const;
-         double               FetchEndTime      () const;
-         double               FetchDuration     () const;
-         double               FetchQueuedTime   () const;
-         double               QueueDuration     () const;
-         bool                 IsServedFromCache () const;
-         std::vector<FILE*>   File_Collect      () const;
-         const std::unordered_map<std::string, std::string>& Headers () const;
-
-         // Modifiers
-         void Reset              ();
-
-      private:
-         class Impl;
-         Impl* m_pImpl;
       };
 
       // -----------------------------------------------------------------------
@@ -231,7 +167,6 @@ namespace SNEEZE
          void   SnapshotFinal ();
 
       private:
-
          class Impl;
          Impl* m_pImpl;
       };
@@ -244,15 +179,6 @@ namespace SNEEZE
       ~NETWORK ();
 
       bool Initialize ();
-
-      CONTEXT*           Context () const;
-      const std::string& sPath_Permanent () const;
-      bool               IsShuttingDown () const;
-      double             SecondsSinceEpoch () const;
-      uint32_t           Asset_Index ();
-      bool               Rules_Stale (ASSET* pAsset) const;
-      ASSET*             Asset_Open  (FILE* pFile);
-      void               Asset_Close (ASSET* pAsset, FILE* pFile);
 
       // --- Primary API ---
 
@@ -273,11 +199,23 @@ namespace SNEEZE
 
       void Rules_Add (const std::string& sContentType, const std::string& sOlderThan);
 
-      void Queue_Post_Fetch (JOB_FETCH* pJob_Fetch);
+      // TODO: MOVE THIS
+      CONTEXT* Context () const;
+      uint32_t Asset_Index ();
+      bool     Rules_Stale (NASSET* pAsset) const;
+      void     Queue_Post_Fetch (JOB_FETCH* pJob_Fetch);
+      double   SecondsSinceEpoch () const;
+
+      NASSET*  Asset_Open (FILE* pFile);
+      void     Asset_Close (NASSET* pAsset, FILE* pFile);
+
+      bool     IsShuttingDown () const;
 
    private:
       class Impl;
       Impl* m_pImpl;
+
+      const std::string&   sPath_Permanent () const;
    };
 }
 #endif // SNEEZE_NETWORK_H

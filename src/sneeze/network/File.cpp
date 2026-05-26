@@ -12,12 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <Sneeze.h>
-
-#include <cstdio>
-#include <mutex>
-
 #include <openssl/sha.h>
+#include "Network_Asset.h"
 
 using namespace SNEEZE;
 
@@ -258,7 +254,7 @@ public:
    FILE*                    m_pFile;
    NETWORK*                 m_pNetwork;
    CONTEXT::CONTAINER::CID  m_CID;
-   ASSET*                   m_pAsset;
+   NASSET*                  m_pAsset;
    IFILE*                   m_pListener;
    uint32_t                 m_nCount_Attach;
    std::recursive_mutex     m_mxFile;
