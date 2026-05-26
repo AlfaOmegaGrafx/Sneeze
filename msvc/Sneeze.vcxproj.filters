@@ -145,6 +145,12 @@
     <ClCompile Include="..\src\sneeze\console\Console.cpp">
       <Filter>src\sneeze\console</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\sneeze\console\Entry.cpp">
+      <Filter>src\sneeze\console</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\sneeze\console\Stream.cpp">
+      <Filter>src\sneeze\console</Filter>
+    </ClCompile>
     <ClCompile Include="..\src\astro\BodyData.cpp">
       <Filter>src\astro</Filter>
     </ClCompile>
@@ -356,6 +362,9 @@
     <ClInclude Include="..\include\Console.h">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\sneeze\console\Stream.h">
+      <Filter>src\sneeze\console</Filter>
+    </ClInclude>
     <ClInclude Include="..\src\sneeze\storage\Storage_Asset.h">
       <Filter>src\sneeze\storage</Filter>
     </ClInclude>
@@ -406,6 +415,9 @@
       <Filter>tests</Filter>
     </None>
     <None Include="..\tests\WasmRuntimeTest.cpp">
+      <Filter>tests</Filter>
+    </None>
+    <None Include="..\tests\ConsoleTest.cpp">
       <Filter>tests</Filter>
     </None>
     <None Include="..\tests\XrRuntimeTest.cpp">

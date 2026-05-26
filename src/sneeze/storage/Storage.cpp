@@ -148,10 +148,10 @@ STORAGE::STORAGE (CONTEXT* pContext) :
 {
 }
 
-bool              STORAGE::Initialize ()              { return m_pImpl->Initialize (); }
-SNEEZE::CONTEXT*  STORAGE::Context    ()        const { return m_pImpl->m_pContext; }
-const std::string& STORAGE::sPath_Permanent () const { return m_pImpl->m_sPath_Permanent; }
-const std::string& STORAGE::sPath_Temporary () const { return m_pImpl->m_sPath_Temporary; }
+bool STORAGE::Initialize ()
+{
+   return m_pImpl->Initialize ();
+}
 
 STORAGE::~STORAGE ()
 {
@@ -159,11 +159,20 @@ STORAGE::~STORAGE ()
 }
 
 // ---------------------------------------------------------------------------
-// Container lifecycle
+// Accessors
 // ---------------------------------------------------------------------------
 
-STORAGE::UNIT* STORAGE::Unit_Open   (const CONTEXT::CONTAINER::CID* pCID)        { return m_pImpl->Unit_Open   (pCID); }
-void           STORAGE::Unit_Close  (UNIT* pUnit)                                 {        m_pImpl->Unit_Close  (pUnit); }
-void           STORAGE::Unit_Enum   (IENUM* pEnum)                                {        m_pImpl->Unit_Enum   (pEnum); }
-ASSET*         STORAGE::Asset_Open  (eSCOPE eScope, const std::string& sPathname) { return m_pImpl->Asset_Open  (eScope, sPathname); }
-void           STORAGE::Asset_Close (ASSET* pAsset)                               {        m_pImpl->Asset_Close (pAsset); }
+SNEEZE::CONTEXT*   STORAGE::Context         ()                                      const { return m_pImpl->m_pContext; }
+const std::string& STORAGE::sPath_Permanent ()                                      const { return m_pImpl->m_sPath_Permanent; }
+const std::string& STORAGE::sPath_Temporary ()                                      const { return m_pImpl->m_sPath_Temporary; }
+
+// ---------------------------------------------------------------------------
+// Methods
+// ---------------------------------------------------------------------------
+
+STORAGE::UNIT*     STORAGE::Unit_Open       (const CONTEXT::CONTAINER::CID* pCID)         { return m_pImpl->Unit_Open       (pCID); }
+void               STORAGE::Unit_Close      (UNIT* pUnit)                                 {        m_pImpl->Unit_Close      (pUnit); }
+void               STORAGE::Unit_Enum       (IENUM* pEnum)                                {        m_pImpl->Unit_Enum       (pEnum); }
+
+ASSET*             STORAGE::Asset_Open      (eSCOPE eScope, const std::string& sPathname) { return m_pImpl->Asset_Open      (eScope, sPathname); }
+void               STORAGE::Asset_Close     (ASSET* pAsset)                               {        m_pImpl->Asset_Close     (pAsset); }

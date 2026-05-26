@@ -34,8 +34,9 @@ extern int RunUiTests      (int nArgc, char** aArgv);
 extern int RunComputeTests (int nArgc, char** aArgv);
 extern int RunVoxTests     (int nArgc, char** aArgv);
 extern int RunJwsTests     (int nArgc, char** aArgv);
-extern int RunNetworkTests   (int nArgc, char** aArgv);
-extern int RunStorageTests   (int nArgc, char** aArgv);
+extern int RunNetworkTests (int nArgc, char** aArgv);
+extern int RunStorageTests (int nArgc, char** aArgv);
+extern int RunConsoleTests (int nArgc, char** aArgv);
 
 // ---------------------------------------------------------------------------
 // Suite table
@@ -55,7 +56,7 @@ static const SUITE g_aSuites[] =
 #endif
    { "--spv",     "Spv",     RunSpvTests     },
 #ifdef SNEEZE_HAS_XR
-   { "--xr",      "Xr",     RunXrTests      },
+   { "--xr",      "Xr",      RunXrTests      },
 #endif
    { "--net",     "Net",     RunNetTests     },
    { "--ui",      "Ui",      RunUiTests      },
@@ -64,6 +65,7 @@ static const SUITE g_aSuites[] =
    { "--jws",     "Jws",     RunJwsTests     },
    { "--network", "Network", RunNetworkTests },
    { "--storage", "Storage", RunStorageTests },
+   { "--console", "Console", RunConsoleTests },
 };
 
 static const int g_nSuiteCount = sizeof (g_aSuites) / sizeof (g_aSuites[0]);

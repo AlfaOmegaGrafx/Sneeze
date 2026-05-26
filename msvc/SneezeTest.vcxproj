@@ -133,6 +133,7 @@
     <ClCompile Include="..\tests\JwsTest.cpp" />
     <ClCompile Include="..\tests\NetworkTest.cpp" />
     <ClCompile Include="..\tests\StorageTest.cpp" />
+    <ClCompile Include="..\tests\ConsoleTest.cpp" />
     <ClCompile Include="..\tests\WasmRuntimeTest.cpp" />
     <ClCompile Include="..\tests\XrRuntimeTest.cpp" />
   </ItemGroup>
