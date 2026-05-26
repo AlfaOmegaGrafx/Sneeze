@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <Sneeze.h>
-
-#include <nlohmann/json.hpp>
+#include "Network_Asset.h"
 
 using namespace SNEEZE;
 
@@ -213,7 +211,7 @@ public:
       }
    }
 
-   bool Rules_Stale (ASSET* pAsset) const
+   bool Rules_Stale (NASSET* pAsset) const
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -406,11 +404,11 @@ public:
    // Asset helpers
    // ---------------------------------------------------------------------------
 
-   ASSET* Asset_Open (FILE* pFile)
+   NASSET* Asset_Open (FILE* pFile)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-      ASSET* pAsset = nullptr;
+      NASSET* pAsset = nullptr;
 
       std::string sUrl      = pFile->Url ();
       std::string sPathname = pFile->sPathname ("");
@@ -418,7 +416,7 @@ public:
       auto it = m_umpAsset.find (sPathname);
       if (it == m_umpAsset.end ())
       {
-         pAsset = new ASSET (m_pNetwork, sUrl, sPathname, Asset_Index ());
+         pAsset = new NASSET (m_pNetwork, sUrl, sPathname, Asset_Index ());
 
          m_umpAsset[sPathname] = pAsset;
       }
@@ -429,7 +427,7 @@ public:
       return pAsset;
    }
 
-   void Asset_Close (ASSET* pAsset, FILE* pFile)
+   void Asset_Close (NASSET* pAsset, FILE* pFile)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -453,7 +451,7 @@ public:
    std::string                             m_sPath_Permanent;
    std::string                             m_sCachePath;
 
-   std::unordered_map<std::string, ASSET*> m_umpAsset;
+   std::unordered_map<std::string, NASSET*> m_umpAsset;
 
    mutable std::recursive_mutex            m_mutex;
 
@@ -502,12 +500,12 @@ bool               NETWORK::IsCacheEnabled    ()                                
 // Methods
 // ---------------------------------------------------------------------------
 
-double             NETWORK::SecondsSinceEpoch ()                                     const { return m_pImpl->SecondsSinceEpoch (); }
+double     NETWORK::SecondsSinceEpoch ()                                     const { return m_pImpl->SecondsSinceEpoch (); }
 
-bool               NETWORK::Rules_Stale       (ASSET* pAsset)                        const { return m_pImpl->Rules_Stale (pAsset); }
-NETWORK::ASSET*    NETWORK::Asset_Open        (FILE* pFile)                                { return m_pImpl->Asset_Open (pFile); }
-void               NETWORK::Asset_Close       (ASSET* pAsset, FILE* pFile)                 {        m_pImpl->Asset_Close (pAsset, pFile); }
-uint32_t           NETWORK::Asset_Index       ()                                           { return m_pImpl->Asset_Index (); }
+bool       NETWORK::Rules_Stale       (NASSET* pAsset)                       const { return m_pImpl->Rules_Stale (pAsset); }
+NASSET*    NETWORK::Asset_Open        (FILE* pFile)                                { return m_pImpl->Asset_Open (pFile); }
+void       NETWORK::Asset_Close       (NASSET* pAsset, FILE* pFile)                {        m_pImpl->Asset_Close (pAsset, pFile); }
+uint32_t   NETWORK::Asset_Index       ()                                           { return m_pImpl->Asset_Index (); }
 
 NETWORK::FILE* NETWORK::File_Open (CONTEXT::CONTAINER::CID* pCID, const std::string& sUrl, IFILE* pListener)
 {
