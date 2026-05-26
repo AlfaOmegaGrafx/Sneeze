@@ -28,6 +28,7 @@ set (TEST_SOURCES
    JwsTest.cpp
    NetworkTest.cpp
    StorageTest.cpp
+   ConsoleTest.cpp
 )
 
 if (SNEEZE_ENABLE_WASM)

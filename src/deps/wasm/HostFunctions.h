@@ -18,7 +18,8 @@
 #include <wasmtime.h>
 #include <cstdint>
 
-namespace DEP {
+namespace DEP
+{
 
 // ---------------------------------------------------------------------------
 // Host functions exposed to WASM modules via Wasmtime linker.
@@ -33,55 +34,40 @@ namespace DEP {
 
 // --- SOM host functions ---
 
-wasm_trap_t* SOM_Node_Create (void* pEnv, wasmtime_caller_t* pCaller,
-   const wasmtime_val_t* pArgs, size_t nArgs,
-   wasmtime_val_t* pResults, size_t nResults);
-
-wasm_trap_t* SOM_Node_Remove (void* pEnv, wasmtime_caller_t* pCaller,
-   const wasmtime_val_t* pArgs, size_t nArgs,
-   wasmtime_val_t* pResults, size_t nResults);
-
-wasm_trap_t* SOM_Transform_Set (void* pEnv, wasmtime_caller_t* pCaller,
-   const wasmtime_val_t* pArgs, size_t nArgs,
-   wasmtime_val_t* pResults, size_t nResults);
-
-wasm_trap_t* SOM_Transform_Get (void* pEnv, wasmtime_caller_t* pCaller,
-   const wasmtime_val_t* pArgs, size_t nArgs,
-   wasmtime_val_t* pResults, size_t nResults);
-
-wasm_trap_t* SOM_Property_Set (void* pEnv, wasmtime_caller_t* pCaller,
-   const wasmtime_val_t* pArgs, size_t nArgs,
-   wasmtime_val_t* pResults, size_t nResults);
-
-wasm_trap_t* SOM_Property_Get (void* pEnv, wasmtime_caller_t* pCaller,
-   const wasmtime_val_t* pArgs, size_t nArgs,
-   wasmtime_val_t* pResults, size_t nResults);
-
-wasm_trap_t* SOM_Watch_Node (void* pEnv, wasmtime_caller_t* pCaller,
-   const wasmtime_val_t* pArgs, size_t nArgs,
-   wasmtime_val_t* pResults, size_t nResults);
-
-wasm_trap_t* SOM_Watch_Tree (void* pEnv, wasmtime_caller_t* pCaller,
-   const wasmtime_val_t* pArgs, size_t nArgs,
-   wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* SOM_Node_Create        (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* SOM_Node_Remove        (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* SOM_Transform_Set      (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* SOM_Transform_Get      (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* SOM_Property_Set       (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* SOM_Property_Get       (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* SOM_Watch_Node         (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* SOM_Watch_Tree         (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
 
 // --- Storage host functions ---
 
-wasm_trap_t* Storage_Get (void* pEnv, wasmtime_caller_t* pCaller,
-   const wasmtime_val_t* pArgs, size_t nArgs,
-   wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* Storage_Get            (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* Storage_Set            (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* Storage_Remove         (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* Storage_Has            (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
 
-wasm_trap_t* Storage_Set (void* pEnv, wasmtime_caller_t* pCaller,
-   const wasmtime_val_t* pArgs, size_t nArgs,
-   wasmtime_val_t* pResults, size_t nResults);
+// --- Console host functions ---
 
-wasm_trap_t* Storage_Remove (void* pEnv, wasmtime_caller_t* pCaller,
-   const wasmtime_val_t* pArgs, size_t nArgs,
-   wasmtime_val_t* pResults, size_t nResults);
-
-wasm_trap_t* Storage_Has (void* pEnv, wasmtime_caller_t* pCaller,
-   const wasmtime_val_t* pArgs, size_t nArgs,
-   wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* Console_Log            (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* Console_Debug          (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* Console_Info           (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* Console_Warn           (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* Console_Error          (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* Console_Assert         (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* Console_Clear          (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* Console_Count          (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* Console_CountReset     (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* Console_Group          (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* Console_GroupCollapsed (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* Console_GroupEnd       (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* Console_Time           (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* Console_TimeEnd        (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* Console_TimeLog        (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+wasm_trap_t* Console_TimeStamp      (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
 
 } // namespace DEP
 

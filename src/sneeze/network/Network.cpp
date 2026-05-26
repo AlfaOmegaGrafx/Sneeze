@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <Sneeze.h>
+
 #include <nlohmann/json.hpp>
-#include "Network_Asset.h"
 
 using namespace SNEEZE;
 
@@ -99,10 +100,6 @@ public:
    // ---------------------------------------------------------------------------
    // Accessors
    // ---------------------------------------------------------------------------
-
-   CONTEXT*            Context () const { return m_pContext; }
-   const std::string&  sPath_Permanent () const { return m_sPath_Permanent; }
-   bool                IsShuttingDown () const { return m_bShuttingDown; }
 
    // ---------------------------------------------------------------------------
    // Path helpers
@@ -216,7 +213,7 @@ public:
       }
    }
 
-   bool Rules_Stale (NASSET* pAsset) const
+   bool Rules_Stale (ASSET* pAsset) const
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -370,15 +367,6 @@ public:
       Rules_Add ("", NowIso8601 ());
    }
 
-   void SetCacheEnabled (bool b)
-   {
-      m_bCacheEnabled = b;
-   }
-
-   bool IsCacheEnabled () const
-   {
-      return m_bCacheEnabled;
-   }
 
    // ---------------------------------------------------------------------------
    // Notification helpers (called under m_mutex -- recursive lock allows re-entry)
@@ -418,11 +406,11 @@ public:
    // Asset helpers
    // ---------------------------------------------------------------------------
 
-   NASSET* Asset_Open (FILE* pFile)
+   ASSET* Asset_Open (FILE* pFile)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-      NASSET* pAsset = nullptr;
+      ASSET* pAsset = nullptr;
 
       std::string sUrl      = pFile->Url ();
       std::string sPathname = pFile->sPathname ("");
@@ -430,7 +418,7 @@ public:
       auto it = m_umpAsset.find (sPathname);
       if (it == m_umpAsset.end ())
       {
-         pAsset = new NASSET (m_pNetwork, sUrl, sPathname, Asset_Index ());
+         pAsset = new ASSET (m_pNetwork, sUrl, sPathname, Asset_Index ());
 
          m_umpAsset[sPathname] = pAsset;
       }
@@ -441,7 +429,7 @@ public:
       return pAsset;
    }
 
-   void Asset_Close (NASSET* pAsset, FILE* pFile)
+   void Asset_Close (ASSET* pAsset, FILE* pFile)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -460,13 +448,12 @@ public:
 
    // ---------------------------------------------------------------------------
 
-   private:
    NETWORK*                                m_pNetwork;
    CONTEXT*                                m_pContext;
    std::string                             m_sPath_Permanent;
    std::string                             m_sCachePath;
 
-   std::unordered_map<std::string, NASSET*> m_umpAsset;
+   std::unordered_map<std::string, ASSET*> m_umpAsset;
 
    mutable std::recursive_mutex            m_mutex;
 
@@ -502,19 +489,25 @@ NETWORK::~NETWORK ()
    delete m_pImpl;
 }
 
-SNEEZE::CONTEXT*   NETWORK::Context           ()                                     const { return m_pImpl->Context (); }
-const std::string& NETWORK::sPath_Permanent   ()                                     const { return m_pImpl->sPath_Permanent (); }
-bool               NETWORK::IsShuttingDown    ()                                     const { return m_pImpl->IsShuttingDown (); }
+// ---------------------------------------------------------------------------
+// Accessors
+// ---------------------------------------------------------------------------
+
+SNEEZE::CONTEXT*   NETWORK::Context           ()                                     const { return m_pImpl->m_pContext; }
+const std::string& NETWORK::sPath_Permanent   ()                                     const { return m_pImpl->m_sPath_Permanent; }
+bool               NETWORK::IsShuttingDown    ()                                     const { return m_pImpl->m_bShuttingDown; }
+bool               NETWORK::IsCacheEnabled    ()                                     const { return m_pImpl->m_bCacheEnabled; }
+
+// ---------------------------------------------------------------------------
+// Methods
+// ---------------------------------------------------------------------------
+
 double             NETWORK::SecondsSinceEpoch ()                                     const { return m_pImpl->SecondsSinceEpoch (); }
+
+bool               NETWORK::Rules_Stale       (ASSET* pAsset)                        const { return m_pImpl->Rules_Stale (pAsset); }
+NETWORK::ASSET*    NETWORK::Asset_Open        (FILE* pFile)                                { return m_pImpl->Asset_Open (pFile); }
+void               NETWORK::Asset_Close       (ASSET* pAsset, FILE* pFile)                 {        m_pImpl->Asset_Close (pAsset, pFile); }
 uint32_t           NETWORK::Asset_Index       ()                                           { return m_pImpl->Asset_Index (); }
-
-bool               NETWORK::Rules_Stale       (NASSET* pAsset)                       const { return m_pImpl->Rules_Stale (pAsset); }
-NASSET*            NETWORK::Asset_Open        (FILE* pFile)                                { return m_pImpl->Asset_Open (pFile); }
-void               NETWORK::Asset_Close       (NASSET* pAsset, FILE* pFile)                {        m_pImpl->Asset_Close (pAsset, pFile); }
-
-// ---------------------------------------------------------------------------
-// File_Open / File_Close
-// ---------------------------------------------------------------------------
 
 NETWORK::FILE* NETWORK::File_Open (CONTEXT::CONTAINER::CID* pCID, const std::string& sUrl, IFILE* pListener)
 {
@@ -539,7 +532,6 @@ void NETWORK::File_Enum  (IENUM* pEnum) { m_pImpl->File_Enum (pEnum); }
 void NETWORK::Clear             ()                                                               { m_pImpl->Clear (); }
 void NETWORK::Reset             ()                                                               { m_pImpl->Reset (); }
 void NETWORK::Rules_Add         (const std::string& sContentType, const std::string& sOlderThan) { m_pImpl->Rules_Add (sContentType, sOlderThan); }
-void NETWORK::SetCacheEnabled   (bool b)                                                         { m_pImpl->SetCacheEnabled (b); }
-bool NETWORK::IsCacheEnabled    ()                                                         const { return m_pImpl->IsCacheEnabled (); }
+void NETWORK::SetCacheEnabled   (bool b)                                                         { m_pImpl->m_bCacheEnabled = b; }
 
-void NETWORK::Queue_Post_Fetch  (JOB_FETCH* pJob_Fetch)                                          { m_pImpl->Context ()->Engine ()->Queue_Post_Fetch (pJob_Fetch); }
+void NETWORK::Queue_Post_Fetch  (JOB_FETCH* pJob_Fetch)                                          { m_pImpl->m_pContext->Engine ()->Queue_Post_Fetch (pJob_Fetch); }
