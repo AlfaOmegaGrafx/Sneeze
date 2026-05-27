@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <Sneeze.h>
 #include "Storage_Asset.h"
 
 using namespace SNEEZE;
@@ -24,8 +23,8 @@ using namespace SNEEZE;
 class SASSET::Impl
 {
 public:
-   Impl (STORAGE* pStorage, STORAGE::eSCOPE eScope, const std::string& sPathname) :
-      m_pStorage (pStorage),
+   Impl (ISTORAGE_IMPL* pIStorage_Impl, STORAGE::eSCOPE eScope, const std::string& sPathname) :
+      m_pIStorage_Impl (pIStorage_Impl),
       m_eScope (eScope),
       m_sPathname (sPathname),
       m_bLoaded (false),
@@ -506,7 +505,7 @@ public:
       TouchAccess ();
    }
 
-   STORAGE*             m_pStorage;
+   ISTORAGE_IMPL*       m_pIStorage_Impl;
    STORAGE::eSCOPE      m_eScope;
    std::string          m_sPathname;
 
@@ -523,17 +522,14 @@ public:
    uint32_t             m_nAccessCount;
 
    mutable std::recursive_mutex  m_mutex;
-
-   friend class UNIT;
-   friend class STORAGE;
 };
 
 // ===========================================================================
 // ASSET
 // ===========================================================================
 
-SASSET::SASSET (STORAGE* pStorage, STORAGE::eSCOPE eScope, const std::string& sPathname) :
-   m_pImpl (new Impl (pStorage, eScope, sPathname))
+SASSET::SASSET (ISTORAGE_IMPL* pIStorage_Impl, STORAGE::eSCOPE eScope, const std::string& sPathname) :
+   m_pImpl (new Impl (pIStorage_Impl, eScope, sPathname))
 {
 }
 

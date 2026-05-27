@@ -223,9 +223,7 @@ public:
       m_mxFrameBuffer.unlock ();
    }
 
-   friend class VIEWPORT;
-
-protected:
+public:
    VIEWPORT*               m_pViewport;
    CONTEXT*                m_pContext;
    SCENE*                  m_pScene;

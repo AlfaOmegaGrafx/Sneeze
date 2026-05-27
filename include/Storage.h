@@ -33,6 +33,7 @@ namespace SNEEZE
    // ---------------------------------------------------------------------------
 
    class SASSET;
+   class ISTORAGE_IMPL;
 
    class STORAGE
    {
@@ -62,7 +63,7 @@ namespace SNEEZE
       class UNIT
       {
       public:
-         UNIT (STORAGE* pStorage, const CONTEXT::CONTAINER::CID* pCID);
+         UNIT (ISTORAGE_IMPL* pIStorage_Impl, const CONTEXT::CONTAINER::CID* pCID);
         ~UNIT ();
 
          void Initialize ();
@@ -120,10 +121,6 @@ namespace SNEEZE
 
       bool Initialize ();
 
-      CONTEXT*            Context () const;
-      const std::string&  Path_Permanent () const;
-      const std::string&  Path_Temporary () const;
-
       // --- Container lifecycle ---
 
       UNIT*   Unit_Open  (const CONTEXT::CONTAINER::CID* pCID);
@@ -134,8 +131,6 @@ namespace SNEEZE
       class Impl;
       Impl* m_pImpl;
 
-      SASSET* Asset_Open  (eSCOPE eScope, const std::string& sPathname);
-      void   Asset_Close (SASSET* pAsset);
    };
 }
 #endif // SNEEZE_STORAGE_STORAGE_H

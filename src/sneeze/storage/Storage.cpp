@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <Sneeze.h>
 #include "Storage_Asset.h"
 
 using namespace SNEEZE;
 
-class STORAGE::Impl
+ISTORAGE_IMPL::ISTORAGE_IMPL () {}
+ISTORAGE_IMPL::~ISTORAGE_IMPL () {}
+
+class STORAGE::Impl : public ISTORAGE_IMPL
 {
 public:
    Impl (STORAGE* pStorage, CONTEXT* pContext) :
@@ -60,7 +62,7 @@ public:
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
 
-         pUnit = new UNIT (m_pStorage, pCID);
+         pUnit = new UNIT (this, pCID);
 
          m_apUnit.push_back (pUnit);
 
@@ -100,8 +102,7 @@ public:
    }
 
    // ---------------------------------------------------------------------------
-   // Asset helpers -- called by UNIT (Initialize, ~UNIT) which is always invoked
-   // under m_mxStorage via Unit_Open/Unit_Close. Not independently thread-safe.
+   // INETWORK_WORKER
    // ---------------------------------------------------------------------------
 
    SASSET* Asset_Open (eSCOPE eScope, const std::string& sPathname)
@@ -111,7 +112,7 @@ public:
       auto it = m_umpAsset.find (sPathname);
       if (it == m_umpAsset.end ())
       {
-         pAsset = new SASSET (m_pStorage, eScope, sPathname);
+         pAsset = new SASSET (this, eScope, sPathname);
          m_umpAsset[sPathname] = pAsset;
       }
       else pAsset = it->second;
@@ -129,6 +130,26 @@ public:
 
          delete pAsset;
       }
+   }
+
+   const std::string& Path_Permanent () const override
+   { 
+      return m_sPath_Permanent; 
+   }
+
+   const std::string& Path_Temporary () const override
+   { 
+      return m_sPath_Temporary; 
+   }
+
+   ICONTEXT* Host () const override
+   {
+      return m_pContext->Host ();
+   }
+
+   void Log (IENGINE::eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage) override
+   {
+      m_pContext->Engine ()->Log (Level, sModule, sMessage);
    }
 
    STORAGE*                                m_pStorage;
@@ -151,9 +172,6 @@ STORAGE::STORAGE (CONTEXT* pContext) :
 }
 
 bool              STORAGE::Initialize ()             { return m_pImpl->Initialize (); }
-SNEEZE::CONTEXT*  STORAGE::Context    ()       const { return m_pImpl->m_pContext; }
-const std::string& STORAGE::Path_Permanent () const { return m_pImpl->m_sPath_Permanent; }
-const std::string& STORAGE::Path_Temporary () const { return m_pImpl->m_sPath_Temporary; }
 
 STORAGE::~STORAGE ()
 {
@@ -167,6 +185,3 @@ STORAGE::~STORAGE ()
 STORAGE::UNIT*     STORAGE::Unit_Open       (const CONTEXT::CONTAINER::CID* pCID)         { return m_pImpl->Unit_Open       (pCID); }
 void               STORAGE::Unit_Close      (UNIT* pUnit)                                 {        m_pImpl->Unit_Close      (pUnit); }
 void               STORAGE::Unit_Enum       (IENUM_UNIT* pEnum)                           {        m_pImpl->Unit_Enum       (pEnum); }
-
-SASSET*            STORAGE::Asset_Open      (eSCOPE eScope, const std::string& sPathname) { return m_pImpl->Asset_Open      (eScope, sPathname); }
-void               STORAGE::Asset_Close     (SASSET* pAsset)                              {        m_pImpl->Asset_Close     (pAsset); }

@@ -24,10 +24,10 @@ using namespace SNEEZE;
 class STORAGE::UNIT::Impl
 {
 public:
-   Impl (STORAGE* pStorage, const CONTEXT::CONTAINER::CID* pCID) :
-      m_pStorage      (pStorage),
-      m_pCID          (pCID),
-      m_bAttached     (false)
+   Impl (ISTORAGE_IMPL* pIStorage_Impl, const CONTEXT::CONTAINER::CID* pCID) :
+      m_pIStorage_Impl (pIStorage_Impl),
+      m_pCID           (pCID),
+      m_bAttached      (false)
    {
       for (int nScope = 0; nScope < STORAGE::kSCOPE_COUNT; nScope++)
          m_apAsset[nScope] = nullptr;
@@ -39,7 +39,7 @@ public:
       {
          eSCOPE eScope = static_cast<eSCOPE> (nScope);
 
-         m_apAsset[nScope] = m_pStorage->Asset_Open (eScope, Pathname (eScope));
+         m_apAsset[nScope] = m_pIStorage_Impl->Asset_Open (eScope, Pathname (eScope));
       }
    }
 
@@ -52,7 +52,7 @@ public:
       {
          if (m_apAsset[nScope])
          {
-            m_pStorage->Asset_Close (m_apAsset[nScope]);
+            m_pIStorage_Impl->Asset_Close (m_apAsset[nScope]);
             m_apAsset[nScope] = nullptr;
          }
       }
@@ -64,7 +64,7 @@ public:
 
    std::string Path (eSCOPE eScope) const
    {
-      const std::string& sBasePath = (eScope == kSCOPE_TEMPORARY_ORG || eScope == kSCOPE_TEMPORARY_COMPANY) ? m_pStorage->Path_Temporary () : m_pStorage->Path_Permanent ();
+      const std::string& sBasePath = (eScope == kSCOPE_TEMPORARY_ORG || eScope == kSCOPE_TEMPORARY_COMPANY) ? m_pIStorage_Impl->Path_Temporary () : m_pIStorage_Impl->Path_Permanent ();
 
       return (std::filesystem::path (sBasePath) / m_pCID->sPersonaHash / m_pCID->sFingerprint.substr (0, 2) / m_pCID->sFingerprint.substr (2, 22)).string ();
    }
@@ -127,14 +127,14 @@ public:
    {
       m_apAsset[eScope]->Set (sPath, jValue);
 
-      m_pStorage->Context ()->Host ()->OnStorageUnitChanged (pUnit, eScope, sPath);
+      m_pIStorage_Impl->Host ()->OnStorageUnitChanged (pUnit, eScope, sPath);
    }
 
    void Remove (UNIT* pUnit, eSCOPE eScope, const std::string& sPath)
    {
       m_apAsset[eScope]->Remove (sPath);
 
-      m_pStorage->Context ()->Host ()->OnStorageUnitChanged (pUnit, eScope, sPath);
+      m_pIStorage_Impl->Host ()->OnStorageUnitChanged (pUnit, eScope, sPath);
    }
 
    bool Has (eSCOPE eScope, const std::string& sPath) const
@@ -150,23 +150,23 @@ public:
    void Json (UNIT* pUnit, eSCOPE eScope, const std::string& sJson)
    {
       m_apAsset[eScope]->Json (sJson);
-      m_pStorage->Context ()->Host ()->OnStorageUnitChanged (pUnit, eScope, "");
+      m_pIStorage_Impl->Host ()->OnStorageUnitChanged (pUnit, eScope, "");
    }
 
 public:
-   STORAGE*                       m_pStorage;
-   const CONTEXT::CONTAINER::CID* m_pCID;
-   SASSET*                        m_apAsset[STORAGE::kSCOPE_COUNT];
-   std::mutex                     m_mxUnit;
-   bool                           m_bAttached;
+   ISTORAGE_IMPL*                   m_pIStorage_Impl;
+   const CONTEXT::CONTAINER::CID*   m_pCID;
+   SASSET*                          m_apAsset[STORAGE::kSCOPE_COUNT];
+   std::mutex                       m_mxUnit;
+   bool                             m_bAttached;
 };
 
 // ===========================================================================
 // STORAGE::UNIT
 // ===========================================================================
 
-STORAGE::UNIT::UNIT (STORAGE* pStorage, const CONTEXT::CONTAINER::CID* pCID) :
-   m_pImpl (new Impl (pStorage, pCID))
+STORAGE::UNIT::UNIT (ISTORAGE_IMPL* pIStorage_Impl, const CONTEXT::CONTAINER::CID* pCID) :
+   m_pImpl (new Impl (pIStorage_Impl, pCID))
 {
 }
 

@@ -15,6 +15,8 @@
 #ifndef SNEEZE_STORAGE_ASSET_H
 #define SNEEZE_STORAGE_ASSET_H
 
+#include "Storage.h"
+
 namespace SNEEZE
 {
    // -----------------------------------------------------------------------
@@ -27,7 +29,7 @@ namespace SNEEZE
    class SASSET
    {
    public:
-      SASSET (STORAGE* pStorage, STORAGE::eSCOPE eScope, const std::string& sPathname);
+      SASSET (ISTORAGE_IMPL* pIStorage_Impl, STORAGE::eSCOPE eScope, const std::string& sPathname);
       virtual ~SASSET ();
 
       // --- State ---
