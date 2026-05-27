@@ -29,7 +29,7 @@ namespace SNEEZE
    class BLOCK
    {
    public:
-      BLOCK (CONSOLE* pConsole, uint32_t nIndex, const std::string& sPathname);
+      BLOCK (ICONSOLE_IMPL* pIConsole_Impl, uint32_t nIndex, const std::string& sPathname);
       virtual ~BLOCK ();
 
       // --- State ---

@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <Sneeze.h>
-#include <Console.h>
+#include "Console.h"
 #include "Block.h"
 #include <iomanip>
 
@@ -26,8 +25,8 @@ using namespace SNEEZE;
 class CONSOLE::STREAM::Impl
 {
 public:
-   Impl (CONSOLE* pConsole, const CONTEXT::CONTAINER::CID* pCID) :
-      m_pConsole         (pConsole),
+   Impl (ICONSOLE_IMPL* pIConsole_Impl, const CONTEXT::CONTAINER::CID* pCID) :
+      m_pIConsole_Impl   (pIConsole_Impl),
       m_pCID             (pCID),
       m_bAttached        (false),
       m_nBlocks          (0),
@@ -55,7 +54,7 @@ public:
       {
          if (m_apBlock[nBlock])
          {
-            m_pConsole->Block_Close (m_apBlock[nBlock]);
+            m_pIConsole_Impl->Block_Close (m_apBlock[nBlock]);
          }
       }
 
@@ -68,7 +67,7 @@ public:
 
    std::string Path (uint32_t nBlock) const
    {
-      const std::string& sBasePath = m_pConsole->Path_Temporary ();
+      const std::string& sBasePath = m_pIConsole_Impl->Path_Temporary ();
 
       return (std::filesystem::path (sBasePath) / m_pCID->sPersonaHash / m_pCID->sFingerprint.substr (0, 2) / m_pCID->sFingerprint.substr (2, 22)).string ();
    }
@@ -127,7 +126,7 @@ public:
 
          for (int nBlock = nFirstBlock; nBlock <= m_nBlock; nBlock++)
          {
-            m_apBlock.push_back (m_pConsole->Block_Open (nBlock, Pathname (nBlock, "log")));
+            m_apBlock.push_back (m_pIConsole_Impl->Block_Open (nBlock, Pathname (nBlock, "log")));
          }
       }
    }
@@ -203,7 +202,7 @@ public:
       m_nBlock++;
       m_nBlockEntryCount = 0;
 
-      m_apBlock.push_back (m_pConsole->Block_Open (m_nBlock, Pathname (m_nBlock, "log")));
+      m_apBlock.push_back (m_pIConsole_Impl->Block_Open (m_nBlock, Pathname (m_nBlock, "log")));
 
       if (m_bAttached)
          m_apBlock.back ()->Attach ();
@@ -215,7 +214,7 @@ public:
          if (m_bAttached)
             pOldBlock->Detach (m_pCID);
 
-         m_pConsole->Block_Close (pOldBlock);
+         m_pIConsole_Impl->Block_Close (pOldBlock);
          m_apBlock.erase (m_apBlock.begin ());
 
          int nOldBlock = m_nBlock - m_nBlocks;
@@ -236,7 +235,7 @@ public:
       if (m_nBlock < 0  ||  m_nBlockEntryCount >= m_nEntries_Block)
          Rotate ();
 
-      auto pEntry = m_pConsole->Entry_Create (m_pCID, eLevel, sMessage, m_nGroupDepth, bCollapsed);
+      auto pEntry = m_pIConsole_Impl->Entry_Create (m_pCID, eLevel, sMessage, m_nGroupDepth, bCollapsed);
 
       m_apBlock.back ()->Write (pEntry);
       m_nBlockEntryCount++;
@@ -326,7 +325,7 @@ public:
    }
 
 public:
-   CONSOLE*                                                               m_pConsole;
+   ICONSOLE_IMPL*                                                         m_pIConsole_Impl;
    const CONTEXT::CONTAINER::CID*                                         m_pCID;
    std::vector<BLOCK*>                                                    m_apBlock;
    std::recursive_mutex                                                   m_mxStream;
@@ -347,8 +346,8 @@ public:
 // CONSOLE::STREAM
 // ===========================================================================
 
-CONSOLE::STREAM::STREAM (CONSOLE* pConsole, const CONTEXT::CONTAINER::CID* pCID) :
-   m_pImpl (new Impl (pConsole, pCID))
+CONSOLE::STREAM::STREAM (ICONSOLE_IMPL* pIConsole_Impl, const CONTEXT::CONTAINER::CID* pCID) :
+   m_pImpl (new Impl (pIConsole_Impl, pCID))
 {
 }
 

@@ -24,8 +24,8 @@ using namespace SNEEZE;
 class BLOCK::Impl
 {
 public:
-   Impl (CONSOLE* pConsole, uint32_t nIndex, const std::string& sPathname) :
-      m_pConsole       (pConsole),
+   Impl (ICONSOLE_IMPL* pIConsole_Impl, uint32_t nIndex, const std::string& sPathname) :
+      m_pIConsole_Impl (pIConsole_Impl),
       m_nIndex         (nIndex),
       m_sPathname      (sPathname),
       m_bLoaded        (false),
@@ -146,11 +146,11 @@ public:
       m_bLoaded = false;
    }
 
-   CONSOLE*                                                   m_pConsole;
+   ICONSOLE_IMPL*                                             m_pIConsole_Impl;
    uint32_t                                                   m_nIndex;
    std::string                                                m_sPathname;
 
-   std::deque<std::shared_ptr<const CONSOLE::ENTRY>>          m_aEntry;
+   std::vector<std::shared_ptr<const CONSOLE::ENTRY>>         m_aEntry;
    std::ofstream                                              m_ofsBlock;
    bool                                                       m_bLoaded;
    uint32_t                                                   m_nCount_Open;
@@ -164,8 +164,8 @@ public:
 // BLOCK
 // ===========================================================================
 
-BLOCK::BLOCK (CONSOLE* pConsole, uint32_t nIndex, const std::string& sPathname) :
-   m_pImpl (new Impl (pConsole, nIndex, sPathname))
+BLOCK::BLOCK (ICONSOLE_IMPL* pIConsole_Impl, uint32_t nIndex, const std::string& sPathname) :
+   m_pImpl (new Impl (pIConsole_Impl, nIndex, sPathname))
 {
 }
 

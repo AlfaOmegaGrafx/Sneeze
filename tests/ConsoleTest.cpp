@@ -389,11 +389,18 @@ int RunConsoleTests (int nArgc, char** aArgv)
 
    std::printf ("\n[Test 13] LevelString\n");
 
-   ASSERT (std::string (CONSOLE::ENTRY::LevelString (CONSOLE::kLEVEL_LOG))   == "log",   "LOG -> log");
-   ASSERT (std::string (CONSOLE::ENTRY::LevelString (CONSOLE::kLEVEL_DEBUG)) == "debug", "DEBUG -> debug");
-   ASSERT (std::string (CONSOLE::ENTRY::LevelString (CONSOLE::kLEVEL_INFO))  == "info",  "INFO -> info");
-   ASSERT (std::string (CONSOLE::ENTRY::LevelString (CONSOLE::kLEVEL_WARN))  == "warn",  "WARN -> warn");
-   ASSERT (std::string (CONSOLE::ENTRY::LevelString (CONSOLE::kLEVEL_ERROR)) == "error", "ERROR -> error");
+   std::string sLevel;
+
+   CONSOLE::ENTRY::LevelString (CONSOLE::kLEVEL_LOG, sLevel);
+   ASSERT (sLevel == "log",   "LOG -> log");
+   CONSOLE::ENTRY::LevelString (CONSOLE::kLEVEL_DEBUG, sLevel);
+   ASSERT (sLevel == "debug", "DEBUG -> debug");
+   CONSOLE::ENTRY::LevelString (CONSOLE::kLEVEL_INFO, sLevel);
+   ASSERT (sLevel == "info",  "INFO -> info");
+   CONSOLE::ENTRY::LevelString (CONSOLE::kLEVEL_WARN, sLevel);
+   ASSERT (sLevel == "warn",  "WARN -> warn");
+   CONSOLE::ENTRY::LevelString (CONSOLE::kLEVEL_ERROR, sLevel);
+   ASSERT (sLevel == "error", "ERROR -> error");
 
    // -----------------------------------------------------------------------
    // Cleanup

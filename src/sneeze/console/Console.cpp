@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <Sneeze.h>
 #include <Console.h>
+#include "Console.h"
 #include "Block.h"
 #include <deque>
 
@@ -23,11 +23,13 @@ using namespace SNEEZE;
 **  Impl Class
 ***********************************************************************************************************************************/
 
-class CONSOLE::Impl
+ICONSOLE_IMPL::ICONSOLE_IMPL () {}
+ICONSOLE_IMPL::~ICONSOLE_IMPL () {}
+
+class CONSOLE::Impl : public ICONSOLE_IMPL
 {
 public:
-   Impl (CONSOLE* pConsole, CONTEXT* pContext) :
-      m_pConsole          (pConsole),
+   Impl (CONTEXT* pContext) :
       m_pContext          (pContext),
       m_sPath_Temporary   ((std::filesystem::path (pContext->Path_Temporary ()) / "Console").string ()),
       m_nIndex_Entry      (0),
@@ -71,7 +73,7 @@ public:
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
 
-         pStream = new STREAM (m_pConsole, pCID);
+         pStream = new STREAM (this, pCID);
 
          m_apStream.push_back (pStream);
 
@@ -140,18 +142,27 @@ public:
    }
 
    // ---------------------------------------------------------------------------
+   // ICONSOLE_IMPL
+   // ---------------------------------------------------------------------------
+
+   const std::string& Path_Temporary () const override
+   {
+      return m_sPath_Temporary;
+   }
+
+   // ---------------------------------------------------------------------------
    // Block helpers -- called by STREAM (Initialize, ~STREAM) which is always invoked
    // under m_mxConsole via Stream_Open/Stream_Close. Not independently thread-safe.
    // ---------------------------------------------------------------------------
 
-   BLOCK* Block_Open (uint32_t nIndex, const std::string& sPathname)
+   BLOCK* Block_Open (uint32_t nIndex, const std::string& sPathname) override
    {
       BLOCK* pBlock = nullptr;
 
       auto it = m_umpBlock.find (sPathname);
       if (it == m_umpBlock.end ())
       {
-         pBlock = new BLOCK (m_pConsole, nIndex, sPathname);
+         pBlock = new BLOCK (this, nIndex, sPathname);
          m_umpBlock[sPathname] = pBlock;
       }
       else pBlock = it->second;
@@ -161,7 +172,7 @@ public:
       return pBlock;
    }
 
-   void Block_Close (BLOCK* pBlock)
+   void Block_Close (BLOCK* pBlock) override
    {
       if (pBlock && pBlock->Close () == 0)
       {
@@ -176,7 +187,7 @@ public:
    // and ring-buffer an entry. Returns the immutable shared_ptr.
    // ---------------------------------------------------------------------------
 
-   std::shared_ptr<const CONSOLE::ENTRY> Entry_Create (const CONTEXT::CONTAINER::CID* pCID, CONSOLE::eLEVEL eLevel, const std::string& sMessage, uint32_t nGroupDepth, bool bCollapsed)
+   std::shared_ptr<const CONSOLE::ENTRY> Entry_Create (const CONTEXT::CONTAINER::CID* pCID, CONSOLE::eLEVEL eLevel, const std::string& sMessage, uint32_t nGroupDepth, bool bCollapsed) override
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
 
@@ -195,7 +206,7 @@ public:
       return pEntry;
    }
 
-   CONSOLE*                                                         m_pConsole;
+   ICONSOLE_IMPL*                                                   pIConsole_Impl;
    CONTEXT*                                                         m_pContext;
    std::string                                                      m_sPath_Temporary;
 
@@ -204,12 +215,11 @@ public:
    uint32_t                                                         m_nBlocks;
 
    std::recursive_mutex                                             m_mxConsole;
+   std::deque<std::shared_ptr<const CONSOLE::ENTRY>>                m_apEntry;
+   uint32_t                                                         m_nIndex_Entry;
 
    std::vector<CONSOLE::STREAM*>                                    m_apStream;
    std::unordered_map<std::string, BLOCK*>                          m_umpBlock;
-   std::deque<std::shared_ptr<const CONSOLE::ENTRY>>                m_apEntry;
-
-   uint32_t                                                         m_nIndex_Entry;
 };
 
 /***********************************************************************************************************************************
@@ -217,7 +227,7 @@ public:
 ***********************************************************************************************************************************/
 
 CONSOLE::CONSOLE (CONTEXT* pContext) :
-   m_pImpl (new Impl (this, pContext))
+   m_pImpl (new Impl (pContext))
 {
 }
 
@@ -236,7 +246,6 @@ CONSOLE::~CONSOLE ()
 // ---------------------------------------------------------------------------
 
 SNEEZE::CONTEXT*   CONSOLE::Context         () const     { return m_pImpl->m_pContext; }
-const std::string& CONSOLE::Path_Temporary  () const     { return m_pImpl->m_sPath_Temporary; }
 
 uint32_t           CONSOLE::Entries_Cache   () const     { return m_pImpl->m_nEntries_Cache; }
 void               CONSOLE::Entries_Cache   (uint32_t n) {        m_pImpl->m_nEntries_Cache = n; }
@@ -256,11 +265,3 @@ void               CONSOLE::Stream_Enum       (IENUM_STREAM* pEnum)             
 void               CONSOLE::Clear             ()                                              {        m_pImpl->Clear             (); }
 
 void               CONSOLE::Entry_Enum        (IENUM_ENTRY* pEnum)                            {        m_pImpl->Entry_Enum        (pEnum); }
-
-BLOCK*             CONSOLE::Block_Open        (uint32_t nIndex, const std::string& sPathname) { return m_pImpl->Block_Open        (nIndex, sPathname); }
-void               CONSOLE::Block_Close       (BLOCK* pBlock)                                 {        m_pImpl->Block_Close       (pBlock); }
-
-std::shared_ptr<const CONSOLE::ENTRY> CONSOLE::Entry_Create (const CONTEXT::CONTAINER::CID* pCID, eLEVEL eLevel, const std::string& sMessage, uint32_t nGroupDepth, bool bCollapsed)
-{
-   return m_pImpl->Entry_Create (pCID, eLevel, sMessage, nGroupDepth, bCollapsed);
-}

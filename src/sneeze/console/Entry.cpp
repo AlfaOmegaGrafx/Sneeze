@@ -53,20 +53,18 @@ const std::string&                           CONSOLE::ENTRY::Source      () cons
 // LevelString
 // ---------------------------------------------------------------------------
 
-const char* CONSOLE::ENTRY::LevelString (eLEVEL eLevel)
+void CONSOLE::ENTRY::LevelString (eLEVEL eLevel, std::string& sLevel)
 {
-   const char* szResult = "log";
+   sLevel = "log";
 
    switch (eLevel)
    {
-      case kLEVEL_LOG:   szResult = "log";   break;
-      case kLEVEL_DEBUG: szResult = "debug"; break;
-      case kLEVEL_INFO:  szResult = "info";  break;
-      case kLEVEL_WARN:  szResult = "warn";  break;
-      case kLEVEL_ERROR: szResult = "error"; break;
+      case kLEVEL_LOG:   sLevel = "log";   break;
+      case kLEVEL_DEBUG: sLevel = "debug"; break;
+      case kLEVEL_INFO:  sLevel = "info";  break;
+      case kLEVEL_WARN:  sLevel = "warn";  break;
+      case kLEVEL_ERROR: sLevel = "error"; break;
    }
-
-   return szResult;
 }
 
 // ---------------------------------------------------------------------------
@@ -102,10 +100,8 @@ std::string CONSOLE::ENTRY::FormatStamp () const
 // single element. JSON parsing errors return the raw message.
 // ---------------------------------------------------------------------------
 
-std::vector<std::string> CONSOLE::ENTRY::MessageParts () const
+void CONSOLE::ENTRY::MessageParts (std::vector<std::string> &aParts) const
 {
-   std::vector<std::string> aParts;
-
    if (!m_sMessage.empty () && m_sMessage.front () == '[')
    {
       try
@@ -129,8 +125,6 @@ std::vector<std::string> CONSOLE::ENTRY::MessageParts () const
       }
    }
    else aParts.push_back (m_sMessage);
-
-   return aParts;
 }
 
 // ---------------------------------------------------------------------------
@@ -140,8 +134,11 @@ std::vector<std::string> CONSOLE::ENTRY::MessageParts () const
 nlohmann::json CONSOLE::ENTRY::ToJson () const
 {
    nlohmann::json jEntry;
+   std::string sLevel;
 
-   jEntry["level"]      = LevelString (m_eLevel);
+   LevelString (m_eLevel, sLevel);
+
+   jEntry["level"]      = sLevel;
    jEntry["message"]    = m_sMessage;
    jEntry["stamp"]      = std::chrono::duration<double> (m_tpStamp.time_since_epoch ()).count ();
    jEntry["index"]      = m_nIndex;

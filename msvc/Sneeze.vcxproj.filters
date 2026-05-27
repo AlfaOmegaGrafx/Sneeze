@@ -380,6 +380,9 @@
     <ClInclude Include="..\src\sneeze\storage\Storage.h">
       <Filter>src\sneeze\storage</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\sneeze\console\Console.h">
+      <Filter>src\sneeze\console</Filter>
+    </ClInclude>
   </ItemGroup>
   <!-- Resource files -->
   <ItemGroup>

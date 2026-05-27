@@ -21,6 +21,7 @@
 namespace SNEEZE
 {
    class BLOCK;
+   class ICONSOLE_IMPL;
 
    // ---------------------------------------------------------------------------
    // CONSOLE — per-context developer console, analogous to a web browser's
@@ -80,9 +81,10 @@ namespace SNEEZE
          const std::string&                              StackTrace  () const;
          const std::string&                              Source      () const;
 
-         static const char*                              LevelString (eLEVEL eLevel);
+         static void                                     LevelString (eLEVEL eLevel, std::string& sLevel);
+
          std::string                                     FormatStamp () const;
-         std::vector<std::string>                        MessageParts () const;
+         void                                            MessageParts (std::vector<std::string>& aParts) const;
          nlohmann::json                                  ToJson      () const;
          static std::shared_ptr<const ENTRY>             FromJson    (const nlohmann::json& jEntry, const CONTEXT::CONTAINER::CID* pCID);
 
@@ -110,7 +112,7 @@ namespace SNEEZE
       class STREAM
       {
       public:
-         STREAM (CONSOLE* pConsole, const CONTEXT::CONTAINER::CID* pCID);
+         STREAM (ICONSOLE_IMPL* pIConsole_Impl, const CONTEXT::CONTAINER::CID* pCID);
         ~STREAM ();
 
          void Initialize (int nBlocks, int nEntries_Block);
@@ -185,8 +187,6 @@ namespace SNEEZE
       bool     Initialize ();
       CONTEXT* Context    () const;
 
-      const std::string&  Path_Temporary () const;
-      
       // --- Clear ---
 
       void Clear ();
@@ -197,11 +197,14 @@ namespace SNEEZE
 
       // --- Configuration ---
 
-      uint32_t Entries_Cache  () const;
+      // --- Accessors
+      uint32_t Entries_Cache ()  const;
+      uint32_t Entries_Block ()  const;
+      uint32_t Blocks ()         const;
+
+      // --- Modifiers
       void     Entries_Cache  (uint32_t n);
-      uint32_t Entries_Block  () const;
       void     Entries_Block  (uint32_t n);
-      uint32_t Blocks         () const;
       void     Blocks         (uint32_t n);
 
       // --- Stream management ---
@@ -213,11 +216,6 @@ namespace SNEEZE
    private:
       class Impl;
       Impl* m_pImpl;
-
-      BLOCK* Block_Open  (uint32_t nIndex, const std::string& sPathname);
-      void   Block_Close (BLOCK* pBlock);
-
-      std::shared_ptr<const ENTRY> Entry_Create (const CONTEXT::CONTAINER::CID* pCID, eLEVEL eLevel, const std::string& sMessage, uint32_t nGroupDepth, bool bCollapsed);
    };
 }
 #endif // SNEEZE_CONSOLE_CONSOLE_H

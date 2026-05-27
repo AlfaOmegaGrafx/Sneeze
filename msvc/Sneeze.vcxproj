@@ -194,6 +194,7 @@
   <!-- Header files                                                           -->
   <!-- ===================================================================== -->
   <ItemGroup>
+    <ClInclude Include="..\src\sneeze\console\Console.h" />
     <ClInclude Include="..\src\sneeze\network\Network.h" />
     <ClInclude Include="..\src\sneeze\network\Network_Asset.h" />
     <ClInclude Include="..\src\sneeze\Pch.h" />
