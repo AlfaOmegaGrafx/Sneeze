@@ -206,6 +206,40 @@ function Show-DepList {
    }
 }
 
+# src/ and include/ must come from the same revision. A stale include/ tree
+# (pre-NASSET/SASSET console refactor) produces hundreds of C2511/C2039 errors
+# that cite old line numbers such as Network.h(254) ASSET* Asset_Open.
+function Test-SourceHeaderSync {
+   param ([string] $Root)
+
+   $sNetworkH  = Join-Path $Root 'include\Network.h'
+   $sStorageH  = Join-Path $Root 'include\Storage.h'
+   $sConsoleH  = Join-Path $Root 'include\Console.h'
+   $sNetworkCpp = Join-Path $Root 'src\sneeze\network\Network.cpp'
+   $bOk        = $true
+
+   if (-not (Select-String -Path $sNetworkH -Pattern 'NASSET\s*\*\s*Asset_Open' -Quiet)) {
+      Write-Host '  MISMATCH: include/Network.h still declares ASSET* Asset_Open (expected NASSET*)'
+      $bOk = $false
+   }
+   if (-not (Select-String -Path $sStorageH -Pattern 'SASSET\s*\*\s*Asset_Open' -Quiet)) {
+      Write-Host '  MISMATCH: include/Storage.h still declares ASSET* Asset_Open (expected SASSET*)'
+      $bOk = $false
+   }
+   if (-not (Select-String -Path $sConsoleH -Pattern 'enum\s+eLEVEL' -Quiet)) {
+      Write-Host '  MISMATCH: include/Console.h is the old JSON-store stub (expected CONSOLE::eLEVEL / ENTRY / STREAM API)'
+      $bOk = $false
+   }
+   if (Test-Path $sNetworkCpp) {
+      if (-not (Select-String -Path $sNetworkCpp -Pattern 'NASSET\s*\*\s*Asset_Open' -Quiet)) {
+         Write-Host '  MISMATCH: src/sneeze/network/Network.cpp does not implement NASSET* Asset_Open'
+         $bOk = $false
+      }
+   }
+
+   return $bOk
+}
+
 # ---------------------------------------------------------------------------
 # -List is read-only, handle it first and exit.
 # ---------------------------------------------------------------------------
@@ -305,6 +339,21 @@ if ($DepsMode) {
 # ---------------------------------------------------------------------------
 
 if ($Fresh -or $SneezeMode) {
+   if ($SneezeMode -and -not (Test-SourceHeaderSync $SneezeDir)) {
+      Write-Error @"
+Sneeze include/ headers do not match src/ (stale checkout or partial sync).
+MSVC will fail with ASSET vs NASSET and missing CONSOLE::ENTRY errors.
+
+Fix on this agent:
+  git fetch origin
+  git reset --hard origin/main
+  git clean -fdx
+  Remove-Item -Recurse -Force builds\windows-x64\build -ErrorAction SilentlyContinue
+  .\scripts\build-windows.ps1 -All -Config $Config
+"@
+      exit 1
+   }
+
    # -Rebuild with Sneeze in scope: clean only the CURRENT config's compiled
    # artifacts via `cmake --build --target clean --config <cfg>`. This preserves
    # the configured CMake tree (CMakeCache.txt, CMakeFiles/, generated .sln and
