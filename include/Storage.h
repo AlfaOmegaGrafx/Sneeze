@@ -32,7 +32,7 @@ namespace SNEEZE
    // Crash durability: JSONL changelog appended on every mutation.
    // ---------------------------------------------------------------------------
 
-   class ASSET;
+   class SASSET;
 
    class STORAGE
    {
@@ -134,8 +134,8 @@ namespace SNEEZE
       class Impl;
       Impl* m_pImpl;
 
-      ASSET* Asset_Open  (eSCOPE eScope, const std::string& sPathname);
-      void   Asset_Close (ASSET* pAsset);
+      SASSET* Asset_Open  (eSCOPE eScope, const std::string& sPathname);
+      void   Asset_Close (SASSET* pAsset);
    };
 }
 #endif // SNEEZE_STORAGE_STORAGE_H

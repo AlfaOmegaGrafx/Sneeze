@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <Sneeze.h>
-
 #include "Types.h"
 #include "control/Control.h"
 #include "wasm/WasmRuntime.h"

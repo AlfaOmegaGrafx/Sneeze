@@ -104,14 +104,14 @@ public:
    // under m_mxStorage via Unit_Open/Unit_Close. Not independently thread-safe.
    // ---------------------------------------------------------------------------
 
-   ASSET* Asset_Open (eSCOPE eScope, const std::string& sPathname)
+   SASSET* Asset_Open (eSCOPE eScope, const std::string& sPathname)
    {
-      ASSET* pAsset = nullptr;
+      SASSET* pAsset = nullptr;
 
       auto it = m_umpAsset.find (sPathname);
       if (it == m_umpAsset.end ())
       {
-         pAsset = new ASSET (m_pStorage, eScope, sPathname);
+         pAsset = new SASSET (m_pStorage, eScope, sPathname);
          m_umpAsset[sPathname] = pAsset;
       }
       else pAsset = it->second;
@@ -121,7 +121,7 @@ public:
       return pAsset;
    }
 
-   void Asset_Close (ASSET* pAsset)
+   void Asset_Close (SASSET* pAsset)
    {
       if (pAsset && pAsset->Close () == 0)
       {
@@ -138,7 +138,7 @@ public:
 
    std::recursive_mutex                    m_mxStorage;
    std::vector<UNIT*>                      m_apUnit;
-   std::unordered_map<std::string, ASSET*> m_umpAsset;
+   std::unordered_map<std::string, SASSET*> m_umpAsset;
 };
 
 // ===========================================================================
@@ -150,10 +150,10 @@ STORAGE::STORAGE (CONTEXT* pContext) :
 {
 }
 
-bool STORAGE::Initialize ()
-{
-   return m_pImpl->Initialize ();
-}
+bool              STORAGE::Initialize ()             { return m_pImpl->Initialize (); }
+SNEEZE::CONTEXT*  STORAGE::Context    ()       const { return m_pImpl->m_pContext; }
+const std::string& STORAGE::Path_Permanent () const { return m_pImpl->m_sPath_Permanent; }
+const std::string& STORAGE::Path_Temporary () const { return m_pImpl->m_sPath_Temporary; }
 
 STORAGE::~STORAGE ()
 {
@@ -161,20 +161,12 @@ STORAGE::~STORAGE ()
 }
 
 // ---------------------------------------------------------------------------
-// Accessors
-// ---------------------------------------------------------------------------
-
-SNEEZE::CONTEXT*   STORAGE::Context         ()                                      const { return m_pImpl->m_pContext; }
-const std::string& STORAGE::Path_Permanent  ()                                      const { return m_pImpl->m_sPath_Permanent; }
-const std::string& STORAGE::Path_Temporary  ()                                      const { return m_pImpl->m_sPath_Temporary; }
-
-// ---------------------------------------------------------------------------
-// Methods
+// Container lifecycle
 // ---------------------------------------------------------------------------
 
 STORAGE::UNIT*     STORAGE::Unit_Open       (const CONTEXT::CONTAINER::CID* pCID)         { return m_pImpl->Unit_Open       (pCID); }
 void               STORAGE::Unit_Close      (UNIT* pUnit)                                 {        m_pImpl->Unit_Close      (pUnit); }
-void               STORAGE::Unit_Enum       (IENUM_UNIT* pEnum)                                {        m_pImpl->Unit_Enum       (pEnum); }
+void               STORAGE::Unit_Enum       (IENUM_UNIT* pEnum)                           {        m_pImpl->Unit_Enum       (pEnum); }
 
-ASSET*             STORAGE::Asset_Open      (eSCOPE eScope, const std::string& sPathname) { return m_pImpl->Asset_Open      (eScope, sPathname); }
-void               STORAGE::Asset_Close     (ASSET* pAsset)                               {        m_pImpl->Asset_Close     (pAsset); }
+SASSET*            STORAGE::Asset_Open      (eSCOPE eScope, const std::string& sPathname) { return m_pImpl->Asset_Open      (eScope, sPathname); }
+void               STORAGE::Asset_Close     (SASSET* pAsset)                              {        m_pImpl->Asset_Close     (pAsset); }

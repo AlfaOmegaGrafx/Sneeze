@@ -12,37 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <Sneeze.h>
-#include "control/Control.h"
-#include <fstream>
-#include <filesystem>
-#include <chrono>
-#include <ctime>
-#include <cstdio>
-#include <mutex>
-#include <algorithm>
+#include "Network_Asset.h"
 
 #include <openssl/evp.h>
-#include <nlohmann/json.hpp>
 
 using namespace SNEEZE;
 
 // ---------------------------------------------------------------------------
 // ASSET_FETCH -- local job class bridging the control-layer fetch pool
-//                back to NETWORK::ASSET::FetchComplete.
+//                back to NASSET::FetchComplete.
 // ---------------------------------------------------------------------------
 
 class ASSET_FETCH : public JOB_FETCH
 {
 public:
-   ASSET_FETCH (NETWORK::ASSET* pAsset, const std::string& sUrl, const std::string& sPath_Temp, const std::string& sPath_Data, const std::string& sHash)
+   ASSET_FETCH (NASSET* pAsset, const std::string& sUrl, const std::string& sPath_Temp, const std::string& sPath_Data, const std::string& sHash)
       : JOB_FETCH (true, sUrl, sPath_Temp, sPath_Data, sHash),
         m_pAsset  (pAsset),
         m_pFile   (nullptr),
         m_bState  (NETWORK::STATE_FETCHING)
    {}
 
-   ASSET_FETCH (NETWORK::ASSET* pAsset, NETWORK::FILE* pFile, NETWORK::STATE bState)
+   ASSET_FETCH (NASSET* pAsset, NETWORK::FILE* pFile, NETWORK::STATE bState)
       : JOB_FETCH (false, "", "", "", ""),
         m_pAsset  (pAsset),
         m_pFile   (pFile),
@@ -57,21 +48,21 @@ public:
    }
 
 private:
-   NETWORK::ASSET*  m_pAsset;
-   NETWORK::FILE*   m_pFile;
-   NETWORK::STATE   m_bState;
+   NASSET*        m_pAsset;
+   NETWORK::FILE* m_pFile;
+   NETWORK::STATE m_bState;
 };
 
 // ---------------------------------------------------------------------------
 
-class NETWORK::ASSET::Impl
+class NASSET::Impl
 {
 public:
-   Impl (NETWORK* pNetwork, const std::string& sUrl, const std::string& sPathname, uint32_t nAssetIx) :
-      m_pNetwork (pNetwork),
+   Impl (INETWORK_IMPL* pINetwork_Impl, const std::string& sUrl, const std::string& sPathname, uint32_t nAssetIx) :
+      m_pINetwork_Impl (pINetwork_Impl),
       m_sUrl (sUrl),
       m_sPathname (sPathname),
-      m_bState (STATE_IDLE),
+      m_bState (NETWORK::STATE_IDLE),
       m_nSizeBytes (0),
       m_nAccessCount (0),
       m_nAssetIx (nAssetIx),
@@ -105,8 +96,8 @@ public:
 
    void Meta_Load ()
    {
-      std::string sMetaPath = Path (DISKFILE_META);
-      std::string sDataPath = Path (DISKFILE_DATA);
+      std::string sMetaPath = Path (NETWORK::DISKFILE_META);
+      std::string sDataPath = Path (NETWORK::DISKFILE_DATA);
 
       std::ifstream file (sMetaPath);
       if (file.is_open ())
@@ -121,7 +112,7 @@ public:
          }
          catch (...)
          {
-            m_pNetwork->Context ()->Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to parse sidecar: " + sMetaPath);
+            m_pINetwork_Impl->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to parse sidecar: " + sMetaPath);
          }
 
          if (bParsed)
@@ -129,15 +120,15 @@ public:
             std::string sMetaUrl = jMeta.value ("url", "");
             if (sMetaUrl == m_sUrl  &&  std::filesystem::exists (sDataPath))
             {
-               m_sHash         = jMeta.value ("hash", "");
-               m_nAssetIx      = jMeta.value ("nMetaIx", static_cast<uint32_t> (0));
+               m_sHash              = jMeta.value ("hash", "");
+               m_nAssetIx           = jMeta.value ("nMetaIx", static_cast<uint32_t> (0));
                // Data file confirmed on disk — state is READY
-               m_nSizeBytes    = jMeta.value ("sizeBytes", static_cast<uint64_t> (0));
-               m_sCreatedAt    = jMeta.value ("createdAt", "");
-               m_nHttpStatus   = jMeta.value ("httpStatus", static_cast<long> (0));
-               m_bReset        = jMeta.value ("reset", false);
-               m_bServedFromCache = true;
-               m_bState = STATE_READY;
+               m_nSizeBytes         = jMeta.value ("sizeBytes", static_cast<uint64_t> (0));
+               m_sCreatedAt         = jMeta.value ("createdAt", "");
+               m_nHttpStatus        = jMeta.value ("httpStatus", static_cast<long> (0));
+               m_bReset             = jMeta.value ("reset", false);
+               m_bServedFromCache   = true;
+               m_bState             = NETWORK::STATE_READY;
 
                if (jMeta.contains ("headers"))
                {
@@ -151,7 +142,7 @@ public:
 
    void Meta_Save ()
    {
-      std::string sMetaPath = Path (DISKFILE_META);
+      std::string sMetaPath = Path (NETWORK::DISKFILE_META);
 
       std::filesystem::create_directories (std::filesystem::path (sMetaPath).parent_path ());
 
@@ -185,7 +176,7 @@ public:
          }
          catch (const nlohmann::json::exception& ex)
          {
-            m_pNetwork->Context ()->Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Meta_Save dump failed for " + m_sUrl + ": " + ex.what ());
+            m_pINetwork_Impl->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Meta_Save dump failed for " + m_sUrl + ": " + ex.what ());
             file.close ();
             std::error_code ec;
             std::filesystem::remove (sTmpPath, ec);
@@ -199,7 +190,7 @@ public:
             std::error_code ec;
             std::filesystem::rename (sTmpPath, sMetaPath, ec);
             if (ec)
-               m_pNetwork->Context ()->Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to rename meta temp: " + ec.message ());
+               m_pINetwork_Impl->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to rename meta temp: " + ec.message ());
          }
       }
    }
@@ -208,18 +199,18 @@ public:
    {
       std::error_code ec;
 
-      std::filesystem::remove (Path (DISKFILE_DATA), ec);
-      std::filesystem::remove (Path (DISKFILE_META), ec);
-      std::filesystem::remove (Path (DISKFILE_TEMP), ec);
+      std::filesystem::remove (Path (NETWORK::DISKFILE_DATA), ec);
+      std::filesystem::remove (Path (NETWORK::DISKFILE_META), ec);
+      std::filesystem::remove (Path (NETWORK::DISKFILE_TEMP), ec);
 
       ResetState ();
 
-      m_nAssetIx = m_pNetwork->Asset_Index ();
+      m_nAssetIx = m_pINetwork_Impl->Asset_Index ();
    }
 
    void ResetState ()
    {
-      m_bState = STATE_IDLE;
+      m_bState = NETWORK::STATE_IDLE;
       m_sHash.clear ();
       m_nSizeBytes = 0;
       m_nHttpStatus = 0;
@@ -234,7 +225,7 @@ public:
 
    void Evict ()
    {
-      m_bState = STATE_IDLE;
+      m_bState = NETWORK::STATE_IDLE;
       m_nSizeBytes = 0;
       m_nHttpStatus = 0;
       m_dFetchQueuedTime = 0.0;
@@ -248,7 +239,7 @@ public:
    // Disk path helpers
    // ---------------------------------------------------------------------------
 
-   std::string Path (DISKFILE eType) const
+   std::string Path (NETWORK::DISKFILE eType) const
    {
       static const char* aExt[] = { ".data", ".temp", ".meta" };
 
@@ -333,11 +324,11 @@ public:
    }
 
 public:
-   NETWORK*                   m_pNetwork;
+   INETWORK_IMPL*             m_pINetwork_Impl;
    std::string                m_sUrl;
    std::string                m_sHash;
    std::string                m_sPathname;
-   STATE                      m_bState;
+   NETWORK::STATE             m_bState;
 
    uint64_t                   m_nSizeBytes;
    std::string                m_sCreatedAt;
@@ -356,7 +347,7 @@ public:
 
    IJOB*                      m_pAsset_Fetch;
 
-   std::vector<FILE*>         m_apFiles;
+   std::vector<NETWORK::FILE*> m_apFiles;
 
    std::recursive_mutex       m_mxAsset;
 
@@ -367,12 +358,12 @@ public:
 // ASSET
 // ---------------------------------------------------------------------------
 
-NETWORK::ASSET::ASSET (NETWORK* pNetwork, const std::string& sUrl, const std::string& sPathname, uint32_t nAssetIx) :
-   m_pImpl (new Impl (pNetwork, sUrl, sPathname, nAssetIx))
+NASSET::NASSET (INETWORK_IMPL* pINetwork_Impl, const std::string& sUrl, const std::string& sPathname, uint32_t nAssetIx) :
+   m_pImpl (new Impl (pINetwork_Impl, sUrl, sPathname, nAssetIx))
 {
 }
 
-NETWORK::ASSET::~ASSET ()
+NASSET::~NASSET ()
 {
    if (m_pImpl->m_pAsset_Fetch)
    {
@@ -387,7 +378,7 @@ NETWORK::ASSET::~ASSET ()
 // Lifecycle
 // ---------------------------------------------------------------------------
 
-void NETWORK::ASSET::Open (FILE* pFile)
+void NASSET::Open (NETWORK::FILE* pFile)
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
 
@@ -396,7 +387,7 @@ void NETWORK::ASSET::Open (FILE* pFile)
    m_pImpl->m_nCount_Open++;
 }
 
-size_t NETWORK::ASSET::Close (FILE* pFile)
+size_t NASSET::Close (NETWORK::FILE* pFile)
 {
    // if pFile == nullptr, the fetch thread is releasing its implicit lock
 
@@ -414,7 +405,7 @@ size_t NETWORK::ASSET::Close (FILE* pFile)
    return m_pImpl->m_nCount_Open;
 }
 
-bool NETWORK::ASSET::Attach (FILE* pFile, bool bFetch_Allowed)
+bool NASSET::Attach (NETWORK::FILE* pFile, bool bFetch_Allowed)
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
 
@@ -431,24 +422,24 @@ bool NETWORK::ASSET::Attach (FILE* pFile, bool bFetch_Allowed)
 
       std::string sHash         = pFile->OpenHash ();
       bool        bCacheEnabled = pFile->CacheEnabled ();
-      bool        bStale        = m_pImpl->m_bState == STATE_READY  &&  m_pImpl->m_pNetwork->Rules_Stale (this);
+      bool        bStale        = m_pImpl->m_bState == NETWORK::STATE_READY  &&  m_pImpl->m_pINetwork_Impl->Rules_Stale (this);
 
       bool bFetch  = false;
       bool bReady  = false;
       bool bFailed = false;
 
-      STATE bState = m_pImpl->m_bState;
+      NETWORK::STATE bState = m_pImpl->m_bState;
 
-      if (bState == STATE_READY  &&  bStale)
+      if (bState == NETWORK::STATE_READY  &&  bStale)
       {
          // Cached but stale per rules — discard and re-fetch
          m_pImpl->Meta_Reset ();
          bFetch = true;
       }
-      else if (bState == STATE_READY  &&  !sHash.empty ()  &&  !IsHashed ())
+      else if (bState == NETWORK::STATE_READY  &&  !sHash.empty ()  &&  !IsHashed ())
       {
          // Cached without hash — caller now requires integrity verification
-         if (VerifyHash (m_pImpl->Path (DISKFILE_DATA), sHash))
+         if (VerifyHash (m_pImpl->Path (NETWORK::DISKFILE_DATA), sHash))
          {
             m_pImpl->m_sHash = sHash;
             m_pImpl->TouchAccess ();
@@ -462,31 +453,31 @@ bool NETWORK::ASSET::Attach (FILE* pFile, bool bFetch_Allowed)
             bFetch = true;
          }
       }
-      else if (bState != STATE_FETCHING  &&  !sHash.empty ()  &&  IsHashed ()  &&  Hash () != sHash)
+      else if (bState != NETWORK::STATE_FETCHING  &&  !sHash.empty ()  &&  IsHashed ()  &&  Hash () != sHash)
       {
          // Caller's hash differs from the asset's — content has been revised, re-fetch
          m_pImpl->m_sHash = sHash;
          bFetch = true;
       }
-      else if (bState == STATE_READY  &&  !bCacheEnabled)
+      else if (bState == NETWORK::STATE_READY  &&  !bCacheEnabled)
       {
          // Cached but caller has caching disabled — force a fresh fetch
          m_pImpl->m_bServedFromCache = false;
          bFetch = true;
       }
-      else if (bState == STATE_READY)
+      else if (bState == NETWORK::STATE_READY)
       {
          // Cached and valid — serve from disk
          m_pImpl->TouchAccess ();
          m_pImpl->m_bServedFromCache = true;
          bReady  = true;
       }
-      else if (bState == STATE_FAILED)
+      else if (bState == NETWORK::STATE_FAILED)
       {
          // Previous fetch failed — propagate the failure to this caller
          bFailed = true;
       }
-      else if (bState == STATE_IDLE)
+      else if (bState == NETWORK::STATE_IDLE)
       {
          // Never fetched — first request for this URL
          if (!sHash.empty ())
@@ -498,7 +489,7 @@ bool NETWORK::ASSET::Attach (FILE* pFile, bool bFetch_Allowed)
       // notify the first file again with OnFileReady — need to decide whether
       // to suppress re-notification or version-gate callbacks.
 
-      else if (bState == STATE_FETCHING)
+      else if (bState == NETWORK::STATE_FETCHING)
       {
          // Already in flight — this caller will be notified when it completes
       }
@@ -511,17 +502,17 @@ bool NETWORK::ASSET::Attach (FILE* pFile, bool bFetch_Allowed)
             m_pImpl->m_pAsset_Fetch = nullptr;
          }
 
-         m_pImpl->m_bState = STATE_FETCHING;
-         m_pImpl->m_dFetchStartTime = m_pImpl->m_pNetwork->SecondsSinceEpoch ();
+         m_pImpl->m_bState = NETWORK::STATE_FETCHING;
+         m_pImpl->m_dFetchStartTime = m_pImpl->m_pINetwork_Impl->SecondsSinceEpoch ();
          pFile->SnapshotProgress ();
 
          m_pImpl->m_nCount_Open++;
          m_pImpl->m_nCount_Attach++;
 
-         auto* pJob = new ASSET_FETCH (this, m_pImpl->m_sUrl, m_pImpl->Path (DISKFILE_TEMP), m_pImpl->Path (DISKFILE_DATA), m_pImpl->m_sHash);
+         auto* pJob = new ASSET_FETCH (this, m_pImpl->m_sUrl, m_pImpl->Path (NETWORK::DISKFILE_TEMP), m_pImpl->Path (NETWORK::DISKFILE_DATA), m_pImpl->m_sHash);
 
          m_pImpl->m_pAsset_Fetch = pJob;
-         m_pImpl->m_pNetwork->Queue_Post_Fetch (pJob);
+         m_pImpl->m_pINetwork_Impl->Queue_Post_Fetch (pJob);
       }
       else if (bReady  ||  bFailed)
       {
@@ -533,7 +524,7 @@ bool NETWORK::ASSET::Attach (FILE* pFile, bool bFetch_Allowed)
          auto* pJob = new ASSET_FETCH (this, pFile, bState);
 
          m_pImpl->m_pAsset_Fetch = pJob;
-         m_pImpl->m_pNetwork->Queue_Post_Fetch (pJob);
+         m_pImpl->m_pINetwork_Impl->Queue_Post_Fetch (pJob);
       }
 
       bResult = true;
@@ -546,7 +537,7 @@ bool NETWORK::ASSET::Attach (FILE* pFile, bool bFetch_Allowed)
    return bResult;
 }
 
-void NETWORK::ASSET::Detach (FILE* pFile)
+void NASSET::Detach (NETWORK::FILE* pFile)
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
 
@@ -554,20 +545,20 @@ void NETWORK::ASSET::Detach (FILE* pFile)
 
    if (m_pImpl->m_nCount_Attach == 0)
    {
-      if (m_pImpl->m_bState == STATE_READY)
+      if (m_pImpl->m_bState == NETWORK::STATE_READY)
          m_pImpl->Meta_Save ();
-      else if (m_pImpl->m_bState == STATE_FAILED)
+      else if (m_pImpl->m_bState == NETWORK::STATE_FAILED)
          m_pImpl->Meta_Reset ();
 
       m_pImpl->Evict ();
    }
 }
 
-void NETWORK::ASSET::Reset ()
+void NASSET::Reset ()
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
 
-   if (m_pImpl->m_bState == STATE_READY)
+   if (m_pImpl->m_bState == NETWORK::STATE_READY)
    {
       m_pImpl->m_bReset = true;
 
@@ -580,25 +571,25 @@ void NETWORK::ASSET::Reset ()
 // Fetch
 // ---------------------------------------------------------------------------
 
-void NETWORK::ASSET::FetchComplete (const FETCH_RESULT& Fetch_Result)
+void NASSET::FetchComplete (const FETCH_RESULT& Fetch_Result)
 {
    {
       std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
 
       m_pImpl->m_nHttpStatus   = Fetch_Result.nHttpStatus;
-      m_pImpl->m_dFetchEndTime = m_pImpl->m_pNetwork->SecondsSinceEpoch ();
+      m_pImpl->m_dFetchEndTime = m_pImpl->m_pINetwork_Impl->SecondsSinceEpoch ();
 
       if (Fetch_Result.bSuccess)
       {
          m_pImpl->m_nSizeBytes = Fetch_Result.nSizeBytes;
          m_pImpl->m_mapHeaders = Fetch_Result.mapHeaders;
-         m_pImpl->m_bState     = STATE_READY;
+         m_pImpl->m_bState     = NETWORK::STATE_READY;
       }
       else
       {
          if (!Fetch_Result.mapHeaders.empty ())
             m_pImpl->m_mapHeaders = Fetch_Result.mapHeaders;
-         m_pImpl->m_bState     = STATE_FAILED;
+         m_pImpl->m_bState     = NETWORK::STATE_FAILED;
       }
 
       for (auto* pFile : m_pImpl->m_apFiles)
@@ -606,7 +597,7 @@ void NETWORK::ASSET::FetchComplete (const FETCH_RESULT& Fetch_Result)
          pFile->SnapshotFinal ();
          pFile->Notify_Changed ();
 
-         IFILE* pListener = pFile->Listener ();
+         NETWORK::IFILE* pListener = pFile->Listener ();
          if (pListener)
          {
             if (Fetch_Result.bSuccess)
@@ -617,16 +608,16 @@ void NETWORK::ASSET::FetchComplete (const FETCH_RESULT& Fetch_Result)
          // the listener may close the file, so it may not be referenced after the notification is called
       }
 
-      m_pImpl->m_pNetwork->Context ()->Engine ()->Log (IENGINE::kLOGLEVEL_Trace, "NETWORK", (Fetch_Result.bSuccess ? "Cached " : "Failed ") + m_pImpl->m_sUrl + " (" + std::to_string (Fetch_Result.nSizeBytes) + " bytes)");
+      m_pImpl->m_pINetwork_Impl->Log (IENGINE::kLOGLEVEL_Trace, "NETWORK", (Fetch_Result.bSuccess ? "Cached " : "Failed ") + m_pImpl->m_sUrl + " (" + std::to_string (Fetch_Result.nSizeBytes) + " bytes)");
 
       m_pImpl->m_pAsset_Fetch = nullptr;
    }
    
    Detach (nullptr);
-   m_pImpl->m_pNetwork->Asset_Close (this, nullptr);
+   m_pImpl->m_pINetwork_Impl->Asset_Close (this, nullptr);
 }
 
-void NETWORK::ASSET::FetchComplete (FILE* pFile, NETWORK::STATE bState)
+void NASSET::FetchComplete (NETWORK::FILE* pFile, NETWORK::STATE bState)
 {
    {
       std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
@@ -645,7 +636,7 @@ void NETWORK::ASSET::FetchComplete (FILE* pFile, NETWORK::STATE bState)
    }
    
    Detach (nullptr);
-   m_pImpl->m_pNetwork->Asset_Close (this, nullptr);
+   m_pImpl->m_pINetwork_Impl->Asset_Close (this, nullptr);
 }
 
 
@@ -653,15 +644,15 @@ void NETWORK::ASSET::FetchComplete (FILE* pFile, NETWORK::STATE bState)
 // Data access
 // ---------------------------------------------------------------------------
 
-void NETWORK::ASSET::ReadData (std::vector<uint8_t>& aData) const
+void NASSET::ReadData (std::vector<uint8_t>& aData) const
 {
    aData.clear ();
 
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
 
-   if (m_pImpl->m_bState == STATE_READY)
+   if (m_pImpl->m_bState == NETWORK::STATE_READY)
    {
-      std::ifstream file (m_pImpl->Path (DISKFILE_DATA), std::ios::binary | std::ios::ate);
+      std::ifstream file (m_pImpl->Path (NETWORK::DISKFILE_DATA), std::ios::binary | std::ios::ate);
       if (file.is_open ())
       {
          auto nSize = file.tellg ();
@@ -675,7 +666,7 @@ void NETWORK::ASSET::ReadData (std::vector<uint8_t>& aData) const
    }
 }
 
-std::string NETWORK::ASSET::Header (const std::string& sName) const
+std::string NASSET::Header (const std::string& sName) const
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
 
@@ -692,7 +683,7 @@ std::string NETWORK::ASSET::Header (const std::string& sName) const
 // Hash verification
 // ---------------------------------------------------------------------------
 
-bool NETWORK::ASSET::VerifyHash (const std::string& sFilePath, const std::string& sHash) const
+bool NASSET::VerifyHash (const std::string& sFilePath, const std::string& sHash) const
 {
    bool bResult = true;
 
@@ -714,28 +705,26 @@ bool NETWORK::ASSET::VerifyHash (const std::string& sFilePath, const std::string
 // Accessors
 // ---------------------------------------------------------------------------
 
-bool                 NETWORK::ASSET::IsShuttingDown ()      const { return m_pImpl->m_pNetwork->IsShuttingDown (); }
-NETWORK::STATE       NETWORK::ASSET::State ()               const { return m_pImpl->m_bState;            }
-bool                 NETWORK::ASSET::IsReset ()             const { return m_pImpl->m_bReset;            }
-size_t               NETWORK::ASSET::File_Count ()          const { return m_pImpl->m_apFiles.size ();   }
-const std::string&   NETWORK::ASSET::Url ()                 const { return m_pImpl->m_sUrl;              }
-uint64_t             NETWORK::ASSET::SizeBytes ()           const { return m_pImpl->m_nSizeBytes;        }
-std::string          NETWORK::ASSET::CreatedTime ()         const { return m_pImpl->m_sCreatedAt;        }
-std::string          NETWORK::ASSET::LastAccessTime ()      const { return m_pImpl->m_sLastAccessedAt;   }
-uint32_t             NETWORK::ASSET::AccessCount ()         const { return m_pImpl->m_nAccessCount;      }
-uint32_t             NETWORK::ASSET::AssetIx ()             const { return m_pImpl->m_nAssetIx;          }
-const std::string&   NETWORK::ASSET::Hash ()                const { return m_pImpl->m_sHash;             }
-bool                 NETWORK::ASSET::IsHashed ()            const { return !m_pImpl->m_sHash.empty ();   }
-std::string          NETWORK::ASSET::DiskPath ()            const { return m_pImpl->Path (DISKFILE_DATA); }
-const std::string&   NETWORK::ASSET::Pathname ()            const { return m_pImpl->m_sPathname;         }
-std::string          NETWORK::ASSET::Path (DISKFILE eType)  const { return m_pImpl->Path (eType);        }
-long                 NETWORK::ASSET::HttpStatus ()          const { return m_pImpl->m_nHttpStatus;       }
-double               NETWORK::ASSET::FetchStartTime ()      const { return m_pImpl->m_dFetchStartTime;   }
-double               NETWORK::ASSET::FetchEndTime ()        const { return m_pImpl->m_dFetchEndTime;     }
-double               NETWORK::ASSET::FetchDuration ()       const { return m_pImpl->m_dFetchEndTime - m_pImpl->m_dFetchStartTime; }
-double               NETWORK::ASSET::FetchQueuedTime ()     const { return m_pImpl->m_dFetchQueuedTime;  }
-double               NETWORK::ASSET::QueueDuration ()       const { return m_pImpl->m_dFetchStartTime - m_pImpl->m_dFetchQueuedTime; }
-bool                 NETWORK::ASSET::IsServedFromCache ()   const { return m_pImpl->m_bServedFromCache;  }
+NETWORK::STATE       NASSET::State ()                        const { return m_pImpl->m_bState;            }
+bool                 NASSET::IsReset ()                      const { return m_pImpl->m_bReset;            }
+size_t               NASSET::File_Count ()                   const { return m_pImpl->m_apFiles.size ();   }
+const std::string&   NASSET::Url ()                          const { return m_pImpl->m_sUrl;              }
+uint64_t             NASSET::SizeBytes ()                    const { return m_pImpl->m_nSizeBytes;        }
+std::string          NASSET::CreatedTime ()                  const { return m_pImpl->m_sCreatedAt;        }
+std::string          NASSET::LastAccessTime ()               const { return m_pImpl->m_sLastAccessedAt;   }
+uint32_t             NASSET::AccessCount ()                  const { return m_pImpl->m_nAccessCount;      }
+uint32_t             NASSET::AssetIx ()                      const { return m_pImpl->m_nAssetIx;          }
+const std::string&   NASSET::Hash ()                         const { return m_pImpl->m_sHash;             }
+bool                 NASSET::IsHashed ()                     const { return !m_pImpl->m_sHash.empty ();   }
+std::string          NASSET::DiskPath ()                     const { return m_pImpl->Path (NETWORK::DISKFILE_DATA); }
+const std::string&   NASSET::Pathname ()                     const { return m_pImpl->m_sPathname;         }
+std::string          NASSET::Path (NETWORK::DISKFILE eType)  const { return m_pImpl->Path (eType);        }
+long                 NASSET::HttpStatus ()                   const { return m_pImpl->m_nHttpStatus;       }
+double               NASSET::FetchStartTime ()               const { return m_pImpl->m_dFetchStartTime;   }
+double               NASSET::FetchEndTime ()                 const { return m_pImpl->m_dFetchEndTime;     }
+double               NASSET::FetchDuration ()                const { return m_pImpl->m_dFetchEndTime - m_pImpl->m_dFetchStartTime; }
+double               NASSET::FetchQueuedTime ()              const { return m_pImpl->m_dFetchQueuedTime;  }
+double               NASSET::QueueDuration ()                const { return m_pImpl->m_dFetchStartTime - m_pImpl->m_dFetchQueuedTime; }
+bool                 NASSET::IsServedFromCache ()            const { return m_pImpl->m_bServedFromCache;  }
 
-std::vector<NETWORK::FILE*>                           NETWORK::ASSET::File_Collect () const { return m_pImpl->m_apFiles;    }
-const std::unordered_map<std::string, std::string>&   NETWORK::ASSET::Headers ()      const { return m_pImpl->m_mapHeaders; }
+const std::unordered_map<std::string, std::string>&   NASSET::Headers ()      const { return m_pImpl->m_mapHeaders; }

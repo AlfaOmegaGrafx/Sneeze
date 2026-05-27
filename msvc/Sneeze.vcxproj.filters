@@ -371,6 +371,12 @@
     <ClInclude Include="..\src\sneeze\storage\Storage_Asset.h">
       <Filter>src\sneeze\storage</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\sneeze\network\Network_Asset.h">
+      <Filter>src\sneeze\network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\sneeze\network\Network.h">
+      <Filter>src\sneeze\network</Filter>
+    </ClInclude>
   </ItemGroup>
   <!-- Resource files -->
   <ItemGroup>

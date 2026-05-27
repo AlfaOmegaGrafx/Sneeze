@@ -19,13 +19,14 @@ endif ()
 file (STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../VERSION" SNEEZE_VER)
 
 # Limit multi-config generators (VS, Xcode, Ninja Multi-Config) to the two
-# configs we actually support. The path generalization block below uses
+# configs we actually support. The path generalization block below may use
 # $<LOWER_CASE:$<CONFIG>> in INTERFACE_INCLUDE_DIRECTORIES on imported
-# targets, and CMake validates those paths against every entry in
-# CMAKE_CONFIGURATION_TYPES at generate time. Default VS values include
-# MinSizeRel and RelWithDebInfo, which resolve to deps paths that don't
-# exist on disk (the deps trees are only built for debug and release).
-# Must be set BEFORE project() so it takes effect for this build.
+# targets when both debug and release deps trees exist on disk; CMake
+# validates those paths against every entry in CMAKE_CONFIGURATION_TYPES at
+# generate time. Default VS values include MinSizeRel and RelWithDebInfo,
+# which resolve to deps paths that don't exist on disk (the deps trees are
+# only built for debug and release). Must be set BEFORE project() so it takes
+# effect for this build.
 set (CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING
    "Semicolon separated list of supported configuration types" FORCE)
 
@@ -201,9 +202,10 @@ endif ()
 # against; at build time, Debug builds pull from deps/builds/<plat>/debug/libs,
 # Release from .../release/libs.
 #
-# REQUIREMENT: both configs' dep trees must already be built on disk before
-# the `cmake --build --config <cfg>` invocation. This is the programmer's
-# responsibility (build-*.ps1 / build-*.sh handles it for both configs).
+# REQUIREMENT: for multi-config IDE builds (Debug + Release dropdown), both
+# configs' dep trees should exist on disk before flipping configs. Jenkins and
+# other Release-only CI agents may configure with only release/deps; include
+# dirs stay concrete in that case (see _sneeze_dualize_target).
 
 if (USE_LOCAL_DEPS)
    set (_sneeze_cfg_seg     "/${SNEEZE_CONFIG_LC}/")
@@ -362,13 +364,31 @@ if (USE_LOCAL_DEPS)
          endif ()
       endif ()
 
-      # INTERFACE_INCLUDE_DIRECTORIES: generator expression is fine here.
+      # CMake validates INTERFACE_INCLUDE_DIRECTORIES on imported targets at
+      # generate time, evaluating any genex per entry in CMAKE_CONFIGURATION_TYPES.
+      # If we unconditionally rewrite "/release/" to "/$<LOWER_CASE:$<CONFIG>>/",
+      # configuring against a tree that has only one config's deps on disk fails
+      # with "Imported target ... includes non-existent path .../debug/...".
+      # Apply the genex only when BOTH config-resolved paths exist on disk.
+      # Otherwise leave the include path concrete to whatever find_package just
+      # resolved -- always valid for the configure-time config, and headers are
+      # config-invariant for the deps Sneeze ships.
       get_target_property (_inc ${tgt} INTERFACE_INCLUDE_DIRECTORIES)
       if (_inc)
          set (_inc_new "")
          foreach (_p IN LISTS _inc)
-            string (REPLACE "${_sneeze_cfg_seg}" "${_sneeze_cfg_gen}" _p_new "${_p}")
-            list (APPEND _inc_new "${_p_new}")
+            if (_p MATCHES "${_sneeze_cfg_seg}")
+               string (REPLACE "${_sneeze_cfg_seg}" "${_sneeze_cfg_debug}"   _p_dbg "${_p}")
+               string (REPLACE "${_sneeze_cfg_seg}" "${_sneeze_cfg_release}" _p_rel "${_p}")
+               if (EXISTS "${_p_dbg}" AND EXISTS "${_p_rel}")
+                  string (REPLACE "${_sneeze_cfg_seg}" "${_sneeze_cfg_gen}" _p_new "${_p}")
+                  list (APPEND _inc_new "${_p_new}")
+               else ()
+                  list (APPEND _inc_new "${_p}")
+               endif ()
+            else ()
+               list (APPEND _inc_new "${_p}")
+            endif ()
          endforeach ()
          set_target_properties (${tgt} PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${_inc_new}")
       endif ()

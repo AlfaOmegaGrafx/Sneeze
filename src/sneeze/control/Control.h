@@ -16,10 +16,6 @@
 #define SNEEZE_CORE_CONTROL_H
 
 #include "Engine.h"
-#include <atomic>
-#include <mutex>
-#include <unordered_map>
-#include <vector>
 
 namespace SNEEZE
 {

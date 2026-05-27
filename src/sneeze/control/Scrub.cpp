@@ -12,10 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <Sneeze.h>
 #include "Control.h"
 #include <filesystem>
-#include <cstdio>
 
 using namespace SNEEZE;
 

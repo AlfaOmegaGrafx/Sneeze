@@ -21,7 +21,7 @@ using namespace SNEEZE;
 // Helpers
 // ===========================================================================
 
-class ASSET::Impl
+class SASSET::Impl
 {
 public:
    Impl (STORAGE* pStorage, STORAGE::eSCOPE eScope, const std::string& sPathname) :
@@ -532,12 +532,12 @@ public:
 // ASSET
 // ===========================================================================
 
-ASSET::ASSET (STORAGE* pStorage, STORAGE::eSCOPE eScope, const std::string& sPathname) :
+SASSET::SASSET (STORAGE* pStorage, STORAGE::eSCOPE eScope, const std::string& sPathname) :
    m_pImpl (new Impl (pStorage, eScope, sPathname))
 {
 }
 
-ASSET::~ASSET ()
+SASSET::~SASSET ()
 {
    delete m_pImpl;
 }
@@ -546,35 +546,35 @@ ASSET::~ASSET ()
 // Accessors
 // ---------------------------------------------------------------------------
 
-bool                 ASSET::IsLoaded       () const { return m_pImpl->m_bLoaded; }
-bool                 ASSET::IsDirty        () const { return m_pImpl->m_bDirty; }
-STORAGE::eSCOPE      ASSET::GetScope       () const { return m_pImpl->m_eScope; }
-const std::string&   ASSET::Pathname       () const { return m_pImpl->m_sPathname; }
-uint64_t             ASSET::SizeBytes      () const { return m_pImpl->m_nSizeBytes; }
-const std::string&   ASSET::CreatedTime    () const { return m_pImpl->m_sCreatedAt; }
-const std::string&   ASSET::LastAccessTime () const { return m_pImpl->m_sLastAccessedAt; }
-uint32_t             ASSET::AccessCount    () const { return m_pImpl->m_nAccessCount; }
+bool                    SASSET::IsLoaded       () const { return m_pImpl->m_bLoaded; }
+bool                    SASSET::IsDirty        () const { return m_pImpl->m_bDirty; }
+SNEEZE::STORAGE::eSCOPE SASSET::GetScope       () const { return m_pImpl->m_eScope; }
+const std::string&      SASSET::Pathname       () const { return m_pImpl->m_sPathname; }
+uint64_t                SASSET::SizeBytes      () const { return m_pImpl->m_nSizeBytes; }
+const std::string&      SASSET::CreatedTime    () const { return m_pImpl->m_sCreatedAt; }
+const std::string&      SASSET::LastAccessTime () const { return m_pImpl->m_sLastAccessedAt; }
+uint32_t                SASSET::AccessCount    () const { return m_pImpl->m_nAccessCount; }
 
 // ---------------------------------------------------------------------------
 // Methods
 // ---------------------------------------------------------------------------
 
-uint32_t       ASSET::Open        ()                                                        { return ++m_pImpl->m_nCount_Open; }
-uint32_t       ASSET::Close       ()                                                        { return --m_pImpl->m_nCount_Open; }
+uint32_t       SASSET::Open       ()                                                        { return ++m_pImpl->m_nCount_Open; }
+uint32_t       SASSET::Close      ()                                                        { return --m_pImpl->m_nCount_Open; }
 
-void           ASSET::Attach      ()                                                        {        m_pImpl->Attach      (); }
-void           ASSET::Detach      (const CONTEXT::CONTAINER::CID* pCID)                     {        m_pImpl->Detach      (pCID); }
+void           SASSET::Attach     ()                                                        {        m_pImpl->Attach      (); }
+void           SASSET::Detach     (const CONTEXT::CONTAINER::CID* pCID)                     {        m_pImpl->Detach      (pCID); }
 
-void           ASSET::Load        ()                                                        {        m_pImpl->Load        (); }
-void           ASSET::Save        ()                                                        {        m_pImpl->Save        (); }
-void           ASSET::Evict       ()                                                        {        m_pImpl->Evict       (); }
+void           SASSET::Load       ()                                                        {        m_pImpl->Load        (); }
+void           SASSET::Save       ()                                                        {        m_pImpl->Save        (); }
+void           SASSET::Evict      ()                                                        {        m_pImpl->Evict       (); }
 
-void           ASSET::TouchAccess ()                                                        {        m_pImpl->TouchAccess (); }
-void           ASSET::Meta_Save   (const CONTEXT::CONTAINER::CID* pCID)                     {        m_pImpl->Meta_Save   (pCID); }
+void           SASSET::TouchAccess ()                                                       {        m_pImpl->TouchAccess (); }
+void           SASSET::Meta_Save  (const CONTEXT::CONTAINER::CID* pCID)                     {        m_pImpl->Meta_Save   (pCID); }
 
-nlohmann::json ASSET::Get         (const std::string& sPath)                          const { return m_pImpl->Get         (sPath); }
-void           ASSET::Set         (const std::string& sPath, const nlohmann::json& j)       {        m_pImpl->Set         (sPath, j); }
-void           ASSET::Remove      (const std::string& sPath)                                {        m_pImpl->Remove      (sPath); }
-bool           ASSET::Has         (const std::string& sPath)                          const { return m_pImpl->Has         (sPath); }
-std::string    ASSET::Json        ()                                                  const { return m_pImpl->Json        (); }
-void           ASSET::Json        (const std::string& sJson)                                {        m_pImpl->Json        (sJson); }
+nlohmann::json SASSET::Get        (const std::string& sPath)                          const { return m_pImpl->Get         (sPath); }
+void           SASSET::Set        (const std::string& sPath, const nlohmann::json& j)       {        m_pImpl->Set         (sPath, j); }
+void           SASSET::Remove     (const std::string& sPath)                                {        m_pImpl->Remove      (sPath); }
+bool           SASSET::Has        (const std::string& sPath)                          const { return m_pImpl->Has         (sPath); }
+std::string    SASSET::Json       ()                                                  const { return m_pImpl->Json        (); }
+void           SASSET::Json       (const std::string& sJson)                                {        m_pImpl->Json        (sJson); }

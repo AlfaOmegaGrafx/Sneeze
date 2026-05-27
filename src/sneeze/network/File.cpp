@@ -12,12 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <Sneeze.h>
-
-#include <cstdio>
-#include <mutex>
-
 #include <openssl/sha.h>
+#include "Network_Asset.h"
 
 using namespace SNEEZE;
 
@@ -28,10 +24,10 @@ using namespace SNEEZE;
 class NETWORK::FILE::Impl
 {
 public:
-   Impl (FILE* pFile, NETWORK* pNetwork, CONTEXT::CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
+   Impl (FILE* pFile, INETWORK_IMPL* pINetwork_Impl, CONTEXT::CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
       m_pFile            (pFile),
-      m_pNetwork         (pNetwork),
-      m_pCID             (pNetwork->Context ()->CID_Pool (pCID)),
+      m_pINetwork_Impl   (pINetwork_Impl),
+      m_pCID             (pCID),
       m_nFileIx          (nFileIx),
       m_sUrl             (sUrl),
       m_sOpenHash        (sHash),
@@ -60,7 +56,7 @@ public:
 
       if (m_pAsset)
       {
-         m_pNetwork->Asset_Close (m_pAsset, m_pFile);
+         m_pINetwork_Impl->Asset_Close (m_pAsset, m_pFile);
          m_pAsset = nullptr;
       }
    }
@@ -76,7 +72,7 @@ public:
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxFile);
 
-         m_pAsset = m_pNetwork->Asset_Open (m_pFile);
+         m_pAsset = m_pINetwork_Impl->Asset_Open (m_pFile);
 
          if (m_pAsset)
          {
@@ -85,12 +81,12 @@ public:
             if (m_pListener)
                Attach (true);
 
-            bClear = !m_pNetwork->Context ()->Host ()->OnNetworkFileCreated (m_pFile);
+            bClear = !m_pINetwork_Impl->Host ()->OnNetworkFileCreated (m_pFile);
          }
       }
 
       if (bClear)
-         m_pNetwork->File_Clear (m_pFile);
+         m_pINetwork_Impl->File_Clear (m_pFile);
 
       return (m_pAsset != nullptr);
    }
@@ -120,17 +116,17 @@ public:
 
    void Clear ()
    {
-      m_pNetwork->File_Clear (m_pFile);
+      m_pINetwork_Impl->File_Clear (m_pFile);
    }
 
    void Close ()
    {
-      m_pNetwork->File_Close (m_pFile);
+      m_pINetwork_Impl->File_Close (m_pFile);
    }
 
    void Reset ()
    {
-      m_pNetwork->File_Reset (m_pFile);
+      m_pINetwork_Impl->File_Reset (m_pFile);
    }
 
    // ---------------------------------------------------------------------------
@@ -147,7 +143,7 @@ public:
       {
          m_bPending_Clear = true;
 
-         m_pNetwork->Context ()->Host ()->OnNetworkFileDeleted (m_pFile);
+         m_pINetwork_Impl->Host ()->OnNetworkFileDeleted (m_pFile);
 
          bChanged = true;
       }
@@ -183,7 +179,7 @@ public:
       std::lock_guard<std::recursive_mutex> guard (m_mxFile);
 
       if (!m_bPending_Clear)
-         m_pNetwork->Context ()->Host ()->OnNetworkFileChanged (m_pFile);
+         m_pINetwork_Impl->Host ()->OnNetworkFileChanged (m_pFile);
    }
 
    // ---------------------------------------------------------------------------
@@ -236,7 +232,7 @@ public:
 
    std::string Path () const
    {
-      return (std::filesystem::path (m_pNetwork->Path_Permanent ()) / m_pCID->sPersonaHash / m_pCID->sFingerprint.substr (0, 2) / m_pCID->sFingerprint.substr (2, 22) / m_pCID->sContainerName / m_sDiskKey.substr (0, 2)).string ();
+      return (std::filesystem::path (m_pINetwork_Impl->Path_Permanent ()) / m_pCID->sPersonaHash / m_pCID->sFingerprint.substr (0, 2) / m_pCID->sFingerprint.substr (2, 22) / m_pCID->sContainerName / m_sDiskKey.substr (0, 2)).string ();
    }
 
    std::string Filename (const std::string& sExt) const
@@ -256,9 +252,9 @@ public:
 
 public:
    FILE*                          m_pFile;
-   NETWORK*                       m_pNetwork;
+   INETWORK_IMPL*                 m_pINetwork_Impl;
    const CONTEXT::CONTAINER::CID* m_pCID;
-   ASSET*                         m_pAsset;
+   NASSET*                        m_pAsset;
    IFILE*                         m_pListener;
    uint32_t                       m_nCount_Attach;
    std::recursive_mutex           m_mxFile;
@@ -289,8 +285,8 @@ public:
 // Constructor / Destructor
 // ---------------------------------------------------------------------------
 
-NETWORK::FILE::FILE (NETWORK* pNetwork, CONTEXT::CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
-   m_pImpl (new Impl (this, pNetwork, pCID, nFileIx, sUrl, sHash, bCacheEnabled))
+NETWORK::FILE::FILE (INETWORK_IMPL* pINetwork_Impl, CONTEXT::CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
+   m_pImpl (new Impl (this, pINetwork_Impl, pCID, nFileIx, sUrl, sHash, bCacheEnabled))
 {
 }
 
