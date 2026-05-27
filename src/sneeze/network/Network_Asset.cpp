@@ -58,8 +58,8 @@ private:
 class NASSET::Impl
 {
 public:
-   Impl (NETWORK* pNetwork, const std::string& sUrl, const std::string& sPathname, uint32_t nAssetIx) :
-      m_pNetwork (pNetwork),
+   Impl (INETWORK_IMPL* pINetwork_Impl, const std::string& sUrl, const std::string& sPathname, uint32_t nAssetIx) :
+      m_pINetwork_Impl (pINetwork_Impl),
       m_sUrl (sUrl),
       m_sPathname (sPathname),
       m_bState (NETWORK::STATE_IDLE),
@@ -112,7 +112,7 @@ public:
          }
          catch (...)
          {
-            m_pNetwork->Context ()->Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to parse sidecar: " + sMetaPath);
+            m_pINetwork_Impl->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to parse sidecar: " + sMetaPath);
          }
 
          if (bParsed)
@@ -176,7 +176,7 @@ public:
          }
          catch (const nlohmann::json::exception& ex)
          {
-            m_pNetwork->Context ()->Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Meta_Save dump failed for " + m_sUrl + ": " + ex.what ());
+            m_pINetwork_Impl->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Meta_Save dump failed for " + m_sUrl + ": " + ex.what ());
             file.close ();
             std::error_code ec;
             std::filesystem::remove (sTmpPath, ec);
@@ -190,7 +190,7 @@ public:
             std::error_code ec;
             std::filesystem::rename (sTmpPath, sMetaPath, ec);
             if (ec)
-               m_pNetwork->Context ()->Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to rename meta temp: " + ec.message ());
+               m_pINetwork_Impl->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to rename meta temp: " + ec.message ());
          }
       }
    }
@@ -205,7 +205,7 @@ public:
 
       ResetState ();
 
-      m_nAssetIx = m_pNetwork->Asset_Index ();
+      m_nAssetIx = m_pINetwork_Impl->Asset_Index ();
    }
 
    void ResetState ()
@@ -324,7 +324,7 @@ public:
    }
 
 public:
-   NETWORK*                   m_pNetwork;
+   INETWORK_IMPL*             m_pINetwork_Impl;
    std::string                m_sUrl;
    std::string                m_sHash;
    std::string                m_sPathname;
@@ -358,8 +358,8 @@ public:
 // ASSET
 // ---------------------------------------------------------------------------
 
-NASSET::NASSET (NETWORK* pNetwork, const std::string& sUrl, const std::string& sPathname, uint32_t nAssetIx) :
-   m_pImpl (new Impl (pNetwork, sUrl, sPathname, nAssetIx))
+NASSET::NASSET (INETWORK_IMPL* pINetwork_Impl, const std::string& sUrl, const std::string& sPathname, uint32_t nAssetIx) :
+   m_pImpl (new Impl (pINetwork_Impl, sUrl, sPathname, nAssetIx))
 {
 }
 
@@ -422,7 +422,7 @@ bool NASSET::Attach (NETWORK::FILE* pFile, bool bFetch_Allowed)
 
       std::string sHash         = pFile->OpenHash ();
       bool        bCacheEnabled = pFile->CacheEnabled ();
-      bool        bStale        = m_pImpl->m_bState == NETWORK::STATE_READY  &&  m_pImpl->m_pNetwork->Rules_Stale (this);
+      bool        bStale        = m_pImpl->m_bState == NETWORK::STATE_READY  &&  m_pImpl->m_pINetwork_Impl->Rules_Stale (this);
 
       bool bFetch  = false;
       bool bReady  = false;
@@ -503,7 +503,7 @@ bool NASSET::Attach (NETWORK::FILE* pFile, bool bFetch_Allowed)
          }
 
          m_pImpl->m_bState = NETWORK::STATE_FETCHING;
-         m_pImpl->m_dFetchStartTime = m_pImpl->m_pNetwork->SecondsSinceEpoch ();
+         m_pImpl->m_dFetchStartTime = m_pImpl->m_pINetwork_Impl->SecondsSinceEpoch ();
          pFile->SnapshotProgress ();
 
          m_pImpl->m_nCount_Open++;
@@ -512,7 +512,7 @@ bool NASSET::Attach (NETWORK::FILE* pFile, bool bFetch_Allowed)
          auto* pJob = new ASSET_FETCH (this, m_pImpl->m_sUrl, m_pImpl->Path (NETWORK::DISKFILE_TEMP), m_pImpl->Path (NETWORK::DISKFILE_DATA), m_pImpl->m_sHash);
 
          m_pImpl->m_pAsset_Fetch = pJob;
-         m_pImpl->m_pNetwork->Queue_Post_Fetch (pJob);
+         m_pImpl->m_pINetwork_Impl->Queue_Post_Fetch (pJob);
       }
       else if (bReady  ||  bFailed)
       {
@@ -524,7 +524,7 @@ bool NASSET::Attach (NETWORK::FILE* pFile, bool bFetch_Allowed)
          auto* pJob = new ASSET_FETCH (this, pFile, bState);
 
          m_pImpl->m_pAsset_Fetch = pJob;
-         m_pImpl->m_pNetwork->Queue_Post_Fetch (pJob);
+         m_pImpl->m_pINetwork_Impl->Queue_Post_Fetch (pJob);
       }
 
       bResult = true;
@@ -577,7 +577,7 @@ void NASSET::FetchComplete (const FETCH_RESULT& Fetch_Result)
       std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
 
       m_pImpl->m_nHttpStatus   = Fetch_Result.nHttpStatus;
-      m_pImpl->m_dFetchEndTime = m_pImpl->m_pNetwork->SecondsSinceEpoch ();
+      m_pImpl->m_dFetchEndTime = m_pImpl->m_pINetwork_Impl->SecondsSinceEpoch ();
 
       if (Fetch_Result.bSuccess)
       {
@@ -608,13 +608,13 @@ void NASSET::FetchComplete (const FETCH_RESULT& Fetch_Result)
          // the listener may close the file, so it may not be referenced after the notification is called
       }
 
-      m_pImpl->m_pNetwork->Context ()->Engine ()->Log (IENGINE::kLOGLEVEL_Trace, "NETWORK", (Fetch_Result.bSuccess ? "Cached " : "Failed ") + m_pImpl->m_sUrl + " (" + std::to_string (Fetch_Result.nSizeBytes) + " bytes)");
+      m_pImpl->m_pINetwork_Impl->Log (IENGINE::kLOGLEVEL_Trace, "NETWORK", (Fetch_Result.bSuccess ? "Cached " : "Failed ") + m_pImpl->m_sUrl + " (" + std::to_string (Fetch_Result.nSizeBytes) + " bytes)");
 
       m_pImpl->m_pAsset_Fetch = nullptr;
    }
    
    Detach (nullptr);
-   m_pImpl->m_pNetwork->Asset_Close (this, nullptr);
+   m_pImpl->m_pINetwork_Impl->Asset_Close (this, nullptr);
 }
 
 void NASSET::FetchComplete (NETWORK::FILE* pFile, NETWORK::STATE bState)
@@ -636,7 +636,7 @@ void NASSET::FetchComplete (NETWORK::FILE* pFile, NETWORK::STATE bState)
    }
    
    Detach (nullptr);
-   m_pImpl->m_pNetwork->Asset_Close (this, nullptr);
+   m_pImpl->m_pINetwork_Impl->Asset_Close (this, nullptr);
 }
 
 
@@ -705,7 +705,6 @@ bool NASSET::VerifyHash (const std::string& sFilePath, const std::string& sHash)
 // Accessors
 // ---------------------------------------------------------------------------
 
-bool                 NASSET::IsShuttingDown ()               const { return m_pImpl->m_pNetwork->IsShuttingDown (); }
 NETWORK::STATE       NASSET::State ()                        const { return m_pImpl->m_bState;            }
 bool                 NASSET::IsReset ()                      const { return m_pImpl->m_bReset;            }
 size_t               NASSET::File_Count ()                   const { return m_pImpl->m_apFiles.size ();   }

@@ -16,6 +16,7 @@
 #define SNEEZE_NETWORK_ASSET_H
 
 #include "../control/Control.h"
+#include "Network.h"
 
 namespace SNEEZE
 {
@@ -29,7 +30,7 @@ namespace SNEEZE
    class NASSET
    {
    public:
-      NASSET (NETWORK* pNetwork, const std::string& sUrl, const std::string& sPathname, uint32_t nAssetIx);
+      NASSET (INETWORK_IMPL* m_pINetwork_Impl, const std::string& sUrl, const std::string& sPathname, uint32_t nAssetIx);
       virtual ~NASSET ();
 
       // Lifecycle
@@ -50,7 +51,6 @@ namespace SNEEZE
       std::string Header (const std::string& sName) const;
 
       // Accessors
-      bool                 IsShuttingDown    () const;
       NETWORK::STATE       State             () const;
       bool                 IsReset           () const;
       size_t               File_Count        () const;

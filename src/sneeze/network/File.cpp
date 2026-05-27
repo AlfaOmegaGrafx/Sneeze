@@ -24,9 +24,9 @@ using namespace SNEEZE;
 class NETWORK::FILE::Impl
 {
 public:
-   Impl (FILE* pFile, NETWORK* pNetwork, CONTEXT::CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
+   Impl (FILE* pFile, INETWORK_IMPL* pINetwork_Impl, CONTEXT::CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
       m_pFile            (pFile),
-      m_pNetwork         (pNetwork),
+      m_pINetwork_Impl   (pINetwork_Impl),
       m_CID              (*pCID),
       m_nFileIx          (nFileIx),
       m_sUrl             (sUrl),
@@ -56,7 +56,7 @@ public:
 
       if (m_pAsset)
       {
-         m_pNetwork->Asset_Close (m_pAsset, m_pFile);
+         m_pINetwork_Impl->Asset_Close (m_pAsset, m_pFile);
          m_pAsset = nullptr;
       }
    }
@@ -72,7 +72,7 @@ public:
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxFile);
 
-         m_pAsset = m_pNetwork->Asset_Open (m_pFile);
+         m_pAsset = m_pINetwork_Impl->Asset_Open (m_pFile);
 
          if (m_pAsset)
          {
@@ -81,12 +81,12 @@ public:
             if (m_pListener)
                Attach (true);
 
-            bClear = !m_pNetwork->Context ()->Host ()->OnNetworkFileCreated (m_pFile);
+            bClear = !m_pINetwork_Impl->Host ()->OnNetworkFileCreated (m_pFile);
          }
       }
 
       if (bClear)
-         m_pNetwork->File_Clear (m_pFile);
+         m_pINetwork_Impl->File_Clear (m_pFile);
 
       return (m_pAsset != nullptr);
    }
@@ -116,17 +116,17 @@ public:
 
    void Clear ()
    {
-      m_pNetwork->File_Clear (m_pFile);
+      m_pINetwork_Impl->File_Clear (m_pFile);
    }
 
    void Close ()
    {
-      m_pNetwork->File_Close (m_pFile);
+      m_pINetwork_Impl->File_Close (m_pFile);
    }
 
    void Reset ()
    {
-      m_pNetwork->File_Reset (m_pFile);
+      m_pINetwork_Impl->File_Reset (m_pFile);
    }
 
    // ---------------------------------------------------------------------------
@@ -143,7 +143,7 @@ public:
       {
          m_bPending_Clear = true;
 
-         m_pNetwork->Context ()->Host ()->OnNetworkFileDeleted (m_pFile);
+         m_pINetwork_Impl->Host ()->OnNetworkFileDeleted (m_pFile);
 
          bChanged = true;
       }
@@ -179,7 +179,7 @@ public:
       std::lock_guard<std::recursive_mutex> guard (m_mxFile);
 
       if (!m_bPending_Clear)
-         m_pNetwork->Context ()->Host ()->OnNetworkFileChanged (m_pFile);
+         m_pINetwork_Impl->Host ()->OnNetworkFileChanged (m_pFile);
    }
 
    // ---------------------------------------------------------------------------
@@ -232,7 +232,7 @@ public:
 
    std::string sPath () const
    {
-      return (std::filesystem::path (m_pNetwork->sPath_Permanent ()) / m_CID.sPersonaHash / m_CID.sFingerprint.substr (0, 2) / m_CID.sFingerprint.substr (2, 22) / m_CID.sContainerName / m_sDiskKey.substr (0, 2)).string ();
+      return (std::filesystem::path (m_pINetwork_Impl->sPath_Permanent ()) / m_CID.sPersonaHash / m_CID.sFingerprint.substr (0, 2) / m_CID.sFingerprint.substr (2, 22) / m_CID.sContainerName / m_sDiskKey.substr (0, 2)).string ();
    }
 
    std::string sFilename (const std::string& sExt) const
@@ -252,7 +252,7 @@ public:
 
 public:
    FILE*                    m_pFile;
-   NETWORK*                 m_pNetwork;
+   INETWORK_IMPL*           m_pINetwork_Impl;
    CONTEXT::CONTAINER::CID  m_CID;
    NASSET*                  m_pAsset;
    IFILE*                   m_pListener;
@@ -285,8 +285,8 @@ public:
 // Constructor / Destructor
 // ---------------------------------------------------------------------------
 
-NETWORK::FILE::FILE (NETWORK* pNetwork, CONTEXT::CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
-   m_pImpl (new Impl (this, pNetwork, pCID, nFileIx, sUrl, sHash, bCacheEnabled))
+NETWORK::FILE::FILE (INETWORK_IMPL* pINetwork_Impl, CONTEXT::CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
+   m_pImpl (new Impl (this, pINetwork_Impl, pCID, nFileIx, sUrl, sHash, bCacheEnabled))
 {
 }
 

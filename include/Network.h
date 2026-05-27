@@ -19,6 +19,7 @@ namespace SNEEZE
 {
    class NASSET;
    class JOB_FETCH;
+   class INETWORK_IMPL;
 
    // ---------------------------------------------------------------------------
    // NETWORK — the network resource system.
@@ -89,7 +90,7 @@ namespace SNEEZE
       class FILE
       {
       public:
-         FILE (NETWORK* pNetwork, CONTEXT::CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled);
+         FILE (INETWORK_IMPL* pINetwork_Impl, CONTEXT::CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled);
          ~FILE ();
 
          // --- Snapshot fields (always available, even after Close) ---
@@ -184,9 +185,6 @@ namespace SNEEZE
 
       FILE* File_Open (CONTEXT::CONTAINER::CID* pCID, const std::string& sUrl, IFILE* pListener);
       FILE* File_Open (CONTEXT::CONTAINER::CID* pCID, const std::string& sUrl, const std::string& sHash, uint32_t nAssetIx = 0, IFILE* pListener = nullptr);
-      void  File_Clear (FILE* pFile);
-      void  File_Close (FILE* pFile);
-      void  File_Reset (FILE* pFile);
 
       // --- Cache management ---
 
@@ -199,23 +197,9 @@ namespace SNEEZE
 
       void Rules_Add (const std::string& sContentType, const std::string& sOlderThan);
 
-      // TODO: MOVE THIS
-      CONTEXT* Context () const;
-      uint32_t Asset_Index ();
-      bool     Rules_Stale (NASSET* pAsset) const;
-      void     Queue_Post_Fetch (JOB_FETCH* pJob_Fetch);
-      double   SecondsSinceEpoch () const;
-
-      NASSET*  Asset_Open (FILE* pFile);
-      void     Asset_Close (NASSET* pAsset, FILE* pFile);
-
-      bool     IsShuttingDown () const;
-
    private:
       class Impl;
       Impl* m_pImpl;
-
-      const std::string&   sPath_Permanent () const;
    };
 }
 #endif // SNEEZE_NETWORK_H

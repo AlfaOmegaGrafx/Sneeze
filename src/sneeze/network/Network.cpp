@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Network.h"
 #include "Network_Asset.h"
 
 using namespace SNEEZE;
@@ -20,7 +21,10 @@ using namespace SNEEZE;
 **  Impl Class
 ***********************************************************************************************************************************/
 
-class NETWORK::Impl
+INETWORK_IMPL::INETWORK_IMPL ()  {}
+INETWORK_IMPL::~INETWORK_IMPL () {}
+
+class NETWORK::Impl : public INETWORK_IMPL
 {
 public:
    struct RULE
@@ -31,10 +35,10 @@ public:
 
 public:
    Impl (NETWORK* pNetwork, CONTEXT* pContext) :
+      INETWORK_IMPL     (),
       m_pNetwork        (pNetwork),
       m_pContext        (pContext),
       m_sPath_Permanent ((std::filesystem::path (pContext->sPath_Permanent ()) / "Network").string ()),
-      m_bShuttingDown   (false),
       m_bCacheEnabled   (true),
       m_nNextAssetIx    (1),
       m_nNextFileIx     (1),
@@ -63,8 +67,6 @@ public:
 
    ~Impl ()
    {
-      m_bShuttingDown = true;
-
       {
          std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -126,9 +128,14 @@ public:
    //     to become per-container as well.
    // ---------------------------------------------------------------------------
 
-   std::string CachePath () const
+   const std::string& CachePath () const
    {
       return m_sPath_Permanent;
+   }
+
+   const std::string& sPath_Permanent () const override
+   { 
+      return m_sPath_Permanent; 
    }
 
    // ---------------------------------------------------------------------------
@@ -261,7 +268,7 @@ public:
       {
          std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-         pFile = new NETWORK::FILE (m_pNetwork, pCID, m_nNextFileIx++, sUrl, sHash, m_bCacheEnabled);
+         pFile = new NETWORK::FILE (this, pCID, m_nNextFileIx++, sUrl, sHash, m_bCacheEnabled);
 
          m_apFile.push_back (pFile);
 
@@ -269,60 +276,6 @@ public:
       }
 
       return pFile;
-   }
-
-   void File_Close (FILE* pFile)
-   {
-      if (pFile)
-      {
-         std::lock_guard<std::recursive_mutex> guard (m_mutex);
-
-         if (pFile->Pending_Close ())
-         {
-            if (pFile->IsPending_Clear ())
-            {
-               auto it = std::find (m_apFile.begin (), m_apFile.end (), pFile);
-               if (it != m_apFile.end ())
-               {
-                  delete pFile;
-
-                  m_apFile.erase (it);
-               }
-            }
-         }
-      }
-   }
-
-   void File_Clear (FILE* pFile)
-   {
-      if (pFile)
-      {
-         std::lock_guard<std::recursive_mutex> guard (m_mutex);
-
-         if (pFile->Pending_Clear ())
-         {
-            if (pFile->IsPending_Close ())
-            {
-               auto it = std::find (m_apFile.begin (), m_apFile.end (), pFile);
-               if (it != m_apFile.end ())
-               {
-                  delete pFile;
-
-                  m_apFile.erase (it);
-               }
-            }
-         }
-      }
-   }
-
-   void File_Reset (FILE* pFile)
-   {
-      if (pFile)
-      {
-         std::lock_guard<std::recursive_mutex> guard (m_mutex);
-
-         pFile->Pending_Reset ();
-      }
    }
 
    void File_Enum (IENUM* pEnum)
@@ -401,10 +354,10 @@ public:
    }
 
    // ---------------------------------------------------------------------------
-   // Asset helpers
+   // INETWORK_WORKER
    // ---------------------------------------------------------------------------
 
-   NASSET* Asset_Open (FILE* pFile)
+   NASSET* Asset_Open (NETWORK::FILE* pFile) override
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -416,7 +369,7 @@ public:
       auto it = m_umpAsset.find (sPathname);
       if (it == m_umpAsset.end ())
       {
-         pAsset = new NASSET (m_pNetwork, sUrl, sPathname, Asset_Index ());
+         pAsset = new NASSET (this, sUrl, sPathname, Asset_Index ());
 
          m_umpAsset[sPathname] = pAsset;
       }
@@ -427,7 +380,7 @@ public:
       return pAsset;
    }
 
-   void Asset_Close (NASSET* pAsset, FILE* pFile)
+   void Asset_Close (NASSET* pAsset, NETWORK::FILE* pFile) override
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -439,9 +392,78 @@ public:
       }
    }
 
-   uint32_t Asset_Index ()
+   void Log (IENGINE::eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage) override
+   {
+      m_pContext->Engine ()->Log (Level, sModule, sMessage);
+   }
+
+   uint32_t Asset_Index () override
    {
       return m_nNextAssetIx++;
+   }
+
+   void Queue_Post_Fetch (JOB_FETCH* pJob_Fetch) override
+   { 
+      m_pContext->Engine ()->Queue_Post_Fetch (pJob_Fetch); 
+   }
+
+   ICONTEXT* Host () const override
+   {
+      return m_pContext->Host ();
+   }
+
+   void File_Close (NETWORK::FILE* pFile) override
+   {
+      if (pFile)
+      {
+         std::lock_guard<std::recursive_mutex> guard (m_mutex);
+
+         if (pFile->Pending_Close ())
+         {
+            if (pFile->IsPending_Clear ())
+            {
+               auto it = std::find (m_apFile.begin (), m_apFile.end (), pFile);
+               if (it != m_apFile.end ())
+               {
+                  delete pFile;
+
+                  m_apFile.erase (it);
+               }
+            }
+         }
+      }
+   }
+
+   void File_Clear (NETWORK::FILE* pFile) override
+   {
+      if (pFile)
+      {
+         std::lock_guard<std::recursive_mutex> guard (m_mutex);
+
+         if (pFile->Pending_Clear ())
+         {
+            if (pFile->IsPending_Close ())
+            {
+               auto it = std::find (m_apFile.begin (), m_apFile.end (), pFile);
+               if (it != m_apFile.end ())
+               {
+                  delete pFile;
+
+                  m_apFile.erase (it);
+               }
+            }
+         }
+      }
+   }
+
+   void File_Reset (NETWORK::FILE* pFile) override
+   {
+      if (pFile)
+      {
+         std::lock_guard<std::recursive_mutex> guard (m_mutex);
+
+         pFile->Pending_Reset ();
+      }
    }
 
    // ---------------------------------------------------------------------------
@@ -455,7 +477,6 @@ public:
 
    mutable std::recursive_mutex            m_mutex;
 
-   bool                                    m_bShuttingDown;
    bool                                    m_bCacheEnabled;
 
    // Staleness rules + asset index counter
@@ -491,21 +512,11 @@ NETWORK::~NETWORK ()
 // Accessors
 // ---------------------------------------------------------------------------
 
-SNEEZE::CONTEXT*   NETWORK::Context           ()                                     const { return m_pImpl->m_pContext; }
-const std::string& NETWORK::sPath_Permanent   ()                                     const { return m_pImpl->m_sPath_Permanent; }
-bool               NETWORK::IsShuttingDown    ()                                     const { return m_pImpl->m_bShuttingDown; }
 bool               NETWORK::IsCacheEnabled    ()                                     const { return m_pImpl->m_bCacheEnabled; }
 
 // ---------------------------------------------------------------------------
 // Methods
 // ---------------------------------------------------------------------------
-
-double     NETWORK::SecondsSinceEpoch ()                                     const { return m_pImpl->SecondsSinceEpoch (); }
-
-bool       NETWORK::Rules_Stale       (NASSET* pAsset)                       const { return m_pImpl->Rules_Stale (pAsset); }
-NASSET*    NETWORK::Asset_Open        (FILE* pFile)                                { return m_pImpl->Asset_Open (pFile); }
-void       NETWORK::Asset_Close       (NASSET* pAsset, FILE* pFile)                {        m_pImpl->Asset_Close (pAsset, pFile); }
-uint32_t   NETWORK::Asset_Index       ()                                           { return m_pImpl->Asset_Index (); }
 
 NETWORK::FILE* NETWORK::File_Open (CONTEXT::CONTAINER::CID* pCID, const std::string& sUrl, IFILE* pListener)
 {
@@ -517,10 +528,6 @@ NETWORK::FILE* NETWORK::File_Open (CONTEXT::CONTAINER::CID* pCID, const std::str
    return m_pImpl->File_Open (pCID, sUrl, sHash, nAssetIx, pListener);
 }
 
-void NETWORK::File_Close (FILE* pFile) { m_pImpl->File_Close (pFile); }
-void NETWORK::File_Clear (FILE* pFile) { m_pImpl->File_Clear (pFile); }
-void NETWORK::File_Reset (FILE* pFile) { m_pImpl->File_Reset (pFile); }
-
 void NETWORK::File_Enum  (IENUM* pEnum) { m_pImpl->File_Enum (pEnum); }
 
 // ---------------------------------------------------------------------------
@@ -531,5 +538,3 @@ void NETWORK::Clear             ()                                              
 void NETWORK::Reset             ()                                                               { m_pImpl->Reset (); }
 void NETWORK::Rules_Add         (const std::string& sContentType, const std::string& sOlderThan) { m_pImpl->Rules_Add (sContentType, sOlderThan); }
 void NETWORK::SetCacheEnabled   (bool b)                                                         { m_pImpl->m_bCacheEnabled = b; }
-
-void NETWORK::Queue_Post_Fetch  (JOB_FETCH* pJob_Fetch)                                          { m_pImpl->m_pContext->Engine ()->Queue_Post_Fetch (pJob_Fetch); }
