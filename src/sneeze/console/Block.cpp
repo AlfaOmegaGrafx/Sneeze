@@ -150,7 +150,6 @@ public:
    uint32_t                                                   m_nIndex;
    std::string                                                m_sPathname;
 
-   std::vector<std::shared_ptr<const CONSOLE::ENTRY>>         m_aEntry;
    std::ofstream                                              m_ofsBlock;
    bool                                                       m_bLoaded;
    uint32_t                                                   m_nCount_Open;
@@ -158,6 +157,7 @@ public:
    uint32_t                                                   m_nEntryCount;
 
    mutable std::recursive_mutex                               m_mutex;
+   std::vector<std::shared_ptr<const CONSOLE::ENTRY>>         m_aEntry;
 };
 
 // ===========================================================================
