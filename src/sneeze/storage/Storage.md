@@ -5,59 +5,58 @@ The `storage` module (`SNEEZE::STORAGE`) provides persistent, per-persona, per-o
 ## Architecture
 
 ```
-STORAGE (singleton, constructor takes ENGINE*)
- ├── m_umpUnit: path -> UNIT*           (one per JSON file on disk)
- ├── m_apUnit: all active UNITs         (one per Unit_Open call)
- ├── m_sPath_Permanent + m_sPath_Temporary
+STORAGE (per-context, constructor takes CONTEXT*)
+ ├── m_umpAsset: pathname -> ASSET*      (one per JSON file on disk, shared across UNITs)
+ ├── m_apUnit: all active UNITs          (one per Unit_Open call)
+ ├── m_sPath_Permanent + m_sPath_Temporary (computed from CONTEXT paths + "/Storage")
  └── m_mxStorage (recursive_mutex)
 
-UNIT (one per JSON file on disk, keyed by full path)
+ASSET (one per JSON file on disk, keyed by full pathname)
  ├── nlohmann::json document (in-memory cache)
- ├── .meta sidecar (SNEEZE::CONTEXT::CONTAINER::NAME, statistics)
+ ├── .meta sidecar (CID identity fields, statistics)
  ├── .log changelog (JSONL write-ahead log for crash durability)
- ├── m_nCount_Open (lifetime: how many UNITs reference this UNIT)
+ ├── m_nCount_Open (lifetime: how many UNITs reference this ASSET)
  ├── m_nCount_Load (cache: how many consumers have data loaded)
  ├── m_bDirty flag
  ├── Load/Save/Evict lifecycle
- └── m_mutex (recursive_mutex, per-UNIT)
+ └── m_mutex (recursive_mutex, per-ASSET)
 
-UNIT (groups four UNITs for a specific container)
- ├── shared_ptr<SNEEZE::CONTEXT::CONTAINER::NAME>
- ├── UNIT* m_apUnits[4] indexed by SCOPE
- ├── m_nCount_Load (tracks active attachments)
- ├── m_bPendingClear (deferred history removal)
- ├── Permanent + Temporary paths (appends "/Storage" to viewport paths)
+UNIT (groups four ASSETs for a specific container)
+ ├── const CID* m_pCID (pooled pointer from CONTEXT::CID_Pool)
+ ├── ASSET* m_apAsset[4] indexed by SCOPE
+ ├── m_bAttached (bool, single-owner semantics)
+ ├── Permanent + Temporary paths (derived from STORAGE paths)
  └── Path-based API: Get/Set/Remove/Has/Json
 ```
 
 ## Ownership Model — Two Counters
 
-UNITs use two separate counters to decouple object lifetime from cache state:
+ASSETs use two separate counters to decouple object lifetime from cache state:
 
-### m_nCount_Open (UNIT lifetime)
+### m_nCount_Open (ASSET lifetime)
 
-Tracks how many UNITs reference a UNIT. Initialized to 1 on construction. Incremented when `Unit_Open` finds an existing UNIT in `m_umpUnit` (shared org UNITs). Decremented in `Unit_Close`. When it reaches zero, the UNIT is erased from `m_umpUnit` and deleted.
+Tracks how many UNITs reference an ASSET. Initialized to 0 in the constructor, incremented by `Open()`, decremented by `Close()`. When it reaches zero, the ASSET is erased from `m_umpAsset` and deleted. Shared org ASSETs accumulate ref counts from multiple UNITs.
 
 ### m_nCount_Load (cache state)
 
-Tracks how many consumers require the JSON data to be loaded in memory. Initialized to 0. Incremented by `UNIT::Attach()` (which also calls `UNIT::Load()` on the first attach). Decremented by `UNIT::Detach()`. When it reaches zero, the UNIT is evicted (`UNIT::Evict()`).
+Tracks how many consumers require the JSON data to be loaded in memory. Initialized to 0. Incremented by `ASSET::Attach()` (which also calls `ASSET::Load()` on first attach). Decremented by `ASSET::Detach(const CID&)` (which saves meta + dirty data, then calls `Evict()` on the 1→0 transition).
 
-This separation allows the inspector to browse UNITs/UNITs without loading their JSON data. The inspector holds references (increments `m_nCount_Open`) but only loads data (`Attach()`) when drilling into a specific UNIT's contents.
+This separation allows the inspector to browse UNITs/ASSETs without loading their JSON data. The inspector holds references (increments `m_nCount_Open`) but only loads data (`Attach()`) when drilling into a specific ASSET's contents.
 
 ### UNIT ownership
 
-UNITs are stored as raw `UNIT*` in `m_apUnit`. Each `Unit_Open` creates a new UNIT instance — UNITs are not shared across callers. They maintain their own `m_nCount_Load` to track active attachments. UNITs are deleted in `Unit_Close` after decrementing `m_nCount_Open` on their UNITs.
+UNITs are stored as raw `UNIT*` in `m_apUnit`. Each `Unit_Open` creates a new UNIT instance — UNITs are not shared across callers. A UNIT uses `m_bAttached` (bool, single-owner semantics) with `std::mutex m_mxUnit` protecting Attach/Detach. UNITs are deleted in `Unit_Close` after calling `Shutdown()` (which calls `Asset_Close` on its four ASSETs).
 
 ## Nested Types
 
 All types are nested inside `SNEEZE::STORAGE`:
 
-| Type    | Parent    | Purpose                                          |
-|---------|-----------|--------------------------------------------------|
-| `UNIT`  | `STORAGE` | Core data wrapper for one JSON file              |
-| `UNIT`  | `STORAGE` | Groups four UNITs for a container                |
-| `SCOPE` | `STORAGE` | Enum selecting which of the four UNITs           |
-| `IENUM` | `STORAGE` | Enumeration callback interface                   |
+| Type        | Parent    | Purpose                                          |
+|-------------|-----------|--------------------------------------------------|
+| `ASSET`     | `STORAGE` | Core data wrapper for one JSON file              |
+| `UNIT`      | `STORAGE` | Groups four ASSETs for a container               |
+| `SCOPE`     | `STORAGE` | Enum selecting which of the four ASSETs          |
+| `IENUM_UNIT`| `STORAGE` | Enumeration callback interface for UNITs         |
 
 ## SCOPE Enum
 
@@ -82,12 +81,12 @@ both paths are ephemeral so everything is wiped on session end.
 
 ## Session Paths
 
-The UNIT constructor appends `Storage/` to the viewport's permanent and temporary base paths, ensuring that storage files live in a dedicated `Storage/` subdirectory — separate from the network cache at the same level.
+STORAGE computes its base paths from the CONTEXT's permanent and temporary paths, appending `Storage/` to ensure storage files live in a dedicated subdirectory — separate from the network cache and console logs at the same level.
 
 ```
-UNIT::UNIT (...) :
-   m_sPath_Permanent ((std::filesystem::path (pViewport->sPath_Permanent ()) / "Storage").string ()),
-   m_sPath_Temporary ((std::filesystem::path (pViewport->sPath_Temporary ()) / "Storage").string ()),
+STORAGE::Impl (...) :
+   m_sPath_Permanent ((std::filesystem::path (pContext->Path_Permanent ()) / "Storage").string ()),
+   m_sPath_Temporary ((std::filesystem::path (pContext->Path_Temporary ()) / "Storage").string ()),
 ```
 
 ## Disk Layout
@@ -114,25 +113,29 @@ UNIT::UNIT (...) :
    │    └── container-chat.json
 ```
 
-The fingerprint path segment uses a 2-character fan-out prefix (`fp-2`) followed by a 22-character remainder (`fp-22`), totaling 24 characters from the 64-character SHA-256 fingerprint.
+The fingerprint path segment uses a 2-character fan-out prefix (`fp-2`) followed by a 22-character remainder (`fp-22`), totaling 24 characters from the 64-character SHA-256 fingerprint. The persona hash is truncated to 12 hex characters (same as Network and Console).
 
-Directory creation happens in `UNIT::Load()` — when a UNIT's JSON data is first loaded from disk, `std::filesystem::create_directories` ensures the full directory path exists. This runs once per UNIT, not on every Save or SaveMeta.
+Directory creation happens in `ASSET::Load()` — when an ASSET's JSON data is first loaded from disk, `std::filesystem::create_directories` ensures the full directory path exists. This runs once per ASSET, not on every Save or Meta_Save.
+
+## CID Pooling
+
+STORAGE receives raw `const CID*` pointers from callers, but immediately exchanges them for stable pooled pointers via `CONTEXT::CID_Pool()`. This ensures all modules sharing a CID (STORAGE, CONSOLE, NETWORK) point to the same CONTEXT-owned instance. The exchange happens inside `STORAGE::Impl::Unit_Open` — one step inside the Impl, symmetric with `CONSOLE::Impl::Stream_Open`.
 
 ## Usage
 
 ```cpp
-#include "storage/Storage.h"
+#include <Storage.h>
 
 // Open storage for a container (typically called by WASM runtime)
-auto pName = std::make_shared<SNEEZE::CONTEXT::CONTAINER::NAME> ();
-pName->sFingerprint   = "abc123def456abc123def456abc123def456abc123def456abc123def456abcd";
-pName->sOrganization  = "Metaversal";
-pName->sCommonName    = "Metaversal";
-pName->sContainerName = "poker";
-pName->sPersonaHash   = "def456...";
-pName->bValidated     = true;
+CONTEXT::CONTAINER::CID cid;
+cid.sFingerprint   = "abc123def456abc123def456abc123def456abc123def456abc123def456abcd";
+cid.sOrganization  = "Metaversal";
+cid.sCommonName    = "Metaversal";
+cid.sContainerName = "poker";
+cid.sPersonaHash   = "def456abc123";
+cid.bValidated     = true;
 
-STORAGE::UNIT* pUnit = pSneeze->Storage ()->Unit_Open (pName, pViewport);
+STORAGE::UNIT* pUnit = pContext->Storage ()->Unit_Open (&cid);
 
 // Path-based JSON access
 pUnit->Set (STORAGE::CONTAINER_PERMANENT, "player.name", "Dean");
@@ -153,7 +156,7 @@ std::string sJson = pUnit->Json (STORAGE::CONTAINER_PERMANENT);
 pUnit->Json (STORAGE::CONTAINER_TEMPORARY, "{\"session\": {\"start\": 12345}}");
 
 // Close when container is destroyed
-pSneeze->Storage ()->Unit_Close (pUnit);
+pContext->Storage ()->Unit_Close (pUnit);
 ```
 
 ## Data Model
@@ -182,12 +185,21 @@ the array with null values if the index exceeds the current size.
 
 ```
 Container instantiated:
-   STORAGE::Unit_Open(pName, pViewport)
-   → create UNIT (appends Storage/ to viewport paths)
-   → for each of 4 scopes: find or create UNIT (increment m_nCount_Open if shared)
-   → UNIT::Attach() → increment m_nCount_Load on each UNIT → UNIT::Load()
+   STORAGE::Impl::Unit_Open(pCID)
+   → CID_Pool exchanges the input CID for a stable pooled pointer
+   → create UNIT(pStorage, pCID)
+   → add to m_apUnit
+   → UNIT::Initialize()
+      → for each of 4 scopes: pStorage->Asset_Open(eScope, sPathname)
+         → find or create ASSET (increment m_nCount_Open if shared)
    → fire OnStorageUnitCreated
    → return UNIT*
+   (caller must explicitly call pUnit->Attach() to load data)
+
+UNIT::Attach():
+   → sets m_bAttached = true
+   → calls Attach() on all four ASSETs
+      → ASSET::Attach() increments m_nCount_Load → ASSET::Load() on first attach
 
 WASM calls storage_set_string(CONTAINER_PERMANENT, "player.name", "Dean"):
    → host function resolves UNIT from WASM store identity
@@ -196,17 +208,24 @@ WASM calls storage_set_string(CONTAINER_PERMANENT, "player.name", "Dean"):
    → appends JSONL line to .log file
    → fires OnStorageUnitChanged notification
 
+UNIT::Detach():
+   → calls Detach(m_CID) on all four ASSETs
+      → ASSET::Detach saves meta + dirty data, evicts on 1→0
+   → Meta_Save
+   → sets m_bAttached = false
+
 Container destroyed:
-   STORAGE::Unit_Close(pUnit)
-   → save any dirty UNITs (full .json write + delete .log)
-   → save .meta sidecar for all UNITs
-   → UNIT::Detach() → decrement m_nCount_Load → evict at zero
-   → decrement m_nCount_Open on all 4 UNITs → delete UNIT at zero
-   → delete UNIT, remove from m_apUnit
+   STORAGE::Impl::Unit_Close(pUnit)
+   → fire OnStorageUnitDeleted
+   → erase from m_apUnit
+   → delete pUnit
+      → ~UNIT calls Shutdown(pStorage)
+         → pStorage->Asset_Close(pAsset) for each of 4
+            → decrement m_nCount_Open → delete ASSET at zero
 ```
 
-Organization UNITs are shared — multiple UNITs from the same publisher point
-to the same org UNITs. `m_nCount_Open` ensures org UNITs stay alive as long as
+Organization ASSETs are shared — multiple UNITs from the same publisher point
+to the same org ASSETs. `m_nCount_Open` ensures org ASSETs stay alive as long as
 any container from that org has an open UNIT.
 
 ## Crash Durability — JSONL Changelog
@@ -266,23 +285,22 @@ use bulk `GetJson`/`SetJson`.
 - Storage units not held by WASM or inspector don't need to live in memory
   (separated by the `m_nCount_Open` / `m_nCount_Load` two-counter model)
 
-## Notifications (IVIEWPORT callbacks)
+## Notifications (ICONTEXT callbacks)
 
 ```cpp
-virtual void OnStorageUnitCreated (NOTIFICATION* pNotification);
-virtual void OnStorageUnitChanged (NOTIFICATION* pNotification);
-virtual void OnStorageUnitDeleted (NOTIFICATION* pNotification);
+virtual void OnStorageUnitCreated (STORAGE::UNIT*) {}
+virtual void OnStorageUnitChanged (STORAGE::UNIT*, STORAGE::eSCOPE eScope, const std::string&) {}
+virtual void OnStorageUnitDeleted (STORAGE::UNIT*) {}
 ```
 
-Notifications fire from STORAGE through the UNIT's `VIEWPORT*` up to the host.
-The host downcasts `NOTIFICATION*` to `STORAGE::UNIT*`.
+Notifications fire from STORAGE through `CONTEXT::Host()` up to the ICONTEXT host. The host receives typed UNIT pointers directly.
 
 ## Sidecar .meta Files
 
-Each storage unit has a companion `.meta` sidecar — same pattern as NETWORK:
+Each ASSET has a companion `.meta` sidecar — same pattern as NETWORK and Console:
 
-- Contains SNEEZE::CONTEXT::CONTAINER::NAME fields (fingerprint, organization, commonName,
-  containerName, personaHash, bValidated)
+- Contains CID identity fields (fingerprint, organization, commonName,
+  containerName, personaHash)
 - Contains scope identifier and statistics (createdAt, lastAccessedAt,
   accessCount, sizeBytes)
 - Lets the inspector build its index without parsing every JSON data file
@@ -290,17 +308,34 @@ Each storage unit has a companion `.meta` sidecar — same pattern as NETWORK:
 
 ## Thread Safety
 
-- `STORAGE` — `m_mxStorage` (recursive_mutex) protecting the UNIT map and UNIT list
-- `UNIT` — `m_mutex` (recursive_mutex) per UNIT protecting its JSON document and metadata
+- `STORAGE` — `m_mxStorage` (recursive_mutex) protecting the ASSET map and UNIT list
+- `ASSET` — `m_mutex` (recursive_mutex) per ASSET protecting its JSON document and metadata
+- `UNIT` — `m_mxUnit` (mutex) protecting Attach/Detach
+
+## Symmetry with Console and Network
+
+The Storage module follows the same structural patterns as Console and Network:
+
+| Storage | Console | Network | Role |
+|---------|---------|---------|------|
+| `STORAGE` | `CONSOLE` | `NETWORK` | Per-context singleton |
+| `UNIT` | `STREAM` | `FILE` | Per-caller handle |
+| `ASSET` | `BLOCK` | `ASSET` | Core data wrapper, shared via ref count |
+| `Unit_Open/Close` | `Stream_Open/Close` | `File_Open/Close` | Lifecycle API |
+| `Asset_Open/Close` | `Block_Open/Close` | `Asset_Open/Close` | Internal shared resource management |
+| `IENUM_UNIT` | `IENUM_STREAM` | `IENUM` | Enumeration callback |
+
+All three modules: pimpl idiom, CID pooling via `CONTEXT::CID_Pool()` in the parent Impl, two-counter ownership on the data wrapper, recursive_mutex, Attach/Detach lifecycle, meta sidecar files.
 
 ## Files
 
 | File | Contents |
 |------|----------|
-| `Storage.h` | `include/Storage.h` — single header with all nested types |
-| `Storage.cpp` | Top-level STORAGE (Initialize, Unit_Open, Unit_Close, Enumerate, destructor) |
-| `Unit.cpp` | STORAGE::UNIT (JSON access, path navigation, changelog, Load/Save/Evict, meta) |
-| `Unit.cpp` | STORAGE::UNIT (path-based API, Attach/Detach, path construction) |
+| `include/Storage.h` | Public header — STORAGE, ASSET, UNIT, SCOPE, IENUM_UNIT |
+| `sneeze/storage/Storage.cpp` | STORAGE + Impl (Unit_Open/Close/Enum, Asset_Open/Close, paths) |
+| `sneeze/storage/Storage_Asset.cpp` | ASSET + Impl (JSON access, path navigation, changelog, Load/Save/Evict, meta) |
+| `sneeze/storage/Storage_Asset.h` | ASSET private header |
+| `sneeze/storage/Unit.cpp` | UNIT (path-based API, Attach/Detach, Initialize/Shutdown, path construction) |
 
 ## WASM Interface (Current State)
 

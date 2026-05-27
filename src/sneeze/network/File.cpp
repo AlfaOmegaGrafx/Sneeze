@@ -31,7 +31,7 @@ public:
    Impl (FILE* pFile, NETWORK* pNetwork, CONTEXT::CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
       m_pFile            (pFile),
       m_pNetwork         (pNetwork),
-      m_CID              (*pCID),
+      m_pCID             (pNetwork->Context ()->CID_Pool (pCID)),
       m_nFileIx          (nFileIx),
       m_sUrl             (sUrl),
       m_sOpenHash        (sHash),
@@ -234,12 +234,12 @@ public:
       return std::string (szHex);
    }
 
-   std::string sPath () const
+   std::string Path () const
    {
-      return (std::filesystem::path (m_pNetwork->sPath_Permanent ()) / m_CID.sPersonaHash / m_CID.sFingerprint.substr (0, 2) / m_CID.sFingerprint.substr (2, 22) / m_CID.sContainerName / m_sDiskKey.substr (0, 2)).string ();
+      return (std::filesystem::path (m_pNetwork->Path_Permanent ()) / m_pCID->sPersonaHash / m_pCID->sFingerprint.substr (0, 2) / m_pCID->sFingerprint.substr (2, 22) / m_pCID->sContainerName / m_sDiskKey.substr (0, 2)).string ();
    }
 
-   std::string sFilename (const std::string& sExt) const
+   std::string Filename (const std::string& sExt) const
    {
       std::string sName = m_sDiskKey.substr (2);
 
@@ -249,40 +249,40 @@ public:
       return sName;
    }
 
-   std::string sPathname (const std::string& sExt) const
+   std::string Pathname (const std::string& sExt) const
    {
-      return (std::filesystem::path (sPath ()) / sFilename (sExt)).string ();
+      return (std::filesystem::path (Path ()) / Filename (sExt)).string ();
    }
 
 public:
-   FILE*                    m_pFile;
-   NETWORK*                 m_pNetwork;
-   CONTEXT::CONTAINER::CID  m_CID;
-   ASSET*                   m_pAsset;
-   IFILE*                   m_pListener;
-   uint32_t                 m_nCount_Attach;
-   std::recursive_mutex     m_mxFile;
+   FILE*                          m_pFile;
+   NETWORK*                       m_pNetwork;
+   const CONTEXT::CONTAINER::CID* m_pCID;
+   ASSET*                         m_pAsset;
+   IFILE*                         m_pListener;
+   uint32_t                       m_nCount_Attach;
+   std::recursive_mutex           m_mxFile;
 
-   std::string              m_sDiskKey;
-   std::string              m_sUrl;
-   std::string              m_sOpenHash;
-   uint32_t                 m_nFileIx;
-   uint32_t                 m_nAssetIx;
-   bool                     m_bCacheEnabled;
+   std::string                    m_sDiskKey;
+   std::string                    m_sUrl;
+   std::string                    m_sOpenHash;
+   uint32_t                       m_nFileIx;
+   uint32_t                       m_nAssetIx;
+   bool                           m_bCacheEnabled;
 
-   STATE                    m_bState;
-   double                   m_dFetchQueuedTime;
-   double                   m_dFetchStartTime;
+   STATE                          m_bState;
+   double                         m_dFetchQueuedTime;
+   double                         m_dFetchStartTime;
 
-   std::string              m_sHash;
-   std::string              m_sContentType;
-   uint64_t                 m_nSizeBytes;
-   long                     m_nHttpStatus;
-   double                   m_dFetchEndTime;
-   bool                     m_bServedFromCache;
+   std::string                    m_sHash;
+   std::string                    m_sContentType;
+   uint64_t                       m_nSizeBytes;
+   long                           m_nHttpStatus;
+   double                         m_dFetchEndTime;
+   bool                           m_bServedFromCache;
 
-   bool                     m_bPending_Clear;
-   bool                     m_bPending_Close;
+   bool                           m_bPending_Clear;
+   bool                           m_bPending_Close;
 };
 
 // ---------------------------------------------------------------------------
@@ -345,7 +345,7 @@ std::string                                        NETWORK::FILE::CreatedTime   
 std::string                                        NETWORK::FILE::LastAccessTime    () const { return m_pImpl->m_pAsset->LastAccessTime (); }
 uint32_t                                           NETWORK::FILE::AccessCount       () const { return m_pImpl->m_pAsset->AccessCount (); }
 const std::unordered_map<std::string, std::string> NETWORK::FILE::Headers           () const { return m_pImpl->m_pAsset->Headers (); }
-std::string                                        NETWORK::FILE::ContainerName     () const { return m_pImpl->m_CID.DisplayName (); }
+std::string                                        NETWORK::FILE::ContainerName     () const { return m_pImpl->m_pCID->DisplayName (); }
 NETWORK::STATE                                     NETWORK::FILE::State             () const { return m_pImpl->m_bState; }
 bool                                               NETWORK::FILE::IsReady           () const { return m_pImpl->m_bState == STATE_READY; }
 std::string                                        NETWORK::FILE::Url               () const { return m_pImpl->m_sUrl; }
@@ -364,9 +364,9 @@ uint64_t                                           NETWORK::FILE::SizeBytes     
 
 bool                                               NETWORK::FILE::IsPending_Clear   () const { return m_pImpl->m_bPending_Clear; }
 bool                                               NETWORK::FILE::IsPending_Close   () const { return m_pImpl->m_bPending_Close; }
-std::string                                        NETWORK::FILE::sPath             () const { return m_pImpl->sPath (); }
-std::string                                        NETWORK::FILE::sFilename         (const std::string& sExt) const { return m_pImpl->sFilename (sExt); }
-std::string                                        NETWORK::FILE::sPathname         (const std::string& sExt) const { return m_pImpl->sPathname (sExt); }
+std::string                                        NETWORK::FILE::Path              () const { return m_pImpl->Path (); }
+std::string                                        NETWORK::FILE::Filename          (const std::string& sExt) const { return m_pImpl->Filename (sExt); }
+std::string                                        NETWORK::FILE::Pathname          (const std::string& sExt) const { return m_pImpl->Pathname (sExt); }
 
 NETWORK::IFILE*                                    NETWORK::FILE::Listener          () const { return m_pImpl->m_pListener; }
 

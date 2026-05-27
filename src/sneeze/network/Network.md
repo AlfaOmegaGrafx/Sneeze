@@ -13,7 +13,7 @@ All files are stored on disk, never solely in memory. Fetches stream to a tempor
 
 ```
 NETWORK (singleton)
- ├── ASSET_MAP: pathname -> ASSET*                (keyed by FILE::sPathname(""), only assets with active FILE handles)
+ ├── ASSET_MAP: pathname -> ASSET*                (keyed by FILE::Pathname(""), only assets with active FILE handles)
  ├── History list: all FILE* handles ever created (m_apFile)
  ├── m_nNextFileIx: monotonic FILE index counter
  ├── m_nNextAssetIx: monotonic ASSET index counter (persisted in rules.json)
@@ -551,7 +551,7 @@ The NETWORK's `Shutdown()` method (**partially implemented — shutdown rework p
 
 1. Sets the atomic shutdown flag (cancels in-flight fetches at next check)
 2. Joins all fetch threads and drains the fetch queue
-3. Saves `.meta` sidecars for all READY assets still in memory (currently broken — calls removed `SaveMeta()` method)
+3. Saves `.meta` sidecars for all READY assets still in memory (currently broken — calls removed `Meta_Save()` method)
 4. Saves `rules.json` (persists `m_nNextAssetIx` and staleness rules)
 5. Clears all assets from `m_umpAsset`
 6. Deletes all FILE handles in the history list
@@ -647,8 +647,8 @@ The NETWORK module completed a multi-session bottom-up refactoring. Build errors
 
 ### Completed
 
-- FILE now owns all path computation (m_sPath_Permanent, m_sDiskKey, sPath/sFilename/sPathname accessors). ASSET stores the pathname but does not compute it.
-- ASSET map keyed by pathname (FILE::sPathname("")) instead of URL — supports per-viewport, per-CID scoping.
+- FILE now owns all path computation (m_sPath_Permanent, m_sDiskKey, Path/Filename/Pathname accessors). ASSET stores the pathname but does not compute it.
+- ASSET map keyed by pathname (FILE::Pathname("")) instead of URL — supports per-viewport, per-CID scoping.
 - Close() calls Detach() immediately — listener disconnected, ASSET attach count decremented on close rather than deferred to destructor.
 - Fetch timing: m_dFetchStartTime set in ASSET::Attach when spawning fetch, m_dFetchEndTime set in FetchComplete via NETWORK::SecondsSinceEpoch().
 - File_Open with null listener returns null for uncached URLs (cache probe path).
@@ -656,7 +656,7 @@ The NETWORK module completed a multi-session bottom-up refactoring. Build errors
 - ASSET::Attach branches documented with state comments.
 - **Per-ASSET FETCH threads replaced with pooled JOB_FETCH jobs.** `m_pJob_Fetch` (FETCH*) replaced by `m_pAsset_Fetch` (IJOB*). ASSET_FETCH bridge class in Network_Asset.cpp passes `SNEEZE::FETCH_RESULT` directly (no conversion — `NETWORK::FETCH_RESULT` was eliminated). Legacy thread pool (16 FETCH_SLOTs + overflow queue) removed from Network.cpp.
 - **FetchComplete lifecycle fix.** Raw counter decrements (`m_nCount_Attach--`, `m_nCount_Open--`) replaced by `Detach(nullptr)` + `m_pNetwork->Asset_Close(this, nullptr)`. This routes through the proper lifecycle methods, triggering Meta_Save when attach count reaches zero. Fixes the long-standing "temporary ungraceful solution" noted in the architecture docs.
-- **Asset_Close simplified.** Uses `pAsset->Pathname()` unconditionally instead of branching on `pFile ? pFile->sPathname("") : pAsset->Pathname()` — both are always equal.
+- **Asset_Close simplified.** Uses `pAsset->Pathname()` unconditionally instead of branching on `pFile ? pFile->Pathname("") : pAsset->Pathname()` — both are always equal.
 - **Queue_Post_Fetch routing.** `NETWORK::Queue_Post_Fetch(JOB_FETCH*)` -> `ENGINE::Queue_Post_Fetch` -> `ENGINE::Impl::Queue_Post_Fetch` -> `CONTROL::Queue_Post_Fetch` -> `POOL_QUEUE<JOB_FETCH*>::Post`. ENGINE::Impl keeps `m_pControl` private; the forwarding method provides controlled access.
 - **All FILE notifications are asynchronous.** Even for already-cached files, OnFileReady/OnFileFailed are delivered via notify-only `ASSET_FETCH` jobs (`IsFetch()==false`) posted to the fetch pool. This eliminates re-entrancy bugs where synchronous notification during `File_Open`/`Initialize`/`Attach` could destroy the FILE mid-initialization.
 - **`IFETCH`/`ISCRUB` interfaces eliminated.** `JOB_FETCH` and `JOB_SCRUB` now inherit directly from `IJOB`. `JOB_FETCH` carries `bool m_bFetch` (set via constructor) to distinguish real fetch jobs from notify-only jobs.

@@ -23,8 +23,8 @@ public:
    Impl (STORAGE* pStorage, CONTEXT* pContext) :
       m_pStorage (pStorage),
       m_pContext (pContext),
-      m_sPath_Permanent ((std::filesystem::path (pContext->sPath_Permanent ()) / "Storage").string ()),
-      m_sPath_Temporary ((std::filesystem::path (pContext->sPath_Temporary ()) / "Storage").string ())
+      m_sPath_Permanent ((std::filesystem::path (pContext->Path_Permanent ()) / "Storage").string ()),
+      m_sPath_Temporary ((std::filesystem::path (pContext->Path_Temporary ()) / "Storage").string ())
    {
    }
 
@@ -48,13 +48,15 @@ public:
       m_umpAsset.clear ();
    }
 
-public:
+   // ---------------------------------------------------------------------------
+   // Unit management
+   // ---------------------------------------------------------------------------
 
    STORAGE::UNIT* Unit_Open (const CONTEXT::CONTAINER::CID* pCID)
    {
       UNIT* pUnit = nullptr;
 
-      if (pCID)
+      if (pCID = m_pContext->CID_Pool (pCID)) // Swap the input CID for the Context pooled CID
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
 
@@ -86,7 +88,7 @@ public:
       }
    }
 
-   void Unit_Enum (IENUM* pEnum)
+   void Unit_Enum (IENUM_UNIT* pEnum)
    {
       if (pEnum)
       {
@@ -163,8 +165,8 @@ STORAGE::~STORAGE ()
 // ---------------------------------------------------------------------------
 
 SNEEZE::CONTEXT*   STORAGE::Context         ()                                      const { return m_pImpl->m_pContext; }
-const std::string& STORAGE::sPath_Permanent ()                                      const { return m_pImpl->m_sPath_Permanent; }
-const std::string& STORAGE::sPath_Temporary ()                                      const { return m_pImpl->m_sPath_Temporary; }
+const std::string& STORAGE::Path_Permanent  ()                                      const { return m_pImpl->m_sPath_Permanent; }
+const std::string& STORAGE::Path_Temporary  ()                                      const { return m_pImpl->m_sPath_Temporary; }
 
 // ---------------------------------------------------------------------------
 // Methods
@@ -172,7 +174,7 @@ const std::string& STORAGE::sPath_Temporary ()                                  
 
 STORAGE::UNIT*     STORAGE::Unit_Open       (const CONTEXT::CONTAINER::CID* pCID)         { return m_pImpl->Unit_Open       (pCID); }
 void               STORAGE::Unit_Close      (UNIT* pUnit)                                 {        m_pImpl->Unit_Close      (pUnit); }
-void               STORAGE::Unit_Enum       (IENUM* pEnum)                                {        m_pImpl->Unit_Enum       (pEnum); }
+void               STORAGE::Unit_Enum       (IENUM_UNIT* pEnum)                                {        m_pImpl->Unit_Enum       (pEnum); }
 
 ASSET*             STORAGE::Asset_Open      (eSCOPE eScope, const std::string& sPathname) { return m_pImpl->Asset_Open      (eScope, sPathname); }
 void               STORAGE::Asset_Close     (ASSET* pAsset)                               {        m_pImpl->Asset_Close     (pAsset); }

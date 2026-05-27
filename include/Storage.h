@@ -69,7 +69,6 @@ namespace SNEEZE
 
          // --- Identity ---
 
-         const CONTEXT::CONTAINER::CID&  CID () const;
          std::string  DisplayName () const;
 
          // --- Path-based API ---
@@ -88,16 +87,11 @@ namespace SNEEZE
 
          void     Attach ();
          void     Detach ();
-         // --- Clear flag (deferred history removal) ---
-
-         bool     IsPendingClear () const;
-         void     SetPendingClear (bool b);
-
          // --- Paths ---
 
-         std::string sPath     (eSCOPE eScope) const;
-         std::string sFilename (eSCOPE eScope, const std::string& sExt = "") const;
-         std::string sPathname (eSCOPE eScope, const std::string& sExt = "") const;
+         std::string Path     (eSCOPE eScope) const;
+         std::string Filename (eSCOPE eScope, const std::string& sExt = "") const;
+         std::string Pathname (eSCOPE eScope, const std::string& sExt = "") const;
 
       private:
          class Impl;
@@ -105,15 +99,15 @@ namespace SNEEZE
       };
 
       // -----------------------------------------------------------------------
-      // IENUM — enumeration callback interface.
+      // IENUM_UNIT — enumeration callback interface.
       //
       // Implement to receive UNIT pointers during Unit_Enum().
       // -----------------------------------------------------------------------
 
-      class IENUM
+      class IENUM_UNIT
       {
       public:
-         virtual ~IENUM () {}
+         virtual ~IENUM_UNIT () {}
          virtual void OnUnit (UNIT* pUnit) = 0;
       };
 
@@ -127,14 +121,14 @@ namespace SNEEZE
       bool Initialize ();
 
       CONTEXT*            Context () const;
-      const std::string&  sPath_Permanent () const;
-      const std::string&  sPath_Temporary () const;
+      const std::string&  Path_Permanent () const;
+      const std::string&  Path_Temporary () const;
 
       // --- Container lifecycle ---
 
       UNIT*   Unit_Open  (const CONTEXT::CONTAINER::CID* pCID);
       void    Unit_Close (UNIT* pUnit);
-      void    Unit_Enum  (IENUM* pEnum);
+      void    Unit_Enum  (IENUM_UNIT* pEnum);
 
    private:
       class Impl;

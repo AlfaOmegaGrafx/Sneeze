@@ -155,6 +155,7 @@
     <ClCompile Include="..\src\sneeze\console\Console.cpp" />
     <ClCompile Include="..\src\sneeze\console\Entry.cpp" />
     <ClCompile Include="..\src\sneeze\console\Stream.cpp" />
+    <ClCompile Include="..\src\sneeze\console\Block.cpp" />
     <!-- network -->
     <ClCompile Include="..\src\sneeze\network\Network.cpp" />
     <ClCompile Include="..\src\sneeze\network\File.cpp" />
@@ -194,7 +195,7 @@
   <!-- ===================================================================== -->
   <ItemGroup>
     <ClInclude Include="..\src\sneeze\Pch.h" />
-    <ClInclude Include="..\src\sneeze\console\Stream.h" />
+    <ClInclude Include="..\src\sneeze\console\Block.h" />
     <ClInclude Include="..\src\sneeze\storage\Storage_Asset.h" />
     <ClInclude Include="..\src\sneeze\Types.h" />
     <ClInclude Include="..\src\sneeze\Engine.h" />

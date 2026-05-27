@@ -35,7 +35,7 @@ public:
    Impl (NETWORK* pNetwork, CONTEXT* pContext) :
       m_pNetwork        (pNetwork),
       m_pContext        (pContext),
-      m_sPath_Permanent ((std::filesystem::path (pContext->sPath_Permanent ()) / "Network").string ()),
+      m_sPath_Permanent ((std::filesystem::path (pContext->Path_Permanent ()) / "Network").string ()),
       m_bShuttingDown   (false),
       m_bCacheEnabled   (true),
       m_nNextAssetIx    (1),
@@ -413,7 +413,7 @@ public:
       ASSET* pAsset = nullptr;
 
       std::string sUrl      = pFile->Url ();
-      std::string sPathname = pFile->sPathname ("");
+      std::string sPathname = pFile->Pathname ("");
 
       auto it = m_umpAsset.find (sPathname);
       if (it == m_umpAsset.end ())
@@ -494,7 +494,7 @@ NETWORK::~NETWORK ()
 // ---------------------------------------------------------------------------
 
 SNEEZE::CONTEXT*   NETWORK::Context           ()                                     const { return m_pImpl->m_pContext; }
-const std::string& NETWORK::sPath_Permanent   ()                                     const { return m_pImpl->m_sPath_Permanent; }
+const std::string& NETWORK::Path_Permanent    ()                                     const { return m_pImpl->m_sPath_Permanent; }
 bool               NETWORK::IsShuttingDown    ()                                     const { return m_pImpl->m_bShuttingDown; }
 bool               NETWORK::IsCacheEnabled    ()                                     const { return m_pImpl->m_bCacheEnabled; }
 

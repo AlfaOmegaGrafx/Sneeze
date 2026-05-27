@@ -14,6 +14,8 @@
 
 #include <Sneeze.h>
 
+#include <unordered_map>
+
 using namespace SNEEZE;
 
 /***********************************************************************************************************************************
@@ -101,6 +103,8 @@ public:
    NETWORK*    m_pNetwork;
    STORAGE*    m_pStorage;
    VIEWPORT*   m_pViewport;
+
+   std::unordered_map<std::string, CONTEXT::CONTAINER::CID> m_umCID;
 };
 
 /***********************************************************************************************************************************
@@ -139,5 +143,27 @@ SNEEZE::NETWORK*   SNEEZE::CONTEXT::Network  () const { return m_pImpl->m_pNetwo
 SNEEZE::STORAGE*   SNEEZE::CONTEXT::Storage  () const { return m_pImpl->m_pStorage;  }
 SNEEZE::VIEWPORT*  SNEEZE::CONTEXT::Viewport () const { return m_pImpl->m_pViewport; }
 
-const std::string& SNEEZE::CONTEXT::sPath_Permanent () const { return m_pImpl->m_sPath_Permanent; }
-const std::string& SNEEZE::CONTEXT::sPath_Temporary () const { return m_pImpl->m_sPath_Temporary; }
+const std::string& SNEEZE::CONTEXT::Path_Permanent () const { return m_pImpl->m_sPath_Permanent; }
+const std::string& SNEEZE::CONTEXT::Path_Temporary () const { return m_pImpl->m_sPath_Temporary; }
+
+const SNEEZE::CONTEXT::CONTAINER::CID* SNEEZE::CONTEXT::CID_Pool (const CONTAINER::CID* pCID)
+{
+   const CONTAINER::CID* pCID_Result = nullptr;
+
+   if (pCID)
+   {
+      std::string sKey = pCID->Key ();
+
+      auto it = m_pImpl->m_umCID.find (sKey);
+      if (it == m_pImpl->m_umCID.end ())
+      {
+         m_pImpl->m_umCID[sKey] = *pCID;
+
+         it = m_pImpl->m_umCID.find (sKey);
+      }
+
+      pCID_Result = &it->second;
+   }
+
+   return pCID_Result;
+}

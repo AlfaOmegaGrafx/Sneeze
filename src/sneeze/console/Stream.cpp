@@ -13,248 +13,394 @@
 // limitations under the License.
 
 #include <Sneeze.h>
-#include "Stream.h"
+#include <Console.h>
+#include "Block.h"
 #include <iomanip>
 
 using namespace SNEEZE;
+
+// ---------------------------------------------------------------------------
+// CONSOLE::STREAM::Impl
+// ---------------------------------------------------------------------------
+
+class CONSOLE::STREAM::Impl
+{
+public:
+   Impl (CONSOLE* pConsole, const CONTEXT::CONTAINER::CID* pCID) :
+      m_pConsole         (pConsole),
+      m_pCID             (pCID),
+      m_bAttached        (false),
+      m_nBlocks          (0),
+      m_nEntries_Block   (0),
+      m_nBlock           (-1),
+      m_nBlockEntryCount (0),
+      m_nGroupDepth      (0)
+   {
+   }
+
+   void Initialize (int nBlocks, int nEntries_Block)
+   {
+      m_nBlocks        = nBlocks;
+      m_nEntries_Block = nEntries_Block;
+
+      Meta_Load ();
+   }
+
+   ~Impl ()
+   {
+      if (m_bAttached)
+         Detach ();
+
+      for (int nBlock = 0; nBlock < (int) m_apBlock.size (); nBlock++)
+      {
+         if (m_apBlock[nBlock])
+         {
+            m_pConsole->Block_Close (m_apBlock[nBlock]);
+         }
+      }
+
+      m_apBlock.clear ();
+   }
+
+   // ---------------------------------------------------------------------------
+   // Path helpers
+   // ---------------------------------------------------------------------------
+
+   std::string Path (uint32_t nBlock) const
+   {
+      const std::string& sBasePath = m_pConsole->Path_Temporary ();
+
+      return (std::filesystem::path (sBasePath) / m_pCID->sPersonaHash / m_pCID->sFingerprint.substr (0, 2) / m_pCID->sFingerprint.substr (2, 22)).string ();
+   }
+
+   std::string Filename (uint32_t nBlock, const std::string& sExt = "") const
+   {
+      char szBlock[5];
+      snprintf (szBlock, sizeof (szBlock), "%04u", nBlock);
+
+      std::string sName = m_pCID->sContainerName + "-" + szBlock;
+
+      if (!sExt.empty ())
+         sName += "." + sExt;
+
+      return sName;
+   }
+
+   std::string Pathname (uint32_t nBlock, const std::string& sExt = "") const
+   {
+      return (std::filesystem::path (Path (nBlock)) / Filename (nBlock, sExt)).string ();
+   }
+
+   std::string Pathname_Meta () const
+   {
+      return (std::filesystem::path (Path (0)) / (m_pCID->sContainerName + ".meta")).string ();
+   }
+
+   // ---------------------------------------------------------------------------
+   // Meta sidecar — read on Initialize, written on Detach.
+   // ---------------------------------------------------------------------------
+
+   void Meta_Load ()
+   {
+      std::string sPathname_Meta = Pathname_Meta ();
+
+      std::ifstream file (sPathname_Meta);
+      if (file.is_open ())
+      {
+         try
+         {
+            nlohmann::json jMeta = nlohmann::json::parse (file);
+
+            m_nBlock           = jMeta.value ("block", -1);
+            m_nBlockEntryCount = jMeta.value ("blockEntryCount", 0);
+         }
+         catch (...)
+         {
+            m_nBlock           = -1;
+            m_nBlockEntryCount = 0;
+         }
+      }
+
+      if (m_nBlock >= 0)
+      {
+         int nFirstBlock = std::max (0, m_nBlock - m_nBlocks + 1);
+
+         for (int nBlock = nFirstBlock; nBlock <= m_nBlock; nBlock++)
+         {
+            m_apBlock.push_back (m_pConsole->Block_Open (nBlock, Pathname (nBlock, "log")));
+         }
+      }
+   }
+
+   void Meta_Save ()
+   {
+      std::string sPathname_Meta = Pathname_Meta ();
+
+      std::error_code ec;
+      std::filesystem::create_directories (std::filesystem::path (sPathname_Meta).parent_path (), ec);
+
+      nlohmann::json jMeta;
+
+      jMeta["block"]           = m_nBlock;
+      jMeta["blockEntryCount"] = m_nBlockEntryCount;
+
+      jMeta["fingerprint"]     = m_pCID->sFingerprint;
+      jMeta["organization"]    = m_pCID->sOrganization;
+      jMeta["commonName"]      = m_pCID->sCommonName;
+      jMeta["containerName"]   = m_pCID->sContainerName;
+      jMeta["personaHash"]     = m_pCID->sPersonaHash;
+
+      std::string sTmpPath = sPathname_Meta + ".temp";
+      std::ofstream ofs (sTmpPath, std::ios::trunc);
+      if (ofs.is_open ())
+      {
+         ofs << jMeta.dump (2);
+         ofs.close ();
+
+         std::filesystem::rename (sTmpPath, sPathname_Meta, ec);
+      }
+   }
+
+   // ---------------------------------------------------------------------------
+   // Attach / Detach
+   // ---------------------------------------------------------------------------
+
+   void Attach ()
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mxStream);
+
+      if (!m_bAttached)
+      {
+         m_bAttached = true;
+
+         for (int nBlock = 0; nBlock < (int) m_apBlock.size (); nBlock++)
+            m_apBlock[nBlock]->Attach ();
+      }
+   }
+
+   void Detach ()
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mxStream);
+
+      if (m_bAttached)
+      {
+         for (int nBlock = 0; nBlock < (int) m_apBlock.size (); nBlock++)
+            m_apBlock[nBlock]->Detach (m_pCID);
+
+         Meta_Save ();
+
+         m_bAttached = false;
+      }
+   }
+
+   // ---------------------------------------------------------------------------
+   // Rotate — create a new block, advance to it, delete the oldest if the
+   // rolling window exceeds m_nBlocks.
+   // ---------------------------------------------------------------------------
+
+   void Rotate ()
+   {
+      m_nBlock++;
+      m_nBlockEntryCount = 0;
+
+      m_apBlock.push_back (m_pConsole->Block_Open (m_nBlock, Pathname (m_nBlock, "log")));
+
+      if (m_bAttached)
+         m_apBlock.back ()->Attach ();
+
+      if ((int) m_apBlock.size () > m_nBlocks)
+      {
+         BLOCK* pOldBlock = m_apBlock.front ();
+
+         if (m_bAttached)
+            pOldBlock->Detach (m_pCID);
+
+         m_pConsole->Block_Close (pOldBlock);
+         m_apBlock.erase (m_apBlock.begin ());
+
+         int nOldBlock = m_nBlock - m_nBlocks;
+         std::error_code ec;
+         std::filesystem::remove (Pathname (nOldBlock, "log"), ec);
+      }
+   }
+
+   // ---------------------------------------------------------------------------
+   // Entry — core write path. Calls back to CONSOLE for entry creation
+   // (timestamp, sequence, ring buffer), then writes to the active block.
+   // ---------------------------------------------------------------------------
+
+   void Entry (CONSOLE::eLEVEL eLevel, const std::string& sMessage, bool bCollapsed = false)
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mxStream);
+
+      if (m_nBlock < 0  ||  m_nBlockEntryCount >= m_nEntries_Block)
+         Rotate ();
+
+      auto pEntry = m_pConsole->Entry_Create (m_pCID, eLevel, sMessage, m_nGroupDepth, bCollapsed);
+
+      m_apBlock.back ()->Write (pEntry);
+      m_nBlockEntryCount++;
+   }
+
+   // ---------------------------------------------------------------------------
+   // Grouping
+   // ---------------------------------------------------------------------------
+
+   void Group (const std::string& sLabel, bool bCollapsed)
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mxStream);
+
+      Entry (CONSOLE::kLEVEL_LOG, sLabel, bCollapsed);
+      m_nGroupDepth++;
+   }
+
+   void GroupEnd ()
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mxStream);
+
+      if (m_nGroupDepth > 0)
+         m_nGroupDepth--;
+   }
+
+   // ---------------------------------------------------------------------------
+   // Counting
+   // ---------------------------------------------------------------------------
+
+   void Count (const std::string& sLabel)
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mxStream);
+
+      uint32_t nCount = ++m_umpCount[sLabel];
+      Entry (CONSOLE::kLEVEL_INFO, sLabel + ": " + std::to_string (nCount));
+   }
+
+   void CountReset (const std::string& sLabel)
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mxStream);
+
+      m_umpCount.erase (sLabel);
+   }
+
+   // ---------------------------------------------------------------------------
+   // Timing
+   // ---------------------------------------------------------------------------
+
+   void Time (const std::string& sLabel)
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mxStream);
+
+      m_umpTime[sLabel] = std::chrono::steady_clock::now ();
+   }
+
+   void TimeEnd (const std::string& sLabel)
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mxStream);
+
+      auto it = m_umpTime.find (sLabel);
+      if (it != m_umpTime.end ())
+      {
+         auto tpNow = std::chrono::steady_clock::now ();
+         double dElapsed = std::chrono::duration<double, std::milli> (tpNow - it->second).count ();
+         m_umpTime.erase (it);
+
+         std::ostringstream oss;
+         oss << sLabel << ": " << std::fixed << std::setprecision (3) << dElapsed << "ms";
+         Entry (CONSOLE::kLEVEL_INFO, oss.str ());
+      }
+   }
+
+   void TimeLog (const std::string& sLabel)
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mxStream);
+
+      auto it = m_umpTime.find (sLabel);
+      if (it != m_umpTime.end ())
+      {
+         auto tpNow = std::chrono::steady_clock::now ();
+         double dElapsed = std::chrono::duration<double, std::milli> (tpNow - it->second).count ();
+
+         std::ostringstream oss;
+         oss << sLabel << ": " << std::fixed << std::setprecision (3) << dElapsed << "ms";
+         Entry (CONSOLE::kLEVEL_INFO, oss.str ());
+      }
+   }
+
+public:
+   CONSOLE*                                                               m_pConsole;
+   const CONTEXT::CONTAINER::CID*                                         m_pCID;
+   std::vector<BLOCK*>                                                    m_apBlock;
+   std::recursive_mutex                                                   m_mxStream;
+   bool                                                                   m_bAttached;
+
+   int                                                                    m_nBlocks;
+   int                                                                    m_nEntries_Block;
+   int                                                                    m_nBlock;
+   int                                                                    m_nBlockEntryCount;
+
+   uint32_t                                                               m_nGroupDepth;
+
+   std::unordered_map<std::string, uint32_t>                              m_umpCount;
+   std::unordered_map<std::string, std::chrono::steady_clock::time_point> m_umpTime;
+};
 
 // ===========================================================================
 // CONSOLE::STREAM
 // ===========================================================================
 
-CONSOLE::STREAM::STREAM (CONSOLE* pConsole, const CONTEXT::CONTAINER::CID* pCID, const std::string& sBasePath) :
-   m_pConsole         (pConsole),
-   m_pCID             (pCID),
-   m_nBlock           (0),
-   m_nBlockEntryCount (0),
-   m_nGroupDepth      (0),
-   m_bLoaded          (false)
+CONSOLE::STREAM::STREAM (CONSOLE* pConsole, const CONTEXT::CONTAINER::CID* pCID) :
+   m_pImpl (new Impl (pConsole, pCID))
 {
-   if (pCID)
-   {
-      std::string sPersona = pCID->sPersonaHash.substr (0, 12);
-      std::string sFp2     = pCID->sFingerprint.substr (0, 2);
-      std::string sFp22    = pCID->sFingerprint.substr (2, 22);
+}
 
-      m_sPath   = (std::filesystem::path (sBasePath) / sPersona / sFp2 / sFp22).string ();
-      m_sPrefix = pCID->sContainerName + "-";
-   }
-   else
-   {
-      m_sPath   = (std::filesystem::path (sBasePath) / "_engine").string ();
-      m_sPrefix = "";
-   }
+void CONSOLE::STREAM::Initialize (int nBlocks, int nEntries_Block)
+{
+   m_pImpl->Initialize (nBlocks, nEntries_Block);
 }
 
 CONSOLE::STREAM::~STREAM ()
 {
-   Close ();
-}
-
-// ---------------------------------------------------------------------------
-// Write — append one JSONL line to the active block file.
-//
-// Creates the directory and opens the file on first write. Adds the entry to
-// the loaded cache if the channel is currently loaded. Rotates to a new block
-// when the current block reaches EntriesPerBlock().
-// ---------------------------------------------------------------------------
-
-void CONSOLE::STREAM::Write (std::shared_ptr<const CONSOLE::ENTRY> pEntry)
-{
-   if (!m_ofsBlock.is_open ())
-   {
-      std::error_code ec;
-      std::filesystem::create_directories (m_sPath, ec);
-      m_ofsBlock.open (Pathname (m_nBlock), std::ios::app);
-   }
-
-   if (m_ofsBlock.is_open ())
-   {
-      m_ofsBlock << pEntry->ToJson ().dump () << "\n";
-      m_nBlockEntryCount++;
-
-      if (m_bLoaded)
-         m_aEntry.push_back (pEntry);
-
-      if (m_nBlockEntryCount >= m_pConsole->EntriesPerBlock ())
-         Rotate ();
-   }
-}
-
-// ---------------------------------------------------------------------------
-// Load — read all existing block files into the in-memory entry cache.
-// Called when the inspector drills into a specific container.
-// ---------------------------------------------------------------------------
-
-void CONSOLE::STREAM::Load ()
-{
-   if (!m_bLoaded)
-   {
-      m_aEntry.clear ();
-
-      uint32_t nMaxBlocks = m_pConsole->MaxBlocks ();
-      uint32_t nFirstBlock = (m_nBlock >= nMaxBlocks) ? (m_nBlock - nMaxBlocks + 1) : 0;
-
-      for (uint32_t nBlock = nFirstBlock; nBlock <= m_nBlock; ++nBlock)
-      {
-         std::ifstream ifs (Pathname (nBlock));
-         if (ifs.is_open ())
-         {
-            std::string sLine;
-            while (std::getline (ifs, sLine))
-            {
-               if (!sLine.empty ())
-               {
-                  try
-                  {
-                     nlohmann::json jEntry = nlohmann::json::parse (sLine);
-                     auto pEntry = CONSOLE::ENTRY::FromJson (jEntry, m_pCID);
-                     if (pEntry)
-                        m_aEntry.push_back (pEntry);
-                  }
-                  catch (...)
-                  {
-                  }
-               }
-            }
-         }
-      }
-
-      m_bLoaded = true;
-   }
-}
-
-// ---------------------------------------------------------------------------
-// Unload — evict the in-memory entry cache.
-// ---------------------------------------------------------------------------
-
-void CONSOLE::STREAM::Unload ()
-{
-   m_aEntry.clear ();
-   m_bLoaded = false;
-}
-
-// ---------------------------------------------------------------------------
-// Close — flush and close the active block file.
-// ---------------------------------------------------------------------------
-
-void CONSOLE::STREAM::Close ()
-{
-   if (m_ofsBlock.is_open ())
-      m_ofsBlock.close ();
-}
-
-// ---------------------------------------------------------------------------
-// Rotate — close the current block, advance to the next, delete the oldest
-// block if the rolling window exceeds MaxBlocks().
-// ---------------------------------------------------------------------------
-
-void CONSOLE::STREAM::Rotate ()
-{
-   Close ();
-
-   m_nBlock++;
-   m_nBlockEntryCount = 0;
-
-   uint32_t nMaxBlocks = m_pConsole->MaxBlocks ();
-   if (m_nBlock >= nMaxBlocks)
-   {
-      uint32_t nOldBlock = m_nBlock - nMaxBlocks;
-      std::error_code ec;
-      std::filesystem::remove (Pathname (nOldBlock), ec);
-   }
-}
-
-// ---------------------------------------------------------------------------
-// Grouping
-// ---------------------------------------------------------------------------
-
-uint32_t CONSOLE::STREAM::GroupDepth () const { return m_nGroupDepth; }
-
-void CONSOLE::STREAM::Group ()
-{
-   m_nGroupDepth++;
-}
-
-void CONSOLE::STREAM::GroupEnd ()
-{
-   if (m_nGroupDepth > 0)
-      m_nGroupDepth--;
-}
-
-// ---------------------------------------------------------------------------
-// Counting
-// ---------------------------------------------------------------------------
-
-uint32_t CONSOLE::STREAM::Count (const std::string& sLabel)
-{
-   return ++m_umpCount[sLabel];
-}
-
-void CONSOLE::STREAM::CountReset (const std::string& sLabel)
-{
-   m_umpCount.erase (sLabel);
-}
-
-// ---------------------------------------------------------------------------
-// Timing
-// ---------------------------------------------------------------------------
-
-void CONSOLE::STREAM::Time (const std::string& sLabel)
-{
-   m_umpTime[sLabel] = std::chrono::steady_clock::now ();
-}
-
-double CONSOLE::STREAM::TimeEnd (const std::string& sLabel)
-{
-   double dResult = -1.0;
-
-   auto it = m_umpTime.find (sLabel);
-   if (it != m_umpTime.end ())
-   {
-      auto tpNow = std::chrono::steady_clock::now ();
-      dResult = std::chrono::duration<double, std::milli> (tpNow - it->second).count ();
-      m_umpTime.erase (it);
-   }
-
-   return dResult;
-}
-
-double CONSOLE::STREAM::TimeLog (const std::string& sLabel) const
-{
-   double dResult = -1.0;
-
-   auto it = m_umpTime.find (sLabel);
-   if (it != m_umpTime.end ())
-   {
-      auto tpNow = std::chrono::steady_clock::now ();
-      dResult = std::chrono::duration<double, std::milli> (tpNow - it->second).count ();
-   }
-
-   return dResult;
+   delete m_pImpl;
 }
 
 // ---------------------------------------------------------------------------
 // Accessors
 // ---------------------------------------------------------------------------
 
-bool CONSOLE::STREAM::IsLoaded () const { return m_bLoaded; }
+std::string CONSOLE::STREAM::DisplayName    ()                                         const { return m_pImpl->m_pCID->DisplayName (); }
 
-const std::deque<std::shared_ptr<const CONSOLE::ENTRY>>& CONSOLE::STREAM::Entries () const { return m_aEntry; }
+std::string CONSOLE::STREAM::Path          (uint32_t nBlock)                          const { return m_pImpl->Path     (nBlock); }
+std::string CONSOLE::STREAM::Filename      (uint32_t nBlock, const std::string& sExt) const { return m_pImpl->Filename (nBlock, sExt); }
+std::string CONSOLE::STREAM::Pathname      (uint32_t nBlock, const std::string& sExt) const { return m_pImpl->Pathname (nBlock, sExt); }
 
 // ---------------------------------------------------------------------------
-// Path helpers
+// Modifiers
 // ---------------------------------------------------------------------------
 
-std::string CONSOLE::STREAM::Filename (uint32_t nBlock) const
-{
-   std::ostringstream oss;
-   oss << m_sPrefix << std::setfill ('0') << std::setw (4) << nBlock << ".log";
+// ---------------------------------------------------------------------------
+// STREAM Caching
+// ---------------------------------------------------------------------------
 
-   return oss.str ();
-}
+void CONSOLE::STREAM::Attach              ()                                                 {                  m_pImpl->Attach (); }
+void CONSOLE::STREAM::Detach              ()                                                 {                  m_pImpl->Detach (); }
 
-std::string CONSOLE::STREAM::Pathname (uint32_t nBlock) const
-{
-   return (std::filesystem::path (m_sPath) / Filename (nBlock)).string ();
-}
+// ---------------------------------------------------------------------------
+// STREAM Pass-through
+// ---------------------------------------------------------------------------
+
+void     CONSOLE::STREAM::Log             (                 const std::string& sMessage)     {                  m_pImpl->Entry      (CONSOLE::kLEVEL_LOG,                          sMessage); }
+void     CONSOLE::STREAM::Debug           (                 const std::string& sMessage)     {                  m_pImpl->Entry      (CONSOLE::kLEVEL_DEBUG,                        sMessage); }
+void     CONSOLE::STREAM::Info            (                 const std::string& sMessage)     {                  m_pImpl->Entry      (CONSOLE::kLEVEL_INFO,                         sMessage); }
+void     CONSOLE::STREAM::Warn            (                 const std::string& sMessage)     {                  m_pImpl->Entry      (CONSOLE::kLEVEL_WARN,                         sMessage); }
+void     CONSOLE::STREAM::Error           (                 const std::string& sMessage)     {                  m_pImpl->Entry      (CONSOLE::kLEVEL_ERROR,                        sMessage); }
+void     CONSOLE::STREAM::Assert          (bool bCondition, const std::string& sMessage)     { if (!bCondition) m_pImpl->Entry      (CONSOLE::kLEVEL_ERROR, "Assertion failed: " + sMessage); }
+
+void     CONSOLE::STREAM::Group           (                 const std::string& sLabel)       {                  m_pImpl->Group      (sLabel, false); }
+void     CONSOLE::STREAM::GroupCollapsed  (                 const std::string& sLabel)       {                  m_pImpl->Group      (sLabel, true);  }
+void     CONSOLE::STREAM::GroupEnd        ()                                                 {                  m_pImpl->GroupEnd   ();              }
+
+void     CONSOLE::STREAM::Count           (                 const std::string& sLabel)       {                  m_pImpl->Count      (sLabel); }
+void     CONSOLE::STREAM::CountReset      (                 const std::string& sLabel)       {                  m_pImpl->CountReset (sLabel); }
+
+void     CONSOLE::STREAM::Time            (                 const std::string& sLabel)       {                  m_pImpl->Time       (sLabel); }
+void     CONSOLE::STREAM::TimeEnd         (                 const std::string& sLabel)       {                  m_pImpl->TimeEnd    (sLabel); }
+void     CONSOLE::STREAM::TimeLog         (                 const std::string& sLabel)       {                  m_pImpl->TimeLog    (sLabel); }

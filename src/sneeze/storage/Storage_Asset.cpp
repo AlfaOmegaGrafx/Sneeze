@@ -240,11 +240,11 @@ public:
          Load (); 
    }
 
-   void Detach (const CONTEXT::CONTAINER::CID& CID)
+   void Detach (const CONTEXT::CONTAINER::CID* pCID)
    {
       if (m_nCount_Load > 0 && --m_nCount_Load == 0)
       {
-         SaveMeta (CID);
+         Meta_Save (pCID);
 
          if (m_bDirty)
             Save ();
@@ -340,24 +340,24 @@ public:
       m_nAccessCount++;
    }
 
-   void SaveMeta (const CONTEXT::CONTAINER::CID& CID)
+   void Meta_Save (const CONTEXT::CONTAINER::CID* pCID)
    {
       std::string sMetaPath = m_sPathname + ".meta";
 
       nlohmann::json jMeta;
 
-      jMeta["fingerprint"] = CID.sFingerprint;
-      jMeta["organization"] = CID.sOrganization;
-      jMeta["commonName"] = CID.sCommonName;
-      jMeta["containerName"] = CID.sContainerName;
-      jMeta["personaHash"] = CID.sPersonaHash;
-      jMeta["validated"] = CID.bValidated;
+      jMeta["fingerprint"]    = pCID->sFingerprint;
+      jMeta["organization"]   = pCID->sOrganization;
+      jMeta["commonName"]     = pCID->sCommonName;
+      jMeta["containerName"]  = pCID->sContainerName;
+      jMeta["personaHash"]    = pCID->sPersonaHash;
+      jMeta["validated"]      = pCID->bValidated;
 
-      jMeta["scope"] = static_cast<int> (m_eScope);
-      jMeta["sizeBytes"] = m_nSizeBytes;
-      jMeta["createdAt"] = m_sCreatedAt;
+      jMeta["scope"]          = static_cast<int> (m_eScope);
+      jMeta["sizeBytes"]      = m_nSizeBytes;
+      jMeta["createdAt"]      = m_sCreatedAt;
       jMeta["lastAccessedAt"] = m_sLastAccessedAt;
-      jMeta["accessCount"] = m_nAccessCount;
+      jMeta["accessCount"]    = m_nAccessCount;
 
       std::string sTmpPath = sMetaPath + ".temp";
       std::ofstream file (sTmpPath, std::ios::trunc);
@@ -369,6 +369,141 @@ public:
          std::error_code ec;
          std::filesystem::rename (sTmpPath, sMetaPath, ec);
       }
+   }
+
+   // ---------------------------------------------------------------------------
+   // JSON access
+   // ---------------------------------------------------------------------------
+
+   nlohmann::json Get (const std::string& sPath) const
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+
+      nlohmann::json* pParent = nullptr;
+      std::string sFinalKey;
+      NavigatePath (sPath, pParent, sFinalKey);
+
+      nlohmann::json jResult;
+      if (pParent  &&  !sFinalKey.empty ())
+      {
+         if (sFinalKey.size () > 2  &&  sFinalKey[0] == '['  &&  sFinalKey.back () == ']')
+         {
+            int nIdx = std::stoi (sFinalKey.substr (1, sFinalKey.size () - 2));
+            if (pParent->is_array ()  &&  nIdx >= 0  &&  static_cast<size_t> (nIdx) < pParent->size ())
+               jResult = (*pParent)[nIdx];
+         }
+         else if (pParent->is_object ()  &&  pParent->contains (sFinalKey))
+            jResult = (*pParent)[sFinalKey];
+      }
+
+      return jResult;
+   }
+
+   void Set (const std::string& sPath, const nlohmann::json& jValue)
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+
+      nlohmann::json* pParent = nullptr;
+      std::string sFinalKey;
+      NavigatePath (sPath, pParent, sFinalKey);
+
+      if (pParent  &&  !sFinalKey.empty ())
+      {
+         if (sFinalKey.size () > 2  &&  sFinalKey[0] == '['  &&  sFinalKey.back () == ']')
+         {
+            int nIdx = std::stoi (sFinalKey.substr (1, sFinalKey.size () - 2));
+            if (!pParent->is_array ())
+               *pParent = nlohmann::json::array ();
+            while (static_cast<size_t> (nIdx) >= pParent->size ())
+               pParent->push_back (nlohmann::json ());
+            (*pParent)[nIdx] = jValue;
+         }
+         else
+         {
+            if (!pParent->is_object ())
+               *pParent = nlohmann::json::object ();
+            (*pParent)[sFinalKey] = jValue;
+         }
+
+         m_bDirty = true;
+         TouchAccess ();
+         Log_Append ("Set", sPath, jValue);
+      }
+   }
+
+   void Remove (const std::string& sPath)
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+
+      nlohmann::json* pParent = nullptr;
+      std::string sFinalKey;
+      NavigatePath (sPath, pParent, sFinalKey);
+
+      if (pParent  &&  !sFinalKey.empty ())
+      {
+         if (sFinalKey.size () > 2  &&  sFinalKey[0] == '['  &&  sFinalKey.back () == ']')
+         {
+            int nIdx = std::stoi (sFinalKey.substr (1, sFinalKey.size () - 2));
+            if (pParent->is_array ()  &&  nIdx >= 0  &&  static_cast<size_t> (nIdx) < pParent->size ())
+               pParent->erase (nIdx);
+         }
+         else
+         {
+            if (pParent->is_object ()  &&  pParent->contains (sFinalKey))
+               pParent->erase (sFinalKey);
+         }
+
+         m_bDirty = true;
+         TouchAccess ();
+         Log_Append ("Remove", sPath, nlohmann::json ());
+      }
+   }
+
+   bool Has (const std::string& sPath) const
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+
+      nlohmann::json* pParent = nullptr;
+      std::string sFinalKey;
+      NavigatePath (sPath, pParent, sFinalKey);
+
+      bool bHas = false;
+      if (pParent  &&  !sFinalKey.empty ())
+      {
+         if (sFinalKey.size () > 2  &&  sFinalKey[0] == '['  &&  sFinalKey.back () == ']')
+         {
+            int nIdx = std::stoi (sFinalKey.substr (1, sFinalKey.size () - 2));
+            bHas = pParent->is_array ()  &&  nIdx >= 0  &&  static_cast<size_t> (nIdx) < pParent->size ();
+         }
+         else
+            bHas = pParent->is_object ()  &&  pParent->contains (sFinalKey);
+      }
+
+      return bHas;
+   }
+
+   std::string Json () const
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+
+      return m_jData.dump (2);
+   }
+
+   void Json (const std::string& sJson)
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+
+      try
+      {
+         m_jData = nlohmann::json::parse (sJson);
+      }
+      catch (...)
+      {
+         m_jData = nlohmann::json::object ();
+      }
+
+      m_bDirty = true;
+      TouchAccess ();
    }
 
    STORAGE*             m_pStorage;
@@ -421,156 +556,25 @@ const std::string&   ASSET::LastAccessTime () const { return m_pImpl->m_sLastAcc
 uint32_t             ASSET::AccessCount    () const { return m_pImpl->m_nAccessCount; }
 
 // ---------------------------------------------------------------------------
-// JSON access
+// Methods
 // ---------------------------------------------------------------------------
 
-nlohmann::json ASSET::Get (const std::string& sPath) const
-{
-   std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mutex);
+uint32_t       ASSET::Open        ()                                                        { return ++m_pImpl->m_nCount_Open; }
+uint32_t       ASSET::Close       ()                                                        { return --m_pImpl->m_nCount_Open; }
 
-   nlohmann::json* pParent = nullptr;
-   std::string sFinalKey;
-   m_pImpl->NavigatePath (sPath, pParent, sFinalKey);
+void           ASSET::Attach      ()                                                        {        m_pImpl->Attach      (); }
+void           ASSET::Detach      (const CONTEXT::CONTAINER::CID* pCID)                     {        m_pImpl->Detach      (pCID); }
 
-   nlohmann::json jResult;
-   if (pParent  &&  !sFinalKey.empty ())
-   {
-      if (sFinalKey.size () > 2  &&  sFinalKey[0] == '['  &&  sFinalKey.back () == ']')
-      {
-         int nIdx = std::stoi (sFinalKey.substr (1, sFinalKey.size () - 2));
-         if (pParent->is_array ()  &&  nIdx >= 0  &&  static_cast<size_t> (nIdx) < pParent->size ())
-            jResult = (*pParent)[nIdx];
-      }
-      else if (pParent->is_object ()  &&  pParent->contains (sFinalKey))
-         jResult = (*pParent)[sFinalKey];
-   }
+void           ASSET::Load        ()                                                        {        m_pImpl->Load        (); }
+void           ASSET::Save        ()                                                        {        m_pImpl->Save        (); }
+void           ASSET::Evict       ()                                                        {        m_pImpl->Evict       (); }
 
-   return jResult;
-}
+void           ASSET::TouchAccess ()                                                        {        m_pImpl->TouchAccess (); }
+void           ASSET::Meta_Save   (const CONTEXT::CONTAINER::CID* pCID)                     {        m_pImpl->Meta_Save   (pCID); }
 
-void ASSET::Set (const std::string& sPath, const nlohmann::json& jValue)
-{
-   std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mutex);
-
-   nlohmann::json* pParent = nullptr;
-   std::string sFinalKey;
-   m_pImpl->NavigatePath (sPath, pParent, sFinalKey);
-
-   if (pParent  &&  !sFinalKey.empty ())
-   {
-      if (sFinalKey.size () > 2  &&  sFinalKey[0] == '['  &&  sFinalKey.back () == ']')
-      {
-         int nIdx = std::stoi (sFinalKey.substr (1, sFinalKey.size () - 2));
-         if (!pParent->is_array ())
-            *pParent = nlohmann::json::array ();
-         while (static_cast<size_t> (nIdx) >= pParent->size ())
-            pParent->push_back (nlohmann::json ());
-         (*pParent)[nIdx] = jValue;
-      }
-      else
-      {
-         if (!pParent->is_object ())
-            *pParent = nlohmann::json::object ();
-         (*pParent)[sFinalKey] = jValue;
-      }
-
-      m_pImpl->m_bDirty = true;
-      m_pImpl->TouchAccess ();
-      m_pImpl->Log_Append ("Set", sPath, jValue);
-   }
-}
-
-void ASSET::Remove (const std::string& sPath)
-{
-   std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mutex);
-
-   nlohmann::json* pParent = nullptr;
-   std::string sFinalKey;
-   m_pImpl->NavigatePath (sPath, pParent, sFinalKey);
-
-   if (pParent  &&  !sFinalKey.empty ())
-   {
-      if (sFinalKey.size () > 2  &&  sFinalKey[0] == '['  &&  sFinalKey.back () == ']')
-      {
-         int nIdx = std::stoi (sFinalKey.substr (1, sFinalKey.size () - 2));
-         if (pParent->is_array ()  &&  nIdx >= 0  &&  static_cast<size_t> (nIdx) < pParent->size ())
-            pParent->erase (nIdx);
-      }
-      else
-      {
-         if (pParent->is_object ()  &&  pParent->contains (sFinalKey))
-            pParent->erase (sFinalKey);
-      }
-
-      m_pImpl->m_bDirty = true;
-      m_pImpl->TouchAccess ();
-      m_pImpl->Log_Append ("Remove", sPath, nlohmann::json ());
-   }
-}
-
-bool ASSET::Has (const std::string& sPath) const
-{
-   std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mutex);
-
-   nlohmann::json* pParent = nullptr;
-   std::string sFinalKey;
-   m_pImpl->NavigatePath (sPath, pParent, sFinalKey);
-
-   bool bHas = false;
-   if (pParent  &&  !sFinalKey.empty ())
-   {
-      if (sFinalKey.size () > 2  &&  sFinalKey[0] == '['  &&  sFinalKey.back () == ']')
-      {
-         int nIdx = std::stoi (sFinalKey.substr (1, sFinalKey.size () - 2));
-         bHas = pParent->is_array ()  &&  nIdx >= 0  &&  static_cast<size_t> (nIdx) < pParent->size ();
-      }
-      else
-         bHas = pParent->is_object ()  &&  pParent->contains (sFinalKey);
-   }
-
-   return bHas;
-}
-
-std::string ASSET::Json () const
-{
-   std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mutex);
-
-   return m_pImpl->m_jData.dump (2);
-}
-
-void ASSET::Json (const std::string& sJson)
-{
-   std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mutex);
-
-   try
-   {
-      m_pImpl->m_jData = nlohmann::json::parse (sJson);
-   }
-   catch (...)
-   {
-      m_pImpl->m_jData = nlohmann::json::object ();
-   }
-
-   m_pImpl->m_bDirty = true;
-   m_pImpl->TouchAccess ();
-}
-
-// ---------------------------------------------------------------------------
-// Lifecycle
-// ---------------------------------------------------------------------------
-
-uint32_t ASSET::Open ()  { return ++m_pImpl->m_nCount_Open; }
-uint32_t ASSET::Close () { return --m_pImpl->m_nCount_Open; }
-
-void ASSET::Attach ()    { m_pImpl->Attach (); }
-void ASSET::Detach (const CONTEXT::CONTAINER::CID& CID) { m_pImpl->Detach (CID); }
-void ASSET::Load ()      { m_pImpl->Load ();   }
-void ASSET::Save ()      { m_pImpl->Save ();   }
-void ASSET::Evict ()     { m_pImpl->Evict ();  }
-
-// ---------------------------------------------------------------------------
-// Meta sidecar
-// ---------------------------------------------------------------------------
-
-void ASSET::TouchAccess ()                                   { m_pImpl->TouchAccess (); }
-void ASSET::SaveMeta (const CONTEXT::CONTAINER::CID& CID)   { m_pImpl->SaveMeta (CID); }
+nlohmann::json ASSET::Get         (const std::string& sPath)                          const { return m_pImpl->Get         (sPath); }
+void           ASSET::Set         (const std::string& sPath, const nlohmann::json& j)       {        m_pImpl->Set         (sPath, j); }
+void           ASSET::Remove      (const std::string& sPath)                                {        m_pImpl->Remove      (sPath); }
+bool           ASSET::Has         (const std::string& sPath)                          const { return m_pImpl->Has         (sPath); }
+std::string    ASSET::Json        ()                                                  const { return m_pImpl->Json        (); }
+void           ASSET::Json        (const std::string& sJson)                                {        m_pImpl->Json        (sJson); }

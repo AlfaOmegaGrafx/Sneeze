@@ -362,7 +362,7 @@ m_pPersona = new persona::PERSONA (m_pEngine);
 
       if (pContext)
       {
-         sPath_Temporary = pContext->sPath_Temporary ();
+         sPath_Temporary = pContext->Path_Temporary ();
 
          {
             std::lock_guard<std::mutex> guard (m_mxContext);
@@ -475,8 +475,8 @@ bool SNEEZE::ENGINE::Context_Close (CONTEXT* pContext)
 }
 
 SNEEZE::IENGINE* SNEEZE::ENGINE::Host () const                { return m_pImpl->m_pHost;      }
-const std::string& SNEEZE::ENGINE::sPath_Persistent () const  { return m_pImpl->m_sPath_Persistent; }
-const std::string& SNEEZE::ENGINE::sPath_Session    () const  { return m_pImpl->m_sPath_Transitory_Session; }
+const std::string& SNEEZE::ENGINE::Path_Persistent () const  { return m_pImpl->m_sPath_Persistent; }
+const std::string& SNEEZE::ENGINE::Path_Session    () const  { return m_pImpl->m_sPath_Transitory_Session; }
 
 SNEEZE::persona::PERSONA*  SNEEZE::ENGINE::Persona () const   { return m_pImpl->m_pPersona;   }
 

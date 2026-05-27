@@ -52,6 +52,7 @@ namespace SNEEZE
             bool        bValidated;
 
             std::string DisplayName () const { return sCommonName + "/" + sContainerName; }
+            std::string Key         () const { return sPersonaHash.substr (0, 12) + "/" + sFingerprint.substr (0, 2) + "/" + sFingerprint.substr (2, 22) + "/" + sContainerName; }
          };
       };
 
@@ -80,8 +81,10 @@ namespace SNEEZE
       STORAGE*   Storage  () const;
       VIEWPORT*  Viewport () const;
 
-      const std::string& sPath_Permanent () const;
-      const std::string& sPath_Temporary () const;
+      const std::string& Path_Permanent () const;
+      const std::string& Path_Temporary () const;
+
+      const CONTAINER::CID* CID_Pool (const CONTAINER::CID* pCID);
 
    private:
       class Impl;

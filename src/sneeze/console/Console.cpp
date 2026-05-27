@@ -13,7 +13,8 @@
 // limitations under the License.
 
 #include <Sneeze.h>
-#include "Stream.h"
+#include <Console.h>
+#include "Block.h"
 #include <deque>
 
 using namespace SNEEZE;
@@ -27,20 +28,17 @@ class CONSOLE::Impl
 public:
    Impl (CONSOLE* pConsole, CONTEXT* pContext) :
       m_pConsole          (pConsole),
-      m_pContext           (pContext),
-      m_sPath_Temporary   ((std::filesystem::path (pContext->sPath_Temporary ()) / "Console").string ()),
-      m_nNextIndex        (1),
-      m_tpEpoch           (std::chrono::steady_clock::now ()),
-      m_nEntriesPerBlock  (4096),
-      m_nMaxBlocks        (5),
-      m_nMaxRingEntries   (16384)
+      m_pContext          (pContext),
+      m_sPath_Temporary   ((std::filesystem::path (pContext->Path_Temporary ()) / "Console").string ()),
+      m_nIndex_Entry      (0),
+      m_nEntries_Cache    (16384),
+      m_nEntries_Block    (4096),
+      m_nBlocks           (4)
    {
    }
 
    bool Initialize ()
    {
-      m_tpEpoch = std::chrono::steady_clock::now ();
-
       m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "CONSOLE", "Initialized");
 
       return true;
@@ -50,198 +48,66 @@ public:
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
 
-      for (auto& pair : m_umpStream)
+      while (!m_apStream.empty ())
+         Stream_Close (m_apStream.front ());
+
+      for (auto& pair : m_umpBlock)
          delete pair.second;
 
-      m_umpStream.clear ();
-      m_aRingBuffer.clear ();
-      m_umpCID.clear ();
+      m_umpBlock.clear ();
+
+      m_apEntry.clear ();
    }
 
    // ---------------------------------------------------------------------------
-   // CID pool — copies each unique CID by value so ENTRY pointers remain
-   // valid after the original container has been destroyed.
-   // Symmetric with NETWORK::FILE and STORAGE::UNIT CID-by-value copies.
+   // Stream management
    // ---------------------------------------------------------------------------
 
-   const CONTEXT::CONTAINER::CID* CID_Pool (const CONTEXT::CONTAINER::CID* pCID)
+   CONSOLE::STREAM* Stream_Open (const CONTEXT::CONTAINER::CID* pCID)
    {
-      const CONTEXT::CONTAINER::CID* pResult = nullptr;
+      STREAM* pStream = nullptr;
 
-      if (pCID)
+      if (pCID = m_pContext->CID_Pool (pCID)) // Swap the input CID for the Context pooled CID
       {
-         std::string sKey = StreamKey (pCID);
-         auto it = m_umpCID.find (sKey);
-         if (it == m_umpCID.end ())
-         {
-            m_umpCID[sKey] = *pCID;
-            it = m_umpCID.find (sKey);
-         }
-         pResult = &it->second;
+         std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
+
+         pStream = new STREAM (m_pConsole, pCID);
+
+         m_apStream.push_back (pStream);
+
+         pStream->Initialize (m_nBlocks, m_nEntries_Block);
+
+         m_pContext->Host ()->OnConsoleStreamCreated (pStream);
       }
 
-      return pResult;
+      return pStream;
    }
 
-   // ---------------------------------------------------------------------------
-   // STREAM map — find-or-create, symmetric with NETWORK::Asset_Open and
-   // STORAGE::Asset_Open.
-   // ---------------------------------------------------------------------------
-
-   CONSOLE::STREAM* Stream_Open (const CONTEXT::CONTAINER::CID* pPooledCID)
+   void Stream_Close (STREAM* pStream)
    {
-      std::string sKey = StreamKey (pPooledCID);
-
-      auto it = m_umpStream.find (sKey);
-      if (it == m_umpStream.end ())
+      if (pStream)
       {
-         STREAM* pStream = new STREAM (m_pConsole, pPooledCID, m_sPath_Temporary);
-         m_umpStream[sKey] = pStream;
-         return pStream;
-      }
+         std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
 
-      return it->second;
-   }
+         m_pContext->Host ()->OnConsoleStreamDeleted (pStream);
 
-   CONSOLE::STREAM* Stream_Find (const CONTEXT::CONTAINER::CID* pCID) const
-   {
-      STREAM* pResult = nullptr;
+         auto it = std::find (m_apStream.begin (), m_apStream.end (), pStream);
+         if (it != m_apStream.end ())
+            m_apStream.erase (it);
 
-      std::string sKey = StreamKey (pCID);
-      auto it = m_umpStream.find (sKey);
-      if (it != m_umpStream.end ())
-         pResult = it->second;
-
-      return pResult;
-   }
-
-   // ---------------------------------------------------------------------------
-   // Emit — core write path shared by all logging methods.
-   //
-   // Creates an ENTRY, delegates disk I/O to STREAM::Write, appends to the
-   // global ring buffer, and fires the ICONTEXT notification.
-   // ---------------------------------------------------------------------------
-
-   void Emit (CONSOLE::eLEVEL eLevel, const CONTEXT::CONTAINER::CID* pCID, const std::string& sMessage, bool bCollapsed = false)
-   {
-      std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
-
-      const auto* pPooledCID = CID_Pool (pCID);
-      STREAM* pStream = Stream_Open (pPooledCID);
-
-      auto pEntry = std::make_shared<const CONSOLE::ENTRY> (
-         eLevel, sMessage, SecondsSinceEpoch (), pPooledCID,
-         m_nNextIndex++, pStream->GroupDepth (), bCollapsed);
-
-      pStream->Write (pEntry);
-
-      m_aRingBuffer.push_back (pEntry);
-      while (m_aRingBuffer.size () > m_nMaxRingEntries)
-         m_aRingBuffer.pop_front ();
-
-      m_pContext->Host ()->OnConsoleEntryCreated (pEntry);
-   }
-
-   // ---------------------------------------------------------------------------
-   // Grouping
-   // ---------------------------------------------------------------------------
-
-   void Group (const CONTEXT::CONTAINER::CID* pCID, const std::string& sLabel, bool bCollapsed)
-   {
-      std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
-
-      const auto* pPooledCID = CID_Pool (pCID);
-      STREAM* pStream = Stream_Open (pPooledCID);
-
-      Emit (CONSOLE::kLEVEL_LOG, pCID, sLabel, bCollapsed);
-
-      pStream->Group ();
-   }
-
-   void GroupEnd (const CONTEXT::CONTAINER::CID* pCID)
-   {
-      std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
-
-      const auto* pPooledCID = CID_Pool (pCID);
-      STREAM* pStream = Stream_Open (pPooledCID);
-      pStream->GroupEnd ();
-   }
-
-   // ---------------------------------------------------------------------------
-   // Counting
-   // ---------------------------------------------------------------------------
-
-   void Count (const CONTEXT::CONTAINER::CID* pCID, const std::string& sLabel)
-   {
-      std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
-
-      const auto* pPooledCID = CID_Pool (pCID);
-      STREAM* pStream = Stream_Open (pPooledCID);
-
-      uint32_t nCount = pStream->Count (sLabel);
-
-      Emit (CONSOLE::kLEVEL_INFO, pCID, sLabel + ": " + std::to_string (nCount));
-   }
-
-   void CountReset (const CONTEXT::CONTAINER::CID* pCID, const std::string& sLabel)
-   {
-      std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
-
-      const auto* pPooledCID = CID_Pool (pCID);
-      STREAM* pStream = Stream_Open (pPooledCID);
-      pStream->CountReset (sLabel);
-   }
-
-   // ---------------------------------------------------------------------------
-   // Timing
-   // ---------------------------------------------------------------------------
-
-   void Time (const CONTEXT::CONTAINER::CID* pCID, const std::string& sLabel)
-   {
-      std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
-
-      const auto* pPooledCID = CID_Pool (pCID);
-      STREAM* pStream = Stream_Open (pPooledCID);
-      pStream->Time (sLabel);
-   }
-
-   void TimeEnd (const CONTEXT::CONTAINER::CID* pCID, const std::string& sLabel)
-   {
-      std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
-
-      const auto* pPooledCID = CID_Pool (pCID);
-      STREAM* pStream = Stream_Open (pPooledCID);
-
-      double dElapsed = pStream->TimeEnd (sLabel);
-      if (dElapsed >= 0.0)
-      {
-         std::ostringstream oss;
-         oss << sLabel << ": " << std::fixed << std::setprecision (3) << dElapsed << "ms";
-         Emit (CONSOLE::kLEVEL_INFO, pCID, oss.str ());
+         delete pStream;
       }
    }
 
-   void TimeLog (const CONTEXT::CONTAINER::CID* pCID, const std::string& sLabel)
+   void Stream_Enum (CONSOLE::IENUM_STREAM* pEnum)
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
-
-      const auto* pPooledCID = CID_Pool (pCID);
-      STREAM* pStream = Stream_Open (pPooledCID);
-
-      double dElapsed = pStream->TimeLog (sLabel);
-      if (dElapsed >= 0.0)
+      if (pEnum)
       {
-         std::ostringstream oss;
-         oss << sLabel << ": " << std::fixed << std::setprecision (3) << dElapsed << "ms";
-         Emit (CONSOLE::kLEVEL_INFO, pCID, oss.str ());
-      }
-   }
+         std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
 
-   void TimeStamp (const CONTEXT::CONTAINER::CID* pCID, const std::string& sLabel)
-   {
-      std::ostringstream oss;
-      oss << std::fixed << std::setprecision (3) << SecondsSinceEpoch () << "s";
-      Emit (CONSOLE::kLEVEL_INFO, pCID, sLabel + ": " + oss.str ());
+         for (STREAM* pStream : m_apStream)
+            pEnum->OnStream (pStream);
+      }
    }
 
    // ---------------------------------------------------------------------------
@@ -252,109 +118,98 @@ public:
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
 
-      for (const auto& pEntry : m_aRingBuffer)
+      for (const auto& pEntry : m_apEntry)
          m_pContext->Host ()->OnConsoleEntryDeleted (pEntry);
 
-      m_aRingBuffer.clear ();
+      m_apEntry.clear ();
    }
 
    // ---------------------------------------------------------------------------
    // Enumeration
    // ---------------------------------------------------------------------------
 
-   void Entry_Enum (CONSOLE::IENUM* pEnum)
+   void Entry_Enum (CONSOLE::IENUM_ENTRY* pEnum)
    {
       if (pEnum)
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
 
-         for (const auto& pEntry : m_aRingBuffer)
+         for (const auto& pEntry : m_apEntry)
             pEnum->OnEntry (pEntry);
       }
    }
 
-   void Entry_Enum (const CONTEXT::CONTAINER::CID* pCID, CONSOLE::IENUM* pEnum)
-   {
-      if (pEnum)
-      {
-         std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
+   // ---------------------------------------------------------------------------
+   // Block helpers -- called by STREAM (Initialize, ~STREAM) which is always invoked
+   // under m_mxConsole via Stream_Open/Stream_Close. Not independently thread-safe.
+   // ---------------------------------------------------------------------------
 
-         const auto* pPooledCID = CID_Pool (pCID);
-         STREAM* pStream = Stream_Find (pPooledCID);
-         if (pStream && pStream->IsLoaded ())
-         {
-            for (const auto& pEntry : pStream->Entries ())
-               pEnum->OnEntry (pEntry);
-         }
+   BLOCK* Block_Open (uint32_t nIndex, const std::string& sPathname)
+   {
+      BLOCK* pBlock = nullptr;
+
+      auto it = m_umpBlock.find (sPathname);
+      if (it == m_umpBlock.end ())
+      {
+         pBlock = new BLOCK (m_pConsole, nIndex, sPathname);
+         m_umpBlock[sPathname] = pBlock;
+      }
+      else pBlock = it->second;
+
+      pBlock->Open ();
+
+      return pBlock;
+   }
+
+   void Block_Close (BLOCK* pBlock)
+   {
+      if (pBlock && pBlock->Close () == 0)
+      {
+         m_umpBlock.erase (pBlock->Pathname ());
+
+         delete pBlock;
       }
    }
 
    // ---------------------------------------------------------------------------
-   // Channel management
+   // Entry creation — called by STREAM to create, timestamp, sequence,
+   // and ring-buffer an entry. Returns the immutable shared_ptr.
    // ---------------------------------------------------------------------------
 
-   void Channel_Load (const CONTEXT::CONTAINER::CID* pCID)
+   std::shared_ptr<const CONSOLE::ENTRY> Entry_Create (const CONTEXT::CONTAINER::CID* pCID, CONSOLE::eLEVEL eLevel, const std::string& sMessage, uint32_t nGroupDepth, bool bCollapsed)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
 
-      const auto* pPooledCID = CID_Pool (pCID);
-      STREAM* pStream = Stream_Find (pPooledCID);
-      if (pStream)
-         pStream->Load ();
-   }
+      auto pEntry = std::make_shared<const CONSOLE::ENTRY> (pCID, eLevel, sMessage, m_nIndex_Entry++, nGroupDepth, bCollapsed);
+      
+      m_apEntry.push_back (pEntry);
 
-   void Channel_Unload (const CONTEXT::CONTAINER::CID* pCID)
-   {
-      std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
+      while (m_apEntry.size () > m_nEntries_Cache)
+      {
+         m_pContext->Host ()->OnConsoleEntryDeleted (m_apEntry.front ());
+         m_apEntry.pop_front ();
+      }
 
-      const auto* pPooledCID = CID_Pool (pCID);
-      STREAM* pStream = Stream_Find (pPooledCID);
-      if (pStream)
-         pStream->Unload ();
-   }
+      m_pContext->Host ()->OnConsoleEntryCreated (pEntry);
 
-   // ---------------------------------------------------------------------------
-   // Accessors
-   // ---------------------------------------------------------------------------
-
-   double SecondsSinceEpoch () const
-   {
-      auto tpNow = std::chrono::steady_clock::now ();
-      return std::chrono::duration<double> (tpNow - m_tpEpoch).count ();
-   }
-
-   // ---------------------------------------------------------------------------
-   // Helpers
-   // ---------------------------------------------------------------------------
-
-   static std::string StreamKey (const CONTEXT::CONTAINER::CID* pCID)
-   {
-      std::string sResult;
-
-      if (pCID)
-         sResult = pCID->sPersonaHash.substr (0, 12) + "/" + pCID->sFingerprint.substr (0, 2) + "/" + pCID->sFingerprint.substr (2, 22) + "/" + pCID->sContainerName;
-      else
-         sResult = "_engine";
-
-      return sResult;
+      return pEntry;
    }
 
    CONSOLE*                                                         m_pConsole;
    CONTEXT*                                                         m_pContext;
    std::string                                                      m_sPath_Temporary;
 
+   uint32_t                                                         m_nEntries_Cache;
+   uint32_t                                                         m_nEntries_Block;
+   uint32_t                                                         m_nBlocks;
+
    std::recursive_mutex                                             m_mxConsole;
 
-   std::unordered_map<std::string, CONTEXT::CONTAINER::CID>        m_umpCID;
-   std::unordered_map<std::string, CONSOLE::STREAM*>               m_umpStream;
-   std::deque<std::shared_ptr<const CONSOLE::ENTRY>>               m_aRingBuffer;
+   std::vector<CONSOLE::STREAM*>                                    m_apStream;
+   std::unordered_map<std::string, BLOCK*>                          m_umpBlock;
+   std::deque<std::shared_ptr<const CONSOLE::ENTRY>>                m_apEntry;
 
-   uint32_t                                                         m_nNextIndex;
-   std::chrono::steady_clock::time_point                            m_tpEpoch;
-
-   uint32_t                                                         m_nEntriesPerBlock;
-   uint32_t                                                         m_nMaxBlocks;
-   uint32_t                                                         m_nMaxRingEntries;
+   uint32_t                                                         m_nIndex_Entry;
 };
 
 /***********************************************************************************************************************************
@@ -380,43 +235,32 @@ CONSOLE::~CONSOLE ()
 // Accessors
 // ---------------------------------------------------------------------------
 
-SNEEZE::CONTEXT*   CONSOLE::Context         () const { return m_pImpl->m_pContext; }
-const std::string& CONSOLE::sPath_Temporary () const { return m_pImpl->m_sPath_Temporary; }
+SNEEZE::CONTEXT*   CONSOLE::Context         () const     { return m_pImpl->m_pContext; }
+const std::string& CONSOLE::Path_Temporary  () const     { return m_pImpl->m_sPath_Temporary; }
+
+uint32_t           CONSOLE::Entries_Cache   () const     { return m_pImpl->m_nEntries_Cache; }
+void               CONSOLE::Entries_Cache   (uint32_t n) {        m_pImpl->m_nEntries_Cache = n; }
+uint32_t           CONSOLE::Entries_Block   () const     { return m_pImpl->m_nEntries_Block; }
+void               CONSOLE::Entries_Block   (uint32_t n) {        m_pImpl->m_nEntries_Block = n; }
+uint32_t           CONSOLE::Blocks          () const     { return m_pImpl->m_nBlocks; }
+void               CONSOLE::Blocks          (uint32_t n) {        m_pImpl->m_nBlocks = n; }
 
 // ---------------------------------------------------------------------------
 // Methods
 // ---------------------------------------------------------------------------
 
-void     CONSOLE::Log             (const CONTEXT::CONTAINER::CID* pCID,                  const std::string& sMessage) {                  m_pImpl->Emit (kLEVEL_LOG,   pCID,                        sMessage); }
-void     CONSOLE::Debug           (const CONTEXT::CONTAINER::CID* pCID,                  const std::string& sMessage) {                  m_pImpl->Emit (kLEVEL_DEBUG, pCID,                        sMessage); }
-void     CONSOLE::Info            (const CONTEXT::CONTAINER::CID* pCID,                  const std::string& sMessage) {                  m_pImpl->Emit (kLEVEL_INFO,  pCID,                        sMessage); }
-void     CONSOLE::Warn            (const CONTEXT::CONTAINER::CID* pCID,                  const std::string& sMessage) {                  m_pImpl->Emit (kLEVEL_WARN,  pCID,                        sMessage); }
-void     CONSOLE::Error           (const CONTEXT::CONTAINER::CID* pCID,                  const std::string& sMessage) {                  m_pImpl->Emit (kLEVEL_ERROR, pCID,                        sMessage); }
-void     CONSOLE::Assert          (const CONTEXT::CONTAINER::CID* pCID, bool bCondition, const std::string& sMessage) { if (!bCondition) m_pImpl->Emit (kLEVEL_ERROR, pCID, "Assertion failed: " + sMessage); }
+CONSOLE::STREAM*   CONSOLE::Stream_Open       (const CONTEXT::CONTAINER::CID* pCID)           { return m_pImpl->Stream_Open       (pCID); }
+void               CONSOLE::Stream_Close      (STREAM* pStream)                               {        m_pImpl->Stream_Close      (pStream); }
+void               CONSOLE::Stream_Enum       (IENUM_STREAM* pEnum)                           {        m_pImpl->Stream_Enum       (pEnum); }
 
-void     CONSOLE::Group           (const CONTEXT::CONTAINER::CID* pCID,                  const std::string& sLabel)   {                  m_pImpl->Group               (pCID, sLabel, false); }
-void     CONSOLE::GroupCollapsed  (const CONTEXT::CONTAINER::CID* pCID,                  const std::string& sLabel)   {                  m_pImpl->Group               (pCID, sLabel, true); }
-void     CONSOLE::GroupEnd        (const CONTEXT::CONTAINER::CID* pCID)                                               {                  m_pImpl->GroupEnd            (pCID); }
+void               CONSOLE::Clear             ()                                              {        m_pImpl->Clear             (); }
 
-void     CONSOLE::Count           (const CONTEXT::CONTAINER::CID* pCID,                  const std::string& sLabel)   {                  m_pImpl->Count               (pCID, sLabel); }
-void     CONSOLE::CountReset      (const CONTEXT::CONTAINER::CID* pCID,                  const std::string& sLabel)   {                  m_pImpl->CountReset          (pCID, sLabel); }
+void               CONSOLE::Entry_Enum        (IENUM_ENTRY* pEnum)                            {        m_pImpl->Entry_Enum        (pEnum); }
 
-void     CONSOLE::Time            (const CONTEXT::CONTAINER::CID* pCID,                  const std::string& sLabel)   {                  m_pImpl->Time                (pCID, sLabel); }
-void     CONSOLE::TimeEnd         (const CONTEXT::CONTAINER::CID* pCID,                  const std::string& sLabel)   {                  m_pImpl->TimeEnd             (pCID, sLabel); }
-void     CONSOLE::TimeLog         (const CONTEXT::CONTAINER::CID* pCID,                  const std::string& sLabel)   {                  m_pImpl->TimeLog             (pCID, sLabel); }
-void     CONSOLE::TimeStamp       (const CONTEXT::CONTAINER::CID* pCID,                  const std::string& sLabel)   {                  m_pImpl->TimeStamp           (pCID, sLabel); }
+BLOCK*             CONSOLE::Block_Open        (uint32_t nIndex, const std::string& sPathname) { return m_pImpl->Block_Open        (nIndex, sPathname); }
+void               CONSOLE::Block_Close       (BLOCK* pBlock)                                 {        m_pImpl->Block_Close       (pBlock); }
 
-void     CONSOLE::Clear           ()                                                                                  {                  m_pImpl->Clear               (); }
-
-void     CONSOLE::Entry_Enum      (                                     IENUM* pEnum)                                 {                  m_pImpl->Entry_Enum          (      pEnum); }
-void     CONSOLE::Entry_Enum      (const CONTEXT::CONTAINER::CID* pCID, IENUM* pEnum)                                 {                  m_pImpl->Entry_Enum          (pCID, pEnum); }
-
-void     CONSOLE::Channel_Load    (const CONTEXT::CONTAINER::CID* pCID)                                               {                  m_pImpl->Channel_Load        (pCID); }
-void     CONSOLE::Channel_Unload  (const CONTEXT::CONTAINER::CID* pCID)                                               {                  m_pImpl->Channel_Unload      (pCID); }
-
-uint32_t CONSOLE::EntriesPerBlock () const       { return m_pImpl->m_nEntriesPerBlock; }
-void     CONSOLE::EntriesPerBlock (uint32_t n)   {        m_pImpl->m_nEntriesPerBlock = n; }
-uint32_t CONSOLE::MaxBlocks       () const       { return m_pImpl->m_nMaxBlocks; }
-void     CONSOLE::MaxBlocks       (uint32_t n)   {        m_pImpl->m_nMaxBlocks = n; }
-uint32_t CONSOLE::MaxRingEntries  () const       { return m_pImpl->m_nMaxRingEntries; }
-void     CONSOLE::MaxRingEntries  (uint32_t n)   {        m_pImpl->m_nMaxRingEntries = n; }
+std::shared_ptr<const CONSOLE::ENTRY> CONSOLE::Entry_Create (const CONTEXT::CONTAINER::CID* pCID, eLEVEL eLevel, const std::string& sMessage, uint32_t nGroupDepth, bool bCollapsed)
+{
+   return m_pImpl->Entry_Create (pCID, eLevel, sMessage, nGroupDepth, bCollapsed);
+}

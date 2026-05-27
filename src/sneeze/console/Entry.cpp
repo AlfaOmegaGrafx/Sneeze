@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include <Sneeze.h>
+#include <ctime>
+#include <cstdio>
 
 using namespace SNEEZE;
 
@@ -20,10 +22,10 @@ using namespace SNEEZE;
 // CONSOLE::ENTRY
 // ===========================================================================
 
-CONSOLE::ENTRY::ENTRY (eLEVEL eLevel, const std::string& sMessage, double dTimestamp, const CONTEXT::CONTAINER::CID* pCID, uint32_t nIndex, uint32_t nGroupDepth, bool bCollapsed, const std::string& sStackTrace, const std::string& sSource) :
+CONSOLE::ENTRY::ENTRY (const CONTEXT::CONTAINER::CID* pCID, eLEVEL eLevel, const std::string& sMessage, uint32_t nIndex, uint32_t nGroupDepth, bool bCollapsed, const std::string& sStackTrace, const std::string& sSource) :
    m_eLevel      (eLevel),
    m_sMessage    (sMessage),
-   m_dTimestamp   (dTimestamp),
+   m_tpStamp     (std::chrono::system_clock::now ()),
    m_pCID        (pCID),
    m_nIndex      (nIndex),
    m_nGroupDepth (nGroupDepth),
@@ -37,15 +39,15 @@ CONSOLE::ENTRY::ENTRY (eLEVEL eLevel, const std::string& sMessage, double dTimes
 // Const accessors
 // ---------------------------------------------------------------------------
 
-CONSOLE::eLEVEL                CONSOLE::ENTRY::Level       () const { return m_eLevel; }
-const std::string&             CONSOLE::ENTRY::Message     () const { return m_sMessage; }
-double                         CONSOLE::ENTRY::Timestamp   () const { return m_dTimestamp; }
-const SNEEZE::CONTEXT::CONTAINER::CID* CONSOLE::ENTRY::CID () const { return m_pCID; }
-uint32_t                       CONSOLE::ENTRY::Index       () const { return m_nIndex; }
-uint32_t                       CONSOLE::ENTRY::GroupDepth  () const { return m_nGroupDepth; }
-bool                           CONSOLE::ENTRY::IsCollapsed () const { return m_bCollapsed; }
-const std::string&             CONSOLE::ENTRY::StackTrace  () const { return m_sStackTrace; }
-const std::string&             CONSOLE::ENTRY::Source      () const { return m_sSource; }
+CONSOLE::eLEVEL                              CONSOLE::ENTRY::Level       () const { return m_eLevel; }
+const std::string&                           CONSOLE::ENTRY::Message     () const { return m_sMessage; }
+std::chrono::system_clock::time_point        CONSOLE::ENTRY::tpStamp     () const { return m_tpStamp; }
+const SNEEZE::CONTEXT::CONTAINER::CID*       CONSOLE::ENTRY::CID         () const { return m_pCID; }
+uint32_t                                     CONSOLE::ENTRY::Index       () const { return m_nIndex; }
+uint32_t                                     CONSOLE::ENTRY::GroupDepth  () const { return m_nGroupDepth; }
+bool                                         CONSOLE::ENTRY::IsCollapsed () const { return m_bCollapsed; }
+const std::string&                           CONSOLE::ENTRY::StackTrace  () const { return m_sStackTrace; }
+const std::string&                           CONSOLE::ENTRY::Source      () const { return m_sSource; }
 
 // ---------------------------------------------------------------------------
 // LevelString
@@ -68,15 +70,26 @@ const char* CONSOLE::ENTRY::LevelString (eLEVEL eLevel)
 }
 
 // ---------------------------------------------------------------------------
-// FormatTimestamp
+// FormatStamp
 // ---------------------------------------------------------------------------
 
-std::string CONSOLE::ENTRY::FormatTimestamp () const
+std::string CONSOLE::ENTRY::FormatStamp () const
 {
-   std::ostringstream oss;
-   oss << std::fixed << std::setprecision (3) << m_dTimestamp << "s";
+   auto tmTime = std::chrono::system_clock::to_time_t (m_tpStamp);
+   auto nMillis = std::chrono::duration_cast<std::chrono::milliseconds> (m_tpStamp.time_since_epoch ()).count () % 1000;
 
-   return oss.str ();
+   struct tm tmLocal;
+#ifdef _WIN32
+   localtime_s (&tmLocal, &tmTime);
+#else
+   localtime_r (&tmTime, &tmLocal);
+#endif
+
+   char szBuf[32];
+   snprintf (szBuf, sizeof (szBuf), "%02d:%02d:%02d.%03d",
+      tmLocal.tm_hour, tmLocal.tm_min, tmLocal.tm_sec, static_cast<int> (nMillis));
+
+   return szBuf;
 }
 
 // ---------------------------------------------------------------------------
@@ -130,7 +143,7 @@ nlohmann::json CONSOLE::ENTRY::ToJson () const
 
    jEntry["level"]      = LevelString (m_eLevel);
    jEntry["message"]    = m_sMessage;
-   jEntry["timestamp"]  = m_dTimestamp;
+   jEntry["stamp"]      = std::chrono::duration<double> (m_tpStamp.time_since_epoch ()).count ();
    jEntry["index"]      = m_nIndex;
    jEntry["groupDepth"] = m_nGroupDepth;
    jEntry["collapsed"]  = m_bCollapsed;
@@ -156,8 +169,6 @@ nlohmann::json CONSOLE::ENTRY::ToJson () const
 
 std::shared_ptr<const CONSOLE::ENTRY> CONSOLE::ENTRY::FromJson (const nlohmann::json& jEntry, const CONTEXT::CONTAINER::CID* pCID)
 {
-   std::shared_ptr<const ENTRY> pEntry;
-
    eLEVEL eLevel = kLEVEL_LOG;
    std::string sLevelStr = jEntry.value ("level", "log");
    if      (sLevelStr == "debug") eLevel = kLEVEL_DEBUG;
@@ -165,18 +176,21 @@ std::shared_ptr<const CONSOLE::ENTRY> CONSOLE::ENTRY::FromJson (const nlohmann::
    else if (sLevelStr == "warn")  eLevel = kLEVEL_WARN;
    else if (sLevelStr == "error") eLevel = kLEVEL_ERROR;
 
-   pEntry = std::make_shared<const ENTRY>
+   auto pEntry = std::make_shared<ENTRY>
    (
+      pCID,
       eLevel,
       jEntry.value ("message",    std::string ()),
-      jEntry.value ("timestamp",  0.0),
-      pCID,
       jEntry.value ("index",      static_cast<uint32_t> (0)),
       jEntry.value ("groupDepth", static_cast<uint32_t> (0)),
       jEntry.value ("collapsed",  false),
       jEntry.value ("stackTrace", std::string ()),
       jEntry.value ("source",     std::string ())
    );
+
+   double dEpochSeconds = jEntry.value ("stamp", 0.0);
+   if (dEpochSeconds > 0.0)
+      pEntry->m_tpStamp = std::chrono::system_clock::time_point (std::chrono::duration_cast<std::chrono::system_clock::duration> (std::chrono::duration<double> (dEpochSeconds)));
 
    return pEntry;
 }

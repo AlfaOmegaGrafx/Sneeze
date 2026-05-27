@@ -1,0 +1,200 @@
+// Copyright 2026 Metaversal Corporation
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#include <Sneeze.h>
+#include "Block.h"
+
+using namespace SNEEZE;
+
+// ===========================================================================
+// BLOCK::Impl
+// ===========================================================================
+
+class BLOCK::Impl
+{
+public:
+   Impl (CONSOLE* pConsole, uint32_t nIndex, const std::string& sPathname) :
+      m_pConsole       (pConsole),
+      m_nIndex         (nIndex),
+      m_sPathname      (sPathname),
+      m_bLoaded        (false),
+      m_nCount_Open    (0),
+      m_nCount_Load    (0),
+      m_nEntryCount    (0)
+   {
+   }
+
+   // ---------------------------------------------------------------------------
+   // Attach / Detach — symmetric with ASSET::Attach / Detach.
+   // ---------------------------------------------------------------------------
+
+   void Attach ()
+   {
+      if (++m_nCount_Load == 1)
+         Load (nullptr);
+   }
+
+   void Detach (const CONTEXT::CONTAINER::CID* pCID)
+   {
+      if (m_nCount_Load > 0 && --m_nCount_Load == 0)
+         Evict ();
+   }
+
+   void Entry_Enum (CONSOLE::IENUM_ENTRY* pEnum) const
+   {
+      if (pEnum)
+      {
+         std::lock_guard<std::recursive_mutex> guard (m_mutex);
+   
+         for (const auto& pEntry : m_aEntry)
+            pEnum->OnEntry (pEntry);
+      }
+   }
+   
+   // ---------------------------------------------------------------------------
+   // Load — read the JSONL file into the in-memory entry cache.
+   // ---------------------------------------------------------------------------
+
+   void Load (const CONTEXT::CONTAINER::CID* pCID)
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+
+      if (!m_bLoaded)
+      {
+         std::error_code ec;
+         std::filesystem::create_directories (std::filesystem::path (m_sPathname).parent_path (), ec);
+
+         m_aEntry.clear ();
+
+         std::ifstream ifs (m_sPathname);
+         if (ifs.is_open ())
+         {
+            std::string sLine;
+            while (std::getline (ifs, sLine))
+            {
+               if (!sLine.empty ())
+               {
+                  try
+                  {
+                     nlohmann::json jEntry = nlohmann::json::parse (sLine);
+                     auto pEntry = CONSOLE::ENTRY::FromJson (jEntry, pCID);
+                     if (pEntry)
+                     {
+                        m_aEntry.push_back (pEntry);
+                        m_nEntryCount++;
+                     }
+                  }
+                  catch (...)
+                  {
+                  }
+               }
+            }
+         }
+
+         m_bLoaded = true;
+      }
+   }
+
+   // ---------------------------------------------------------------------------
+   // Write — append one JSONL line to the block file.
+   // ---------------------------------------------------------------------------
+
+   void Write (std::shared_ptr<const CONSOLE::ENTRY> pEntry)
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+
+      if (!m_ofsBlock.is_open ())
+      {
+         std::error_code ec;
+         std::filesystem::create_directories (std::filesystem::path (m_sPathname).parent_path (), ec);
+         m_ofsBlock.open (m_sPathname, std::ios::app);
+      }
+
+      if (m_ofsBlock.is_open ())
+      {
+         m_ofsBlock << pEntry->ToJson ().dump () << "\n";
+         m_nEntryCount++;
+
+         if (m_bLoaded)
+            m_aEntry.push_back (pEntry);
+      }
+   }
+
+   // ---------------------------------------------------------------------------
+   // Evict — drop the in-memory entry cache.
+   // ---------------------------------------------------------------------------
+
+   void Evict ()
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+
+      if (m_ofsBlock.is_open ())
+         m_ofsBlock.close ();
+
+      m_aEntry.clear ();
+      m_bLoaded = false;
+   }
+
+   CONSOLE*                                                   m_pConsole;
+   uint32_t                                                   m_nIndex;
+   std::string                                                m_sPathname;
+
+   std::deque<std::shared_ptr<const CONSOLE::ENTRY>>          m_aEntry;
+   std::ofstream                                              m_ofsBlock;
+   bool                                                       m_bLoaded;
+   uint32_t                                                   m_nCount_Open;
+   uint32_t                                                   m_nCount_Load;
+   uint32_t                                                   m_nEntryCount;
+
+   mutable std::recursive_mutex                               m_mutex;
+};
+
+// ===========================================================================
+// BLOCK
+// ===========================================================================
+
+BLOCK::BLOCK (CONSOLE* pConsole, uint32_t nIndex, const std::string& sPathname) :
+   m_pImpl (new Impl (pConsole, nIndex, sPathname))
+{
+}
+
+BLOCK::~BLOCK ()
+{
+   delete m_pImpl;
+}
+
+// ---------------------------------------------------------------------------
+// Accessors
+// ---------------------------------------------------------------------------
+
+bool                 BLOCK::IsLoaded    () const { return m_pImpl->m_bLoaded; }
+uint32_t             BLOCK::GetIndex    () const { return m_pImpl->m_nIndex; }
+const std::string&   BLOCK::Pathname    () const { return m_pImpl->m_sPathname; }
+uint32_t             BLOCK::EntryCount  () const { return m_pImpl->m_nEntryCount; }
+
+// ---------------------------------------------------------------------------
+// Methods
+// ---------------------------------------------------------------------------
+
+uint32_t BLOCK::Open       ()                                             { return ++m_pImpl->m_nCount_Open; }
+uint32_t BLOCK::Close      ()                                             { return --m_pImpl->m_nCount_Open; }
+
+void     BLOCK::Attach     ()                                             { m_pImpl->Attach     (); }
+void     BLOCK::Detach     (const CONTEXT::CONTAINER::CID* pCID)          { m_pImpl->Detach     (pCID); }
+void     BLOCK::Entry_Enum (CONSOLE::IENUM_ENTRY* pEnum)            const { m_pImpl->Entry_Enum (pEnum); }
+
+void     BLOCK::Load       (const CONTEXT::CONTAINER::CID* pCID)          { m_pImpl->Load       (pCID); }
+void     BLOCK::Evict      ()                                             { m_pImpl->Evict      (); }
+
+void     BLOCK::Write      (std::shared_ptr<const CONSOLE::ENTRY> pEntry) { m_pImpl->Write      (pEntry); }

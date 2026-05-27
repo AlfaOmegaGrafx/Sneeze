@@ -116,11 +116,11 @@ static void TestInitializeAndOpenClose ()
    auto CID = MakeTestCID ();
    STORAGE::UNIT* pUnit = pStorage->Unit_Open (&CID);
    Check (pUnit != nullptr, "Open returns UNIT");
-   Check (pUnit->CID ().sFingerprint == CID.sFingerprint, "UNIT holds correct CID");
+   Check (pUnit->DisplayName () == CID.DisplayName (), "UNIT holds correct CID");
    Check (pUnit != nullptr, "Unit opened successfully");
 
    pUnit->Attach ();
-   Check (pUnit->CID ().sFingerprint == CID.sFingerprint, "CID preserved after Attach");
+   Check (pUnit->DisplayName () == CID.DisplayName (), "CID preserved after Attach");
 
    Check (s_pContextHost->m_nCreatedCount == 1, "OnStorageUnitCreated fired");
 
@@ -337,7 +337,7 @@ static void TestCrashRecovery ()
    // Compute the actual path that STORAGE will use
    std::string sFp2  = CID.sFingerprint.substr (0, 2);
    std::string sFp22 = CID.sFingerprint.substr (2, 22);
-   std::filesystem::path sDir = std::filesystem::path (s_pContext->sPath_Permanent ()) / "Storage" / CID.sPersonaHash / (sFp2 + "/" + sFp22);
+   std::filesystem::path sDir = std::filesystem::path (s_pContext->Path_Permanent ()) / "Storage" / CID.sPersonaHash / (sFp2 + "/" + sFp22);
    std::filesystem::path sJsonPath = sDir / "container-crash-test.json";
    std::filesystem::path sLogPath  = sDir / "container-crash-test.log";
 
@@ -423,7 +423,7 @@ static void TestMetaSidecar ()
    pUnit->Attach ();
    pUnit->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "data", "value");
 
-   std::string sMetaPath = pUnit->sPathname (STORAGE::kSCOPE_PERMANENT_COMPANY, "meta");
+   std::string sMetaPath = pUnit->Pathname (STORAGE::kSCOPE_PERMANENT_COMPANY, "meta");
 
    pUnit->Detach ();
    pStorage->Unit_Close (pUnit);

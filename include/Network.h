@@ -193,9 +193,9 @@ namespace SNEEZE
 
          // --- Paths ---
 
-         std::string        sPath () const;
-         std::string        sFilename (const std::string& sExt = "") const;
-         std::string        sPathname (const std::string& sExt = "") const;
+         std::string        Path () const;
+         std::string        Filename (const std::string& sExt = "") const;
+         std::string        Pathname (const std::string& sExt = "") const;
 
          // --- Listener ---
 
@@ -246,7 +246,7 @@ namespace SNEEZE
       bool Initialize ();
 
       CONTEXT*           Context () const;
-      const std::string& sPath_Permanent () const;
+      const std::string& Path_Permanent () const;
       bool               IsShuttingDown () const;
       double             SecondsSinceEpoch () const;
       uint32_t           Asset_Index ();

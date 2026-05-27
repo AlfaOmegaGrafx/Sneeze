@@ -54,7 +54,7 @@ namespace SNEEZE
       uint32_t            Open ();
       uint32_t            Close ();
       void                Attach ();
-      void                Detach (const CONTEXT::CONTAINER::CID& CID);
+      void                Detach (const CONTEXT::CONTAINER::CID* pCID);
       void                Load ();
       void                Save ();
       void                Evict ();
@@ -68,7 +68,7 @@ namespace SNEEZE
       uint32_t           AccessCount () const;
 
       void  TouchAccess ();
-      void  SaveMeta (const CONTEXT::CONTAINER::CID& CID);
+      void  Meta_Save (const CONTEXT::CONTAINER::CID* pCID);
 
    private:
       class Impl;
