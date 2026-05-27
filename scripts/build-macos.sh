@@ -102,11 +102,7 @@ case "$CONFIG" in
    *) echo "--config must be Debug or Release (got '$CONFIG')" >&2; exit 1 ;;
 esac
 
-case "$(uname -m)" in
-   arm64)  PLATFORM="macos-arm64" ;;
-   x86_64) PLATFORM="macos-x64" ;;
-   *) echo "Unexpected macOS arch: $(uname -m)" >&2; exit 1 ;;
-esac
+PLATFORM="macos-universal"
 
 CFG_LOWER="$(echo "$CONFIG" | tr '[:upper:]' '[:lower:]')"
 DEPS_BUILD_DIR="$SNEEZE_DIR/deps/builds/$PLATFORM/$CFG_LOWER/build"
