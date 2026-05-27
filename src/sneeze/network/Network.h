@@ -33,7 +33,7 @@ namespace SNEEZE
       virtual void               Log (IENGINE::eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage)   = 0;
 
       virtual double             SecondsSinceEpoch () const                                                                = 0;
-      virtual const std::string& sPath_Permanent () const                                                                  = 0;
+      virtual const std::string& Path_Permanent () const                                                                   = 0;
 
       virtual ICONTEXT*          Host () const                                                                             = 0;
 
