@@ -60,7 +60,10 @@ if (NOT DEFINED SNEEZE_PLATFORM OR SNEEZE_PLATFORM STREQUAL "")
          set (_plat "linux-x64")
       endif ()
    elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-      if (CMAKE_SYSTEM_PROCESSOR MATCHES "arm64"
+      if (CMAKE_OSX_ARCHITECTURES MATCHES "arm64"
+            AND CMAKE_OSX_ARCHITECTURES MATCHES "x86_64")
+         set (_plat "macos-universal")
+      elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "arm64"
             OR CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "arm64")
          set (_plat "macos-arm64")
       else ()
