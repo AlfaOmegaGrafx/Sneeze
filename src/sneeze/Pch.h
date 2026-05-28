@@ -26,7 +26,6 @@
 // --- Standard library ---
 
 #include <unordered_map>
-#include <vector>
 #include <map>
 #include <queue>
 #include <fstream>
@@ -37,9 +36,7 @@
 #include <condition_variable>
 #include <filesystem>
 #include <functional>
-#include <memory>
 #include <mutex>
-#include <string>
 #include <thread>
 #include <sstream>
 #include <random>
@@ -47,8 +44,6 @@
 #include <openssl/evp.h>
 #include <openssl/sha.h>
 #include <openssl/pem.h>
-
-#include <nlohmann/json.hpp>
 
 #ifdef _WIN32
 #define NOMINMAX

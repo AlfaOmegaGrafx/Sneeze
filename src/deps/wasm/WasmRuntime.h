@@ -17,10 +17,6 @@
 
 #include "WasmStore.h"
 #include <wasmtime.h>
-#include <unordered_map>
-#include <memory>
-#include <mutex>
-#include <string>
 
 namespace SNEEZE
 {

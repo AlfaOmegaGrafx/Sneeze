@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "Network.h"
-#include "Network.h"
 
 using namespace SNEEZE;
 
