@@ -17,7 +17,7 @@
 
 namespace SNEEZE
 {
-   class NASSET;
+   class ASSET;
    class JOB_FETCH;
    class INETWORK_IMPL;
 

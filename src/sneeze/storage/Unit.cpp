@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Storage_Asset.h"
+#include "Storage.h"
 
 using namespace SNEEZE;
 
@@ -20,7 +20,7 @@ using namespace SNEEZE;
 // Helpers
 // ===========================================================================
 
-class SASSET::Impl
+class UNIT::Impl
 {
 public:
    Impl (ISTORAGE_IMPL* pIStorage_Impl, STORAGE::eSCOPE eScope, const std::string& sPathname) :
@@ -525,15 +525,15 @@ public:
 };
 
 // ===========================================================================
-// ASSET
+// UNIT
 // ===========================================================================
 
-SASSET::SASSET (ISTORAGE_IMPL* pIStorage_Impl, STORAGE::eSCOPE eScope, const std::string& sPathname) :
+UNIT::UNIT (ISTORAGE_IMPL* pIStorage_Impl, STORAGE::eSCOPE eScope, const std::string& sPathname) :
    m_pImpl (new Impl (pIStorage_Impl, eScope, sPathname))
 {
 }
 
-SASSET::~SASSET ()
+UNIT::~UNIT ()
 {
    delete m_pImpl;
 }
@@ -542,35 +542,35 @@ SASSET::~SASSET ()
 // Accessors
 // ---------------------------------------------------------------------------
 
-bool                    SASSET::IsLoaded       () const { return m_pImpl->m_bLoaded; }
-bool                    SASSET::IsDirty        () const { return m_pImpl->m_bDirty; }
-SNEEZE::STORAGE::eSCOPE SASSET::GetScope       () const { return m_pImpl->m_eScope; }
-const std::string&      SASSET::Pathname       () const { return m_pImpl->m_sPathname; }
-uint64_t                SASSET::SizeBytes      () const { return m_pImpl->m_nSizeBytes; }
-const std::string&      SASSET::CreatedTime    () const { return m_pImpl->m_sCreatedAt; }
-const std::string&      SASSET::LastAccessTime () const { return m_pImpl->m_sLastAccessedAt; }
-uint32_t                SASSET::AccessCount    () const { return m_pImpl->m_nAccessCount; }
+bool                    UNIT::IsLoaded       () const { return m_pImpl->m_bLoaded; }
+bool                    UNIT::IsDirty        () const { return m_pImpl->m_bDirty; }
+SNEEZE::STORAGE::eSCOPE UNIT::GetScope       () const { return m_pImpl->m_eScope; }
+const std::string&      UNIT::Pathname       () const { return m_pImpl->m_sPathname; }
+uint64_t                UNIT::SizeBytes      () const { return m_pImpl->m_nSizeBytes; }
+const std::string&      UNIT::CreatedTime    () const { return m_pImpl->m_sCreatedAt; }
+const std::string&      UNIT::LastAccessTime () const { return m_pImpl->m_sLastAccessedAt; }
+uint32_t                UNIT::AccessCount    () const { return m_pImpl->m_nAccessCount; }
 
 // ---------------------------------------------------------------------------
 // Methods
 // ---------------------------------------------------------------------------
 
-uint32_t       SASSET::Open       ()                                                        { return ++m_pImpl->m_nCount_Open; }
-uint32_t       SASSET::Close      ()                                                        { return --m_pImpl->m_nCount_Open; }
+uint32_t       UNIT::Open       ()                                                        { return ++m_pImpl->m_nCount_Open; }
+uint32_t       UNIT::Close      ()                                                        { return --m_pImpl->m_nCount_Open; }
 
-void           SASSET::Attach     ()                                                        {        m_pImpl->Attach      (); }
-void           SASSET::Detach     (const CONTEXT::CONTAINER::CID* pCID)                     {        m_pImpl->Detach      (pCID); }
+void           UNIT::Attach     ()                                                        {        m_pImpl->Attach      (); }
+void           UNIT::Detach     (const CONTEXT::CONTAINER::CID* pCID)                     {        m_pImpl->Detach      (pCID); }
 
-void           SASSET::Load       ()                                                        {        m_pImpl->Load        (); }
-void           SASSET::Save       ()                                                        {        m_pImpl->Save        (); }
-void           SASSET::Evict      ()                                                        {        m_pImpl->Evict       (); }
+void           UNIT::Load       ()                                                        {        m_pImpl->Load        (); }
+void           UNIT::Save       ()                                                        {        m_pImpl->Save        (); }
+void           UNIT::Evict      ()                                                        {        m_pImpl->Evict       (); }
 
-void           SASSET::TouchAccess ()                                                       {        m_pImpl->TouchAccess (); }
-void           SASSET::Meta_Save  (const CONTEXT::CONTAINER::CID* pCID)                     {        m_pImpl->Meta_Save   (pCID); }
+void           UNIT::TouchAccess ()                                                       {        m_pImpl->TouchAccess (); }
+void           UNIT::Meta_Save  (const CONTEXT::CONTAINER::CID* pCID)                     {        m_pImpl->Meta_Save   (pCID); }
 
-nlohmann::json SASSET::Get        (const std::string& sPath)                          const { return m_pImpl->Get         (sPath); }
-void           SASSET::Set        (const std::string& sPath, const nlohmann::json& j)       {        m_pImpl->Set         (sPath, j); }
-void           SASSET::Remove     (const std::string& sPath)                                {        m_pImpl->Remove      (sPath); }
-bool           SASSET::Has        (const std::string& sPath)                          const { return m_pImpl->Has         (sPath); }
-std::string    SASSET::Json       ()                                                  const { return m_pImpl->Json        (); }
-void           SASSET::Json       (const std::string& sJson)                                {        m_pImpl->Json        (sJson); }
+nlohmann::json UNIT::Get        (const std::string& sPath)                          const { return m_pImpl->Get         (sPath); }
+void           UNIT::Set        (const std::string& sPath, const nlohmann::json& j)       {        m_pImpl->Set         (sPath, j); }
+void           UNIT::Remove     (const std::string& sPath)                                {        m_pImpl->Remove      (sPath); }
+bool           UNIT::Has        (const std::string& sPath)                          const { return m_pImpl->Has         (sPath); }
+std::string    UNIT::Json       ()                                                  const { return m_pImpl->Json        (); }
+void           UNIT::Json       (const std::string& sJson)                                {        m_pImpl->Json        (sJson); }

@@ -38,7 +38,7 @@ ASSET (internal shared state, one per URL, pImpl)
  │   └── m_apFiles: vector<FILE*> attached handles
  └── Meta_Load/Meta_Save/Meta_Reset (private Impl methods)
 
-ASSET_FETCH (file-local class in Network_Asset.cpp, derives from JOB_FETCH)
+ASSET_FETCH (file-local class in Asset.cpp, derives from JOB_FETCH)
  ├── ASSET* m_pAsset (back-pointer)
  └── OnFetch_Complete(): calls ASSET::FetchComplete (real fetch) or ASSET::FetchComplete(FILE*, STATE) (notify-only)
 
@@ -521,7 +521,7 @@ This means only assets with active FILE handles live in memory. Re-opening a pre
 
 ### Current: Pooled Fetch via CONTROL
 
-Fetches are dispatched as `JOB_FETCH` jobs through the engine's thread pool infrastructure. `ASSET::Attach` creates an `ASSET_FETCH` (a file-local class in `Network_Asset.cpp` deriving from `JOB_FETCH`) and posts it via `NETWORK::Queue_Post_Fetch` -> `ENGINE::Queue_Post_Fetch` -> `CONTROL::Queue_Post_Fetch` -> `POOL_QUEUE<JOB_FETCH*>::Post`. The job is picked up by one of 16 `AGENT::FETCH` workers in `CONTROL`'s fetch pool.
+Fetches are dispatched as `JOB_FETCH` jobs through the engine's thread pool infrastructure. `ASSET::Attach` creates an `ASSET_FETCH` (a file-local class in `Asset.cpp` deriving from `JOB_FETCH`) and posts it via `NETWORK::Queue_Post_Fetch` -> `ENGINE::Queue_Post_Fetch` -> `CONTROL::Queue_Post_Fetch` -> `POOL_QUEUE<JOB_FETCH*>::Post`. The job is picked up by one of 16 `AGENT::FETCH` workers in `CONTROL`'s fetch pool.
 
 `ASSET_FETCH` has two constructors: (1) real fetch (`IsFetch()==true`) with URL/paths/hash for HTTP downloads, and (2) notify-only (`IsFetch()==false`) with `FILE*` and `STATE` for asynchronous notifications of cached/failed files. All FILE notifications (OnFileReady/OnFileFailed) go through the fetch pool — even for already-cached files — preventing re-entrancy bugs where synchronous OnFileReady during `File_Open`/`Initialize` could destroy the FILE mid-initialization.
 
@@ -654,7 +654,7 @@ The NETWORK module completed a multi-session bottom-up refactoring. Build errors
 - File_Open with null listener returns null for uncached URLs (cache probe path).
 - curl_global_init/cleanup moved from NETWORK to ENGINE (truly global, reference-counted).
 - ASSET::Attach branches documented with state comments.
-- **Per-ASSET FETCH threads replaced with pooled JOB_FETCH jobs.** `m_pJob_Fetch` (FETCH*) replaced by `m_pAsset_Fetch` (IJOB*). ASSET_FETCH bridge class in Network_Asset.cpp passes `SNEEZE::FETCH_RESULT` directly (no conversion — `NETWORK::FETCH_RESULT` was eliminated). Legacy thread pool (16 FETCH_SLOTs + overflow queue) removed from Network.cpp.
+- **Per-ASSET FETCH threads replaced with pooled JOB_FETCH jobs.** `m_pJob_Fetch` (FETCH*) replaced by `m_pAsset_Fetch` (IJOB*). ASSET_FETCH bridge class in Asset.cpp passes `SNEEZE::FETCH_RESULT` directly (no conversion — `NETWORK::FETCH_RESULT` was eliminated). Legacy thread pool (16 FETCH_SLOTs + overflow queue) removed from Network.cpp.
 - **FetchComplete lifecycle fix.** Raw counter decrements (`m_nCount_Attach--`, `m_nCount_Open--`) replaced by `Detach(nullptr)` + `m_pNetwork->Asset_Close(this, nullptr)`. This routes through the proper lifecycle methods, triggering Meta_Save when attach count reaches zero. Fixes the long-standing "temporary ungraceful solution" noted in the architecture docs.
 - **Asset_Close simplified.** Uses `pAsset->Pathname()` unconditionally instead of branching on `pFile ? pFile->Pathname("") : pAsset->Pathname()` — both are always equal.
 - **Queue_Post_Fetch routing.** `NETWORK::Queue_Post_Fetch(JOB_FETCH*)` -> `ENGINE::Queue_Post_Fetch` -> `ENGINE::Impl::Queue_Post_Fetch` -> `CONTROL::Queue_Post_Fetch` -> `POOL_QUEUE<JOB_FETCH*>::Post`. ENGINE::Impl keeps `m_pControl` private; the forwarding method provides controlled access.

@@ -23,17 +23,75 @@ namespace SNEEZE
       ISTORAGE_IMPL ();
       virtual ~ISTORAGE_IMPL ();
 
-      virtual SASSET*            Asset_Open  (STORAGE::eSCOPE eScope, const std::string& sPathname)                        = 0;
-      virtual void               Asset_Close (SASSET* pAsset)                                                              = 0;
+      virtual UNIT*              Unit_Open  (STORAGE::eSCOPE eScope, const std::string& sPathname)                        = 0;
+      virtual void               Unit_Close (UNIT* pUnit)                                                                 = 0;
 
-      virtual void               Log (IENGINE::eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage)   = 0;
+      virtual void               Log (IENGINE::eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage)  = 0;
 
-      virtual const std::string& Path_Permanent () const                                                                   = 0;
-      virtual const std::string& Path_Temporary () const                                                                   = 0;
+      virtual const std::string& Path_Permanent () const                                                                  = 0;
+      virtual const std::string& Path_Temporary () const                                                                  = 0;
 
-      virtual ICONTEXT*          Host () const                                                                             = 0;
+      virtual ICONTEXT*          Host () const                                                                            = 0;
 
    private:
+   };
+
+   // -----------------------------------------------------------------------
+   // UNIT -- one per JSON file on disk. The core data wrapper.
+   //
+   // Caches an nlohmann::json document in memory, manages a .meta sidecar
+   // file for inspector metadata, and provides the JSONL changelog for crash
+   // durability. Also serves as the interface for flat file sandbox ops.
+   // -----------------------------------------------------------------------
+
+   class UNIT
+   {
+   public:
+      UNIT (ISTORAGE_IMPL* pIStorage_Impl, STORAGE::eSCOPE eScope, const std::string& sPathname);
+      virtual ~UNIT ();
+
+      // --- State ---
+
+      bool                IsLoaded () const;
+      bool                IsDirty () const;
+      STORAGE::eSCOPE     GetScope () const;
+
+      // --- JSON access ---
+
+      nlohmann::json      Get (const std::string& sPath) const;
+      void                Set (const std::string& sPath, const nlohmann::json& jValue);
+      void                Remove (const std::string& sPath);
+      bool                Has (const std::string& sPath) const;
+
+      // --- Bulk ---
+
+      std::string         Json () const;
+      void                Json (const std::string& sJson);
+
+      // --- Lifecycle ---
+
+      uint32_t            Open ();
+      uint32_t            Close ();
+      void                Attach ();
+      void                Detach (const CONTEXT::CONTAINER::CID* pCID);
+      void                Load ();
+      void                Save ();
+      void                Evict ();
+
+      // --- Meta sidecar ---
+
+      const std::string& Pathname () const;
+      uint64_t           SizeBytes () const;
+      const std::string& CreatedTime () const;
+      const std::string& LastAccessTime () const;
+      uint32_t           AccessCount () const;
+
+      void  TouchAccess ();
+      void  Meta_Save (const CONTEXT::CONTAINER::CID* pCID);
+
+   private:
+      class Impl;
+      Impl* m_pImpl;
    };
 }
 #endif // SNEEZE_STORAGE_ISTORAGEIMPL_H

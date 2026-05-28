@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include <Sneeze.h>
-#include "Storage_Asset.h"
+#include "Storage.h"
 
 using namespace SNEEZE;
 
@@ -30,7 +30,7 @@ public:
       m_bAttached      (false)
    {
       for (int nScope = 0; nScope < STORAGE::kSCOPE_COUNT; nScope++)
-         m_apAsset[nScope] = nullptr;
+         m_apUnit[nScope] = nullptr;
    }
 
    void Initialize ()
@@ -39,7 +39,7 @@ public:
       {
          eSCOPE eScope = static_cast<eSCOPE> (nScope);
 
-         m_apAsset[nScope] = m_pIStorage_Impl->Asset_Open (eScope, Pathname (eScope));
+         m_apUnit[nScope] = m_pIStorage_Impl->Unit_Open (eScope, Pathname (eScope));
       }
    }
 
@@ -50,10 +50,10 @@ public:
 
       for (int nScope = 0; nScope < kSCOPE_COUNT; nScope++)
       {
-         if (m_apAsset[nScope])
+         if (m_apUnit[nScope])
          {
-            m_pIStorage_Impl->Asset_Close (m_apAsset[nScope]);
-            m_apAsset[nScope] = nullptr;
+            m_pIStorage_Impl->Unit_Close (m_apUnit[nScope]);
+            m_apUnit[nScope] = nullptr;
          }
       }
    }
@@ -97,7 +97,7 @@ public:
          m_bAttached = true;
 
          for (int nScope = 0; nScope < kSCOPE_COUNT; nScope++)
-            m_apAsset[nScope]->Attach ();
+            m_apUnit[nScope]->Attach ();
       }
    }
 
@@ -108,55 +108,55 @@ public:
       if (m_bAttached)
       {
          for (int nScope = 0; nScope < kSCOPE_COUNT; nScope++)
-            m_apAsset[nScope]->Detach (m_pCID);
+            m_apUnit[nScope]->Detach (m_pCID);
 
          m_bAttached = false;
       }
    }
 
    // ---------------------------------------------------------------------------
-   // ASSET Pass-through
+   // UNIT Pass-through
    // ---------------------------------------------------------------------------
 
    nlohmann::json Get (eSCOPE eScope, const std::string& sPath) const
    {
-      return m_apAsset[eScope]->Get (sPath);
+      return m_apUnit[eScope]->Get (sPath);
    }
 
    void Set (SILO* pSilo, eSCOPE eScope, const std::string& sPath, const nlohmann::json& jValue)
    {
-      m_apAsset[eScope]->Set (sPath, jValue);
+      m_apUnit[eScope]->Set (sPath, jValue);
 
       m_pIStorage_Impl->Host ()->OnStorageSiloChanged (pSilo, eScope, sPath);
    }
 
    void Remove (SILO* pSilo, eSCOPE eScope, const std::string& sPath)
    {
-      m_apAsset[eScope]->Remove (sPath);
+      m_apUnit[eScope]->Remove (sPath);
 
       m_pIStorage_Impl->Host ()->OnStorageSiloChanged (pSilo, eScope, sPath);
    }
 
    bool Has (eSCOPE eScope, const std::string& sPath) const
    {
-      return m_apAsset[eScope]->Has (sPath);
+      return m_apUnit[eScope]->Has (sPath);
    }
 
    std::string Json (eSCOPE eScope) const
    {
-      return m_apAsset[eScope]->Json ();
+      return m_apUnit[eScope]->Json ();
    }
 
    void Json (SILO* pSilo, eSCOPE eScope, const std::string& sJson)
    {
-      m_apAsset[eScope]->Json (sJson);
+      m_apUnit[eScope]->Json (sJson);
       m_pIStorage_Impl->Host ()->OnStorageSiloChanged (pSilo, eScope, "");
    }
 
 public:
    ISTORAGE_IMPL*                   m_pIStorage_Impl;
    const CONTEXT::CONTAINER::CID*   m_pCID;
-   SASSET*                          m_apAsset[STORAGE::kSCOPE_COUNT];
+   UNIT*                          m_apUnit[STORAGE::kSCOPE_COUNT];
    std::mutex                       m_mxSilo;
    bool                             m_bAttached;
 };
@@ -195,14 +195,14 @@ std::string STORAGE::SILO::Pathname    (eSCOPE eScope, const std::string& sExt) 
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// ASSET Caching
+// UNIT Caching
 // ---------------------------------------------------------------------------
 
 void        STORAGE::SILO::Attach      ()                                                                            {        m_pImpl->Attach    (); }
 void        STORAGE::SILO::Detach      ()                                                                            {        m_pImpl->Detach    (); }
 
 // ---------------------------------------------------------------------------
-// ASSET Pass-through
+// UNIT Pass-through
 // ---------------------------------------------------------------------------
 
 nlohmann::json STORAGE::SILO::Get      (eSCOPE eScope, const std::string& sPath)                               const { return m_pImpl->Get    (eScope, sPath); }

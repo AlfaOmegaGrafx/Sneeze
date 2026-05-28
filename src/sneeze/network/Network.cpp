@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "Network.h"
-#include "Network_Asset.h"
+#include "Network.h"
 
 using namespace SNEEZE;
 
@@ -218,7 +218,7 @@ public:
       }
    }
 
-   bool Rules_Stale (NASSET* pAsset) const
+   bool Rules_Stale (ASSET* pAsset) const
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -357,11 +357,11 @@ public:
    // INETWORK_IMPL
    // ---------------------------------------------------------------------------
 
-   NASSET* Asset_Open (NETWORK::FILE* pFile) override
+   ASSET* Asset_Open (NETWORK::FILE* pFile) override
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-      NASSET* pAsset = nullptr;
+      ASSET* pAsset = nullptr;
 
       std::string sUrl      = pFile->Url ();
       std::string sPathname = pFile->Pathname ("");
@@ -369,7 +369,7 @@ public:
       auto it = m_umpAsset.find (sPathname);
       if (it == m_umpAsset.end ())
       {
-         pAsset = new NASSET (this, sUrl, sPathname, Asset_Index ());
+         pAsset = new ASSET (this, sUrl, sPathname, Asset_Index ());
 
          m_umpAsset[sPathname] = pAsset;
       }
@@ -380,7 +380,7 @@ public:
       return pAsset;
    }
 
-   void Asset_Close (NASSET* pAsset, NETWORK::FILE* pFile) override
+   void Asset_Close (ASSET* pAsset, NETWORK::FILE* pFile) override
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -473,7 +473,7 @@ public:
    std::string                             m_sPath_Permanent;
    std::string                             m_sCachePath;
 
-   std::unordered_map<std::string, NASSET*> m_umpAsset;
+   std::unordered_map<std::string, ASSET*> m_umpAsset;
 
    mutable std::recursive_mutex            m_mutex;
 

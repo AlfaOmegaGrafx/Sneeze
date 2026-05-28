@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Storage_Asset.h"
+#include "Storage.h"
 
 using namespace SNEEZE;
 
@@ -44,10 +44,10 @@ public:
       while (!m_apSilo.empty ())
          Silo_Close (m_apSilo.front ());
 
-      for (auto& pair : m_umpAsset)
+      for (auto& pair : m_umpUnit)
          delete pair.second;
 
-      m_umpAsset.clear ();
+      m_umpUnit.clear ();
    }
 
    // ---------------------------------------------------------------------------
@@ -105,30 +105,30 @@ public:
    // ISTORAGE_IMPL
    // ---------------------------------------------------------------------------
 
-   SASSET* Asset_Open (eSCOPE eScope, const std::string& sPathname)
+   UNIT* Unit_Open (eSCOPE eScope, const std::string& sPathname)
    {
-      SASSET* pAsset = nullptr;
+      UNIT* pUnit = nullptr;
 
-      auto it = m_umpAsset.find (sPathname);
-      if (it == m_umpAsset.end ())
+      auto it = m_umpUnit.find (sPathname);
+      if (it == m_umpUnit.end ())
       {
-         pAsset = new SASSET (this, eScope, sPathname);
-         m_umpAsset[sPathname] = pAsset;
+         pUnit = new UNIT (this, eScope, sPathname);
+         m_umpUnit[sPathname] = pUnit;
       }
-      else pAsset = it->second;
+      else pUnit = it->second;
 
-      pAsset->Open ();
+      pUnit->Open ();
 
-      return pAsset;
+      return pUnit;
    }
 
-   void Asset_Close (SASSET* pAsset)
+   void Unit_Close (UNIT* pUnit)
    {
-      if (pAsset && pAsset->Close () == 0)
+      if (pUnit && pUnit->Close () == 0)
       {
-         m_umpAsset.erase (pAsset->Pathname ());
+         m_umpUnit.erase (pUnit->Pathname ());
 
-         delete pAsset;
+         delete pUnit;
       }
    }
 
@@ -159,7 +159,7 @@ public:
 
    std::recursive_mutex                    m_mxStorage;
    std::vector<SILO*>                      m_apSilo;
-   std::unordered_map<std::string, SASSET*> m_umpAsset;
+   std::unordered_map<std::string, UNIT*> m_umpUnit;
 };
 
 // ===========================================================================

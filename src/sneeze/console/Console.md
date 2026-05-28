@@ -26,7 +26,7 @@ STREAM (per-container log channel, symmetric with STORAGE::SILO)
  ├── Meta sidecar (.meta) — read on Initialize, written on Detach
  └── m_mxStream (recursive_mutex)
 
-BLOCK (one per JSONL log file on disk, symmetric with STORAGE::ASSET)
+BLOCK (one per JSONL log file on disk, symmetric with STORAGE::UNIT)
  ├── CONSOLE* m_pConsole (parent back-pointer)
  ├── m_nIndex: block number
  ├── m_sPathname: full disk path to the .log JSONL file
@@ -57,9 +57,9 @@ The Console module was deliberately designed to be structurally symmetric with S
 |---------|---------|---------|------|
 | `CONSOLE` | `STORAGE` | `NETWORK` | Per-context singleton, owns child objects |
 | `STREAM` | `SILO` | `FILE` | Per-caller handle, groups child resources |
-| `BLOCK` | `ASSET` | `ASSET` | Core data wrapper, shared via ref count |
+| `BLOCK` | `UNIT` | `ASSET` | Core data wrapper, shared via ref count |
 | `Stream_Open/Close` | `Silo_Open/Close` | `File_Open/Close` | Lifecycle API |
-| `Block_Open/Close` | `Asset_Open/Close` | `Asset_Open/Close` | Internal shared resource management |
+| `Block_Open/Close` | `Unit_Open/Close` | `Asset_Open/Close` | Internal shared resource management |
 | `IENUM_ENTRY` | `IENUM_SILO` | `IENUM` | Enumeration callback interface |
 | `IENUM_STREAM` | — | — | Stream enumeration |
 

@@ -25,14 +25,14 @@ namespace SNEEZE
    // container permanent/temporary). Data is stored as JSON files on disk.
    //
    // Consumers:
-   //   1. WASM modules — scoped to their own four storage assets
+   //   1. WASM modules — scoped to their own four storage units
    //   2. Inspector — omniscient, browsable, request/release pattern
    //
-   // Caching: ASSETs are loaded on demand and evicted when no longer referenced.
+   // Caching: UNITs are loaded on demand and evicted when no longer referenced.
    // Crash durability: JSONL changelog appended on every mutation.
    // ---------------------------------------------------------------------------
 
-   class SASSET;
+   class UNIT;
    class ISTORAGE_IMPL;
 
    class STORAGE
@@ -40,7 +40,7 @@ namespace SNEEZE
    public:
 
       // -----------------------------------------------------------------------
-      // SCOPE — selects one of the four storage assets within a SILO.
+      // SCOPE — selects one of the four storage units within a SILO.
       // -----------------------------------------------------------------------
 
       enum eSCOPE
@@ -53,7 +53,7 @@ namespace SNEEZE
       };
 
       // -----------------------------------------------------------------------
-      // SILO — groups four ASSETs for a specific container.
+      // SILO — groups four UNITs for a specific container.
       //
       // The handle passed to both WASM host functions and the inspector.
       // Created when a WASM container is instantiated or when the inspector

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include <openssl/sha.h>
-#include "Network_Asset.h"
+#include "Network.h"
 
 using namespace SNEEZE;
 
@@ -254,7 +254,7 @@ public:
    FILE*                          m_pFile;
    INETWORK_IMPL*                 m_pINetwork_Impl;
    const CONTEXT::CONTAINER::CID* m_pCID;
-   NASSET*                        m_pAsset;
+   ASSET*                         m_pAsset;
    IFILE*                         m_pListener;
    uint32_t                       m_nCount_Attach;
    std::recursive_mutex           m_mxFile;

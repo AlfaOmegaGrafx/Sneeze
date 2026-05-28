@@ -124,7 +124,7 @@
     <ClCompile Include="..\src\sneeze\control\AgentC.cpp">
       <Filter>src\sneeze\control</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\sneeze\network\Network_Asset.cpp">
+    <ClCompile Include="..\src\sneeze\network\Asset.cpp">
       <Filter>src\sneeze\network</Filter>
     </ClCompile>
     <ClCompile Include="..\src\sneeze\network\File.cpp">
@@ -136,7 +136,7 @@
     <ClCompile Include="..\src\sneeze\storage\Storage.cpp">
       <Filter>src\sneeze\storage</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\sneeze\storage\Storage_Asset.cpp">
+    <ClCompile Include="..\src\sneeze\storage\Unit.cpp">
       <Filter>src\sneeze\storage</Filter>
     </ClCompile>
     <ClCompile Include="..\src\sneeze\storage\Silo.cpp">
@@ -364,12 +364,6 @@
     </ClInclude>
     <ClInclude Include="..\include\Console.h">
       <Filter>include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\sneeze\storage\Storage_Asset.h">
-      <Filter>src\sneeze\storage</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\sneeze\network\Network_Asset.h">
-      <Filter>src\sneeze\network</Filter>
     </ClInclude>
     <ClInclude Include="..\src\sneeze\network\Network.h">
       <Filter>src\sneeze\network</Filter>

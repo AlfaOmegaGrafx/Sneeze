@@ -6,24 +6,24 @@ The `storage` module (`SNEEZE::STORAGE`) provides persistent, per-persona, per-o
 
 ```
 STORAGE (per-context, constructor takes CONTEXT*)
- ├── m_umpAsset: pathname -> ASSET*      (one per JSON file on disk, shared across SILOs)
+ ├── m_umpUnit: pathname -> UNIT*      (one per JSON file on disk, shared across SILOs)
  ├── m_apSilo: all active SILOs          (one per Silo_Open call)
  ├── m_sPath_Permanent + m_sPath_Temporary (computed from CONTEXT paths + "/Storage")
  └── m_mxStorage (recursive_mutex)
 
-ASSET (one per JSON file on disk, keyed by full pathname)
+UNIT (one per JSON file on disk, keyed by full pathname)
  ├── nlohmann::json document (in-memory cache)
  ├── .meta sidecar (CID identity fields, statistics)
  ├── .log changelog (JSONL write-ahead log for crash durability)
- ├── m_nCount_Open (lifetime: how many SILOs reference this ASSET)
+ ├── m_nCount_Open (lifetime: how many SILOs reference this UNIT)
  ├── m_nCount_Load (cache: how many consumers have data loaded)
  ├── m_bDirty flag
  ├── Load/Save/Evict lifecycle
- └── m_mutex (recursive_mutex, per-ASSET)
+ └── m_mutex (recursive_mutex, per-UNIT)
 
-SILO (groups four ASSETs for a specific container)
+SILO (groups four UNITs for a specific container)
  ├── const CID* m_pCID (pooled pointer from CONTEXT::CID_Pool)
- ├── ASSET* m_apAsset[4] indexed by SCOPE
+ ├── UNIT* m_apUnit[4] indexed by SCOPE
  ├── m_bAttached (bool, single-owner semantics)
  ├── Permanent + Temporary paths (derived from STORAGE paths)
  └── Path-based API: Get/Set/Remove/Has/Json
@@ -31,21 +31,21 @@ SILO (groups four ASSETs for a specific container)
 
 ## Ownership Model — Two Counters
 
-ASSETs use two separate counters to decouple object lifetime from cache state:
+UNITs use two separate counters to decouple object lifetime from cache state:
 
-### m_nCount_Open (ASSET lifetime)
+### m_nCount_Open (UNIT lifetime)
 
-Tracks how many SILOs reference an ASSET. Initialized to 0 in the constructor, incremented by `Open()`, decremented by `Close()`. When it reaches zero, the ASSET is erased from `m_umpAsset` and deleted. Shared org ASSETs accumulate ref counts from multiple SILOs.
+Tracks how many SILOs reference an UNIT. Initialized to 0 in the constructor, incremented by `Open()`, decremented by `Close()`. When it reaches zero, the UNIT is erased from `m_umpUnit` and deleted. Shared org UNITs accumulate ref counts from multiple SILOs.
 
 ### m_nCount_Load (cache state)
 
-Tracks how many consumers require the JSON data to be loaded in memory. Initialized to 0. Incremented by `ASSET::Attach()` (which also calls `ASSET::Load()` on first attach). Decremented by `ASSET::Detach(const CID&)` (which saves meta + dirty data, then calls `Evict()` on the 1→0 transition).
+Tracks how many consumers require the JSON data to be loaded in memory. Initialized to 0. Incremented by `UNIT::Attach()` (which also calls `UNIT::Load()` on first attach). Decremented by `UNIT::Detach(const CID&)` (which saves meta + dirty data, then calls `Evict()` on the 1→0 transition).
 
-This separation allows the inspector to browse SILOs/ASSETs without loading their JSON data. The inspector holds references (increments `m_nCount_Open`) but only loads data (`Attach()`) when drilling into a specific ASSET's contents.
+This separation allows the inspector to browse SILOs/UNITs without loading their JSON data. The inspector holds references (increments `m_nCount_Open`) but only loads data (`Attach()`) when drilling into a specific UNIT's contents.
 
 ### SILO ownership
 
-SILOs are stored as raw `SILO*` in `m_apSilo`. Each `Silo_Open` creates a new SILO instance — SILOs are not shared across callers. A SILO uses `m_bAttached` (bool, single-owner semantics) with `std::mutex m_mxSilo` protecting Attach/Detach. SILOs are deleted in `Silo_Close` after calling `Shutdown()` (which calls `Asset_Close` on its four ASSETs).
+SILOs are stored as raw `SILO*` in `m_apSilo`. Each `Silo_Open` creates a new SILO instance — SILOs are not shared across callers. A SILO uses `m_bAttached` (bool, single-owner semantics) with `std::mutex m_mxSilo` protecting Attach/Detach. SILOs are deleted in `Silo_Close` after calling `Shutdown()` (which calls `Unit_Close` on its four UNITs).
 
 ## Nested Types
 
@@ -53,9 +53,9 @@ All types are nested inside `SNEEZE::STORAGE`:
 
 | Type        | Parent    | Purpose                                          |
 |-------------|-----------|--------------------------------------------------|
-| `ASSET`     | `STORAGE` | Core data wrapper for one JSON file              |
-| `SILO`      | `STORAGE` | Groups four ASSETs for a container               |
-| `SCOPE`     | `STORAGE` | Enum selecting which of the four ASSETs          |
+| `UNIT`     | `STORAGE` | Core data wrapper for one JSON file              |
+| `SILO`      | `STORAGE` | Groups four UNITs for a container               |
+| `SCOPE`     | `STORAGE` | Enum selecting which of the four UNITs          |
 | `IENUM_SILO`| `STORAGE` | Enumeration callback interface for SILOs         |
 
 ## SCOPE Enum
@@ -115,7 +115,7 @@ STORAGE::Impl (...) :
 
 The fingerprint path segment uses a 2-character fan-out prefix (`fp-2`) followed by a 22-character remainder (`fp-22`), totaling 24 characters from the 64-character SHA-256 fingerprint. The persona hash is truncated to 12 hex characters (same as Network and Console).
 
-Directory creation happens in `ASSET::Load()` — when an ASSET's JSON data is first loaded from disk, `std::filesystem::create_directories` ensures the full directory path exists. This runs once per ASSET, not on every Save or Meta_Save.
+Directory creation happens in `UNIT::Load()` — when an UNIT's JSON data is first loaded from disk, `std::filesystem::create_directories` ensures the full directory path exists. This runs once per UNIT, not on every Save or Meta_Save.
 
 ## CID Pooling
 
@@ -190,16 +190,16 @@ Container instantiated:
    → create SILO(pStorage, pCID)
    → add to m_apSilo
    → SILO::Initialize()
-      → for each of 4 scopes: pStorage->Asset_Open(eScope, sPathname)
-         → find or create ASSET (increment m_nCount_Open if shared)
+      → for each of 4 scopes: pStorage->Unit_Open(eScope, sPathname)
+         → find or create UNIT (increment m_nCount_Open if shared)
    → fire OnStorageSiloCreated
    → return SILO*
    (caller must explicitly call pSilo->Attach() to load data)
 
 SILO::Attach():
    → sets m_bAttached = true
-   → calls Attach() on all four ASSETs
-      → ASSET::Attach() increments m_nCount_Load → ASSET::Load() on first attach
+   → calls Attach() on all four UNITs
+      → UNIT::Attach() increments m_nCount_Load → UNIT::Load() on first attach
 
 WASM calls storage_set_string(CONTAINER_PERMANENT, "player.name", "Dean"):
    → host function resolves SILO from WASM store identity
@@ -209,8 +209,8 @@ WASM calls storage_set_string(CONTAINER_PERMANENT, "player.name", "Dean"):
    → fires OnStorageSiloChanged notification
 
 SILO::Detach():
-   → calls Detach(m_CID) on all four ASSETs
-      → ASSET::Detach saves meta + dirty data, evicts on 1→0
+   → calls Detach(m_CID) on all four UNITs
+      → UNIT::Detach saves meta + dirty data, evicts on 1→0
    → Meta_Save
    → sets m_bAttached = false
 
@@ -220,12 +220,12 @@ Container destroyed:
    → erase from m_apSilo
    → delete pSilo
       → ~SILO calls Shutdown(pStorage)
-         → pStorage->Asset_Close(pAsset) for each of 4
-            → decrement m_nCount_Open → delete ASSET at zero
+         → pStorage->Unit_Close(pUnit) for each of 4
+            → decrement m_nCount_Open → delete UNIT at zero
 ```
 
-Organization ASSETs are shared — multiple SILOs from the same publisher point
-to the same org ASSETs. `m_nCount_Open` ensures org ASSETs stay alive as long as
+Organization UNITs are shared — multiple SILOs from the same publisher point
+to the same org UNITs. `m_nCount_Open` ensures org UNITs stay alive as long as
 any container from that org has an open SILO.
 
 ## Crash Durability — JSONL Changelog
@@ -297,7 +297,7 @@ Notifications fire from STORAGE through `CONTEXT::Host()` up to the ICONTEXT hos
 
 ## Sidecar .meta Files
 
-Each ASSET has a companion `.meta` sidecar — same pattern as NETWORK and Console:
+Each UNIT has a companion `.meta` sidecar — same pattern as NETWORK and Console:
 
 - Contains CID identity fields (fingerprint, organization, commonName,
   containerName, personaHash)
@@ -308,8 +308,8 @@ Each ASSET has a companion `.meta` sidecar — same pattern as NETWORK and Conso
 
 ## Thread Safety
 
-- `STORAGE` — `m_mxStorage` (recursive_mutex) protecting the ASSET map and SILO list
-- `ASSET` — `m_mutex` (recursive_mutex) per ASSET protecting its JSON document and metadata
+- `STORAGE` — `m_mxStorage` (recursive_mutex) protecting the UNIT map and SILO list
+- `UNIT` — `m_mutex` (recursive_mutex) per UNIT protecting its JSON document and metadata
 - `SILO` — `m_mxSilo` (mutex) protecting Attach/Detach
 
 ## Symmetry with Console and Network
@@ -320,9 +320,9 @@ The Storage module follows the same structural patterns as Console and Network:
 |---------|---------|---------|------|
 | `STORAGE` | `CONSOLE` | `NETWORK` | Per-context singleton |
 | `SILO` | `STREAM` | `FILE` | Per-caller handle |
-| `ASSET` | `BLOCK` | `ASSET` | Core data wrapper, shared via ref count |
+| `UNIT` | `BLOCK` | `UNIT` | Core data wrapper, shared via ref count |
 | `Silo_Open/Close` | `Stream_Open/Close` | `File_Open/Close` | Lifecycle API |
-| `Asset_Open/Close` | `Block_Open/Close` | `Asset_Open/Close` | Internal shared resource management |
+| `Unit_Open/Close` | `Block_Open/Close` | `Unit_Open/Close` | Internal shared resource management |
 | `IENUM_SILO` | `IENUM_STREAM` | `IENUM` | Enumeration callback |
 
 All three modules: pimpl idiom, CID pooling via `CONTEXT::CID_Pool()` in the parent Impl, two-counter ownership on the data wrapper, recursive_mutex, Attach/Detach lifecycle, meta sidecar files.
@@ -331,10 +331,9 @@ All three modules: pimpl idiom, CID pooling via `CONTEXT::CID_Pool()` in the par
 
 | File | Contents |
 |------|----------|
-| `include/Storage.h` | Public header — STORAGE, ASSET, SILO, SCOPE, IENUM_SILO |
-| `sneeze/storage/Storage.cpp` | STORAGE + Impl (Silo_Open/Close/Enum, Asset_Open/Close, paths) |
-| `sneeze/storage/Storage_Asset.cpp` | ASSET + Impl (JSON access, path navigation, changelog, Load/Save/Evict, meta) |
-| `sneeze/storage/Storage_Asset.h` | ASSET private header |
+| `include/Storage.h` | Public header — STORAGE, UNIT, SILO, SCOPE, IENUM_SILO |
+| `sneeze/storage/Storage.cpp` | STORAGE + Impl (Silo_Open/Close/Enum, Unit_Open/Close, paths) |
+| `sneeze/storage/Storage_Unit.cpp` | UNIT + Impl (JSON access, path navigation, changelog, Load/Save/Evict, meta) |
 | `sneeze/storage/Silo.cpp` | SILO (path-based API, Attach/Detach, Initialize/Shutdown, path construction) |
 
 ## WASM Interface (Current State)

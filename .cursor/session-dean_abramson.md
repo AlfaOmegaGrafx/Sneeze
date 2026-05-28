@@ -12,14 +12,14 @@
 ## 2026-05-26 – 2026-05-27 (Monday–Tuesday), multi-session
 
 - Implemented the CONSOLE module (`sneeze/console/`) — per-context developer console with two-tier storage: global ring buffer + per-container disk-backed STREAMs.
-- Designed and enforced strict structural symmetry with STORAGE: CONSOLE↔STORAGE, STREAM↔SILO, BLOCK↔ASSET. Same pimpl pattern, same CID pooling via `CONTEXT::CID_Pool`, same two-counter ownership on data wrappers, same Attach/Detach lifecycle, same meta sidecar pattern.
+- Designed and enforced strict structural symmetry with STORAGE: CONSOLE↔STORAGE, STREAM↔SILO, BLOCK↔UNIT. Same pimpl pattern, same CID pooling via `CONTEXT::CID_Pool`, same two-counter ownership on data wrappers, same Attach/Detach lifecycle, same meta sidecar pattern.
 - Created `Console.h` (public header), `Console.cpp` (CONSOLE + Impl), `Stream.cpp` (STREAM + Impl), `Block.cpp` (BLOCK + Impl), `Block.h` (private header), `Entry.cpp` (ENTRY class).
 - Refactored ENTRY time handling: replaced origin-based offset (`dTimestamp`) with self-stamping `system_clock::time_point` (`m_tpStamp`). Entries compute their own wall-clock time in the constructor. Serialized as epoch seconds (double) in JSONL.
 - Added `CONTEXT::CID_Pool()` — centralized CID ownership in CONTEXT via `unordered_map<string, CID>`. Both CONSOLE and STORAGE Impls call `CID_Pool` in their open methods.
-- Refactored STORAGE for symmetry: moved CID exchange into `Impl::Silo_Open`, renamed `IENUM` to `IENUM_SILO`, moved ASSET functional code into Impl, aligned accessors.
+- Refactored STORAGE for symmetry: moved CID exchange into `Impl::Silo_Open`, renamed `IENUM` to `IENUM_SILO`, moved UNIT functional code into Impl, aligned accessors.
 - Added ICONTEXT callbacks: `OnConsoleStreamCreated/Deleted`, `OnConsoleEntryCreated/Deleted`.
 - Context initialization order: CONSOLE → NETWORK → STORAGE → VIEWPORT (teardown in reverse).
 - Fixed build errors: reordered `FromJson` args, updated `Stream.cpp` include from `Console_Block.h` to `Block.h`, rewrote `ConsoleTest.cpp` to route logging through STREAMs, added `Block.cpp` to CMakeLists.txt and MSVC project files.
 - Created `Console.md` documentation.
-- Updated `Storage.md` to reflect CONTEXT* ownership, ASSET/SILO naming, CID pooling, IENUM_SILO, symmetry table.
+- Updated `Storage.md` to reflect CONTEXT* ownership, UNIT/SILO naming, CID pooling, IENUM_SILO, symmetry table.
 - Updated `project.mdc` with CONSOLE module in directory structure, module table, key classes, ICONTEXT callbacks, and CID_Pool on CONTEXT.

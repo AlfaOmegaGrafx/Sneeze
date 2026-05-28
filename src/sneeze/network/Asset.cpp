@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Network_Asset.h"
+#include "Network.h"
 
 #include <openssl/evp.h>
 
@@ -20,20 +20,20 @@ using namespace SNEEZE;
 
 // ---------------------------------------------------------------------------
 // ASSET_FETCH -- local job class bridging the control-layer fetch pool
-//                back to NASSET::FetchComplete.
+//                back to ASSET::FetchComplete.
 // ---------------------------------------------------------------------------
 
 class ASSET_FETCH : public JOB_FETCH
 {
 public:
-   ASSET_FETCH (NASSET* pAsset, const std::string& sUrl, const std::string& sPath_Temp, const std::string& sPath_Data, const std::string& sHash)
+   ASSET_FETCH (ASSET* pAsset, const std::string& sUrl, const std::string& sPath_Temp, const std::string& sPath_Data, const std::string& sHash)
       : JOB_FETCH (true, sUrl, sPath_Temp, sPath_Data, sHash),
         m_pAsset  (pAsset),
         m_pFile   (nullptr),
         m_bState  (NETWORK::STATE_FETCHING)
    {}
 
-   ASSET_FETCH (NASSET* pAsset, NETWORK::FILE* pFile, NETWORK::STATE bState)
+   ASSET_FETCH (ASSET* pAsset, NETWORK::FILE* pFile, NETWORK::STATE bState)
       : JOB_FETCH (false, "", "", "", ""),
         m_pAsset  (pAsset),
         m_pFile   (pFile),
@@ -48,14 +48,14 @@ public:
    }
 
 private:
-   NASSET*        m_pAsset;
+   ASSET*        m_pAsset;
    NETWORK::FILE* m_pFile;
    NETWORK::STATE m_bState;
 };
 
 // ---------------------------------------------------------------------------
 
-class NASSET::Impl
+class ASSET::Impl
 {
 public:
    Impl (INETWORK_IMPL* pINetwork_Impl, const std::string& sUrl, const std::string& sPathname, uint32_t nAssetIx) :
@@ -358,12 +358,12 @@ public:
 // ASSET
 // ---------------------------------------------------------------------------
 
-NASSET::NASSET (INETWORK_IMPL* pINetwork_Impl, const std::string& sUrl, const std::string& sPathname, uint32_t nAssetIx) :
+ASSET::ASSET (INETWORK_IMPL* pINetwork_Impl, const std::string& sUrl, const std::string& sPathname, uint32_t nAssetIx) :
    m_pImpl (new Impl (pINetwork_Impl, sUrl, sPathname, nAssetIx))
 {
 }
 
-NASSET::~NASSET ()
+ASSET::~ASSET ()
 {
    if (m_pImpl->m_pAsset_Fetch)
    {
@@ -378,7 +378,7 @@ NASSET::~NASSET ()
 // Lifecycle
 // ---------------------------------------------------------------------------
 
-void NASSET::Open (NETWORK::FILE* pFile)
+void ASSET::Open (NETWORK::FILE* pFile)
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
 
@@ -387,7 +387,7 @@ void NASSET::Open (NETWORK::FILE* pFile)
    m_pImpl->m_nCount_Open++;
 }
 
-size_t NASSET::Close (NETWORK::FILE* pFile)
+size_t ASSET::Close (NETWORK::FILE* pFile)
 {
    // if pFile == nullptr, the fetch thread is releasing its implicit lock
 
@@ -405,7 +405,7 @@ size_t NASSET::Close (NETWORK::FILE* pFile)
    return m_pImpl->m_nCount_Open;
 }
 
-bool NASSET::Attach (NETWORK::FILE* pFile, bool bFetch_Allowed)
+bool ASSET::Attach (NETWORK::FILE* pFile, bool bFetch_Allowed)
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
 
@@ -537,7 +537,7 @@ bool NASSET::Attach (NETWORK::FILE* pFile, bool bFetch_Allowed)
    return bResult;
 }
 
-void NASSET::Detach (NETWORK::FILE* pFile)
+void ASSET::Detach (NETWORK::FILE* pFile)
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
 
@@ -554,7 +554,7 @@ void NASSET::Detach (NETWORK::FILE* pFile)
    }
 }
 
-void NASSET::Reset ()
+void ASSET::Reset ()
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
 
@@ -571,7 +571,7 @@ void NASSET::Reset ()
 // Fetch
 // ---------------------------------------------------------------------------
 
-void NASSET::FetchComplete (const FETCH_RESULT& Fetch_Result)
+void ASSET::FetchComplete (const FETCH_RESULT& Fetch_Result)
 {
    {
       std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
@@ -617,7 +617,7 @@ void NASSET::FetchComplete (const FETCH_RESULT& Fetch_Result)
    m_pImpl->m_pINetwork_Impl->Asset_Close (this, nullptr);
 }
 
-void NASSET::FetchComplete (NETWORK::FILE* pFile, NETWORK::STATE bState)
+void ASSET::FetchComplete (NETWORK::FILE* pFile, NETWORK::STATE bState)
 {
    {
       std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
@@ -644,7 +644,7 @@ void NASSET::FetchComplete (NETWORK::FILE* pFile, NETWORK::STATE bState)
 // Data access
 // ---------------------------------------------------------------------------
 
-void NASSET::ReadData (std::vector<uint8_t>& aData) const
+void ASSET::ReadData (std::vector<uint8_t>& aData) const
 {
    aData.clear ();
 
@@ -666,7 +666,7 @@ void NASSET::ReadData (std::vector<uint8_t>& aData) const
    }
 }
 
-std::string NASSET::Header (const std::string& sName) const
+std::string ASSET::Header (const std::string& sName) const
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
 
@@ -683,7 +683,7 @@ std::string NASSET::Header (const std::string& sName) const
 // Hash verification
 // ---------------------------------------------------------------------------
 
-bool NASSET::VerifyHash (const std::string& sFilePath, const std::string& sHash) const
+bool ASSET::VerifyHash (const std::string& sFilePath, const std::string& sHash) const
 {
    bool bResult = true;
 
@@ -705,26 +705,26 @@ bool NASSET::VerifyHash (const std::string& sFilePath, const std::string& sHash)
 // Accessors
 // ---------------------------------------------------------------------------
 
-NETWORK::STATE       NASSET::State ()                        const { return m_pImpl->m_bState;            }
-bool                 NASSET::IsReset ()                      const { return m_pImpl->m_bReset;            }
-size_t               NASSET::File_Count ()                   const { return m_pImpl->m_apFiles.size ();   }
-const std::string&   NASSET::Url ()                          const { return m_pImpl->m_sUrl;              }
-uint64_t             NASSET::SizeBytes ()                    const { return m_pImpl->m_nSizeBytes;        }
-std::string          NASSET::CreatedTime ()                  const { return m_pImpl->m_sCreatedAt;        }
-std::string          NASSET::LastAccessTime ()               const { return m_pImpl->m_sLastAccessedAt;   }
-uint32_t             NASSET::AccessCount ()                  const { return m_pImpl->m_nAccessCount;      }
-uint32_t             NASSET::AssetIx ()                      const { return m_pImpl->m_nAssetIx;          }
-const std::string&   NASSET::Hash ()                         const { return m_pImpl->m_sHash;             }
-bool                 NASSET::IsHashed ()                     const { return !m_pImpl->m_sHash.empty ();   }
-std::string          NASSET::DiskPath ()                     const { return m_pImpl->Path (NETWORK::DISKFILE_DATA); }
-const std::string&   NASSET::Pathname ()                     const { return m_pImpl->m_sPathname;         }
-std::string          NASSET::Path (NETWORK::DISKFILE eType)  const { return m_pImpl->Path (eType);        }
-long                 NASSET::HttpStatus ()                   const { return m_pImpl->m_nHttpStatus;       }
-double               NASSET::FetchStartTime ()               const { return m_pImpl->m_dFetchStartTime;   }
-double               NASSET::FetchEndTime ()                 const { return m_pImpl->m_dFetchEndTime;     }
-double               NASSET::FetchDuration ()                const { return m_pImpl->m_dFetchEndTime - m_pImpl->m_dFetchStartTime; }
-double               NASSET::FetchQueuedTime ()              const { return m_pImpl->m_dFetchQueuedTime;  }
-double               NASSET::QueueDuration ()                const { return m_pImpl->m_dFetchStartTime - m_pImpl->m_dFetchQueuedTime; }
-bool                 NASSET::IsServedFromCache ()            const { return m_pImpl->m_bServedFromCache;  }
+NETWORK::STATE       ASSET::State ()                        const { return m_pImpl->m_bState;            }
+bool                 ASSET::IsReset ()                      const { return m_pImpl->m_bReset;            }
+size_t               ASSET::File_Count ()                   const { return m_pImpl->m_apFiles.size ();   }
+const std::string&   ASSET::Url ()                          const { return m_pImpl->m_sUrl;              }
+uint64_t             ASSET::SizeBytes ()                    const { return m_pImpl->m_nSizeBytes;        }
+std::string          ASSET::CreatedTime ()                  const { return m_pImpl->m_sCreatedAt;        }
+std::string          ASSET::LastAccessTime ()               const { return m_pImpl->m_sLastAccessedAt;   }
+uint32_t             ASSET::AccessCount ()                  const { return m_pImpl->m_nAccessCount;      }
+uint32_t             ASSET::AssetIx ()                      const { return m_pImpl->m_nAssetIx;          }
+const std::string&   ASSET::Hash ()                         const { return m_pImpl->m_sHash;             }
+bool                 ASSET::IsHashed ()                     const { return !m_pImpl->m_sHash.empty ();   }
+std::string          ASSET::DiskPath ()                     const { return m_pImpl->Path (NETWORK::DISKFILE_DATA); }
+const std::string&   ASSET::Pathname ()                     const { return m_pImpl->m_sPathname;         }
+std::string          ASSET::Path (NETWORK::DISKFILE eType)  const { return m_pImpl->Path (eType);        }
+long                 ASSET::HttpStatus ()                   const { return m_pImpl->m_nHttpStatus;       }
+double               ASSET::FetchStartTime ()               const { return m_pImpl->m_dFetchStartTime;   }
+double               ASSET::FetchEndTime ()                 const { return m_pImpl->m_dFetchEndTime;     }
+double               ASSET::FetchDuration ()                const { return m_pImpl->m_dFetchEndTime - m_pImpl->m_dFetchStartTime; }
+double               ASSET::FetchQueuedTime ()              const { return m_pImpl->m_dFetchQueuedTime;  }
+double               ASSET::QueueDuration ()                const { return m_pImpl->m_dFetchStartTime - m_pImpl->m_dFetchQueuedTime; }
+bool                 ASSET::IsServedFromCache ()            const { return m_pImpl->m_bServedFromCache;  }
 
-const std::unordered_map<std::string, std::string>&   NASSET::Headers ()      const { return m_pImpl->m_mapHeaders; }
+const std::unordered_map<std::string, std::string>&   ASSET::Headers ()      const { return m_pImpl->m_mapHeaders; }
