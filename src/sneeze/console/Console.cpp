@@ -14,7 +14,6 @@
 
 #include <Console.h>
 #include "Console.h"
-#include "Block.h"
 #include <deque>
 
 using namespace SNEEZE;
@@ -50,13 +49,8 @@ public:
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
 
-      while (!m_apStream.empty ())
-         Stream_Close (m_apStream.front ());
-
-      for (auto& pair : m_umpBlock)
-         delete pair.second;
-
-      m_umpBlock.clear ();
+      while (!m_umpStream.empty ())
+         Stream_Close (m_umpStream.begin ()->second);
 
       m_apEntry.clear ();
    }
@@ -73,13 +67,16 @@ public:
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
 
-         pStream = new STREAM (this, pCID);
+         if (m_umpStream.find (pCID) == m_umpStream.end ())
+         {
+            pStream = new STREAM (this, pCID);
 
-         m_apStream.push_back (pStream);
+            m_umpStream[pCID] = pStream;
 
-         pStream->Initialize (m_nBlocks, m_nEntries_Block);
+            pStream->Initialize (m_nBlocks, m_nEntries_Block);
 
-         m_pContext->Host ()->OnConsoleStreamCreated (pStream);
+            m_pContext->Host ()->OnConsoleStreamCreated (pStream);
+         }
       }
 
       return pStream;
@@ -93,9 +90,14 @@ public:
 
          m_pContext->Host ()->OnConsoleStreamDeleted (pStream);
 
-         auto it = std::find (m_apStream.begin (), m_apStream.end (), pStream);
-         if (it != m_apStream.end ())
-            m_apStream.erase (it);
+         for (auto it = m_umpStream.begin (); it != m_umpStream.end (); ++it)
+         {
+            if (it->second == pStream)
+            {
+               m_umpStream.erase (it);
+               break;
+            }
+         }
 
          delete pStream;
       }
@@ -107,8 +109,8 @@ public:
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
 
-         for (STREAM* pStream : m_apStream)
-            pEnum->OnStream (pStream);
+         for (auto& pair : m_umpStream)
+            pEnum->OnStream (pair.second);
       }
    }
 
@@ -148,38 +150,6 @@ public:
    const std::string& Path_Temporary () const override
    {
       return m_sPath_Temporary;
-   }
-
-   // ---------------------------------------------------------------------------
-   // Block helpers -- called by STREAM (Initialize, ~STREAM) which is always invoked
-   // under m_mxConsole via Stream_Open/Stream_Close. Not independently thread-safe.
-   // ---------------------------------------------------------------------------
-
-   BLOCK* Block_Open (uint32_t nIndex, const std::string& sPathname) override
-   {
-      BLOCK* pBlock = nullptr;
-
-      auto it = m_umpBlock.find (sPathname);
-      if (it == m_umpBlock.end ())
-      {
-         pBlock = new BLOCK (this, nIndex, sPathname);
-         m_umpBlock[sPathname] = pBlock;
-      }
-      else pBlock = it->second;
-
-      pBlock->Open ();
-
-      return pBlock;
-   }
-
-   void Block_Close (BLOCK* pBlock) override
-   {
-      if (pBlock && pBlock->Close () == 0)
-      {
-         m_umpBlock.erase (pBlock->Pathname ());
-
-         delete pBlock;
-      }
    }
 
    // ---------------------------------------------------------------------------
@@ -224,7 +194,6 @@ public:
       return pEntry;
    }
 
-   ICONSOLE_IMPL*                                                   pIConsole_Impl;
    CONTEXT*                                                         m_pContext;
    std::string                                                      m_sPath_Temporary;
 
@@ -236,8 +205,7 @@ public:
    std::deque<std::shared_ptr<const CONSOLE::ENTRY>>                m_apEntry;
    uint32_t                                                         m_nIndex_Entry;
 
-   std::vector<CONSOLE::STREAM*>                                    m_apStream;
-   std::unordered_map<std::string, BLOCK*>                          m_umpBlock;
+   std::unordered_map<const CONTEXT::CONTAINER::CID*, CONSOLE::STREAM*> m_umpStream;
 };
 
 /***********************************************************************************************************************************

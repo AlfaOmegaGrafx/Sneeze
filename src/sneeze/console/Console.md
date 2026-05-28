@@ -14,7 +14,7 @@ CONSOLE (per-context, constructor takes CONTEXT*)
  ├── Configuration: m_nEntries_Cache, m_nEntries_Block, m_nBlocks
  └── m_mxConsole (recursive_mutex)
 
-STREAM (per-container log channel, symmetric with STORAGE::UNIT)
+STREAM (per-container log channel, symmetric with STORAGE::SILO)
  ├── CONSOLE* m_pConsole (parent back-pointer)
  ├── const CID* m_pCID (pooled, from CONTEXT::CID_Pool)
  ├── m_apBlock: vector<BLOCK*> (rolling window, dynamically sized)
@@ -56,11 +56,11 @@ The Console module was deliberately designed to be structurally symmetric with S
 | Console | Storage | Network | Role |
 |---------|---------|---------|------|
 | `CONSOLE` | `STORAGE` | `NETWORK` | Per-context singleton, owns child objects |
-| `STREAM` | `UNIT` | `FILE` | Per-caller handle, groups child resources |
+| `STREAM` | `SILO` | `FILE` | Per-caller handle, groups child resources |
 | `BLOCK` | `ASSET` | `ASSET` | Core data wrapper, shared via ref count |
-| `Stream_Open/Close` | `Unit_Open/Close` | `File_Open/Close` | Lifecycle API |
+| `Stream_Open/Close` | `Silo_Open/Close` | `File_Open/Close` | Lifecycle API |
 | `Block_Open/Close` | `Asset_Open/Close` | `Asset_Open/Close` | Internal shared resource management |
-| `IENUM_ENTRY` | `IENUM_UNIT` | `IENUM` | Enumeration callback interface |
+| `IENUM_ENTRY` | `IENUM_SILO` | `IENUM` | Enumeration callback interface |
 | `IENUM_STREAM` | — | — | Stream enumeration |
 
 All three modules follow the same patterns: pimpl idiom, CID pooling in the parent Impl (`Console::Impl::Stream_Open` calls `Context::CID_Pool`), two-counter ownership on the data wrapper (BLOCK), recursive_mutex, Attach/Detach lifecycle, and meta sidecar files.

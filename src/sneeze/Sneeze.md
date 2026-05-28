@@ -133,9 +133,9 @@ public:
    virtual void OnNetworkFileCreated (NOTIFICATION* pNotification) {}
    virtual void OnNetworkFileChanged (NOTIFICATION* pNotification) {}
    virtual void OnNetworkFileDeleted (NOTIFICATION* pNotification) {}
-   virtual void OnStorageUnitCreated (NOTIFICATION* pNotification) {}
-   virtual void OnStorageUnitChanged (NOTIFICATION* pNotification) {}
-   virtual void OnStorageUnitDeleted (NOTIFICATION* pNotification) {}
+   virtual void OnStorageSiloCreated (NOTIFICATION* pNotification) {}
+   virtual void OnStorageSiloChanged (NOTIFICATION* pNotification) {}
+   virtual void OnStorageSiloDeleted (NOTIFICATION* pNotification) {}
 };
 ```
 

@@ -41,8 +41,8 @@ public:
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
 
-      while (!m_apUnit.empty ())
-         Unit_Close (m_apUnit.front ());
+      while (!m_apSilo.empty ())
+         Silo_Close (m_apSilo.front ());
 
       for (auto& pair : m_umpAsset)
          delete pair.second;
@@ -51,58 +51,58 @@ public:
    }
 
    // ---------------------------------------------------------------------------
-   // Unit management
+   // Silo management
    // ---------------------------------------------------------------------------
 
-   STORAGE::UNIT* Unit_Open (const CONTEXT::CONTAINER::CID* pCID)
+   STORAGE::SILO* Silo_Open (const CONTEXT::CONTAINER::CID* pCID)
    {
-      UNIT* pUnit = nullptr;
+      SILO* pSilo = nullptr;
 
       if (pCID = m_pContext->CID_Pool (pCID)) // Swap the input CID for the Context pooled CID
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
 
-         pUnit = new UNIT (this, pCID);
+         pSilo = new SILO (this, pCID);
 
-         m_apUnit.push_back (pUnit);
+         m_apSilo.push_back (pSilo);
 
-         pUnit->Initialize ();
+         pSilo->Initialize ();
 
-         m_pContext->Host ()->OnStorageUnitCreated (pUnit);
+         m_pContext->Host ()->OnStorageSiloCreated (pSilo);
       }
 
-      return pUnit;
+      return pSilo;
    }
 
-   void Unit_Close (UNIT* pUnit)
+   void Silo_Close (SILO* pSilo)
    {
-      if (pUnit)
+      if (pSilo)
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
 
-         m_pContext->Host ()->OnStorageUnitDeleted (pUnit);
+         m_pContext->Host ()->OnStorageSiloDeleted (pSilo);
 
-         auto it = std::find (m_apUnit.begin (), m_apUnit.end (), pUnit);
-         if (it != m_apUnit.end ())
-            m_apUnit.erase (it);
+         auto it = std::find (m_apSilo.begin (), m_apSilo.end (), pSilo);
+         if (it != m_apSilo.end ())
+            m_apSilo.erase (it);
 
-         delete pUnit;
+         delete pSilo;
       }
    }
 
-   void Unit_Enum (IENUM_UNIT* pEnum)
+   void Silo_Enum (IENUM_SILO* pEnum)
    {
       if (pEnum)
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
 
-         for (UNIT* pUnit : m_apUnit)
-            pEnum->OnUnit (pUnit);
+         for (SILO* pSilo : m_apSilo)
+            pEnum->OnSilo (pSilo);
       }
    }
 
    // ---------------------------------------------------------------------------
-   // INETWORK_WORKER
+   // ISTORAGE_IMPL
    // ---------------------------------------------------------------------------
 
    SASSET* Asset_Open (eSCOPE eScope, const std::string& sPathname)
@@ -158,7 +158,7 @@ public:
    std::string                             m_sPath_Temporary;
 
    std::recursive_mutex                    m_mxStorage;
-   std::vector<UNIT*>                      m_apUnit;
+   std::vector<SILO*>                      m_apSilo;
    std::unordered_map<std::string, SASSET*> m_umpAsset;
 };
 
@@ -182,6 +182,6 @@ STORAGE::~STORAGE ()
 // Container lifecycle
 // ---------------------------------------------------------------------------
 
-STORAGE::UNIT*     STORAGE::Unit_Open       (const CONTEXT::CONTAINER::CID* pCID)         { return m_pImpl->Unit_Open       (pCID); }
-void               STORAGE::Unit_Close      (UNIT* pUnit)                                 {        m_pImpl->Unit_Close      (pUnit); }
-void               STORAGE::Unit_Enum       (IENUM_UNIT* pEnum)                           {        m_pImpl->Unit_Enum       (pEnum); }
+STORAGE::SILO*     STORAGE::Silo_Open       (const CONTEXT::CONTAINER::CID* pCID)         { return m_pImpl->Silo_Open       (pCID); }
+void               STORAGE::Silo_Close      (SILO* pSilo)                                 {        m_pImpl->Silo_Close      (pSilo); }
+void               STORAGE::Silo_Enum       (IENUM_SILO* pEnum)                           {        m_pImpl->Silo_Enum       (pEnum); }

@@ -139,7 +139,7 @@
     <ClCompile Include="..\src\sneeze\storage\Storage_Asset.cpp">
       <Filter>src\sneeze\storage</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\sneeze\storage\Unit.cpp">
+    <ClCompile Include="..\src\sneeze\storage\Silo.cpp">
       <Filter>src\sneeze\storage</Filter>
     </ClCompile>
     <ClCompile Include="..\src\sneeze\console\Console.cpp">
@@ -364,9 +364,6 @@
     </ClInclude>
     <ClInclude Include="..\include\Console.h">
       <Filter>include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\sneeze\console\Block.h">
-      <Filter>src\sneeze\console</Filter>
     </ClInclude>
     <ClInclude Include="..\src\sneeze\storage\Storage_Asset.h">
       <Filter>src\sneeze\storage</Filter>

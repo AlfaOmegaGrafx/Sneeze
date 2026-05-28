@@ -25,13 +25,50 @@ namespace SNEEZE
 
       virtual const std::string& Path_Temporary () const                         = 0;
 
-      virtual BLOCK* Block_Open (uint32_t nIndex, const std::string& sPathname)  = 0;
-      virtual void   Block_Close (BLOCK* pBlock) = 0;
-
       virtual std::shared_ptr<const CONSOLE::ENTRY> Entry_Create (const CONTEXT::CONTAINER::CID* pCID, CONSOLE::eLEVEL eLevel, const std::string& sMessage, uint32_t nGroupDepth, bool bCollapsed) = 0;
       virtual std::shared_ptr<const CONSOLE::ENTRY> Entry_Find   (uint32_t nIndex) = 0;
 
    private:
    };
+
+   // -----------------------------------------------------------------------
+   // BLOCK -- one per JSONL log file on disk. Owned directly by STREAM.
+   //
+   // Caches ENTRY shared_ptrs in memory. Each block file holds up to
+   // Entries_Block() entries.
+   // -----------------------------------------------------------------------
+
+   class BLOCK
+   {
+   public:
+      BLOCK (ICONSOLE_IMPL* pIConsole_Impl, uint32_t nIndex, const std::string& sPathname);
+      virtual ~BLOCK ();
+
+      // --- State ---
+
+      bool                IsLoaded () const;
+      uint32_t            GetIndex () const;
+
+      // --- Entry access ---
+
+      void                Write (std::shared_ptr<const CONSOLE::ENTRY> pEntry);
+      void                Entry_Enum (CONSOLE::IENUM_ENTRY* pEnum) const;
+
+      // --- Lifecycle ---
+
+      void                Attach ();
+      void                Detach (const CONTEXT::CONTAINER::CID* pCID);
+      void                Load (const CONTEXT::CONTAINER::CID* pCID);
+      void                Evict ();
+
+      // --- Meta ---
+
+      const std::string&  Pathname () const;
+      uint32_t            EntryCount () const;
+
+   private:
+      class Impl;
+      Impl* m_pImpl;
+   };
 }
-#endif // SNEEZE_NETWORK_INETWORKIMPL_H
+#endif // SNEEZE_CONSOLE_ICONSOLEIMPL_H

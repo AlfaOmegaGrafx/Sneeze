@@ -627,12 +627,12 @@ set (NETWORK_GENERATED_SOURCES "${CMAKE_CURRENT_BINARY_DIR}/cacert_data.cpp")
 set (CONTAINER_HEADERS)
 
 set (CONSOLE_SOURCES  sneeze/console/Console.cpp sneeze/console/Entry.cpp sneeze/console/Stream.cpp sneeze/console/Block.cpp)
-set (CONSOLE_HEADERS  sneeze/console/Block.h)
+set (CONSOLE_HEADERS  )
 
 set (NETWORK_SOURCES  sneeze/network/Network.cpp sneeze/network/File.cpp sneeze/network/Network_Asset.cpp)
 set (NETWORK_HEADERS)
 
-set (STORAGE_SOURCES  sneeze/storage/Storage.cpp sneeze/storage/Unit.cpp sneeze/storage/Storage_Asset.cpp)
+set (STORAGE_SOURCES  sneeze/storage/Storage.cpp sneeze/storage/Silo.cpp sneeze/storage/Storage_Asset.cpp)
 set (STORAGE_HEADERS  sneeze/storage/Storage_Asset.h)
 
 set (PERSONA_SOURCES  persona/Persona.cpp)

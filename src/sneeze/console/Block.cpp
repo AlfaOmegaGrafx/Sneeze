@@ -14,7 +14,6 @@
 
 #include <Sneeze.h>
 #include "Console.h"
-#include "Block.h"
 
 using namespace SNEEZE;
 
@@ -30,7 +29,6 @@ public:
       m_nIndex         (nIndex),
       m_sPathname      (sPathname),
       m_bLoaded        (false),
-      m_nCount_Open    (0),
       m_nCount_Load    (0),
       m_nEntryCount    (0)
    {
@@ -159,7 +157,6 @@ public:
 
    std::ofstream                                              m_ofsBlock;
    bool                                                       m_bLoaded;
-   uint32_t                                                   m_nCount_Open;
    uint32_t                                                   m_nCount_Load;
    uint32_t                                                   m_nEntryCount;
 
@@ -193,9 +190,6 @@ uint32_t             BLOCK::EntryCount  () const { return m_pImpl->m_nEntryCount
 // ---------------------------------------------------------------------------
 // Methods
 // ---------------------------------------------------------------------------
-
-uint32_t BLOCK::Open       ()                                             { return ++m_pImpl->m_nCount_Open; }
-uint32_t BLOCK::Close      ()                                             { return --m_pImpl->m_nCount_Open; }
 
 void     BLOCK::Attach     ()                                             { m_pImpl->Attach     (); }
 void     BLOCK::Detach     (const CONTEXT::CONTAINER::CID* pCID)          { m_pImpl->Detach     (pCID); }

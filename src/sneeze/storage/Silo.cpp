@@ -18,10 +18,10 @@
 using namespace SNEEZE;
 
 // ---------------------------------------------------------------------------
-// STORAGE::UNIT::Impl
+// STORAGE::SILO::Impl
 // ---------------------------------------------------------------------------
 
-class STORAGE::UNIT::Impl
+class STORAGE::SILO::Impl
 {
 public:
    Impl (ISTORAGE_IMPL* pIStorage_Impl, const CONTEXT::CONTAINER::CID* pCID) :
@@ -90,7 +90,7 @@ public:
 
    void Attach ()
    {
-      std::lock_guard<std::mutex> guard (m_mxUnit);
+      std::lock_guard<std::mutex> guard (m_mxSilo);
 
       if (!m_bAttached)
       {
@@ -103,7 +103,7 @@ public:
 
    void Detach ()
    {
-      std::lock_guard<std::mutex> guard (m_mxUnit);
+      std::lock_guard<std::mutex> guard (m_mxSilo);
 
       if (m_bAttached)
       {
@@ -123,18 +123,18 @@ public:
       return m_apAsset[eScope]->Get (sPath);
    }
 
-   void Set (UNIT* pUnit, eSCOPE eScope, const std::string& sPath, const nlohmann::json& jValue)
+   void Set (SILO* pSilo, eSCOPE eScope, const std::string& sPath, const nlohmann::json& jValue)
    {
       m_apAsset[eScope]->Set (sPath, jValue);
 
-      m_pIStorage_Impl->Host ()->OnStorageUnitChanged (pUnit, eScope, sPath);
+      m_pIStorage_Impl->Host ()->OnStorageSiloChanged (pSilo, eScope, sPath);
    }
 
-   void Remove (UNIT* pUnit, eSCOPE eScope, const std::string& sPath)
+   void Remove (SILO* pSilo, eSCOPE eScope, const std::string& sPath)
    {
       m_apAsset[eScope]->Remove (sPath);
 
-      m_pIStorage_Impl->Host ()->OnStorageUnitChanged (pUnit, eScope, sPath);
+      m_pIStorage_Impl->Host ()->OnStorageSiloChanged (pSilo, eScope, sPath);
    }
 
    bool Has (eSCOPE eScope, const std::string& sPath) const
@@ -147,35 +147,35 @@ public:
       return m_apAsset[eScope]->Json ();
    }
 
-   void Json (UNIT* pUnit, eSCOPE eScope, const std::string& sJson)
+   void Json (SILO* pSilo, eSCOPE eScope, const std::string& sJson)
    {
       m_apAsset[eScope]->Json (sJson);
-      m_pIStorage_Impl->Host ()->OnStorageUnitChanged (pUnit, eScope, "");
+      m_pIStorage_Impl->Host ()->OnStorageSiloChanged (pSilo, eScope, "");
    }
 
 public:
    ISTORAGE_IMPL*                   m_pIStorage_Impl;
    const CONTEXT::CONTAINER::CID*   m_pCID;
    SASSET*                          m_apAsset[STORAGE::kSCOPE_COUNT];
-   std::mutex                       m_mxUnit;
+   std::mutex                       m_mxSilo;
    bool                             m_bAttached;
 };
 
 // ===========================================================================
-// STORAGE::UNIT
+// STORAGE::SILO
 // ===========================================================================
 
-STORAGE::UNIT::UNIT (ISTORAGE_IMPL* pIStorage_Impl, const CONTEXT::CONTAINER::CID* pCID) :
+STORAGE::SILO::SILO (ISTORAGE_IMPL* pIStorage_Impl, const CONTEXT::CONTAINER::CID* pCID) :
    m_pImpl (new Impl (pIStorage_Impl, pCID))
 {
 }
 
-void STORAGE::UNIT::Initialize ()
+void STORAGE::SILO::Initialize ()
 {
    m_pImpl->Initialize ();
 }
 
-STORAGE::UNIT::~UNIT ()
+STORAGE::SILO::~SILO ()
 {
    delete m_pImpl;
 }
@@ -184,11 +184,11 @@ STORAGE::UNIT::~UNIT ()
 // Accessors
 // ---------------------------------------------------------------------------
 
-std::string STORAGE::UNIT::DisplayName ()                                                                      const { return m_pImpl->m_pCID->DisplayName (); }
+std::string STORAGE::SILO::DisplayName ()                                                                      const { return m_pImpl->m_pCID->DisplayName (); }
 
-std::string STORAGE::UNIT::Path        (eSCOPE eScope)                                                         const { return m_pImpl->Path     (eScope);       }
-std::string STORAGE::UNIT::Filename    (eSCOPE eScope, const std::string& sExt)                                const { return m_pImpl->Filename (eScope, sExt); }
-std::string STORAGE::UNIT::Pathname    (eSCOPE eScope, const std::string& sExt)                                const { return m_pImpl->Pathname (eScope, sExt); }
+std::string STORAGE::SILO::Path        (eSCOPE eScope)                                                         const { return m_pImpl->Path     (eScope);       }
+std::string STORAGE::SILO::Filename    (eSCOPE eScope, const std::string& sExt)                                const { return m_pImpl->Filename (eScope, sExt); }
+std::string STORAGE::SILO::Pathname    (eSCOPE eScope, const std::string& sExt)                                const { return m_pImpl->Pathname (eScope, sExt); }
 
 // ---------------------------------------------------------------------------
 // Modifiers
@@ -198,17 +198,17 @@ std::string STORAGE::UNIT::Pathname    (eSCOPE eScope, const std::string& sExt) 
 // ASSET Caching
 // ---------------------------------------------------------------------------
 
-void        STORAGE::UNIT::Attach      ()                                                                            {        m_pImpl->Attach    (); }
-void        STORAGE::UNIT::Detach      ()                                                                            {        m_pImpl->Detach    (); }
+void        STORAGE::SILO::Attach      ()                                                                            {        m_pImpl->Attach    (); }
+void        STORAGE::SILO::Detach      ()                                                                            {        m_pImpl->Detach    (); }
 
 // ---------------------------------------------------------------------------
 // ASSET Pass-through
 // ---------------------------------------------------------------------------
 
-nlohmann::json STORAGE::UNIT::Get      (eSCOPE eScope, const std::string& sPath)                               const { return m_pImpl->Get    (eScope, sPath); }
-void           STORAGE::UNIT::Set      (eSCOPE eScope, const std::string& sPath, const nlohmann::json& jValue)       {        m_pImpl->Set    (this, eScope, sPath, jValue); }
-void           STORAGE::UNIT::Remove   (eSCOPE eScope, const std::string& sPath)                                     {        m_pImpl->Remove (this, eScope, sPath); }
-bool           STORAGE::UNIT::Has      (eSCOPE eScope, const std::string& sPath)                               const { return m_pImpl->Has    (eScope, sPath); }
-std::string    STORAGE::UNIT::Json     (eSCOPE eScope)                                                         const { return m_pImpl->Json   (eScope); }
-void           STORAGE::UNIT::Json     (eSCOPE eScope, const std::string& sJson)                                     {        m_pImpl->Json   (this, eScope, sJson); }
+nlohmann::json STORAGE::SILO::Get      (eSCOPE eScope, const std::string& sPath)                               const { return m_pImpl->Get    (eScope, sPath); }
+void           STORAGE::SILO::Set      (eSCOPE eScope, const std::string& sPath, const nlohmann::json& jValue)       {        m_pImpl->Set    (this, eScope, sPath, jValue); }
+void           STORAGE::SILO::Remove   (eSCOPE eScope, const std::string& sPath)                                     {        m_pImpl->Remove (this, eScope, sPath); }
+bool           STORAGE::SILO::Has      (eSCOPE eScope, const std::string& sPath)                               const { return m_pImpl->Has    (eScope, sPath); }
+std::string    STORAGE::SILO::Json     (eSCOPE eScope)                                                         const { return m_pImpl->Json   (eScope); }
+void           STORAGE::SILO::Json     (eSCOPE eScope, const std::string& sJson)                                     {        m_pImpl->Json   (this, eScope, sJson); }
 

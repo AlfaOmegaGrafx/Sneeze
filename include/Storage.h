@@ -40,7 +40,7 @@ namespace SNEEZE
    public:
 
       // -----------------------------------------------------------------------
-      // SCOPE — selects one of the four storage assets within a UNIT.
+      // SCOPE — selects one of the four storage assets within a SILO.
       // -----------------------------------------------------------------------
 
       enum eSCOPE
@@ -53,18 +53,18 @@ namespace SNEEZE
       };
 
       // -----------------------------------------------------------------------
-      // UNIT — groups four ASSETs for a specific container.
+      // SILO — groups four ASSETs for a specific container.
       //
       // The handle passed to both WASM host functions and the inspector.
       // Created when a WASM container is instantiated or when the inspector
       // enumerates from disk. Destroyed/evicted when last reference releases.
       // -----------------------------------------------------------------------
 
-      class UNIT
+      class SILO
       {
       public:
-         UNIT (ISTORAGE_IMPL* pIStorage_Impl, const CONTEXT::CONTAINER::CID* pCID);
-        ~UNIT ();
+         SILO (ISTORAGE_IMPL* pIStorage_Impl, const CONTEXT::CONTAINER::CID* pCID);
+        ~SILO ();
 
          void Initialize ();
 
@@ -100,16 +100,16 @@ namespace SNEEZE
       };
 
       // -----------------------------------------------------------------------
-      // IENUM_UNIT — enumeration callback interface.
+      // IENUM_SILO — enumeration callback interface.
       //
-      // Implement to receive UNIT pointers during Unit_Enum().
+      // Implement to receive SILO pointers during Silo_Enum().
       // -----------------------------------------------------------------------
 
-      class IENUM_UNIT
+      class IENUM_SILO
       {
       public:
-         virtual ~IENUM_UNIT () {}
-         virtual void OnUnit (UNIT* pUnit) = 0;
+         virtual ~IENUM_SILO () {}
+         virtual void OnSilo (SILO* pSilo) = 0;
       };
 
       // -----------------------------------------------------------------------
@@ -123,9 +123,9 @@ namespace SNEEZE
 
       // --- Container lifecycle ---
 
-      UNIT*   Unit_Open  (const CONTEXT::CONTAINER::CID* pCID);
-      void    Unit_Close (UNIT* pUnit);
-      void    Unit_Enum  (IENUM_UNIT* pEnum);
+      SILO*   Silo_Open  (const CONTEXT::CONTAINER::CID* pCID);
+      void    Silo_Close (SILO* pSilo);
+      void    Silo_Enum  (IENUM_SILO* pEnum);
 
    private:
       class Impl;

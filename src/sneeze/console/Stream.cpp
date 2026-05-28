@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "Console.h"
-#include "Block.h"
 #include <iomanip>
 
 using namespace SNEEZE;
@@ -51,12 +50,7 @@ public:
          Detach ();
 
       for (int nBlock = 0; nBlock < (int) m_apBlock.size (); nBlock++)
-      {
-         if (m_apBlock[nBlock])
-         {
-            m_pIConsole_Impl->Block_Close (m_apBlock[nBlock]);
-         }
-      }
+         delete m_apBlock[nBlock];
 
       m_apBlock.clear ();
    }
@@ -125,9 +119,7 @@ public:
          int nFirstBlock = std::max (0, m_nBlock - m_nBlocks + 1);
 
          for (int nBlock = nFirstBlock; nBlock <= m_nBlock; nBlock++)
-         {
-            m_apBlock.push_back (m_pIConsole_Impl->Block_Open (nBlock, Pathname (nBlock, "log")));
-         }
+            m_apBlock.push_back (new BLOCK (m_pIConsole_Impl, nBlock, Pathname (nBlock, "log")));
       }
    }
 
@@ -202,19 +194,19 @@ public:
       m_nBlock++;
       m_nBlockEntryCount = 0;
 
-      m_apBlock.push_back (m_pIConsole_Impl->Block_Open (m_nBlock, Pathname (m_nBlock, "log")));
+      m_apBlock.push_back (new BLOCK (m_pIConsole_Impl, m_nBlock, Pathname (m_nBlock, "log")));
 
       if (m_bAttached)
          m_apBlock.back ()->Attach ();
 
       if ((int) m_apBlock.size () > m_nBlocks)
       {
-         BLOCK* pOldBlock = m_apBlock.front ();
+         BLOCK* pBlock = m_apBlock.front ();
 
          if (m_bAttached)
-            pOldBlock->Detach (m_pCID);
+            pBlock->Detach (m_pCID);
 
-         m_pIConsole_Impl->Block_Close (pOldBlock);
+         delete pBlock;
          m_apBlock.erase (m_apBlock.begin ());
 
          int nOldBlock = m_nBlock - m_nBlocks;

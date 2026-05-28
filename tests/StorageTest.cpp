@@ -73,9 +73,9 @@ public:
    int m_nChangedCount = 0;
    int m_nDeletedCount = 0;
 
-   void OnStorageUnitCreated (STORAGE::UNIT*) override { m_nCreatedCount++; }
-   void OnStorageUnitChanged (STORAGE::UNIT*, STORAGE::eSCOPE, const std::string&) override { m_nChangedCount++; }
-   void OnStorageUnitDeleted (STORAGE::UNIT*) override { m_nDeletedCount++; }
+   void OnStorageSiloCreated (STORAGE::SILO*) override { m_nCreatedCount++; }
+   void OnStorageSiloChanged (STORAGE::SILO*, STORAGE::eSCOPE, const std::string&) override { m_nChangedCount++; }
+   void OnStorageSiloDeleted (STORAGE::SILO*) override { m_nDeletedCount++; }
 };
 
 static STORAGE_TEST_HOST*          s_pHost        = nullptr;
@@ -114,18 +114,18 @@ static void TestInitializeAndOpenClose ()
    Check (pStorage != nullptr, "Storage exists");
 
    auto CID = MakeTestCID ();
-   STORAGE::UNIT* pUnit = pStorage->Unit_Open (&CID);
-   Check (pUnit != nullptr, "Open returns UNIT");
-   Check (pUnit->DisplayName () == CID.DisplayName (), "UNIT holds correct CID");
-   Check (pUnit != nullptr, "Unit opened successfully");
+   STORAGE::SILO* pSilo = pStorage->Silo_Open (&CID);
+   Check (pSilo != nullptr, "Open returns SILO");
+   Check (pSilo->DisplayName () == CID.DisplayName (), "SILO holds correct CID");
+   Check (pSilo != nullptr, "Silo opened successfully");
 
-   pUnit->Attach ();
-   Check (pUnit->DisplayName () == CID.DisplayName (), "CID preserved after Attach");
+   pSilo->Attach ();
+   Check (pSilo->DisplayName () == CID.DisplayName (), "CID preserved after Attach");
 
-   Check (s_pContextHost->m_nCreatedCount == 1, "OnStorageUnitCreated fired");
+   Check (s_pContextHost->m_nCreatedCount == 1, "OnStorageSiloCreated fired");
 
-   pUnit->Detach ();
-   pStorage->Unit_Close (pUnit);
+   pSilo->Detach ();
+   pStorage->Silo_Close (pSilo);
 }
 
 // ---------------------------------------------------------------------------
@@ -138,26 +138,26 @@ static void TestBasicOperations ()
 
    STORAGE* pStorage = s_pStorage;
    auto CID = MakeTestCID ();
-   STORAGE::UNIT* pUnit = pStorage->Unit_Open (&CID);
-   pUnit->Attach ();
+   STORAGE::SILO* pSilo = pStorage->Silo_Open (&CID);
+   pSilo->Attach ();
 
    s_pContextHost->m_nChangedCount = 0;
 
-   pUnit->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "player.name", "Dean");
-   Check (s_pContextHost->m_nChangedCount == 1, "OnStorageUnitChanged fired on Set");
+   pSilo->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "player.name", "Dean");
+   Check (s_pContextHost->m_nChangedCount == 1, "OnStorageSiloChanged fired on Set");
 
-   auto jValue = pUnit->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "player.name");
+   auto jValue = pSilo->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "player.name");
    Check (jValue.is_string (), "Get returns string type");
    Check (jValue.get<std::string> () == "Dean", "Get returns correct value");
 
-   Check (pUnit->Has (STORAGE::kSCOPE_PERMANENT_COMPANY, "player.name"), "Has returns true for existing key");
-   Check (!pUnit->Has (STORAGE::kSCOPE_PERMANENT_COMPANY, "player.missing"), "Has returns false for missing key");
+   Check (pSilo->Has (STORAGE::kSCOPE_PERMANENT_COMPANY, "player.name"), "Has returns true for existing key");
+   Check (!pSilo->Has (STORAGE::kSCOPE_PERMANENT_COMPANY, "player.missing"), "Has returns false for missing key");
 
-   pUnit->Remove (STORAGE::kSCOPE_PERMANENT_COMPANY, "player.name");
-   Check (!pUnit->Has (STORAGE::kSCOPE_PERMANENT_COMPANY, "player.name"), "Remove deletes key");
+   pSilo->Remove (STORAGE::kSCOPE_PERMANENT_COMPANY, "player.name");
+   Check (!pSilo->Has (STORAGE::kSCOPE_PERMANENT_COMPANY, "player.name"), "Remove deletes key");
 
-   pUnit->Detach ();
-   pStorage->Unit_Close (pUnit);
+   pSilo->Detach ();
+   pStorage->Silo_Close (pSilo);
 }
 
 // ---------------------------------------------------------------------------
@@ -170,23 +170,23 @@ static void TestPathNavigation ()
 
    STORAGE* pStorage = s_pStorage;
    auto CID = MakeTestCID ();
-   STORAGE::UNIT* pUnit = pStorage->Unit_Open (&CID);
-   pUnit->Attach ();
+   STORAGE::SILO* pSilo = pStorage->Silo_Open (&CID);
+   pSilo->Attach ();
 
-   pUnit->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "game.poker.table.color", "green");
-   pUnit->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "game.poker.table.seats", 8);
+   pSilo->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "game.poker.table.color", "green");
+   pSilo->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "game.poker.table.seats", 8);
 
-   auto jColor = pUnit->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "game.poker.table.color");
+   auto jColor = pSilo->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "game.poker.table.color");
    Check (jColor.is_string ()  &&  jColor.get<std::string> () == "green", "Deep nested string");
 
-   auto jSeats = pUnit->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "game.poker.table.seats");
+   auto jSeats = pSilo->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "game.poker.table.seats");
    Check (jSeats.is_number_integer ()  &&  jSeats.get<int> () == 8, "Deep nested number");
 
-   Check (pUnit->Has (STORAGE::kSCOPE_PERMANENT_COMPANY, "game.poker.table.color"), "Has works for deep path");
-   Check (!pUnit->Has (STORAGE::kSCOPE_PERMANENT_COMPANY, "game.poker.table.missing"), "Has fails for missing deep path");
+   Check (pSilo->Has (STORAGE::kSCOPE_PERMANENT_COMPANY, "game.poker.table.color"), "Has works for deep path");
+   Check (!pSilo->Has (STORAGE::kSCOPE_PERMANENT_COMPANY, "game.poker.table.missing"), "Has fails for missing deep path");
 
-   pUnit->Detach ();
-   pStorage->Unit_Close (pUnit);
+   pSilo->Detach ();
+   pStorage->Silo_Close (pSilo);
 }
 
 // ---------------------------------------------------------------------------
@@ -199,32 +199,32 @@ static void TestArrayAccess ()
 
    STORAGE* pStorage = s_pStorage;
    auto CID = MakeTestCID ();
-   STORAGE::UNIT* pUnit = pStorage->Unit_Open (&CID);
-   pUnit->Attach ();
+   STORAGE::SILO* pSilo = pStorage->Silo_Open (&CID);
+   pSilo->Attach ();
 
-   pUnit->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "scores[0]", 100);
-   pUnit->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "scores[1]", 200);
-   pUnit->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "scores[2]", 300);
+   pSilo->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "scores[0]", 100);
+   pSilo->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "scores[1]", 200);
+   pSilo->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "scores[2]", 300);
 
-   auto j0 = pUnit->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "scores[0]");
-   auto j1 = pUnit->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "scores[1]");
-   auto j2 = pUnit->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "scores[2]");
+   auto j0 = pSilo->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "scores[0]");
+   auto j1 = pSilo->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "scores[1]");
+   auto j2 = pSilo->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "scores[2]");
 
    Check (j0.is_number ()  &&  j0.get<int> () == 100, "Array index 0");
    Check (j1.is_number ()  &&  j1.get<int> () == 200, "Array index 1");
    Check (j2.is_number ()  &&  j2.get<int> () == 300, "Array index 2");
 
-   pUnit->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "game.players[0].name", "Alice");
-   pUnit->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "game.players[1].name", "Bob");
+   pSilo->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "game.players[0].name", "Alice");
+   pSilo->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "game.players[1].name", "Bob");
 
-   auto jAlice = pUnit->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "game.players[0].name");
-   auto jBob   = pUnit->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "game.players[1].name");
+   auto jAlice = pSilo->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "game.players[0].name");
+   auto jBob   = pSilo->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "game.players[1].name");
 
    Check (jAlice.is_string ()  &&  jAlice.get<std::string> () == "Alice", "Nested array object [0]");
    Check (jBob.is_string ()  &&  jBob.get<std::string> () == "Bob", "Nested array object [1]");
 
-   pUnit->Detach ();
-   pStorage->Unit_Close (pUnit);
+   pSilo->Detach ();
+   pStorage->Silo_Close (pSilo);
 }
 
 // ---------------------------------------------------------------------------
@@ -239,25 +239,25 @@ static void TestPersistence ()
    auto CID = MakeTestCID ("persist-test");
 
    {
-      STORAGE::UNIT* pUnit = pStorage->Unit_Open (&CID);
-      pUnit->Attach ();
-      pUnit->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "saved.value", 42);
-      pUnit->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "saved.text", "hello");
-      pUnit->Detach ();
-      pStorage->Unit_Close (pUnit);
+      STORAGE::SILO* pSilo = pStorage->Silo_Open (&CID);
+      pSilo->Attach ();
+      pSilo->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "saved.value", 42);
+      pSilo->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "saved.text", "hello");
+      pSilo->Detach ();
+      pStorage->Silo_Close (pSilo);
    }
 
    {
-      STORAGE::UNIT* pUnit = pStorage->Unit_Open (&CID);
-      pUnit->Attach ();
-      auto jValue = pUnit->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "saved.value");
-      auto jText  = pUnit->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "saved.text");
+      STORAGE::SILO* pSilo = pStorage->Silo_Open (&CID);
+      pSilo->Attach ();
+      auto jValue = pSilo->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "saved.value");
+      auto jText  = pSilo->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "saved.text");
 
       Check (jValue.is_number ()  &&  jValue.get<int> () == 42, "Number persisted across Open/Close");
       Check (jText.is_string ()  &&  jText.get<std::string> () == "hello", "String persisted across Open/Close");
 
-      pUnit->Detach ();
-      pStorage->Unit_Close (pUnit);
+      pSilo->Detach ();
+      pStorage->Silo_Close (pSilo);
    }
 }
 
@@ -273,22 +273,22 @@ static void TestOrgSharing ()
    auto CID_A = MakeTestCID ("container-a");
    auto CID_B = MakeTestCID ("container-b");
 
-   STORAGE::UNIT* pUnitA = pStorage->Unit_Open (&CID_A);
-   pUnitA->Attach ();
-   pUnitA->Set (STORAGE::kSCOPE_PERMANENT_ORG, "org.setting", "shared-value");
+   STORAGE::SILO* pSiloA = pStorage->Silo_Open (&CID_A);
+   pSiloA->Attach ();
+   pSiloA->Set (STORAGE::kSCOPE_PERMANENT_ORG, "org.setting", "shared-value");
 
-   STORAGE::UNIT* pUnitB = pStorage->Unit_Open (&CID_B);
-   pUnitB->Attach ();
-   auto jOrgB = pUnitB->Get (STORAGE::kSCOPE_PERMANENT_ORG, "org.setting");
+   STORAGE::SILO* pSiloB = pStorage->Silo_Open (&CID_B);
+   pSiloB->Attach ();
+   auto jOrgB = pSiloB->Get (STORAGE::kSCOPE_PERMANENT_ORG, "org.setting");
 
    Check (jOrgB.is_string ()  &&  jOrgB.get<std::string> () == "shared-value",
       "Org storage visible to second container");
 
 
-   pUnitA->Detach ();
-   pStorage->Unit_Close (pUnitA);
-   pUnitB->Detach ();
-   pStorage->Unit_Close (pUnitB);
+   pSiloA->Detach ();
+   pStorage->Silo_Close (pSiloA);
+   pSiloB->Detach ();
+   pStorage->Silo_Close (pSiloB);
 }
 
 // ---------------------------------------------------------------------------
@@ -301,26 +301,26 @@ static void TestScopeIsolation ()
 
    STORAGE* pStorage = s_pStorage;
    auto CID = MakeTestCID ("scope-test");
-   STORAGE::UNIT* pUnit = pStorage->Unit_Open (&CID);
-   pUnit->Attach ();
+   STORAGE::SILO* pSilo = pStorage->Silo_Open (&CID);
+   pSilo->Attach ();
 
-   pUnit->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "key", "permanent");
-   pUnit->Set (STORAGE::kSCOPE_TEMPORARY_COMPANY, "key", "temporary");
-   pUnit->Set (STORAGE::kSCOPE_PERMANENT_ORG, "key", "org-permanent");
-   pUnit->Set (STORAGE::kSCOPE_TEMPORARY_ORG, "key", "org-temporary");
+   pSilo->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "key", "permanent");
+   pSilo->Set (STORAGE::kSCOPE_TEMPORARY_COMPANY, "key", "temporary");
+   pSilo->Set (STORAGE::kSCOPE_PERMANENT_ORG, "key", "org-permanent");
+   pSilo->Set (STORAGE::kSCOPE_TEMPORARY_ORG, "key", "org-temporary");
 
-   auto j1 = pUnit->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "key");
-   auto j2 = pUnit->Get (STORAGE::kSCOPE_TEMPORARY_COMPANY, "key");
-   auto j3 = pUnit->Get (STORAGE::kSCOPE_PERMANENT_ORG, "key");
-   auto j4 = pUnit->Get (STORAGE::kSCOPE_TEMPORARY_ORG, "key");
+   auto j1 = pSilo->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "key");
+   auto j2 = pSilo->Get (STORAGE::kSCOPE_TEMPORARY_COMPANY, "key");
+   auto j3 = pSilo->Get (STORAGE::kSCOPE_PERMANENT_ORG, "key");
+   auto j4 = pSilo->Get (STORAGE::kSCOPE_TEMPORARY_ORG, "key");
 
    Check (j1.get<std::string> () == "permanent", "PERMANENT_COMPANY isolated");
    Check (j2.get<std::string> () == "temporary", "TEMPORARY_COMPANY isolated");
    Check (j3.get<std::string> () == "org-permanent", "PERMANENT_ORG isolated");
    Check (j4.get<std::string> () == "org-temporary", "TEMPORARY_ORG isolated");
 
-   pUnit->Detach ();
-   pStorage->Unit_Close (pUnit);
+   pSilo->Detach ();
+   pStorage->Silo_Close (pSilo);
 }
 
 // ---------------------------------------------------------------------------
@@ -357,12 +357,12 @@ static void TestCrashRecovery ()
       f << "[\"Remove\",\"will-remove\"]\n";
    }
 
-   STORAGE::UNIT* pUnit = pStorage->Unit_Open (&CID);
-   pUnit->Attach ();
+   STORAGE::SILO* pSilo = pStorage->Silo_Open (&CID);
+   pSilo->Attach ();
 
-   auto jRecovered = pUnit->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "recovered");
-   auto jBase      = pUnit->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "base");
-   auto jRemoved   = pUnit->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "will-remove");
+   auto jRecovered = pSilo->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "recovered");
+   auto jBase      = pSilo->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "base");
+   auto jRemoved   = pSilo->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "will-remove");
 
    Check (jRecovered.is_string ()  &&  jRecovered.get<std::string> () == "yes",
       "Log Set replayed on recovery");
@@ -373,8 +373,8 @@ static void TestCrashRecovery ()
 
    Check (!std::filesystem::exists (sLogPath), "Log file deleted after recovery");
 
-   pUnit->Detach ();
-   pStorage->Unit_Close (pUnit);
+   pSilo->Detach ();
+   pStorage->Silo_Close (pSilo);
 }
 
 // ---------------------------------------------------------------------------
@@ -387,25 +387,25 @@ static void TestBulkJson ()
 
    STORAGE* pStorage = s_pStorage;
    auto CID = MakeTestCID ("bulk-test");
-   STORAGE::UNIT* pUnit = pStorage->Unit_Open (&CID);
-   pUnit->Attach ();
+   STORAGE::SILO* pSilo = pStorage->Silo_Open (&CID);
+   pSilo->Attach ();
 
-   pUnit->Json (STORAGE::kSCOPE_PERMANENT_COMPANY,
+   pSilo->Json (STORAGE::kSCOPE_PERMANENT_COMPANY,
       "{\"bulk\": {\"a\": 1, \"b\": 2}, \"list\": [10, 20, 30]}");
 
-   auto jA = pUnit->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "bulk.a");
-   auto jB = pUnit->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "bulk.b");
-   auto jList1 = pUnit->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "list[1]");
+   auto jA = pSilo->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "bulk.a");
+   auto jB = pSilo->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "bulk.b");
+   auto jList1 = pSilo->Get (STORAGE::kSCOPE_PERMANENT_COMPANY, "list[1]");
 
    Check (jA.is_number ()  &&  jA.get<int> () == 1, "Bulk set: nested value a");
    Check (jB.is_number ()  &&  jB.get<int> () == 2, "Bulk set: nested value b");
    Check (jList1.is_number ()  &&  jList1.get<int> () == 20, "Bulk set: array access");
 
-   std::string sJson = pUnit->Json (STORAGE::kSCOPE_PERMANENT_COMPANY);
+   std::string sJson = pSilo->Json (STORAGE::kSCOPE_PERMANENT_COMPANY);
    Check (sJson.find ("\"bulk\"") != std::string::npos, "Json contains data");
 
-   pUnit->Detach ();
-   pStorage->Unit_Close (pUnit);
+   pSilo->Detach ();
+   pStorage->Silo_Close (pSilo);
 }
 
 // ---------------------------------------------------------------------------
@@ -419,14 +419,14 @@ static void TestMetaSidecar ()
    STORAGE* pStorage = s_pStorage;
    auto CID = MakeTestCID ("meta-test");
 
-   STORAGE::UNIT* pUnit = pStorage->Unit_Open (&CID);
-   pUnit->Attach ();
-   pUnit->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "data", "value");
+   STORAGE::SILO* pSilo = pStorage->Silo_Open (&CID);
+   pSilo->Attach ();
+   pSilo->Set (STORAGE::kSCOPE_PERMANENT_COMPANY, "data", "value");
 
-   std::string sMetaPath = pUnit->Pathname (STORAGE::kSCOPE_PERMANENT_COMPANY, "meta");
+   std::string sMetaPath = pSilo->Pathname (STORAGE::kSCOPE_PERMANENT_COMPANY, "meta");
 
-   pUnit->Detach ();
-   pStorage->Unit_Close (pUnit);
+   pSilo->Detach ();
+   pStorage->Silo_Close (pSilo);
 
    Check (std::filesystem::exists (sMetaPath), "Meta sidecar file created on Close");
 
