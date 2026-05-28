@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <Sneeze.h>
+#include "Console.h"
 #include "Block.h"
 
 using namespace SNEEZE;
@@ -88,7 +89,13 @@ public:
                   try
                   {
                      nlohmann::json jEntry = nlohmann::json::parse (sLine);
-                     auto pEntry = CONSOLE::ENTRY::FromJson (jEntry, pCID);
+
+                     uint32_t nIndex = jEntry.value ("index", static_cast<uint32_t> (UINT32_MAX));
+                     auto pEntry = (nIndex != UINT32_MAX) ? m_pIConsole_Impl->Entry_Find (nIndex) : nullptr;
+
+                     if (!pEntry)
+                        pEntry = CONSOLE::ENTRY::FromJson (jEntry, pCID);
+
                      if (pEntry)
                      {
                         m_aEntry.push_back (pEntry);

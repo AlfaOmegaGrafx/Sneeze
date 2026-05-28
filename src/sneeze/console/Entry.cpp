@@ -23,15 +23,15 @@ using namespace SNEEZE;
 // ===========================================================================
 
 CONSOLE::ENTRY::ENTRY (const CONTEXT::CONTAINER::CID* pCID, eLEVEL eLevel, const std::string& sMessage, uint32_t nIndex, uint32_t nGroupDepth, bool bCollapsed, const std::string& sStackTrace, const std::string& sSource) :
+   m_pCID        (pCID),
    m_eLevel      (eLevel),
    m_sMessage    (sMessage),
-   m_tpStamp     (std::chrono::system_clock::now ()),
-   m_pCID        (pCID),
    m_nIndex      (nIndex),
    m_nGroupDepth (nGroupDepth),
    m_bCollapsed  (bCollapsed),
    m_sStackTrace (sStackTrace),
-   m_sSource     (sSource)
+   m_sSource     (sSource),
+   m_tpStamp     (std::chrono::system_clock::now ())
 {
 }
 
@@ -39,15 +39,15 @@ CONSOLE::ENTRY::ENTRY (const CONTEXT::CONTAINER::CID* pCID, eLEVEL eLevel, const
 // Const accessors
 // ---------------------------------------------------------------------------
 
+const SNEEZE::CONTEXT::CONTAINER::CID*       CONSOLE::ENTRY::CID         () const { return m_pCID; }
 CONSOLE::eLEVEL                              CONSOLE::ENTRY::Level       () const { return m_eLevel; }
 const std::string&                           CONSOLE::ENTRY::Message     () const { return m_sMessage; }
-std::chrono::system_clock::time_point        CONSOLE::ENTRY::tpStamp     () const { return m_tpStamp; }
-const SNEEZE::CONTEXT::CONTAINER::CID*       CONSOLE::ENTRY::CID         () const { return m_pCID; }
 uint32_t                                     CONSOLE::ENTRY::Index       () const { return m_nIndex; }
 uint32_t                                     CONSOLE::ENTRY::GroupDepth  () const { return m_nGroupDepth; }
 bool                                         CONSOLE::ENTRY::IsCollapsed () const { return m_bCollapsed; }
 const std::string&                           CONSOLE::ENTRY::StackTrace  () const { return m_sStackTrace; }
 const std::string&                           CONSOLE::ENTRY::Source      () const { return m_sSource; }
+std::chrono::system_clock::time_point        CONSOLE::ENTRY::tpStamp     () const { return m_tpStamp; }
 
 // ---------------------------------------------------------------------------
 // LevelString
@@ -59,8 +59,8 @@ void CONSOLE::ENTRY::LevelString (eLEVEL eLevel, std::string& sLevel)
 
    switch (eLevel)
    {
-      case kLEVEL_LOG:   sLevel = "log";   break;
       case kLEVEL_DEBUG: sLevel = "debug"; break;
+      case kLEVEL_LOG:   sLevel = "log";   break;
       case kLEVEL_INFO:  sLevel = "info";  break;
       case kLEVEL_WARN:  sLevel = "warn";  break;
       case kLEVEL_ERROR: sLevel = "error"; break;
@@ -73,21 +73,20 @@ void CONSOLE::ENTRY::LevelString (eLEVEL eLevel, std::string& sLevel)
 
 std::string CONSOLE::ENTRY::FormatStamp () const
 {
-   auto tmTime = std::chrono::system_clock::to_time_t (m_tpStamp);
-   auto nMillis = std::chrono::duration_cast<std::chrono::milliseconds> (m_tpStamp.time_since_epoch ()).count () % 1000;
+   auto tStamp        = std::chrono::system_clock::to_time_t (m_tpStamp);
+   auto nMilliseconds = std::chrono::duration_cast<std::chrono::milliseconds> (m_tpStamp.time_since_epoch ()).count () % 1000;
 
    struct tm tmLocal;
 #ifdef _WIN32
-   localtime_s (&tmLocal, &tmTime);
+   localtime_s (&tmLocal, &tStamp);
 #else
-   localtime_r (&tmTime, &tmLocal);
+   localtime_r (&tStamp, &tmLocal);
 #endif
 
-   char szBuf[32];
-   snprintf (szBuf, sizeof (szBuf), "%02d:%02d:%02d.%03d",
-      tmLocal.tm_hour, tmLocal.tm_min, tmLocal.tm_sec, static_cast<int> (nMillis));
+   char sStamp[32];
+   snprintf (sStamp, sizeof (sStamp), "%02d:%02d:%02d.%03d", tmLocal.tm_hour, tmLocal.tm_min, tmLocal.tm_sec, static_cast<int> (nMilliseconds));
 
-   return szBuf;
+   return sStamp;
 }
 
 // ---------------------------------------------------------------------------
@@ -102,7 +101,7 @@ std::string CONSOLE::ENTRY::FormatStamp () const
 
 void CONSOLE::ENTRY::MessageParts (std::vector<std::string> &aParts) const
 {
-   if (!m_sMessage.empty () && m_sMessage.front () == '[')
+   if (!m_sMessage.empty ()  &&  m_sMessage.front () == '[')
    {
       try
       {
@@ -138,17 +137,13 @@ nlohmann::json CONSOLE::ENTRY::ToJson () const
 
    LevelString (m_eLevel, sLevel);
 
+// jEntry["container"] = m_pCID->DisplayName ();
    jEntry["level"]      = sLevel;
    jEntry["message"]    = m_sMessage;
    jEntry["stamp"]      = std::chrono::duration<double> (m_tpStamp.time_since_epoch ()).count ();
    jEntry["index"]      = m_nIndex;
    jEntry["groupDepth"] = m_nGroupDepth;
    jEntry["collapsed"]  = m_bCollapsed;
-
-   if (m_pCID)
-      jEntry["container"] = m_pCID->DisplayName ();
-   else
-      jEntry["container"] = "_engine";
 
    if (!m_sStackTrace.empty ())
       jEntry["stackTrace"] = m_sStackTrace;
@@ -185,9 +180,9 @@ std::shared_ptr<const CONSOLE::ENTRY> CONSOLE::ENTRY::FromJson (const nlohmann::
       jEntry.value ("source",     std::string ())
    );
 
-   double dEpochSeconds = jEntry.value ("stamp", 0.0);
-   if (dEpochSeconds > 0.0)
-      pEntry->m_tpStamp = std::chrono::system_clock::time_point (std::chrono::duration_cast<std::chrono::system_clock::duration> (std::chrono::duration<double> (dEpochSeconds)));
+   double dStamp = jEntry.value ("stamp", 0.0);
+   if (dStamp > 0.0)
+      pEntry->m_tpStamp = std::chrono::system_clock::time_point (std::chrono::duration_cast<std::chrono::system_clock::duration> (std::chrono::duration<double> (dStamp)));
 
    return pEntry;
 }

@@ -187,6 +187,24 @@ public:
    // and ring-buffer an entry. Returns the immutable shared_ptr.
    // ---------------------------------------------------------------------------
 
+   std::shared_ptr<const CONSOLE::ENTRY> Entry_Find (uint32_t nIndex) override
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
+
+      std::shared_ptr<const CONSOLE::ENTRY> pEntry;
+
+      if (!m_apEntry.empty ())
+      {
+         uint32_t nFirst = m_apEntry.front ()->Index ();
+         uint32_t nLast  = m_apEntry.back  ()->Index ();
+
+         if (nIndex >= nFirst  &&  nIndex <= nLast)
+            pEntry = m_apEntry[nIndex - nFirst];
+      }
+
+      return pEntry;
+   }
+
    std::shared_ptr<const CONSOLE::ENTRY> Entry_Create (const CONTEXT::CONTAINER::CID* pCID, CONSOLE::eLEVEL eLevel, const std::string& sMessage, uint32_t nGroupDepth, bool bCollapsed) override
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxConsole);

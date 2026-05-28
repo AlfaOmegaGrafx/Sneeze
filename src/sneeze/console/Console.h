@@ -29,6 +29,7 @@ namespace SNEEZE
       virtual void   Block_Close (BLOCK* pBlock) = 0;
 
       virtual std::shared_ptr<const CONSOLE::ENTRY> Entry_Create (const CONTEXT::CONTAINER::CID* pCID, CONSOLE::eLEVEL eLevel, const std::string& sMessage, uint32_t nGroupDepth, bool bCollapsed) = 0;
+      virtual std::shared_ptr<const CONSOLE::ENTRY> Entry_Find   (uint32_t nIndex) = 0;
 
    private:
    };
