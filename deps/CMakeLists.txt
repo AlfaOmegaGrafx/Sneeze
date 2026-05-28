@@ -154,6 +154,15 @@ if (CMAKE_OSX_DEPLOYMENT_TARGET)
    list (APPEND CROSS_COMPILE_ARGS -DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET})
 endif ()
 
+# Universal macOS: build wasmtime via cargo+lipo (deps/wasmtime.cmake).
+# CI must pass -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" (quoted — ';' in shell).
+if (APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+   if (CMAKE_OSX_ARCHITECTURES MATCHES "arm64" AND CMAKE_OSX_ARCHITECTURES MATCHES "x86_64")
+      set (WASMTIME_MACOS_UNIVERSAL ON CACHE BOOL "Build macOS universal wasmtime dylib" FORCE)
+      message (STATUS "Sneeze deps: WASMTIME_MACOS_UNIVERSAL=ON")
+   endif ()
+endif ()
+
 # ---------------------------------------------------------------------------
 # Dependency list
 # ---------------------------------------------------------------------------
