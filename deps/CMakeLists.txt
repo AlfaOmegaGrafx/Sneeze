@@ -147,8 +147,17 @@ endif ()
 
 # Always forward macOS/iOS arch + deployment target -- matters for both
 # native (macOS universal) and cross (iOS) builds.
+#
+# Universal macOS: CMAKE_OSX_ARCHITECTURES must be arm64;x86_64. Do NOT pass
+# that via ExternalProject CMAKE_ARGS (${CROSS_COMPILE_ARGS}) — CMake list
+# expansion splits on ';', so subprojects only see arm64. Use CACHE_ARGS
+# (TYPE=STRING) instead; see CROSS_COMPILE_CACHE_ARGS in each deps/*.cmake.
+set (CROSS_COMPILE_CACHE_ARGS)
 if (CMAKE_OSX_ARCHITECTURES)
-   list (APPEND CROSS_COMPILE_ARGS "-DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}")
+   string (JOIN ";" _sneeze_osx_archs ${CMAKE_OSX_ARCHITECTURES})
+   list (APPEND CROSS_COMPILE_CACHE_ARGS
+      -DCMAKE_OSX_ARCHITECTURES:STRING=${_sneeze_osx_archs})
+   message (STATUS "Sneeze deps: CMAKE_OSX_ARCHITECTURES=${_sneeze_osx_archs}")
 endif ()
 if (CMAKE_OSX_DEPLOYMENT_TARGET)
    list (APPEND CROSS_COMPILE_ARGS -DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET})

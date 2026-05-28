@@ -19,4 +19,6 @@ ExternalProject_Add (nlohmann-json
       -DCMAKE_BUILD_TYPE=${SNEEZE_CONFIG}
       -DJSON_BuildTests=OFF
       ${CROSS_COMPILE_ARGS}
+   CMAKE_CACHE_ARGS
+      ${CROSS_COMPILE_CACHE_ARGS}
 )

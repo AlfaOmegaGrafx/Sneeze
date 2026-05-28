@@ -110,6 +110,8 @@ ExternalProject_Add (halogen
       -DFILAMENT_ROOT=${LIBS_DIR}/filament/install
       -DFILAMENT_SDK_DIR=${LIBS_DIR}/filament/install
       ${CROSS_COMPILE_ARGS}
+   CMAKE_CACHE_ARGS
+      ${CROSS_COMPILE_CACHE_ARGS}
    BUILD_COMMAND    ${CMAKE_COMMAND} --build <BINARY_DIR> --config ${SNEEZE_CONFIG}
    INSTALL_COMMAND  ${CMAKE_COMMAND} --build <BINARY_DIR> --config ${SNEEZE_CONFIG} --target install
 )

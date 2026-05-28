@@ -28,4 +28,6 @@ ExternalProject_Add (spirv-tools
       -DSPIRV_SKIP_TESTS=ON
       -DSPIRV_SKIP_EXECUTABLES=ON
       ${CROSS_COMPILE_ARGS}
+   CMAKE_CACHE_ARGS
+      ${CROSS_COMPILE_CACHE_ARGS}
 )

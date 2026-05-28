@@ -87,7 +87,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: libs-${{ inputs.platform }}/${{ steps.dir.outputs.name }}
-          key: ${{ inputs.platform }}-${{ matrix.dep }}-${{ inputs.platform == 'macos' && 'univ2-' || '' }}${{ hashFiles('CMakeLists.txt', format('deps/{0}.cmake', matrix.dep), 'deps/CMakeLists.txt') }}
+          key: ${{ inputs.platform }}-${{ matrix.dep }}-${{ inputs.platform == 'macos' && 'univ3-' || '' }}${{ hashFiles('CMakeLists.txt', format('deps/{0}.cmake', matrix.dep), 'deps/CMakeLists.txt') }}
 
       - name: Install Rust
         if: matrix.dep == 'wasmtime' && steps.cache.outputs.cache-hit != 'true' && inputs.rust-targets != ''
@@ -145,6 +145,13 @@ jobs:
             cmake "${DEPS_CMAKE[@]}" $CMAKE_ARGS
           fi
           cmake --build build --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
+
+      - name: Verify macOS universal binaries (tier0)
+        if: inputs.platform == 'macos' && steps.cache.outputs.cache-hit != 'true'
+        run: |
+          chmod +x scripts/verify-macos-universal-libs.sh
+          bash scripts/verify-macos-universal-libs.sh \
+            "libs-${{ inputs.platform }}/${{ steps.dir.outputs.name }}/install"
 
       - name: Upload dep artifact
         uses: actions/upload-artifact@v4
@@ -242,6 +249,21 @@ jobs:
             cmake "${DEPS_CMAKE[@]}" $CMAKE_ARGS
           fi
           cmake --build build --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
+
+      - name: Verify macOS universal binaries (tier1)
+        if: inputs.platform == 'macos'
+        run: |
+          case "${{ matrix.dep }}" in
+            spirv-tools) DIR=SPIRV-Tools ;;
+            rmlui)       DIR=RmlUi ;;
+            halogen)     DIR=Halogen ;;
+            curl)        DIR=curl ;;
+            vox)         DIR=Vox ;;
+            *)           DIR="${{ matrix.dep }}" ;;
+          esac
+          chmod +x scripts/verify-macos-universal-libs.sh
+          bash scripts/verify-macos-universal-libs.sh \
+            "libs-${{ inputs.platform }}/$DIR/install"
 
       - name: Upload dep artifact
         uses: actions/upload-artifact@v4
@@ -355,6 +377,17 @@ jobs:
           find libs-${{ inputs.platform }} -path '*/install/bin/*' -type f -exec chmod +x {} +
           echo "Available deps:" && ls libs-${{ inputs.platform }}/
 
+      - name: Verify macOS universal deps before link
+        if: inputs.platform == 'macos'
+        run: |
+          chmod +x scripts/verify-macos-universal-libs.sh
+          for INST in libs-${{ inputs.platform }}/*/install; do
+            if [ -d "$INST" ]; then
+              echo "--- $INST ---"
+              bash scripts/verify-macos-universal-libs.sh "$INST"
+            fi
+          done
+
       - name: Install Rust
         if: inputs.rust-targets != ''
         uses: dtolnay/rust-toolchain@stable
@@ -390,17 +423,10 @@ jobs:
           fi
           cmake --build build-sneeze --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
 
-      - name: Verify macOS universal deps and Sneeze
+      - name: Verify macOS universal libSneeze
         if: inputs.platform == 'macos'
         run: |
           set -e
-          WT=libs-macos/Wasmtime/install/lib/libwasmtime.dylib
-          if [ -f "$WT" ]; then
-            echo "=== $WT ==="
-            lipo -info "$WT"
-            lipo -info "$WT" | grep -q arm64
-            lipo -info "$WT" | grep -q x86_64
-          fi
           LIB=$(find build-sneeze -name 'libSneeze.a' -print -quit)
           if [ -n "$LIB" ]; then
             echo "=== $LIB ==="

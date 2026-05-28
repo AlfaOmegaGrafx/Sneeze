@@ -20,6 +20,8 @@ if (SNEEZE_ENABLE_XR)
          -DCMAKE_BUILD_TYPE=${SNEEZE_CONFIG}
          -DDYNAMIC_LOADER=OFF
          ${CROSS_COMPILE_ARGS}
+      CMAKE_CACHE_ARGS
+         ${CROSS_COMPILE_CACHE_ARGS}
    )
 else ()
    add_custom_target (openxr-sdk)

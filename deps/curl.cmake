@@ -57,4 +57,6 @@ ExternalProject_Add (curl
       -DCURL_ZSTD=OFF
       ${CURL_SSL_ARGS}
       ${CROSS_COMPILE_ARGS}
+   CMAKE_CACHE_ARGS
+      ${CROSS_COMPILE_CACHE_ARGS}
 )
