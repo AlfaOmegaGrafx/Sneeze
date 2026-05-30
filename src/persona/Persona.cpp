@@ -38,8 +38,7 @@ void PERSONA::Login (const std::string& sFirst, const std::string& sSecond)
 
 void PERSONA::Logout ()
 {
-   m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "PERSONA",
-      "Logged out \"" + m_sName + "\"");
+   m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "PERSONA", "Logged out \"" + m_sName + "\"");
    m_bLoggedIn = false;
    m_sName.clear ();
    m_sHash.clear ();
@@ -48,8 +47,8 @@ void PERSONA::Logout ()
 std::string PERSONA::ComputeHash (const std::string& sInput)
 {
    unsigned char aDigest[SHA256_DIGEST_LENGTH];
-   SHA256 (reinterpret_cast<const unsigned char*> (sInput.data ()),
-      sInput.size (), aDigest);
+
+   SHA256 (reinterpret_cast<const unsigned char*> (sInput.data ()), sInput.size (), aDigest);
 
    char szHex[SHA256_DIGEST_LENGTH * 2 + 1];
    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++)
