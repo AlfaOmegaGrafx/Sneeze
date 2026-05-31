@@ -68,29 +68,28 @@ namespace SNEEZE
       void Activate (IVIEWPORT* pHost);
       void Deactivate ();
 
-      ENGINE*              Engine () const;
-      CONTEXT*             Context () const;
-      IVIEWPORT*           Host () const;
-      SCENE*               Scene () const;
+      ENGINE*              Engine   () const;
+      CONTEXT*             Context  () const;
+      IVIEWPORT*           Host     () const;
+      SCENE*               Scene    () const;
       bool                 IsActive () const;
 
       // --- Input (called by application) ---
 
-      void  Input_Mouse (int nDX, int nDY, float dScrollY, bool bMouseLeft, bool bMouseRight);
-      void  Input_Key (bool bKeySpace, bool bKeyPlus, bool bKeyMinus);
+      void  Input_Mouse   (int nDX, int nDY, float dScrollY, bool bMouseLeft, bool bMouseRight);
+      void  Input_Key     (bool bKeySpace, bool bKeyPlus, bool bKeyMinus);
       INPUT Input_Consume ();
 
       // --- Framebuffer ---
 
-      void            FrameBuffer_Write (const uint32_t* pPixels, int nWidth, int nHeight);
+      void            FrameBuffer_Write   (const uint32_t* pPixels, int nWidth, int nHeight);
       const uint32_t* FrameBuffer_Capture (int& nWidth, int& nHeight);
       void            FrameBuffer_Release ();
 
       // --- Dimensions ---
 
-      int  Width () const;
-      int  Height () const;
-      void SetDimensions (int nWidth, int nHeight);
+      void Size   (int& nWidth, int& nHeight);
+      void Resize (int  nWidth, int  nHeight);
 
       // --- Camera ---
 

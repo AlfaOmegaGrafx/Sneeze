@@ -399,6 +399,9 @@ void RENDERER::ANARI::Resize (int nWidth, int nHeight)
       uint32_t aSize[2] = { static_cast<uint32_t> (nWidth), static_cast<uint32_t> (nHeight) };
       anariSetParameter (m_pDevice, m_pFrame, "size", ANARI_UINT32_VEC2, aSize);
       anariCommitParameters (m_pDevice, m_pFrame);
+
+//    if (m_pNativeSurface)
+//       anariCommitParameters (m_pDevice, reinterpret_cast<ANARIObject> (m_pNativeSurface));
    }
 }
 

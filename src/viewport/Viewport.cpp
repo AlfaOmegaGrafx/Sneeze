@@ -79,8 +79,6 @@ public:
       {
          m_pHost = pHost;
 
-         m_pHost->FrameSize (m_nWidth, m_nHeight);
-
          m_pJob_Compositor = new JOB_COMPOSITOR (m_pViewport);
          m_pContext->Engine ()->Queue_Post_Compositor (m_pJob_Compositor);
       }
@@ -307,14 +305,18 @@ SNEEZE::CONTEXT*     VIEWPORT::Context         () const { return m_pImpl->m_pCon
 IVIEWPORT*           VIEWPORT::Host            () const { return m_pImpl->m_pHost;               }
 VIEWPORT::SCENE*     VIEWPORT::Scene           () const { return m_pImpl->m_pScene;              }
 bool                 VIEWPORT::IsActive        () const { return m_pImpl->m_pHost != nullptr;     }
-int                  VIEWPORT::Width           () const { return m_pImpl->m_nWidth;              }
-int                  VIEWPORT::Height          () const { return m_pImpl->m_nHeight;             }
 VIEWPORT::VIEW&      VIEWPORT::View            ()       { return m_pImpl->m_View;                }
 VIEWPORT::RENDERER*  VIEWPORT::Renderer        () const { return m_pImpl->m_pRenderer;           }
 
-void VIEWPORT::SetDimensions (int nWidth, int nHeight)
+void VIEWPORT::Size (int& nWidth, int& nHeight)
 {
-   m_pImpl->m_nWidth = nWidth;
+   nWidth  = m_pImpl->m_nWidth;
+   nHeight = m_pImpl->m_nHeight;
+}
+
+void VIEWPORT::Resize (int nWidth, int nHeight)
+{
+   m_pImpl->m_nWidth  = nWidth;
    m_pImpl->m_nHeight = nHeight;
 }
 

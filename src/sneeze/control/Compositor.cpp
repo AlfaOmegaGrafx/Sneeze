@@ -217,9 +217,19 @@ bool AGENT::COMPOSITOR::Job ()
 
 void AGENT::COMPOSITOR::Execute_Create (JOB_COMPOSITOR* pJob_Compositor)
 {
+   VIEWPORT*           pViewport = pJob_Compositor->Viewport();
+   IVIEWPORT*          pHost     = pViewport->Host();
+
+   int nHostW, nHostH;
+
    if (m_nAgentIz == 0)
    {
       VIEWPORT* pViewport = pJob_Compositor->Viewport ();
+
+      pViewport->Size (nHostW, nHostH);
+
+      pHost->FrameSize  (nHostW, nHostH);
+      pViewport->Resize (nHostW, nHostH);
 
       pViewport->Renderer_Initialize ();
 
@@ -252,15 +262,17 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
    IVIEWPORT*          pHost     = pViewport->Host ();
    int64_t             tmNow     = pViewport->m_tmNow;
 
+   int nHostW, nHostH;
+
    if (pRenderer  &&  pHost)
    {
       auto tpLoopStart = std::chrono::steady_clock::now ();
 
-      int nHostW, nHostH;
-      pHost->FrameSize (nHostW, nHostH);
-      if (nHostW != pViewport->Width ()  ||  nHostH != pViewport->Height ())
+      pViewport->Size (nHostW, nHostH);
+
+      if (pHost->FrameSize (nHostW, nHostH))
       {
-         pViewport->SetDimensions (nHostW, nHostH);
+         pViewport->Resize (nHostW, nHostH);
          pRenderer->Resize (nHostW, nHostH);
       }
 
@@ -286,12 +298,16 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
       int nW = pRenderer->GetWidth ();
       int nH = pRenderer->GetHeight ();
 
-      Camera.dFovY   = 60.0f * 3.14159265f / 180.0f;
-      Camera.dAspect = (nW > 0  &&  nH > 0)
-         ? static_cast<float> (nW) / static_cast<float> (nH)
-         : 1.0f;
-      Camera.dNear   = 0.0001f;
-      Camera.dFar    = 1000.0f;
+#if (1)
+      float dBaseFovY = 60.0f * 3.14159265f / 180.0f;
+      int   nRefH     = 1080;
+      Camera.dFovY    = 2.0f * std::atan (std::tan (dBaseFovY * 0.5f) * static_cast<float> (nH) / static_cast<float> (nRefH));
+#else
+      Camera.dFovY    = 60.0f * 3.14159265f / 180.0f;
+#endif
+      Camera.dAspect  = (nW > 0  &&  nH > 0) ? static_cast<float> (nW) / static_cast<float> (nH) : 1.0f;
+      Camera.dNear    = 0.0001f;
+      Camera.dFar     = 1000.0f;
 
       pRenderer->SetCamera (Camera);
 

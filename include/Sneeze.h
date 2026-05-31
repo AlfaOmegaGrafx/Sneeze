@@ -101,7 +101,7 @@ namespace SNEEZE
       virtual ~IVIEWPORT () = default;
 
       virtual void* FrameWindow () = 0;
-      virtual void  FrameSize (int& nWidth, int& nHeight) = 0;
+      virtual bool  FrameSize (int& nWidth, int& nHeight) = 0;
 
       virtual void  OnFrameReady (const uint32_t* pFB, int nFbW, int nFbH) = 0;
    };
