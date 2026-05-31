@@ -14,10 +14,7 @@
 
 #include "compute/EmbeddedKernels.h"
 
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#else
+#ifndef _WIN32
 #include <cstring>
 
 // Provided by the generated kernels_embedded.c

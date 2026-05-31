@@ -16,7 +16,6 @@
 #define SNEEZE_CONSOLE_CONSOLE_H
 
 #include <chrono>
-#include <memory>
 
 namespace SNEEZE
 {

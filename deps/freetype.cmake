@@ -24,4 +24,6 @@ ExternalProject_Add (freetype
       -DFT_DISABLE_HARFBUZZ=ON
       -DFT_DISABLE_BROTLI=ON
       ${CROSS_COMPILE_ARGS}
+   CMAKE_CACHE_ARGS
+      ${CROSS_COMPILE_CACHE_ARGS}
 )

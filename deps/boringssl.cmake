@@ -62,4 +62,6 @@ ExternalProject_Add (boringssl
       -DBUILD_SHARED_LIBS=OFF
       ${BORINGSSL_EXTRA_ARGS}
       ${CROSS_COMPILE_ARGS}
+   CMAKE_CACHE_ARGS
+      ${CROSS_COMPILE_CACHE_ARGS}
 )

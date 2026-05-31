@@ -36,4 +36,6 @@ ExternalProject_Add (spirv-cross
       -DSPIRV_CROSS_SHARED=OFF
       -DSPIRV_CROSS_STATIC=ON
       ${CROSS_COMPILE_ARGS}
+   CMAKE_CACHE_ARGS
+      ${CROSS_COMPILE_CACHE_ARGS}
 )

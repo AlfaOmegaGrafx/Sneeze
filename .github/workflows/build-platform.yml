@@ -87,7 +87,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: libs-${{ inputs.platform }}/${{ steps.dir.outputs.name }}
-          key: ${{ inputs.platform }}-${{ matrix.dep }}-${{ hashFiles('CMakeLists.txt', format('deps/{0}.cmake', matrix.dep), 'deps/CMakeLists.txt') }}
+          key: ${{ inputs.platform }}-${{ matrix.dep }}-${{ inputs.platform == 'macos' && 'univ3-' || '' }}${{ hashFiles('CMakeLists.txt', format('deps/{0}.cmake', matrix.dep), 'deps/CMakeLists.txt') }}
 
       - name: Install Rust
         if: matrix.dep == 'wasmtime' && steps.cache.outputs.cache-hit != 'true' && inputs.rust-targets != ''
@@ -131,12 +131,27 @@ jobs:
             fi
           fi
 
-          cmake -S deps -B build -GNinja \
-            -DDEP=${{ matrix.dep }} \
-            -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} \
-            -DSNEEZE_DEP_REPO=${{ github.workspace }}/deps/repos \
-            $CMAKE_ARGS
+          DEPS_CMAKE=( -S deps -B build -GNinja
+            -DDEP=${{ matrix.dep }}
+            -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }}
+            -DSNEEZE_DEP_REPO=${{ github.workspace }}/deps/repos
+          )
+          if [ "${{ inputs.platform }}" = "macos" ]; then
+            cmake "${DEPS_CMAKE[@]}" \
+              -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+              -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+          else
+            # shellcheck disable=SC2086
+            cmake "${DEPS_CMAKE[@]}" $CMAKE_ARGS
+          fi
           cmake --build build --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
+
+      - name: Verify macOS universal binaries (tier0)
+        if: inputs.platform == 'macos' && steps.cache.outputs.cache-hit != 'true'
+        run: |
+          chmod +x scripts/verify-macos-universal-libs.sh
+          bash scripts/verify-macos-universal-libs.sh \
+            "libs-${{ inputs.platform }}/${{ steps.dir.outputs.name }}/install"
 
       - name: Upload dep artifact
         uses: actions/upload-artifact@v4
@@ -220,12 +235,35 @@ jobs:
           CMAKE_ARGS="${{ inputs.cmake-args }}"
           CMAKE_ARGS="${CMAKE_ARGS//\$ANDROID_NDK_ROOT/$ANDROID_NDK_ROOT}"
           CMAKE_ARGS="${CMAKE_ARGS//cmake\/toolchain/${{ github.workspace }}/cmake/toolchain}"
-          cmake -S deps -B build -GNinja \
-            -DDEP=${{ matrix.dep }} \
-            -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} \
-            -DSNEEZE_DEP_REPO=${{ github.workspace }}/deps/repos \
-            $CMAKE_ARGS
+          DEPS_CMAKE=( -S deps -B build -GNinja
+            -DDEP=${{ matrix.dep }}
+            -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }}
+            -DSNEEZE_DEP_REPO=${{ github.workspace }}/deps/repos
+          )
+          if [ "${{ inputs.platform }}" = "macos" ]; then
+            cmake "${DEPS_CMAKE[@]}" \
+              -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+              -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+          else
+            # shellcheck disable=SC2086
+            cmake "${DEPS_CMAKE[@]}" $CMAKE_ARGS
+          fi
           cmake --build build --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
+
+      - name: Verify macOS universal binaries (tier1)
+        if: inputs.platform == 'macos'
+        run: |
+          case "${{ matrix.dep }}" in
+            spirv-tools) DIR=SPIRV-Tools ;;
+            rmlui)       DIR=RmlUi ;;
+            halogen)     DIR=Halogen ;;
+            curl)        DIR=curl ;;
+            vox)         DIR=Vox ;;
+            *)           DIR="${{ matrix.dep }}" ;;
+          esac
+          chmod +x scripts/verify-macos-universal-libs.sh
+          bash scripts/verify-macos-universal-libs.sh \
+            "libs-${{ inputs.platform }}/$DIR/install"
 
       - name: Upload dep artifact
         uses: actions/upload-artifact@v4
@@ -278,11 +316,19 @@ jobs:
           # Toolchain paths are relative to repo root — make absolute
           CMAKE_ARGS="${CMAKE_ARGS//cmake\/toolchain/${{ github.workspace }}/cmake/toolchain}"
           echo "Available deps:" && ls libs-${{ inputs.platform }}/ || true
-          cmake -S deps -B build -GNinja \
-            -DDEP=${{ matrix.dep }} \
-            -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} \
-            -DSNEEZE_DEP_REPO=${{ github.workspace }}/deps/repos \
-            $CMAKE_ARGS
+          DEPS_CMAKE=( -S deps -B build -GNinja
+            -DDEP=${{ matrix.dep }}
+            -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }}
+            -DSNEEZE_DEP_REPO=${{ github.workspace }}/deps/repos
+          )
+          if [ "${{ inputs.platform }}" = "macos" ]; then
+            cmake "${DEPS_CMAKE[@]}" \
+              -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+              -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+          else
+            # shellcheck disable=SC2086
+            cmake "${DEPS_CMAKE[@]}" $CMAKE_ARGS
+          fi
           cmake --build build --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
 
       - name: Upload dep artifact
@@ -331,6 +377,17 @@ jobs:
           find libs-${{ inputs.platform }} -path '*/install/bin/*' -type f -exec chmod +x {} +
           echo "Available deps:" && ls libs-${{ inputs.platform }}/
 
+      - name: Verify macOS universal deps before link
+        if: inputs.platform == 'macos'
+        run: |
+          chmod +x scripts/verify-macos-universal-libs.sh
+          for INST in libs-${{ inputs.platform }}/*/install; do
+            if [ -d "$INST" ]; then
+              echo "--- $INST ---"
+              bash scripts/verify-macos-universal-libs.sh "$INST"
+            fi
+          done
+
       - name: Install Rust
         if: inputs.rust-targets != ''
         uses: dtolnay/rust-toolchain@stable
@@ -349,12 +406,34 @@ jobs:
           CMAKE_ARGS="${CMAKE_ARGS//\$ANDROID_NDK_ROOT/$ANDROID_NDK_ROOT}"
           # Toolchain paths are relative to repo root — make absolute
           CMAKE_ARGS="${CMAKE_ARGS//cmake\/toolchain/${{ github.workspace }}/cmake/toolchain}"
-          cmake -S src -B build-sneeze -GNinja \
-            -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} \
-            -DSNEEZE_PLATFORM=${{ inputs.platform }} \
-            -DSNEEZE_ENABLE_WASM=ON \
-            $CMAKE_ARGS
+          if [ "${{ inputs.platform }}" = "macos" ]; then
+            cmake -S src -B build-sneeze -GNinja \
+              -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} \
+              -DSNEEZE_PLATFORM=${{ inputs.platform }} \
+              -DSNEEZE_ENABLE_WASM=ON \
+              -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+              -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+          else
+            # shellcheck disable=SC2086
+            cmake -S src -B build-sneeze -GNinja \
+              -DLIBS_DIR=${{ github.workspace }}/libs-${{ inputs.platform }} \
+              -DSNEEZE_PLATFORM=${{ inputs.platform }} \
+              -DSNEEZE_ENABLE_WASM=ON \
+              $CMAKE_ARGS
+          fi
           cmake --build build-sneeze --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu)
+
+      - name: Verify macOS universal libSneeze
+        if: inputs.platform == 'macos'
+        run: |
+          set -e
+          LIB=$(find build-sneeze -name 'libSneeze.a' -print -quit)
+          if [ -n "$LIB" ]; then
+            echo "=== $LIB ==="
+            lipo -info "$LIB"
+            lipo -info "$LIB" | grep -q arm64
+            lipo -info "$LIB" | grep -q x86_64
+          fi
 
       - name: Run tests
         if: ${{ !inputs.setup-ndk }}

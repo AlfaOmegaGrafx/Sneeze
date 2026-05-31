@@ -35,4 +35,6 @@ ExternalProject_Add (anari-sdk
       -DBUILD_TESTING=OFF
       -DBUILD_EXAMPLES=OFF
       ${CROSS_COMPILE_ARGS}
+   CMAKE_CACHE_ARGS
+      ${CROSS_COMPILE_CACHE_ARGS}
 )

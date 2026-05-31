@@ -15,8 +15,6 @@
 #ifndef SNEEZE_CONTEXT_H
 #define SNEEZE_CONTEXT_H
 
-#include <string>
-
 namespace SNEEZE
 {
    class ENGINE;

@@ -43,4 +43,6 @@ ExternalProject_Add (vox
       -DBUILD_TESTING=OFF
       ${VOX_EXTRA_ARGS}
       ${CROSS_COMPILE_ARGS}
+   CMAKE_CACHE_ARGS
+      ${CROSS_COMPILE_CACHE_ARGS}
 )
