@@ -610,7 +610,7 @@ static void TestHttpHeaders ()
       bool bGot = listener.WaitFor (15000);
       if (bGot  &&  listener.Succeeded ())
       {
-         auto& mapHeaders = pFile->Headers ();
+         auto& mapHeaders = pFile->RspHeaders ();
          Check (!mapHeaders.empty (), "Headers map is non-empty");
 
          std::string sCt = pFile->ContentType ();

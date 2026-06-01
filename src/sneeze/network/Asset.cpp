@@ -26,15 +26,15 @@ using namespace SNEEZE;
 class ASSET_FETCH : public JOB_FETCH
 {
 public:
-   ASSET_FETCH (ASSET* pAsset, const std::string& sUrl, const std::string& sPath_Temp, const std::string& sPath_Data, const std::string& sHash)
-      : JOB_FETCH (true, sUrl, sPath_Temp, sPath_Data, sHash),
+   ASSET_FETCH (ASSET* pAsset, const std::string& sUrl, const std::string& sPath_Temp, const std::string& sPath_Data, const std::string& sHash, std::unordered_map<std::string, std::string>& mapReqHeaders)
+      : JOB_FETCH (true, sUrl, sPath_Temp, sPath_Data, sHash, mapReqHeaders),
         m_pAsset  (pAsset),
         m_pFile   (nullptr),
         m_bState  (NETWORK::STATE_FETCHING)
    {}
 
    ASSET_FETCH (ASSET* pAsset, NETWORK::FILE* pFile, NETWORK::STATE bState)
-      : JOB_FETCH (false, "", "", "", ""),
+      : JOB_FETCH (false),
         m_pAsset  (pAsset),
         m_pFile   (pFile),
         m_bState  (bState)
@@ -130,10 +130,16 @@ public:
                m_bServedFromCache   = true;
                m_bState             = NETWORK::STATE_READY;
 
-               if (jMeta.contains ("headers"))
+               if (jMeta.contains ("reqheaders"))
                {
-                  for (auto& [sKey, sVal] : jMeta["headers"].items ())
-                     m_mapHeaders[sKey] = sVal.get<std::string> ();
+                  for (auto& [sKey, sVal] : jMeta["reqheaders"].items ())
+                     m_mapReqHeaders[sKey] = sVal.get<std::string> ();
+               }
+
+               if (jMeta.contains ("rspheaders"))
+               {
+                  for (auto& [sKey, sVal] : jMeta["rspheaders"].items ())
+                     m_mapRspHeaders[sKey] = sVal.get<std::string> ();
                }
             }
          }
@@ -157,10 +163,15 @@ public:
       jMeta["httpStatus"]     = m_nHttpStatus;
       jMeta["reset"]          = m_bReset;
 
-      nlohmann::json jHeaders = nlohmann::json::object ();
-      for (auto& [sKey, sVal] : m_mapHeaders)
-         jHeaders[sKey] = sVal;
-      jMeta["headers"] = jHeaders;
+      nlohmann::json jRspHeaders = nlohmann::json::object ();
+      for (auto& [sKey, sVal] : m_mapRspHeaders)
+         jRspHeaders[sKey] = sVal;
+      jMeta["rspheaders"] = jRspHeaders;
+
+      nlohmann::json jReqHeaders = nlohmann::json::object ();
+      for (auto& [sKey, sVal] : m_mapReqHeaders)
+         jReqHeaders[sKey] = sVal;
+      jMeta["reqheaders"] = jReqHeaders;
 
       std::string sTmpPath = sMetaPath + ".temp";
       std::ofstream file (sTmpPath, std::ios::trunc);
@@ -220,7 +231,8 @@ public:
       m_bServedFromCache = false;
       m_bReset = false;
       m_nAssetIx = 0;
-      m_mapHeaders.clear ();
+      m_mapReqHeaders.clear ();
+      m_mapRspHeaders.clear ();
    }
 
    void Evict ()
@@ -232,7 +244,8 @@ public:
       m_dFetchStartTime = 0.0;
       m_dFetchEndTime = 0.0;
       m_bServedFromCache = false;
-      m_mapHeaders.clear ();
+      m_mapReqHeaders.clear ();
+      m_mapRspHeaders.clear ();
    }
 
    // ---------------------------------------------------------------------------
@@ -324,34 +337,37 @@ public:
    }
 
 public:
-   INETWORK_IMPL*             m_pINetwork_Impl;
-   std::string                m_sUrl;
-   std::string                m_sHash;
-   std::string                m_sPathname;
-   NETWORK::STATE             m_bState;
+   INETWORK_IMPL*                m_pINetwork_Impl;
+   std::string                   m_sUrl;
+   std::string                   m_sHash;
+   std::string                   m_sPathname;
+   NETWORK::STATE                m_bState;
 
-   uint64_t                   m_nSizeBytes;
-   std::string                m_sCreatedAt;
-   std::string                m_sLastAccessedAt;
-   uint32_t                   m_nAccessCount;
-   uint32_t                   m_nAssetIx;
+   uint64_t                      m_nSizeBytes;
+   std::string                   m_sCreatedAt;
+   std::string                   m_sLastAccessedAt;
+   uint32_t                      m_nAccessCount;
+   uint32_t                      m_nAssetIx;
 
-   long                       m_nHttpStatus;
-   double                     m_dFetchQueuedTime;
-   double                     m_dFetchStartTime;
-   double                     m_dFetchEndTime;
-   bool                       m_bServedFromCache;
-   bool                       m_bReset;
-   uint32_t                   m_nCount_Open;
-   uint32_t                   m_nCount_Attach;
+   long                          m_nHttpStatus;
+   double                        m_dFetchQueuedTime;
+   double                        m_dFetchStartTime;
+   double                        m_dFetchEndTime;
+   bool                          m_bServedFromCache;
+   bool                          m_bReset;
+   uint32_t                      m_nCount_Open;
+   uint32_t                      m_nCount_Attach;
 
-   IJOB*                      m_pAsset_Fetch;
+   std::string                   m_sRemoteAddress;
 
-   std::vector<NETWORK::FILE*> m_apFiles;
+   IJOB*                         m_pAsset_Fetch;
 
-   std::recursive_mutex       m_mxAsset;
+   std::vector<NETWORK::FILE*>   m_apFiles;
 
-   std::unordered_map<std::string, std::string> m_mapHeaders;
+   std::recursive_mutex          m_mxAsset;
+
+   std::unordered_map<std::string, std::string> m_mapRspHeaders;
+   std::unordered_map<std::string, std::string> m_mapReqHeaders;
 };
 
 // ---------------------------------------------------------------------------
@@ -509,7 +525,11 @@ bool ASSET::Attach (NETWORK::FILE* pFile, bool bFetch_Allowed)
          m_pImpl->m_nCount_Open++;
          m_pImpl->m_nCount_Attach++;
 
-         auto* pJob = new ASSET_FETCH (this, m_pImpl->m_sUrl, m_pImpl->Path (NETWORK::DISKFILE_TEMP), m_pImpl->Path (NETWORK::DISKFILE_DATA), m_pImpl->m_sHash);
+         std::unordered_map<std::string, std::string> mapReqHeaders;
+
+         mapReqHeaders.insert ({ "User-Agent", "Artemis/1.0 Sneeze/1.0 (Windows NT 10.0; Win64; x64)" });
+
+         auto* pJob = new ASSET_FETCH (this, m_pImpl->m_sUrl, m_pImpl->Path (NETWORK::DISKFILE_TEMP), m_pImpl->Path (NETWORK::DISKFILE_DATA), m_pImpl->m_sHash, mapReqHeaders);
 
          m_pImpl->m_pAsset_Fetch = pJob;
          m_pImpl->m_pINetwork_Impl->Queue_Post_Fetch (pJob);
@@ -576,19 +596,24 @@ void ASSET::FetchComplete (const FETCH_RESULT& Fetch_Result)
    {
       std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
 
-      m_pImpl->m_nHttpStatus   = Fetch_Result.nHttpStatus;
-      m_pImpl->m_dFetchEndTime = m_pImpl->m_pINetwork_Impl->SecondsSinceEpoch ();
+      m_pImpl->m_nHttpStatus     = Fetch_Result.nHttpStatus;
+      m_pImpl->m_dFetchEndTime   = m_pImpl->m_pINetwork_Impl->SecondsSinceEpoch ();
+      m_pImpl->m_sRemoteAddress  = Fetch_Result.sRemoteAddress;
 
       if (Fetch_Result.bSuccess)
       {
          m_pImpl->m_nSizeBytes = Fetch_Result.nSizeBytes;
-         m_pImpl->m_mapHeaders = Fetch_Result.mapHeaders;
+         m_pImpl->m_mapReqHeaders = Fetch_Result.mapReqHeaders;
+         m_pImpl->m_mapRspHeaders = Fetch_Result.mapRspHeaders;
          m_pImpl->m_bState     = NETWORK::STATE_READY;
       }
       else
       {
-         if (!Fetch_Result.mapHeaders.empty ())
-            m_pImpl->m_mapHeaders = Fetch_Result.mapHeaders;
+         if (!Fetch_Result.mapReqHeaders.empty ())
+            m_pImpl->m_mapReqHeaders = Fetch_Result.mapReqHeaders;
+
+         if (!Fetch_Result.mapRspHeaders.empty ())
+            m_pImpl->m_mapRspHeaders = Fetch_Result.mapRspHeaders;
          m_pImpl->m_bState     = NETWORK::STATE_FAILED;
       }
 
@@ -666,14 +691,14 @@ void ASSET::ReadData (std::vector<uint8_t>& aData) const
    }
 }
 
-std::string ASSET::Header (const std::string& sName) const
+std::string ASSET::RspHeader (const std::string& sName) const
 {
    std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
 
    std::string sResult;
 
-   auto it = m_pImpl->m_mapHeaders.find (sName);
-   if (it != m_pImpl->m_mapHeaders.end ())
+   auto it = m_pImpl->m_mapRspHeaders.find (sName);
+   if (it != m_pImpl->m_mapRspHeaders.end ())
       sResult = it->second;
 
    return sResult;
@@ -726,5 +751,7 @@ double               ASSET::FetchDuration ()                const { return m_pIm
 double               ASSET::FetchQueuedTime ()              const { return m_pImpl->m_dFetchQueuedTime;  }
 double               ASSET::QueueDuration ()                const { return m_pImpl->m_dFetchStartTime - m_pImpl->m_dFetchQueuedTime; }
 bool                 ASSET::IsServedFromCache ()            const { return m_pImpl->m_bServedFromCache;  }
+const std::string&   ASSET::RemoteAddress ()                const { return m_pImpl->m_sRemoteAddress;    }
 
-const std::unordered_map<std::string, std::string>&   ASSET::Headers ()      const { return m_pImpl->m_mapHeaders; }
+const std::unordered_map<std::string, std::string>&   ASSET::RspHeaders ()      const { return m_pImpl->m_mapRspHeaders; }
+const std::unordered_map<std::string, std::string>&   ASSET::ReqHeaders ()      const { return m_pImpl->m_mapReqHeaders; }

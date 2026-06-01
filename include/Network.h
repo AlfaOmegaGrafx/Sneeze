@@ -117,12 +117,15 @@ namespace SNEEZE
          // --- ASSET-dependent (require attached ASSET, empty/default after Close) ---
 
          void                 ReadData          (std::vector<uint8_t>& aData) const;
-         std::string          Header (const std::string& sName) const;
+//         std::string          Header (const std::string& sName) const;
          std::string          DiskPath          () const;
          std::string          CreatedTime       () const;
          std::string          LastAccessTime    () const;
          uint32_t             AccessCount       () const;
-         const std::unordered_map<std::string, std::string> Headers () const;
+         const std::unordered_map<std::string, std::string>& ReqHeaders () const;
+         const std::unordered_map<std::string, std::string>& RspHeaders () const;
+
+         const std::string&   RemoteAddress     () const;
 
          // --- Container ---
 

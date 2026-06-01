@@ -202,7 +202,7 @@ public:
    {
       m_bState           = m_pAsset->State ();
       m_sHash            = m_pAsset->Hash ();
-      m_sContentType     = m_pAsset->Header ("content-type");
+      m_sContentType     = m_pAsset->RspHeader ("content-type");
       m_nSizeBytes       = m_pAsset->SizeBytes ();
       m_nHttpStatus      = m_pAsset->HttpStatus ();
       m_dFetchQueuedTime = m_pAsset->FetchQueuedTime ();
@@ -333,14 +333,15 @@ void NETWORK::FILE::SnapshotFinal    () { m_pImpl->SnapshotFinal (); }
 // ASSET-dependent accessors (require attached ASSET)
 // ---------------------------------------------------------------------------
 
-std::string                                        NETWORK::FILE::Header            (const std::string& sName) const { return m_pImpl->m_pAsset->Header (sName); }
+//std::string                                        NETWORK::FILE::Header            (const std::string& sName) const { return m_pImpl->m_pAsset->Header (sName); }
 void                                               NETWORK::FILE::ReadData          (std::vector<uint8_t>& aData) const { return m_pImpl->m_pAsset->ReadData (aData); }
 
 std::string                                        NETWORK::FILE::DiskPath          () const { return m_pImpl->m_pAsset->DiskPath (); }
 std::string                                        NETWORK::FILE::CreatedTime       () const { return m_pImpl->m_pAsset->CreatedTime (); }
 std::string                                        NETWORK::FILE::LastAccessTime    () const { return m_pImpl->m_pAsset->LastAccessTime (); }
 uint32_t                                           NETWORK::FILE::AccessCount       () const { return m_pImpl->m_pAsset->AccessCount (); }
-const std::unordered_map<std::string, std::string> NETWORK::FILE::Headers           () const { return m_pImpl->m_pAsset->Headers (); }
+const std::unordered_map<std::string, std::string>& NETWORK::FILE::RspHeaders        () const { return m_pImpl->m_pAsset->RspHeaders (); }
+const std::unordered_map<std::string, std::string>& NETWORK::FILE::ReqHeaders        () const { return m_pImpl->m_pAsset->ReqHeaders (); }
 std::string                                        NETWORK::FILE::ContainerName     () const { return m_pImpl->m_pCID->DisplayName (); }
 NETWORK::STATE                                     NETWORK::FILE::State             () const { return m_pImpl->m_bState; }
 bool                                               NETWORK::FILE::IsReady           () const { return m_pImpl->m_bState == STATE_READY; }
@@ -368,3 +369,5 @@ NETWORK::IFILE*                                    NETWORK::FILE::Listener      
 
 const std::string&                                 NETWORK::FILE::OpenHash          () const { return m_pImpl->m_sOpenHash; }
 bool                                               NETWORK::FILE::CacheEnabled      () const { return m_pImpl->m_bCacheEnabled; }
+
+const std::string&                                 NETWORK::FILE::RemoteAddress     () const { return m_pImpl->m_pAsset->RemoteAddress (); }

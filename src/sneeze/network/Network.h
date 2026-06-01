@@ -74,7 +74,7 @@ namespace SNEEZE
       bool        VerifyHash (const std::string& sFilePath, const std::string& sHash) const;
 
       void ReadData (std::vector<uint8_t>& aData) const;
-      std::string Header (const std::string& sName) const;
+      std::string RspHeader (const std::string& sName) const;
 
       // Accessors
       NETWORK::STATE       State             () const;
@@ -98,7 +98,9 @@ namespace SNEEZE
       double               FetchQueuedTime   () const;
       double               QueueDuration     () const;
       bool                 IsServedFromCache () const;
-      const std::unordered_map<std::string, std::string>& Headers () const;
+      const std::unordered_map<std::string, std::string>& RspHeaders () const;
+      const std::unordered_map<std::string, std::string>& ReqHeaders () const;
+      const std::string&   RemoteAddress     () const;
 
       // Modifiers
       void Reset              ();

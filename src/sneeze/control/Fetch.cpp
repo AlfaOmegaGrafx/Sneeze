@@ -31,16 +31,28 @@ void JOB_FETCH::Complete_Deliver ()
    OnFetch_Complete (m_ResultComplete);
 }
 
-JOB_FETCH::JOB_FETCH (bool bFetch, const std::string& sUrl, const std::string& sPath_Temp, const std::string& sPath_Data, const std::string& sHash) :
+JOB_FETCH::JOB_FETCH (bool bFetch, const std::string& sUrl, const std::string& sPath_Temp, const std::string& sPath_Data, const std::string& sHash, std::unordered_map<std::string, std::string>& mapReqHeaders) :
    m_bFetch         (bFetch),
    m_sUrl           (sUrl),
    m_sPath_Temp     (sPath_Temp),
    m_sPath_Data     (sPath_Data),
    m_sHash          (sHash),
+   m_mapReqHeaders  (mapReqHeaders),
    m_ResultComplete {}
 {
 }
 
+JOB_FETCH::JOB_FETCH (bool bFetch) :
+   m_bFetch (bFetch)
+{
+
+}
+
+const std::string&                                    JOB_FETCH::Url ()            const { return m_sUrl; }
+const std::string&                                    JOB_FETCH::Path_Temp ()      const { return m_sPath_Temp; }
+const std::string&                                    JOB_FETCH::Path_Data ()      const { return m_sPath_Data; }
+const std::string&                                    JOB_FETCH::Hash ()           const { return m_sHash; }
+const std::unordered_map<std::string, std::string>&   JOB_FETCH::RequestHeaders () const { return m_mapReqHeaders; }
 
 // ===========================================================================
 // Static helpers -- encoding
@@ -109,7 +121,6 @@ static size_t WriteCallback (char* pData, size_t nSize, size_t nMembers, void* p
    return nSize * nMembers;
 }
 
-#if 1
 static size_t HeaderCallback (char* pData, size_t nSize, size_t nMembers, void* pUserData)
 {
    const size_t bytes = nSize * nMembers;
@@ -147,37 +158,6 @@ static size_t HeaderCallback (char* pData, size_t nSize, size_t nMembers, void* 
 
    return bytes;
 }
-#else
-static size_t HeaderCallback (char* pData, size_t nSize, size_t nMembers, void* pUserData)
-{
-   auto* pmapHeaders = static_cast<std::unordered_map<std::string, std::string>*> (pUserData);
-
-   size_t nTotal = nSize * nMembers;
-   std::string sLine (pData, nTotal);
-
-   auto nColon = sLine.find (':');
-   if (nColon != std::string::npos)
-   {
-      std::string sKey = sLine.substr (0, nColon);
-      std::string sValue = sLine.substr (nColon + 1);
-
-      auto nStart = sValue.find_first_not_of (" \t\r\n");
-      auto nEnd = sValue.find_last_not_of (" \t\r\n");
-      if (nStart != std::string::npos  &&  nEnd != std::string::npos)
-         sValue = sValue.substr (nStart, nEnd - nStart + 1);
-      else
-         sValue.clear ();
-
-      sKey = ToUtf8 (sKey);
-      sValue = ToUtf8 (sValue);
-      std::transform (sKey.begin (), sKey.end (), sKey.begin (),
-         [](unsigned char c) { return static_cast<char> (std::tolower (c)); });
-      (*pmapHeaders)[sKey] = sValue;
-   }
-
-   return nTotal;
-}
-#endif
 
 struct PROGRESS_DATA
 {
@@ -371,12 +351,25 @@ void AGENT::FETCH::Execute (JOB_FETCH* pJob_Fetch)
 
             if (out.is_open ())
             {
+               struct curl_slist* slist1 = NULL;
+
+               result.mapReqHeaders = pJob_Fetch->RequestHeaders ();
+               for (auto const& x : result.mapReqHeaders)
+               {
+                  std::string sBuffer = x.first + ": " + x.second;
+
+                  slist1 = curl_slist_append (slist1, sBuffer.c_str ());
+               }
+
+               if (slist1 != NULL)
+                  curl_easy_setopt (pCurl, CURLOPT_HTTPHEADER, slist1);
+
                curl_easy_setopt (pCurl, CURLOPT_URL, pJob_Fetch->Url ().c_str ());
                curl_easy_setopt (pCurl, CURLOPT_WRITEFUNCTION, WriteCallback);
                curl_easy_setopt (pCurl, CURLOPT_WRITEDATA, &out);
 
                curl_easy_setopt (pCurl, CURLOPT_HEADERFUNCTION, HeaderCallback);
-               curl_easy_setopt (pCurl, CURLOPT_HEADERDATA, &result.mapHeaders);
+               curl_easy_setopt (pCurl, CURLOPT_HEADERDATA, &result.mapRspHeaders);
 
                curl_easy_setopt (pCurl, CURLOPT_FOLLOWLOCATION, 1L);
                curl_easy_setopt (pCurl, CURLOPT_TIMEOUT, 300L);
@@ -420,6 +413,14 @@ void AGENT::FETCH::Execute (JOB_FETCH* pJob_Fetch)
                }
                else
                {
+                  char* pszIPAddress = NULL;
+
+                  if (curl_easy_getinfo (pCurl, CURLINFO_PRIMARY_IP, &pszIPAddress) == CURLE_OK && pszIPAddress)
+                  {
+                     result.sRemoteAddress = pszIPAddress;
+                  }
+                  else result.sRemoteAddress.clear ();
+
                   if (VerifyHash (pJob_Fetch->Path_Temp (), pJob_Fetch->Hash ()))
                   {
                      std::error_code ec;

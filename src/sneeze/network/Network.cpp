@@ -223,7 +223,7 @@ public:
 
       bool bResult = false;
 
-      std::string sContentType = pAsset->Header ("content-type");
+      std::string sContentType = pAsset->RspHeader ("content-type");
       std::string sCreatedAt = pAsset->CreatedTime ();
 
       for (auto& rule : m_aRules)

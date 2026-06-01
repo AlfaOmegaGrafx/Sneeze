@@ -60,10 +60,13 @@ namespace SNEEZE
 
    struct FETCH_RESULT
    {
-      bool        bSuccess;
-      uint64_t    nSizeBytes;
-      long        nHttpStatus;
-      std::unordered_map<std::string, std::string> mapHeaders;
+      bool                             bSuccess;
+      uint64_t                         nSizeBytes;
+      long                             nHttpStatus;
+      std::string                      sRemoteAddress;
+
+      std::unordered_map<std::string, std::string> mapReqHeaders;
+      std::unordered_map<std::string, std::string> mapRspHeaders;
    };
 
    // ========================================================================
@@ -76,12 +79,14 @@ namespace SNEEZE
    class JOB_FETCH : public IJOB
    {
    public:
-      JOB_FETCH (bool bFetch, const std::string& sUrl, const std::string& sPath_Temp, const std::string& sPath_Data, const std::string& sHash);
+      JOB_FETCH (bool bFetch, const std::string& sUrl, const std::string& sPath_Temp, const std::string& sPath_Data, const std::string& sHash, std::unordered_map<std::string, std::string>& mapReqHeaders);
+      JOB_FETCH (bool bFetch);
 
-      const std::string& Url ()       const { return m_sUrl; }
-      const std::string& Path_Temp () const { return m_sPath_Temp; }
-      const std::string& Path_Data () const { return m_sPath_Data; }
-      const std::string& Hash ()      const { return m_sHash; }
+      const std::string&                                    Url ()            const;
+      const std::string&                                    Path_Temp ()      const;
+      const std::string&                                    Path_Data ()      const;
+      const std::string&                                    Hash ()           const;
+      const std::unordered_map<std::string, std::string>&   RequestHeaders () const;
 
       bool IsFetch () const { return m_bFetch; }
 
@@ -95,6 +100,8 @@ namespace SNEEZE
       std::string m_sPath_Temp;
       std::string m_sPath_Data;
       std::string m_sHash;
+      std::unordered_map<std::string, std::string> m_mapReqHeaders;
+
       FETCH_RESULT m_ResultComplete;
 
       void Complete_Deliver () override;
