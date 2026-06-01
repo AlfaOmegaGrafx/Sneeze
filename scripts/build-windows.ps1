@@ -284,8 +284,10 @@ function Clear-SneezePrecompiledHeaders {
       return
    }
 
+   # Only compiled PCH outputs — never cmake_pch.cxx / cmake_pch.hxx (CMake generates
+   # those at configure; deleting them causes C1083 on the next build).
    $nRemoved = 0
-   foreach ($name in @('cmake_pch.cxx', 'cmake_pch.cxx.obj', 'cmake_pch.hxx', 'cmake_pch.hxx.pch', 'cmake_pch.pch')) {
+   foreach ($name in @('cmake_pch.cxx.obj', 'cmake_pch.hxx.pch', 'cmake_pch.pch')) {
       Get-ChildItem -Path $BuildRoot -Recurse -Filter $name -ErrorAction SilentlyContinue |
          ForEach-Object {
             Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue
@@ -293,7 +295,7 @@ function Clear-SneezePrecompiledHeaders {
          }
    }
    if ($nRemoved -gt 0) {
-      Write-Host "  Cleared $nRemoved stale CMake PCH artifact(s) under $BuildRoot"
+      Write-Host "  Cleared $nRemoved stale CMake PCH output(s) under $BuildRoot (will recompile cmake_pch.cxx)"
    }
 }
 
