@@ -318,15 +318,15 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
       std::vector<SPHERE_DATA> aSpheres;
       std::vector<CURVE_DATA>  aCurves;
 
-      VIEWPORT::SCENE* pScene = pViewport->Scene ();
-      VIEWPORT::SCENE::FABRIC* pPrimaryFabric = pScene ? pScene->Fabric_Primary () : nullptr;
-      VIEWPORT::SCENE::FABRIC::NODE* pSomRoot = pPrimaryFabric ? pPrimaryFabric->Node_Root () : nullptr;
+      SCENE* pScene = pViewport->Scene ();
+      SCENE::FABRIC* pPrimaryFabric = pScene ? pScene->Fabric_Primary () : nullptr;
+      SCENE::FABRIC::NODE* pSomRoot = pPrimaryFabric ? pPrimaryFabric->Node_Root () : nullptr;
 
       if (pSomRoot)
       {
          ORBIT_POSITION pos;
 
-         for (VIEWPORT::SCENE::FABRIC::NODE* pNode : pSomRoot->Node_Children ())
+         for (SCENE::FABRIC::NODE* pNode : pSomRoot->Node_Children ())
          {
             MAP_OBJECT* pObj = pNode->MapObject ();
             if (!pObj  ||  pObj->GetType () != MAP_OBJECT_TYPE_CELESTIAL)

@@ -20,7 +20,6 @@ namespace SNEEZE
    class VIEWPORT
    {
    public:
-      class SCENE;
       class MSF;
       class RENDERER;
 
@@ -61,7 +60,7 @@ namespace SNEEZE
       explicit VIEWPORT (CONTEXT* pContext);
       ~VIEWPORT ();
 
-      bool Initialize (const std::string& sUrl);
+      bool Initialize ();
       bool Renderer_Initialize ();
       void Renderer_Shutdown ();
 

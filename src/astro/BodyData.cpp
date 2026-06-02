@@ -446,12 +446,12 @@ namespace SNEEZE
       // fabric, then cleans up all temporary RMCOBJECT data before returning.
       // -----------------------------------------------------------------------
 
-      void InjectSolarSystem (VIEWPORT::SCENE::FABRIC* pFabric)
+      void InjectSolarSystem (SCENE::FABRIC* pFabric)
       {
          if (!pFabric  ||  !pFabric->Node_Root ())
             return;
 
-         VIEWPORT::SCENE::FABRIC::NODE* pRoot = pFabric->Node_Root ();
+         SCENE::FABRIC::NODE* pRoot = pFabric->Node_Root ();
 
          std::vector<RMCOBJECT*>            aBodies;
          std::map<std::string, RMCOBJECT*>  registry;
@@ -480,7 +480,7 @@ namespace SNEEZE
             pMapObj->m_dMass           = 1.98841e30;
             pMapObj->m_sTextureUrl     = (itSun != registry.end ()) ? itSun->second->sTexture : "";
 
-            auto* pNode = new VIEWPORT::SCENE::FABRIC::NODE (pFabric);
+            auto* pNode = new SCENE::FABRIC::NODE (pFabric);
             pNode->MapObject_Set (pMapObj);
             pRoot->Node_Add (pNode);
          }
@@ -532,7 +532,7 @@ namespace SNEEZE
             pMapObj->m_sTextureUrl     = sTexture;
             pMapObj->m_orbit           = *pBody->pOrbit;
 
-            auto* pNode = new VIEWPORT::SCENE::FABRIC::NODE (pFabric);
+            auto* pNode = new SCENE::FABRIC::NODE (pFabric);
             pNode->MapObject_Set (pMapObj);
             pRoot->Node_Add (pNode);
          }

@@ -10,14 +10,17 @@
     <Filter Include="src\sneeze\control">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000002}</UniqueIdentifier>
     </Filter>
-    <Filter Include="src\sneeze\network">
+    <Filter Include="src\context\network">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000003}</UniqueIdentifier>
     </Filter>
-    <Filter Include="src\sneeze\storage">
+    <Filter Include="src\context\storage">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000004}</UniqueIdentifier>
     </Filter>
-    <Filter Include="src\sneeze\console">
+    <Filter Include="src\context\console">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000012}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\context">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000013}</UniqueIdentifier>
     </Filter>
     <Filter Include="src\astro">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000005}</UniqueIdentifier>
@@ -25,13 +28,13 @@
     <Filter Include="src\viewport">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000006}</UniqueIdentifier>
     </Filter>
-    <Filter Include="src\viewport\scene">
+    <Filter Include="src\context\scene">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000007}</UniqueIdentifier>
     </Filter>
     <Filter Include="src\viewport\renderer">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000008}</UniqueIdentifier>
     </Filter>
-    <Filter Include="src\viewport\msf">
+    <Filter Include="src\context\msf">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000009}</UniqueIdentifier>
     </Filter>
     <Filter Include="src\persona">
@@ -91,8 +94,8 @@
     <ClCompile Include="..\src\sneeze\Engine.cpp">
       <Filter>src\sneeze</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\sneeze\Context.cpp">
-      <Filter>src\sneeze</Filter>
+    <ClCompile Include="..\src\context\Context.cpp">
+      <Filter>src\context</Filter>
     </ClCompile>
     <ClCompile Include="..\src\sneeze\Thread.cpp">
       <Filter>src\sneeze</Filter>
@@ -124,35 +127,35 @@
     <ClCompile Include="..\src\sneeze\control\AgentC.cpp">
       <Filter>src\sneeze\control</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\sneeze\network\Asset.cpp">
-      <Filter>src\sneeze\network</Filter>
+    <ClCompile Include="..\src\context\network\Asset.cpp">
+      <Filter>src\context\network</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\sneeze\network\File.cpp">
-      <Filter>src\sneeze\network</Filter>
+    <ClCompile Include="..\src\context\network\File.cpp">
+      <Filter>src\context\network</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\sneeze\network\Network.cpp">
-      <Filter>src\sneeze\network</Filter>
+    <ClCompile Include="..\src\context\network\Network.cpp">
+      <Filter>src\context\network</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\sneeze\storage\Storage.cpp">
-      <Filter>src\sneeze\storage</Filter>
+    <ClCompile Include="..\src\context\storage\Storage.cpp">
+      <Filter>src\context\storage</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\sneeze\storage\Unit.cpp">
-      <Filter>src\sneeze\storage</Filter>
+    <ClCompile Include="..\src\context\storage\Unit.cpp">
+      <Filter>src\context\storage</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\sneeze\storage\Silo.cpp">
-      <Filter>src\sneeze\storage</Filter>
+    <ClCompile Include="..\src\context\storage\Silo.cpp">
+      <Filter>src\context\storage</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\sneeze\console\Console.cpp">
-      <Filter>src\sneeze\console</Filter>
+    <ClCompile Include="..\src\context\console\Console.cpp">
+      <Filter>src\context\console</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\sneeze\console\Entry.cpp">
-      <Filter>src\sneeze\console</Filter>
+    <ClCompile Include="..\src\context\console\Entry.cpp">
+      <Filter>src\context\console</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\sneeze\console\Stream.cpp">
-      <Filter>src\sneeze\console</Filter>
+    <ClCompile Include="..\src\context\console\Stream.cpp">
+      <Filter>src\context\console</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\sneeze\console\Block.cpp">
-      <Filter>src\sneeze\console</Filter>
+    <ClCompile Include="..\src\context\console\Block.cpp">
+      <Filter>src\context\console</Filter>
     </ClCompile>
     <ClCompile Include="..\src\astro\BodyData.cpp">
       <Filter>src\astro</Filter>
@@ -163,35 +166,35 @@
     <ClCompile Include="..\src\viewport\Viewport.cpp">
       <Filter>src\viewport</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\viewport\scene\Celestial.cpp">
-      <Filter>src\viewport\scene</Filter>
+    <ClCompile Include="..\src\context\scene\Celestial.cpp">
+      <Filter>src\context\scene</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\viewport\scene\Orbit.cpp">
-      <Filter>src\viewport\scene</Filter>
+    <ClCompile Include="..\src\context\scene\Orbit.cpp">
+      <Filter>src\context\scene</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\viewport\scene\Epoch.cpp">
-      <Filter>src\viewport\scene</Filter>
+    <ClCompile Include="..\src\context\scene\Epoch.cpp">
+      <Filter>src\context\scene</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\viewport\scene\Node.cpp">
-      <Filter>src\viewport\scene</Filter>
+    <ClCompile Include="..\src\context\scene\Node.cpp">
+      <Filter>src\context\scene</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\viewport\scene\Fabric.cpp">
-      <Filter>src\viewport\scene</Filter>
+    <ClCompile Include="..\src\context\scene\Fabric.cpp">
+      <Filter>src\context\scene</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\viewport\scene\Scene.cpp">
-      <Filter>src\viewport\scene</Filter>
+    <ClCompile Include="..\src\context\scene\Scene.cpp">
+      <Filter>src\context\scene</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\viewport\scene\MapObject.cpp">
-      <Filter>src\viewport\scene</Filter>
+    <ClCompile Include="..\src\context\scene\MapObject.cpp">
+      <Filter>src\context\scene</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\viewport\scene\AccessControl.cpp">
-      <Filter>src\viewport\scene</Filter>
+    <ClCompile Include="..\src\context\scene\AccessControl.cpp">
+      <Filter>src\context\scene</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\viewport\scene\Events.cpp">
-      <Filter>src\viewport\scene</Filter>
+    <ClCompile Include="..\src\context\scene\Events.cpp">
+      <Filter>src\context\scene</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\viewport\scene\SpatialIndex.cpp">
-      <Filter>src\viewport\scene</Filter>
+    <ClCompile Include="..\src\context\scene\SpatialIndex.cpp">
+      <Filter>src\context\scene</Filter>
     </ClCompile>
     <ClCompile Include="..\src\viewport\renderer\AnariRenderer.cpp">
       <Filter>src\viewport\renderer</Filter>
@@ -199,11 +202,11 @@
     <ClCompile Include="..\src\viewport\renderer\UVSphere.cpp">
       <Filter>src\viewport\renderer</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\viewport\msf\MsfFile.cpp">
-      <Filter>src\viewport\msf</Filter>
+    <ClCompile Include="..\src\context\msf\MsfFile.cpp">
+      <Filter>src\context\msf</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\viewport\msf\CertChain.cpp">
-      <Filter>src\viewport\msf</Filter>
+    <ClCompile Include="..\src\context\msf\CertChain.cpp">
+      <Filter>src\context\msf</Filter>
     </ClCompile>
     <ClCompile Include="..\src\persona\Persona.cpp">
       <Filter>src\persona</Filter>
@@ -268,35 +271,32 @@
     <ClInclude Include="..\src\astro\RMCObject.h">
       <Filter>src\astro</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\viewport\scene\Celestial.h">
-      <Filter>src\viewport\scene</Filter>
+    <ClInclude Include="..\src\context\scene\Celestial.h">
+      <Filter>src\context\scene</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\viewport\scene\Orbit.h">
-      <Filter>src\viewport\scene</Filter>
+    <ClInclude Include="..\src\context\scene\Orbit.h">
+      <Filter>src\context\scene</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\viewport\scene\Epoch.h">
-      <Filter>src\viewport\scene</Filter>
+    <ClInclude Include="..\src\context\scene\Epoch.h">
+      <Filter>src\context\scene</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\viewport\scene\Node.h">
-      <Filter>src\viewport\scene</Filter>
+    <ClInclude Include="..\src\context\scene\Node.h">
+      <Filter>src\context\scene</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\viewport\scene\Fabric.h">
-      <Filter>src\viewport\scene</Filter>
+    <ClInclude Include="..\src\context\scene\Fabric.h">
+      <Filter>src\context\scene</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\viewport\scene\Scene.h">
-      <Filter>src\viewport\scene</Filter>
+    <ClInclude Include="..\src\context\scene\MapObject.h">
+      <Filter>src\context\scene</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\viewport\scene\MapObject.h">
-      <Filter>src\viewport\scene</Filter>
+    <ClInclude Include="..\src\context\scene\AccessControl.h">
+      <Filter>src\context\scene</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\viewport\scene\AccessControl.h">
-      <Filter>src\viewport\scene</Filter>
+    <ClInclude Include="..\src\context\scene\Events.h">
+      <Filter>src\context\scene</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\viewport\scene\Events.h">
-      <Filter>src\viewport\scene</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\viewport\scene\SpatialIndex.h">
-      <Filter>src\viewport\scene</Filter>
+    <ClInclude Include="..\src\context\scene\SpatialIndex.h">
+      <Filter>src\context\scene</Filter>
     </ClInclude>
     <ClInclude Include="..\src\viewport\renderer\Renderer.h">
       <Filter>src\viewport\renderer</Filter>
@@ -307,8 +307,8 @@
     <ClInclude Include="..\src\viewport\renderer\UVSphere.h">
       <Filter>src\viewport\renderer</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\viewport\msf\Msf.h">
-      <Filter>src\viewport\msf</Filter>
+    <ClInclude Include="..\src\context\msf\Msf.h">
+      <Filter>src\context\msf</Filter>
     </ClInclude>
     <ClInclude Include="..\src\deps\wasm\WasmRuntime.h">
       <Filter>src\deps\wasm</Filter>
@@ -365,20 +365,23 @@
     <ClInclude Include="..\include\Storage.h">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\Scene.h">
+      <Filter>include</Filter>
+    </ClInclude>
     <ClInclude Include="..\include\Console.h">
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="..\include\Image.h">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\sneeze\network\Network.h">
-      <Filter>src\sneeze\network</Filter>
+    <ClInclude Include="..\src\context\network\Network.h">
+      <Filter>src\context\network</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\sneeze\storage\Storage.h">
-      <Filter>src\sneeze\storage</Filter>
+    <ClInclude Include="..\src\context\storage\Storage.h">
+      <Filter>src\context\storage</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\sneeze\console\Console.h">
-      <Filter>src\sneeze\console</Filter>
+    <ClInclude Include="..\src\context\console\Console.h">
+      <Filter>src\context\console</Filter>
     </ClInclude>
   </ItemGroup>
   <!-- Resource files -->

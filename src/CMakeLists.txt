@@ -524,7 +524,7 @@ endif ()
 
 set (CORE_SOURCES
    sneeze/Engine.cpp
-   sneeze/Context.cpp
+   context/Context.cpp
    sneeze/Thread.cpp
    sneeze/control/Agent.cpp
    sneeze/control/Control.cpp
@@ -551,27 +551,26 @@ set (ASTRO_HEADERS
 
 set (SOM_SOURCES
    viewport/Viewport.cpp
-   viewport/scene/Celestial.cpp
-   viewport/scene/Orbit.cpp
-   viewport/scene/Epoch.cpp
-   viewport/scene/Node.cpp
-   viewport/scene/Fabric.cpp
-   viewport/scene/Scene.cpp
-   viewport/scene/MapObject.cpp
-   viewport/scene/AccessControl.cpp
-   viewport/scene/Events.cpp
-   viewport/scene/SpatialIndex.cpp)
+   context/scene/Celestial.cpp
+   context/scene/Orbit.cpp
+   context/scene/Epoch.cpp
+   context/scene/Node.cpp
+   context/scene/Fabric.cpp
+   context/scene/Scene.cpp
+   context/scene/MapObject.cpp
+   context/scene/AccessControl.cpp
+   context/scene/Events.cpp
+   context/scene/SpatialIndex.cpp)
 set (SOM_HEADERS
-   viewport/scene/Celestial.h
-   viewport/scene/Orbit.h
-   viewport/scene/Epoch.h
-   viewport/scene/Node.h
-   viewport/scene/Fabric.h
-   viewport/scene/Scene.h
-   viewport/scene/MapObject.h
-   viewport/scene/AccessControl.h
-   viewport/scene/Events.h
-   viewport/scene/SpatialIndex.h)
+   context/scene/Celestial.h
+   context/scene/Orbit.h
+   context/scene/Epoch.h
+   context/scene/Node.h
+   context/scene/Fabric.h
+   context/scene/MapObject.h
+   context/scene/AccessControl.h
+   context/scene/Events.h
+   context/scene/SpatialIndex.h)
 
 # Embed Mozilla's CA bundle (cacert.pem) as a string blob so libcurl can
 # verify HTTPS certificates on platforms whose system has no libcurl-
@@ -626,13 +625,13 @@ set (NETWORK_GENERATED_SOURCES "${CMAKE_CURRENT_BINARY_DIR}/cacert_data.cpp")
 
 set (CONTAINER_HEADERS)
 
-set (CONSOLE_SOURCES  sneeze/console/Console.cpp sneeze/console/Entry.cpp sneeze/console/Stream.cpp sneeze/console/Block.cpp)
+set (CONSOLE_SOURCES  context/console/Console.cpp context/console/Entry.cpp context/console/Stream.cpp context/console/Block.cpp)
 set (CONSOLE_HEADERS  )
 
-set (NETWORK_SOURCES  sneeze/network/Network.cpp sneeze/network/File.cpp sneeze/network/Asset.cpp)
+set (NETWORK_SOURCES  context/network/Network.cpp context/network/File.cpp context/network/Asset.cpp)
 set (NETWORK_HEADERS)
 
-set (STORAGE_SOURCES  sneeze/storage/Storage.cpp sneeze/storage/Silo.cpp sneeze/storage/Unit.cpp)
+set (STORAGE_SOURCES  context/storage/Storage.cpp context/storage/Silo.cpp context/storage/Unit.cpp)
 set (STORAGE_HEADERS)
 
 set (PERSONA_SOURCES  persona/Persona.cpp)
@@ -677,10 +676,10 @@ set (COMPUTE_SOURCES deps/compute/EmbeddedKernels.cpp deps/compute/ComputeDispat
 set (COMPUTE_HEADERS deps/compute/EmbeddedKernels.h deps/compute/ComputeDispatch.h)
 
 set (MSF_SOURCES
-   viewport/msf/MsfFile.cpp
-   viewport/msf/CertChain.cpp)
+   context/msf/MsfFile.cpp
+   context/msf/CertChain.cpp)
 set (MSF_HEADERS
-   viewport/msf/Msf.h)
+   context/msf/Msf.h)
 
 set (STB_SOURCES  deps/stb/stb_image_impl.cpp deps/stb/Image.cpp)
 set (STB_HEADERS  deps/stb/stb_image.h)
@@ -691,6 +690,7 @@ set (INCLUDE_HEADERS
    ../include/Persona.h
    ../include/Network.h
    ../include/Container.h
+   ../include/Scene.h
    ../include/Viewport.h
    ../include/Storage.h
    ../include/Console.h
@@ -743,6 +743,7 @@ target_include_directories (Sneeze PUBLIC
    ${CMAKE_CURRENT_SOURCE_DIR}
    ${CMAKE_CURRENT_SOURCE_DIR}/../include
    ${CMAKE_CURRENT_SOURCE_DIR}/sneeze
+   ${CMAKE_CURRENT_SOURCE_DIR}/context
    ${CMAKE_CURRENT_SOURCE_DIR}/viewport
    ${CMAKE_CURRENT_SOURCE_DIR}/deps
    ${SPIRV_TOOLS_INCLUDE}

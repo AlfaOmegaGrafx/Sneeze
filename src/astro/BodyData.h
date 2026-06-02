@@ -15,13 +15,13 @@
 #ifndef SNEEZE_ASTRO_BODYDATA_H
 #define SNEEZE_ASTRO_BODYDATA_H
 
-#include "scene/Scene.h"
+#include <Scene.h>
 
 namespace SNEEZE
 {
    namespace astro
    {
-      void InjectSolarSystem (VIEWPORT::SCENE::FABRIC* pFabric);
+      void InjectSolarSystem (SCENE::FABRIC* pFabric);
    } // namespace astro
 }
 

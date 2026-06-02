@@ -332,9 +332,9 @@ All three modules: pimpl idiom, CID pooling via `CONTEXT::CID_Pool()` in the par
 | File | Contents |
 |------|----------|
 | `include/Storage.h` | Public header — STORAGE, UNIT, SILO, SCOPE, IENUM_SILO |
-| `sneeze/storage/Storage.cpp` | STORAGE + Impl (Silo_Open/Close/Enum, Unit_Open/Close, paths) |
-| `sneeze/storage/Storage_Unit.cpp` | UNIT + Impl (JSON access, path navigation, changelog, Load/Save/Evict, meta) |
-| `sneeze/storage/Silo.cpp` | SILO (path-based API, Attach/Detach, Initialize/Shutdown, path construction) |
+| `context/storage/Storage.cpp` | STORAGE + Impl (Silo_Open/Close/Enum, Unit_Open/Close, paths) |
+| `context/storage/Unit.cpp` | UNIT + Impl (JSON access, path navigation, changelog, Load/Save/Evict, meta) |
+| `context/storage/Silo.cpp` | SILO (path-based API, Attach/Detach, Initialize/Shutdown, path construction) |
 
 ## WASM Interface (Current State)
 

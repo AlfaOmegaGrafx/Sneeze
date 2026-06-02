@@ -19,9 +19,8 @@
 
 using namespace SNEEZE;
 
-using SCENE  = VIEWPORT::SCENE;
-using FABRIC = VIEWPORT::SCENE::FABRIC;
-using NODE   = VIEWPORT::SCENE::FABRIC::NODE;
+using FABRIC = SCENE::FABRIC;
+using NODE   = SCENE::FABRIC::NODE;
 
 FABRIC::FABRIC (SCENE* pScene) :
    m_pScene (pScene),

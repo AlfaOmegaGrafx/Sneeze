@@ -15,8 +15,8 @@
 #ifndef SNEEZE_VIEWPORT_NODE_H
 #define SNEEZE_VIEWPORT_NODE_H
 
-#include "scene/Fabric.h"
-#include "scene/MapObject.h"
+#include "Fabric.h"
+#include "MapObject.h"
 
 namespace SNEEZE
 {
@@ -43,14 +43,14 @@ namespace SNEEZE
    };
 
    // ---------------------------------------------------------------------------
-   // VIEWPORT::SCENE::FABRIC::NODE -- structural element in the scene.
+   // SCENE::FABRIC::NODE -- structural element in the scene.
    //
    // Each node participates in a tree owned by a single FABRIC. When a
    // MAP_OBJECT with a non-empty texture URL is assigned, the node requests the
    // texture from the network and decodes it on completion.
    // ---------------------------------------------------------------------------
 
-   class VIEWPORT::SCENE::FABRIC::NODE : public NETWORK::IFILE
+   class SCENE::FABRIC::NODE : public NETWORK::IFILE
    {
    public:
       explicit NODE (FABRIC* pFabric);

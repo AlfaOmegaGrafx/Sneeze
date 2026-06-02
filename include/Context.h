@@ -23,6 +23,7 @@ namespace SNEEZE
    class CONSOLE;
    class NETWORK;
    class STORAGE;
+   class SCENE;
    class VIEWPORT;
 
    class CONTEXT
@@ -77,6 +78,7 @@ namespace SNEEZE
       CONSOLE*   Console  () const;
       NETWORK*   Network  () const;
       STORAGE*   Storage  () const;
+      SCENE*     Scene    () const;
       VIEWPORT*  Viewport () const;
 
       const std::string& Path_Permanent () const;

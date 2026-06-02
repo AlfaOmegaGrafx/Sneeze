@@ -251,11 +251,11 @@ Entry notifications fire from `Entry_Create` (on append) and `Clear` (on evictio
 | File | Contents |
 |------|----------|
 | `include/Console.h` | Public header — CONSOLE, ENTRY, STREAM, IENUM_ENTRY, IENUM_STREAM |
-| `sneeze/console/Console.cpp` | CONSOLE + Impl (Stream_Open/Close, Block_Open/Close, Entry_Create, Clear, Entry_Enum, configuration) |
-| `sneeze/console/Stream.cpp` | STREAM + Impl (Entry, Rotate, Attach/Detach, Meta_Load/Save, Group, Count, Time, path helpers) |
-| `sneeze/console/Block.cpp` | BLOCK + Impl (Write, Load, Evict, Attach/Detach, Entry_Enum, Open/Close ref counting) |
-| `sneeze/console/Block.h` | BLOCK declaration (private header) |
-| `sneeze/console/Entry.cpp` | ENTRY (constructor, accessors, LevelString, FormatStamp, MessageParts, ToJson, FromJson) |
+| `context/console/Console.cpp` | CONSOLE + Impl (Stream_Open/Close, Block_Open/Close, Entry_Create, Clear, Entry_Enum, configuration) |
+| `context/console/Stream.cpp` | STREAM + Impl (Entry, Rotate, Attach/Detach, Meta_Load/Save, Group, Count, Time, path helpers) |
+| `context/console/Block.cpp` | BLOCK + Impl (Write, Load, Evict, Attach/Detach, Entry_Enum, Open/Close ref counting) |
+| `context/console/Console.h` | BLOCK declaration (private header) |
+| `context/console/Entry.cpp` | ENTRY (constructor, accessors, LevelString, FormatStamp, MessageParts, ToJson, FromJson) |
 
 ## Build Status
 

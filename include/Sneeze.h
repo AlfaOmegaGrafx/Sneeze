@@ -33,6 +33,7 @@ namespace SNEEZE
 #include "Console.h"
 #include "Network.h"
 #include "Storage.h"
+#include "Scene.h"
 #include "Viewport.h"
 #include "Persona.h"
 

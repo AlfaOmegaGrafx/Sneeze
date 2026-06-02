@@ -13,20 +13,18 @@
 // limitations under the License.
 
 #include <Sneeze.h>
-#include "scene/Scene.h"
-#include "scene/Fabric.h"
-#include "scene/Node.h"
+#include <Scene.h>
+#include "Fabric.h"
+#include "Node.h"
 #include "astro/BodyData.h"
 
 using namespace SNEEZE;
 
-using SCENE    = VIEWPORT::SCENE;
-using FABRIC   = VIEWPORT::SCENE::FABRIC;
-using NODE     = VIEWPORT::SCENE::FABRIC::NODE;
-using VIEWPORT = VIEWPORT;
+using FABRIC   = SCENE::FABRIC;
+using NODE     = SCENE::FABRIC::NODE;
 
-SCENE::SCENE (VIEWPORT* pViewport) :
-   m_pViewport       (pViewport),
+SCENE::SCENE (CONTEXT* pContext) :
+   m_pContext        (pContext),
    m_pFabric_Root    (nullptr),
    m_pFabric_Primary (nullptr)
 {
@@ -78,10 +76,10 @@ SCENE::~SCENE ()
    }
 }
 
-VIEWPORT*        SCENE::Viewport       () const { return m_pViewport; }
+SNEEZE::CONTEXT* SCENE::Context        () const { return m_pContext; }
 
-SNEEZE::ENGINE*  SCENE::Engine         () const { return m_pViewport->Engine (); }
-SNEEZE::NETWORK* SCENE::Network        () const { return m_pViewport->Context ()->Network (); }
+SNEEZE::ENGINE*  SCENE::Engine         () const { return m_pContext->Engine (); }
+SNEEZE::NETWORK* SCENE::Network        () const { return m_pContext->Network (); }
 FABRIC*          SCENE::Fabric_Root    () const { return m_pFabric_Root; }
 FABRIC*          SCENE::Fabric_Primary () const { return m_pFabric_Primary; }
 

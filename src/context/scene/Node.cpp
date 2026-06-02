@@ -14,7 +14,7 @@
 
 #include "Node.h"
 #include "Fabric.h"
-#include "Scene.h"
+#include <Scene.h>
 #include "MapObject.h"
 #include <Container.h>
 #include "stb/stb_image.h"
@@ -22,8 +22,8 @@
 
 using namespace SNEEZE;
 
-using FABRIC    = VIEWPORT::SCENE::FABRIC;
-using NODE      = VIEWPORT::SCENE::FABRIC::NODE;
+using FABRIC    = SCENE::FABRIC;
+using NODE      = SCENE::FABRIC::NODE;
 using CONTAINER = SNEEZE::CONTEXT::CONTAINER;
 
 // ---------------------------------------------------------------------------

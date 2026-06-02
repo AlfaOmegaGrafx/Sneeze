@@ -15,7 +15,7 @@
 #ifndef SNEEZE_SOM_ACCESSCONTROL_H
 #define SNEEZE_SOM_ACCESSCONTROL_H
 
-#include "scene/Fabric.h"
+#include "Fabric.h"
 
 namespace SNEEZE
 {
@@ -30,10 +30,10 @@ namespace SNEEZE
    // (WASM_STORE*). A null owner means browser-internal -- always granted.
    // ---------------------------------------------------------------------------
 
-   bool CanRead (const VIEWPORT::SCENE::FABRIC::NODE* pNode, const void* pRequestingOwner);
-   bool CanWrite (const VIEWPORT::SCENE::FABRIC::NODE* pNode, const void* pRequestingOwner);
+   bool CanRead (const SCENE::FABRIC::NODE* pNode, const void* pRequestingOwner);
+   bool CanWrite (const SCENE::FABRIC::NODE* pNode, const void* pRequestingOwner);
 
-   bool CanReadFabric (const VIEWPORT::SCENE::FABRIC* pFabric, const void* pRequestingOwner);
-   bool CanWriteFabric (const VIEWPORT::SCENE::FABRIC* pFabric, const void* pRequestingOwner);
+   bool CanReadFabric (const SCENE::FABRIC* pFabric, const void* pRequestingOwner);
+   bool CanWriteFabric (const SCENE::FABRIC* pFabric, const void* pRequestingOwner);
 }  
 #endif // SNEEZE_SOM_ACCESSCONTROL_H

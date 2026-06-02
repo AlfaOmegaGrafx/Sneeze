@@ -15,7 +15,7 @@
 #ifndef SNEEZE_NETWORK_INETWORKIMPL_H
 #define SNEEZE_NETWORK_INETWORKIMPL_H
 
-#include "../control/Control.h"
+#include "sneeze/control/Control.h"
 
 namespace SNEEZE
 {

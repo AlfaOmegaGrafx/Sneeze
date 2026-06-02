@@ -19,8 +19,8 @@
 
 using namespace SNEEZE;
 
-using NODE   = VIEWPORT::SCENE::FABRIC::NODE;
-using FABRIC = VIEWPORT::SCENE::FABRIC;
+using NODE   = SCENE::FABRIC::NODE;
+using FABRIC = SCENE::FABRIC;
 
 // ---------------------------------------------------------------------------
 // CanRead -- determines if pRequestingOwner may read this node's data.

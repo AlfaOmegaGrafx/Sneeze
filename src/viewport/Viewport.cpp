@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include <Sneeze.h>
-#include "scene/Scene.h"
 #include "renderer/AnariRenderer.h"
 #include "sneeze/control/Control.h"
 
@@ -35,7 +34,6 @@ public:
    Impl (VIEWPORT* pViewport, CONTEXT* pContext) :
       m_pViewport        (pViewport),
       m_pContext         (pContext),
-      m_pScene           (nullptr),
       m_pHost            (nullptr),
       m_pJob_Compositor  (nullptr),
       m_pRenderer        (nullptr),
@@ -46,29 +44,14 @@ public:
    {
    }
 
-   bool Initialize (const std::string& sUrl)
+   bool Initialize ()
    {
-      bool bResult = false;
-
-      m_pScene = new SCENE (m_pViewport);
-
-      if (m_pScene->Initialize (sUrl))
-      {
-         bResult = true;
-
-         m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "VIEWPORT", "Initialized");
-      }
-      else m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "VIEWPORT", "Failed to initialize scene");
-
-      return bResult;
+      return true;
    }
 
    ~Impl ()
    {
       Deactivate ();
-
-      delete m_pScene;
-      m_pScene = nullptr;
    }
 
    void Activate (IVIEWPORT* pHost)
@@ -224,7 +207,6 @@ public:
 public:
    VIEWPORT*               m_pViewport;
    CONTEXT*                m_pContext;
-   SCENE*                  m_pScene;
    IVIEWPORT*              m_pHost;
    JOB_COMPOSITOR*         m_pJob_Compositor;
    RENDERER*               m_pRenderer;
@@ -266,9 +248,9 @@ VIEWPORT::VIEWPORT (CONTEXT* pContext) :
 {
 }
 
-bool VIEWPORT::Initialize (const std::string& sUrl)
+bool VIEWPORT::Initialize ()
 {
-   return m_pImpl->Initialize (sUrl);
+   return m_pImpl->Initialize ();
 }
 
 VIEWPORT::~VIEWPORT ()
@@ -303,7 +285,7 @@ void VIEWPORT::Renderer_Shutdown ()
 SNEEZE::ENGINE*      VIEWPORT::Engine          () const { return m_pImpl->m_pContext->Engine (); }
 SNEEZE::CONTEXT*     VIEWPORT::Context         () const { return m_pImpl->m_pContext;            }
 IVIEWPORT*           VIEWPORT::Host            () const { return m_pImpl->m_pHost;               }
-VIEWPORT::SCENE*     VIEWPORT::Scene           () const { return m_pImpl->m_pScene;              }
+SNEEZE::SCENE*       VIEWPORT::Scene           () const { return m_pImpl->m_pContext->Scene ();  }
 bool                 VIEWPORT::IsActive        () const { return m_pImpl->m_pHost != nullptr;     }
 VIEWPORT::VIEW&      VIEWPORT::View            ()       { return m_pImpl->m_View;                }
 VIEWPORT::RENDERER*  VIEWPORT::Renderer        () const { return m_pImpl->m_pRenderer;           }

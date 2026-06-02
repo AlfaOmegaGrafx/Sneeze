@@ -1,9 +1,10 @@
 # SOM — Scene Object Model
 
-The `som` module implements the core scene graph of the metaverse browser.
+The `scene` module implements the core scene graph of the metaverse browser.
 The SOM is a multi-source, hierarchically owned graph of FABRICs and NODEs.
 Content providers (astro, WASM modules) populate it; the compositor and
-renderer read from it.
+renderer read from it. SCENE is owned by CONTEXT (not VIEWPORT) — it
+represents the tab's spatial state, independent of whether a viewport is active.
 
 ## Architecture
 
@@ -28,7 +29,7 @@ A spatial fabric representing a branch of the SOM owned by a single
 container/store.
 
 ```cpp
-SNEEZE::VIEWPORT::SCENE::FABRIC fabric;
+SNEEZE::SCENE::FABRIC fabric;
 fabric.Url_Set ("https://example.com/world.msf");
 fabric.Owner_Set (pMyStore);
 fabric.Node_Set_Root (pRootNode);
@@ -56,7 +57,7 @@ containers for different access patterns:
 Both are protected by a single `std::mutex`.
 
 ```cpp
-SNEEZE::VIEWPORT::SCENE::FABRIC::NODE node;
+SNEEZE::SCENE::FABRIC::NODE node;
 node.ObjectIx_Set (42);
 node.MapObject_Set (&myMapObject);
 node.Fabric_Set_Attached (&childFabric);   // if this is an attachment point
@@ -107,7 +108,7 @@ reading or writing nodes/fabrics. Browser internals pass `nullptr` as the
 owner and bypass all checks.
 
 ```cpp
-#include "som/AccessControl.h"
+#include "AccessControl.h"
 
 // WASM host function checks before reading
 if (!CanRead (pNode, pRequestingStoreOwner))
@@ -158,7 +159,7 @@ for efficient spatial queries.
 SPATIAL_INDEX bvh;
 
 // Collect all nodes with map objects
-std::vector<SNEEZE::VIEWPORT::SCENE::FABRIC::NODE*> apNodes;
+std::vector<SNEEZE::SCENE::FABRIC::NODE*> apNodes;
 // ... populate from SOM traversal ...
 
 bvh.Build (apNodes);
@@ -166,11 +167,11 @@ bvh.Build (apNodes);
 // Frustum culling — returns visible nodes
 FRUSTUM frustum;
 // ... populate 6 planes from camera projection ...
-std::vector<SNEEZE::VIEWPORT::SCENE::FABRIC::NODE*> aVisible;
+std::vector<SNEEZE::SCENE::FABRIC::NODE*> aVisible;
 bvh.QueryFrustum (frustum, aVisible);
 
 // Proximity query — all nodes within a sphere
-std::vector<SNEEZE::VIEWPORT::SCENE::FABRIC::NODE*> aNearby;
+std::vector<SNEEZE::SCENE::FABRIC::NODE*> aNearby;
 bvh.QuerySphere (x, y, z, dRadius, aNearby);
 ```
 

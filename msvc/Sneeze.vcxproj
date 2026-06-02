@@ -63,7 +63,7 @@
   <!-- ===================================================================== -->
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(SneezeRoot)\src;$(SneezeRoot)\include;$(SneezeRoot)\src\sneeze;$(SneezeRoot)\src\viewport;$(SneezeRoot)\src\deps;$(SneezeDepsRoot)\debug\libs\SPIRV-Tools\install\include;$(SneezeDepsRoot)\debug\libs\curl\install\include;$(SneezeDepsRoot)\debug\libs\FreeType\install\include\freetype2;$(SneezeDepsRoot)\debug\libs\RmlUi\install\include;$(SneezeDepsRoot)\debug\libs\nlohmann-json\install\include;$(SneezeDepsRoot)\debug\libs\boringssl\install\include;$(SneezeDepsRoot)\debug\libs\jwt-cpp\install\include;$(SneezeDepsRoot)\debug\libs\Wasmtime\install\include;$(SneezeDepsRoot)\debug\libs\OpenXR-SDK\install\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SneezeRoot)\src;$(SneezeRoot)\include;$(SneezeRoot)\src\sneeze;$(SneezeRoot)\src\context;$(SneezeRoot)\src\viewport;$(SneezeRoot)\src\deps;$(SneezeDepsRoot)\debug\libs\SPIRV-Tools\install\include;$(SneezeDepsRoot)\debug\libs\curl\install\include;$(SneezeDepsRoot)\debug\libs\FreeType\install\include\freetype2;$(SneezeDepsRoot)\debug\libs\RmlUi\install\include;$(SneezeDepsRoot)\debug\libs\nlohmann-json\install\include;$(SneezeDepsRoot)\debug\libs\boringssl\install\include;$(SneezeDepsRoot)\debug\libs\jwt-cpp\install\include;$(SneezeDepsRoot)\debug\libs\Wasmtime\install\include;$(SneezeDepsRoot)\debug\libs\OpenXR-SDK\install\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>%(AdditionalOptions) /external:I "$(SneezeDepsRoot)\debug\libs\ANARI-SDK\install\include" /external:I "$(SneezeDepsRoot)\debug\libs\Vox\install\include"</AdditionalOptions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
@@ -89,7 +89,7 @@
   <!-- ===================================================================== -->
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(SneezeRoot)\src;$(SneezeRoot)\include;$(SneezeRoot)\src\sneeze;$(SneezeRoot)\src\viewport;$(SneezeRoot)\src\deps;$(SneezeDepsRoot)\release\libs\SPIRV-Tools\install\include;$(SneezeDepsRoot)\release\libs\curl\install\include;$(SneezeDepsRoot)\release\libs\FreeType\install\include\freetype2;$(SneezeDepsRoot)\release\libs\RmlUi\install\include;$(SneezeDepsRoot)\release\libs\nlohmann-json\install\include;$(SneezeDepsRoot)\release\libs\boringssl\install\include;$(SneezeDepsRoot)\release\libs\jwt-cpp\install\include;$(SneezeDepsRoot)\release\libs\Wasmtime\install\include;$(SneezeDepsRoot)\release\libs\OpenXR-SDK\install\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SneezeRoot)\src;$(SneezeRoot)\include;$(SneezeRoot)\src\sneeze;$(SneezeRoot)\src\context;$(SneezeRoot)\src\viewport;$(SneezeRoot)\src\deps;$(SneezeDepsRoot)\release\libs\SPIRV-Tools\install\include;$(SneezeDepsRoot)\release\libs\curl\install\include;$(SneezeDepsRoot)\release\libs\FreeType\install\include\freetype2;$(SneezeDepsRoot)\release\libs\RmlUi\install\include;$(SneezeDepsRoot)\release\libs\nlohmann-json\install\include;$(SneezeDepsRoot)\release\libs\boringssl\install\include;$(SneezeDepsRoot)\release\libs\jwt-cpp\install\include;$(SneezeDepsRoot)\release\libs\Wasmtime\install\include;$(SneezeDepsRoot)\release\libs\OpenXR-SDK\install\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>%(AdditionalOptions) /external:I "$(SneezeDepsRoot)\release\libs\ANARI-SDK\install\include" /external:I "$(SneezeDepsRoot)\release\libs\Vox\install\include"</AdditionalOptions>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
@@ -124,7 +124,7 @@
   <ItemGroup>
     <!-- sneeze core -->
     <ClCompile Include="..\src\sneeze\Engine.cpp" />
-    <ClCompile Include="..\src\sneeze\Context.cpp" />
+    <ClCompile Include="..\src\context\Context.cpp" />
     <ClCompile Include="..\src\sneeze\Thread.cpp" />
     <ClCompile Include="..\src\sneeze\control\Agent.cpp" />
     <ClCompile Include="..\src\sneeze\control\Control.cpp" />
@@ -141,29 +141,29 @@
     <ClCompile Include="..\src\astro\RMCObject.cpp" />
     <!-- viewport -->
     <ClCompile Include="..\src\viewport\Viewport.cpp" />
-    <ClCompile Include="..\src\viewport\scene\Celestial.cpp" />
-    <ClCompile Include="..\src\viewport\scene\Orbit.cpp" />
-    <ClCompile Include="..\src\viewport\scene\Epoch.cpp" />
-    <ClCompile Include="..\src\viewport\scene\Node.cpp" />
-    <ClCompile Include="..\src\viewport\scene\Fabric.cpp" />
-    <ClCompile Include="..\src\viewport\scene\Scene.cpp" />
-    <ClCompile Include="..\src\viewport\scene\MapObject.cpp" />
-    <ClCompile Include="..\src\viewport\scene\AccessControl.cpp" />
-    <ClCompile Include="..\src\viewport\scene\Events.cpp" />
-    <ClCompile Include="..\src\viewport\scene\SpatialIndex.cpp" />
+    <ClCompile Include="..\src\context\scene\Celestial.cpp" />
+    <ClCompile Include="..\src\context\scene\Orbit.cpp" />
+    <ClCompile Include="..\src\context\scene\Epoch.cpp" />
+    <ClCompile Include="..\src\context\scene\Node.cpp" />
+    <ClCompile Include="..\src\context\scene\Fabric.cpp" />
+    <ClCompile Include="..\src\context\scene\Scene.cpp" />
+    <ClCompile Include="..\src\context\scene\MapObject.cpp" />
+    <ClCompile Include="..\src\context\scene\AccessControl.cpp" />
+    <ClCompile Include="..\src\context\scene\Events.cpp" />
+    <ClCompile Include="..\src\context\scene\SpatialIndex.cpp" />
     <!-- console -->
-    <ClCompile Include="..\src\sneeze\console\Console.cpp" />
-    <ClCompile Include="..\src\sneeze\console\Entry.cpp" />
-    <ClCompile Include="..\src\sneeze\console\Stream.cpp" />
-    <ClCompile Include="..\src\sneeze\console\Block.cpp" />
+    <ClCompile Include="..\src\context\console\Console.cpp" />
+    <ClCompile Include="..\src\context\console\Entry.cpp" />
+    <ClCompile Include="..\src\context\console\Stream.cpp" />
+    <ClCompile Include="..\src\context\console\Block.cpp" />
     <!-- network -->
-    <ClCompile Include="..\src\sneeze\network\Network.cpp" />
-    <ClCompile Include="..\src\sneeze\network\File.cpp" />
-    <ClCompile Include="..\src\sneeze\network\Asset.cpp" />
+    <ClCompile Include="..\src\context\network\Network.cpp" />
+    <ClCompile Include="..\src\context\network\File.cpp" />
+    <ClCompile Include="..\src\context\network\Asset.cpp" />
     <!-- storage -->
-    <ClCompile Include="..\src\sneeze\storage\Storage.cpp" />
-    <ClCompile Include="..\src\sneeze\storage\Silo.cpp" />
-    <ClCompile Include="..\src\sneeze\storage\Unit.cpp" />
+    <ClCompile Include="..\src\context\storage\Storage.cpp" />
+    <ClCompile Include="..\src\context\storage\Silo.cpp" />
+    <ClCompile Include="..\src\context\storage\Unit.cpp" />
     <!-- persona -->
     <ClCompile Include="..\src\persona\Persona.cpp" />
     <!-- renderer -->
@@ -185,8 +185,8 @@
     <ClCompile Include="..\src\deps\compute\EmbeddedKernels.cpp" />
     <ClCompile Include="..\src\deps\compute\ComputeDispatch.cpp" />
     <!-- msf -->
-    <ClCompile Include="..\src\viewport\msf\MsfFile.cpp" />
-    <ClCompile Include="..\src\viewport\msf\CertChain.cpp" />
+    <ClCompile Include="..\src\context\msf\MsfFile.cpp" />
+    <ClCompile Include="..\src\context\msf\CertChain.cpp" />
     <!-- stb -->
     <ClCompile Include="..\src\deps\stb\stb_image_impl.cpp" />
     <ClCompile Include="..\src\deps\stb\Image.cpp" />
@@ -195,26 +195,25 @@
   <!-- Header files                                                           -->
   <!-- ===================================================================== -->
   <ItemGroup>
-    <ClInclude Include="..\src\sneeze\console\Console.h" />
-    <ClInclude Include="..\src\sneeze\network\Network.h" />
+    <ClInclude Include="..\src\context\console\Console.h" />
+    <ClInclude Include="..\src\context\network\Network.h" />
     <ClInclude Include="..\src\sneeze\Pch.h" />
 
-    <ClInclude Include="..\src\sneeze\storage\Storage.h" />
+    <ClInclude Include="..\src\context\storage\Storage.h" />
     <ClInclude Include="..\src\sneeze\Types.h" />
     <ClInclude Include="..\src\sneeze\Engine.h" />
     <ClInclude Include="..\src\sneeze\control\Control.h" />
     <ClInclude Include="..\src\astro\BodyData.h" />
     <ClInclude Include="..\src\astro\RMCObject.h" />
-    <ClInclude Include="..\src\viewport\scene\Celestial.h" />
-    <ClInclude Include="..\src\viewport\scene\Orbit.h" />
-    <ClInclude Include="..\src\viewport\scene\Epoch.h" />
-    <ClInclude Include="..\src\viewport\scene\Node.h" />
-    <ClInclude Include="..\src\viewport\scene\Fabric.h" />
-    <ClInclude Include="..\src\viewport\scene\Scene.h" />
-    <ClInclude Include="..\src\viewport\scene\MapObject.h" />
-    <ClInclude Include="..\src\viewport\scene\AccessControl.h" />
-    <ClInclude Include="..\src\viewport\scene\Events.h" />
-    <ClInclude Include="..\src\viewport\scene\SpatialIndex.h" />
+    <ClInclude Include="..\src\context\scene\Celestial.h" />
+    <ClInclude Include="..\src\context\scene\Orbit.h" />
+    <ClInclude Include="..\src\context\scene\Epoch.h" />
+    <ClInclude Include="..\src\context\scene\Node.h" />
+    <ClInclude Include="..\src\context\scene\Fabric.h" />
+    <ClInclude Include="..\src\context\scene\MapObject.h" />
+    <ClInclude Include="..\src\context\scene\AccessControl.h" />
+    <ClInclude Include="..\src\context\scene\Events.h" />
+    <ClInclude Include="..\src\context\scene\SpatialIndex.h" />
     <ClInclude Include="..\src\viewport\renderer\Renderer.h" />
     <ClInclude Include="..\src\viewport\renderer\AnariRenderer.h" />
     <ClInclude Include="..\src\viewport\renderer\UVSphere.h" />
@@ -228,7 +227,7 @@
     <ClInclude Include="..\src\deps\ui\UiContext.h" />
     <ClInclude Include="..\src\deps\compute\EmbeddedKernels.h" />
     <ClInclude Include="..\src\deps\compute\ComputeDispatch.h" />
-    <ClInclude Include="..\src\viewport\msf\Msf.h" />
+    <ClInclude Include="..\src\context\msf\Msf.h" />
     <ClInclude Include="..\src\deps\stb\stb_image.h" />
     <!-- public headers -->
     <ClInclude Include="..\include\Sneeze.h" />
@@ -237,6 +236,7 @@
     <ClInclude Include="..\include\Console.h" />
     <ClInclude Include="..\include\Network.h" />
     <ClInclude Include="..\include\Storage.h" />
+    <ClInclude Include="..\include\Scene.h" />
     <ClInclude Include="..\include\Container.h" />
     <ClInclude Include="..\include\Viewport.h" />
     <ClInclude Include="..\include\Image.h" />

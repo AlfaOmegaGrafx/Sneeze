@@ -32,6 +32,7 @@ public:
       m_pConsole        (nullptr),
       m_pNetwork        (nullptr),
       m_pStorage        (nullptr),
+      m_pScene          (nullptr),
       m_pViewport       (nullptr)
    {
    }
@@ -52,15 +53,21 @@ public:
 
             if (m_pStorage->Initialize ())
             {
-               m_pViewport = new VIEWPORT (m_pContext);
+               m_pScene = new SCENE (m_pContext);
 
-               if (m_pViewport->Initialize (sUrl))
+               if (m_pScene->Initialize (sUrl))
                {
-                  bResult = true;
+                  m_pViewport = new VIEWPORT (m_pContext);
 
-                  m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "CONTEXT", "Initialized");
+                  if (m_pViewport->Initialize ())
+                  {
+                     bResult = true;
+
+                     m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "CONTEXT", "Initialized");
+                  }
+                  else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "CONTEXT", "Failed to initialize viewport");
                }
-               else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "CONTEXT", "Failed to initialize viewport");
+               else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "CONTEXT", "Failed to initialize scene");
             }
             else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "CONTEXT", "Failed to initialize storage");
          }
@@ -75,6 +82,9 @@ public:
    {
       delete m_pViewport;
       m_pViewport = nullptr;
+
+      delete m_pScene;
+      m_pScene = nullptr;
 
       delete m_pStorage;
       m_pStorage = nullptr;
@@ -98,6 +108,7 @@ public:
    CONSOLE*    m_pConsole;
    NETWORK*    m_pNetwork;
    STORAGE*    m_pStorage;
+   SCENE*      m_pScene;
    VIEWPORT*   m_pViewport;
 
    std::unordered_map<std::string, CONTEXT::CONTAINER::CID> m_umCID;
@@ -137,6 +148,7 @@ SNEEZE::ICONTEXT*  SNEEZE::CONTEXT::Host     () const { return m_pImpl->m_pHost;
 SNEEZE::CONSOLE*   SNEEZE::CONTEXT::Console  () const { return m_pImpl->m_pConsole;  }
 SNEEZE::NETWORK*   SNEEZE::CONTEXT::Network  () const { return m_pImpl->m_pNetwork;  }
 SNEEZE::STORAGE*   SNEEZE::CONTEXT::Storage  () const { return m_pImpl->m_pStorage;  }
+SNEEZE::SCENE*     SNEEZE::CONTEXT::Scene    () const { return m_pImpl->m_pScene;    }
 SNEEZE::VIEWPORT*  SNEEZE::CONTEXT::Viewport () const { return m_pImpl->m_pViewport; }
 
 const std::string& SNEEZE::CONTEXT::Path_Permanent () const { return m_pImpl->m_sPath_Permanent; }

@@ -15,12 +15,12 @@
 #ifndef SNEEZE_VIEWPORT_FABRIC_H
 #define SNEEZE_VIEWPORT_FABRIC_H
 
-#include "scene/Scene.h"
+#include <Scene.h>
 
 namespace SNEEZE
 {
    // ---------------------------------------------------------------------------
-   // VIEWPORT::SCENE::FABRIC -- a spatial fabric's branch in the scene graph.
+   // SCENE::FABRIC -- a spatial fabric's branch in the scene graph.
    //
    // Each fabric owns a tree of NODEs rooted at m_pNode_Root. Fabrics form their
    // own hierarchy (parent/child) mirroring the attachment relationships in the
@@ -28,7 +28,7 @@ namespace SNEEZE
    // serves as the attachment point for this fabric.
    // ---------------------------------------------------------------------------
 
-   class VIEWPORT::SCENE::FABRIC
+   class SCENE::FABRIC
    {
    public:
       class NODE;

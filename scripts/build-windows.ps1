@@ -213,10 +213,10 @@ function Test-SourceHeaderSync {
    param ([string] $Root)
 
    $sNetworkH       = Join-Path $Root 'include\Network.h'
-   $sNetworkImplH   = Join-Path $Root 'src\sneeze\network\Network.h'
+   $sNetworkImplH   = Join-Path $Root 'src\context\network\Network.h'
    $sStorageH        = Join-Path $Root 'include\Storage.h'
    $sConsoleH        = Join-Path $Root 'include\Console.h'
-   $sConsoleImplH    = Join-Path $Root 'src\sneeze\console\Console.h'
+   $sConsoleImplH    = Join-Path $Root 'src\context\console\Console.h'
    $bOk              = $true
 
    if (-not (Select-String -Path $sNetworkH -Pattern 'void\s+File_Enum\s*\(' -Quiet)) {
@@ -232,7 +232,7 @@ function Test-SourceHeaderSync {
       $bOk = $false
    }
    if (-not (Test-Path $sNetworkImplH)) {
-      Write-Host '  MISSING: src/sneeze/network/Network.h (internal INETWORK_IMPL header)'
+      Write-Host '  MISSING: src/context/network/Network.h (internal INETWORK_IMPL header)'
       $bOk = $false
    }
    if (-not (Select-String -Path $sStorageH -Pattern 'class\s+ISTORAGE_IMPL' -Quiet)) {
@@ -252,11 +252,11 @@ function Test-SourceHeaderSync {
       $bOk = $false
    }
    if (-not (Test-Path $sConsoleImplH)) {
-      Write-Host '  MISSING: src/sneeze/console/Console.h (internal ICONSOLE_IMPL header)'
+      Write-Host '  MISSING: src/context/console/Console.h (internal ICONSOLE_IMPL header)'
       $bOk = $false
    }
    elseif (-not (Select-String -Path $sConsoleImplH -Pattern 'class\s+ICONSOLE_IMPL' -Quiet)) {
-      Write-Host '  MISMATCH: src/sneeze/console/Console.h does not define ICONSOLE_IMPL'
+      Write-Host '  MISMATCH: src/context/console/Console.h does not define ICONSOLE_IMPL'
       $bOk = $false
    }
 

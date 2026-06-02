@@ -22,7 +22,7 @@
 
 using namespace SNEEZE;
 
-using NODE = VIEWPORT::SCENE::FABRIC::NODE;
+using NODE = SCENE::FABRIC::NODE;
 
 // ===========================================================================
 // AABB

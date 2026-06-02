@@ -15,7 +15,7 @@
 #ifndef SNEEZE_SOM_EVENTS_H
 #define SNEEZE_SOM_EVENTS_H
 
-#include "scene/Fabric.h"
+#include "Fabric.h"
 
 namespace SNEEZE
 {
@@ -38,8 +38,8 @@ namespace SNEEZE
    struct EVENT_DATA
    {
       EVENT_TYPE  bType;
-      VIEWPORT::SCENE::FABRIC::NODE*  pNode;
-      VIEWPORT::SCENE::FABRIC::NODE*  pParent;
+      SCENE::FABRIC::NODE*  pNode;
+      SCENE::FABRIC::NODE*  pParent;
       uint32_t    twObjectIx;
    };
 
@@ -56,7 +56,7 @@ namespace SNEEZE
    struct WATCH
    {
       uint32_t       twWatchId;
-      VIEWPORT::SCENE::FABRIC::NODE*  pTarget;
+      SCENE::FABRIC::NODE*  pTarget;
       bool           bRecursive;
       uint32_t       nEventMask;
       void*          pOwner;
@@ -78,19 +78,19 @@ namespace SNEEZE
 
       // --- Watch management ---
 
-      uint32_t Watch_Node (VIEWPORT::SCENE::FABRIC::NODE* pNode, uint32_t nEventMask, void* pOwner, EVENT_CALLBACK pfnCallback);
-      uint32_t Watch_Tree (VIEWPORT::SCENE::FABRIC::NODE* pNode, uint32_t nEventMask, void* pOwner, EVENT_CALLBACK pfnCallback);
+      uint32_t Watch_Node (SCENE::FABRIC::NODE* pNode, uint32_t nEventMask, void* pOwner, EVENT_CALLBACK pfnCallback);
+      uint32_t Watch_Tree (SCENE::FABRIC::NODE* pNode, uint32_t nEventMask, void* pOwner, EVENT_CALLBACK pfnCallback);
       void     Unwatch (uint32_t twWatchId);
       void     UnwatchAll (void* pOwner);
 
       // --- Event dispatch (called by SOM mutators) ---
 
-      void Fire_NodeAdded (VIEWPORT::SCENE::FABRIC::NODE* pParent, VIEWPORT::SCENE::FABRIC::NODE* pChild);
-      void Fire_NodeRemoved (VIEWPORT::SCENE::FABRIC::NODE* pParent, VIEWPORT::SCENE::FABRIC::NODE* pChild);
-      void Fire_NodeModified (VIEWPORT::SCENE::FABRIC::NODE* pNode);
+      void Fire_NodeAdded (SCENE::FABRIC::NODE* pParent, SCENE::FABRIC::NODE* pChild);
+      void Fire_NodeRemoved (SCENE::FABRIC::NODE* pParent, SCENE::FABRIC::NODE* pChild);
+      void Fire_NodeModified (SCENE::FABRIC::NODE* pNode);
 
    private:
-      bool MatchesTarget (const WATCH& pWatch, VIEWPORT::SCENE::FABRIC::NODE* pNode) const;
+      bool MatchesTarget (const WATCH& pWatch, SCENE::FABRIC::NODE* pNode) const;
 
       std::vector<WATCH>  m_aWatches;
       uint32_t            m_twNextWatchId;
