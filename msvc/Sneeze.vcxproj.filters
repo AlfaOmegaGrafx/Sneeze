@@ -241,6 +241,9 @@
     <ClCompile Include="..\src\deps\stb\stb_image_impl.cpp">
       <Filter>src\deps\stb</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\deps\stb\Image.cpp">
+      <Filter>src\deps\stb</Filter>
+    </ClCompile>
     <ClCompile Include="..\src\sneeze\control\Fetch.cpp">
       <Filter>src\sneeze\control</Filter>
     </ClCompile>
@@ -363,6 +366,9 @@
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="..\include\Console.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Image.h">
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="..\src\sneeze\network\Network.h">

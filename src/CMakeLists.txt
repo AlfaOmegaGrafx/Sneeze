@@ -682,7 +682,7 @@ set (MSF_SOURCES
 set (MSF_HEADERS
    viewport/msf/Msf.h)
 
-set (STB_SOURCES  deps/stb/stb_image_impl.cpp)
+set (STB_SOURCES  deps/stb/stb_image_impl.cpp deps/stb/Image.cpp)
 set (STB_HEADERS  deps/stb/stb_image.h)
 
 set (INCLUDE_HEADERS
@@ -693,7 +693,8 @@ set (INCLUDE_HEADERS
    ../include/Container.h
    ../include/Viewport.h
    ../include/Storage.h
-   ../include/Console.h)
+   ../include/Console.h
+   ../include/Image.h)
 
 # ---------------------------------------------------------------------------
 # Static library
