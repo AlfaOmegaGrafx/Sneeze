@@ -314,6 +314,8 @@ if ($List) {
 # ---------------------------------------------------------------------------
 
 if ($DepsMode) {
+   . (Join-Path $PSScriptRoot 'dep-sync.ps1')
+
    if ($Rebuild) {
       if ($Only) {
          Remove-DepState $Only
@@ -325,6 +327,11 @@ if ($DepsMode) {
          Write-Host "Scrubbed: $DepRoot"
       }
    }
+
+   $depsCMakeLists = Join-Path $DepsSourceDir 'CMakeLists.txt'
+   $orderedForSync = @($DepsOrdered)
+   Update-DepStampsFromCMake -DepsSourceDir $DepsSourceDir -Deps $orderedForSync `
+      -StampDir $StampDir -CMakeListsPath $depsCMakeLists -ListName 'SNEEZE_DEPS' -ScriptLabel 'Sneeze'
 
    Write-Host "==> Sneeze Windows deps build"
    Write-Host "    Platform       = $Platform"
