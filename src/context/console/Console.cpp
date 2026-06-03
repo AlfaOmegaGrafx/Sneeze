@@ -58,7 +58,7 @@ public:
    // Stream management
    // ---------------------------------------------------------------------------
 
-   CONSOLE::STREAM* Stream_Open (const CONTEXT::CONTAINER::CID* pCID)
+   CONSOLE::STREAM* Stream_Open (const CONTAINER::CID* pCID)
    {
       STREAM* pStream = nullptr;
 
@@ -174,7 +174,7 @@ public:
       return pEntry;
    }
 
-   std::shared_ptr<const CONSOLE::ENTRY> Entry_Create (const CONTEXT::CONTAINER::CID* pCID, CONSOLE::eLEVEL eLevel, const std::string& sMessage, uint32_t nGroupDepth, bool bCollapsed) override
+   std::shared_ptr<const CONSOLE::ENTRY> Entry_Create (const CONTAINER::CID* pCID, CONSOLE::eLEVEL eLevel, const std::string& sMessage, uint32_t nGroupDepth, bool bCollapsed) override
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
 
@@ -204,7 +204,7 @@ public:
    std::deque<std::shared_ptr<const CONSOLE::ENTRY>>                m_apEntry;
    uint32_t                                                         m_nIndex_Entry;
 
-   std::unordered_map<const CONTEXT::CONTAINER::CID*, CONSOLE::STREAM*> m_umpStream;
+   std::unordered_map<const CONTAINER::CID*, CONSOLE::STREAM*>      m_umpStream;
 };
 
 /***********************************************************************************************************************************
@@ -243,7 +243,7 @@ void               CONSOLE::Blocks          (uint32_t n) {        m_pImpl->m_nBl
 // Methods
 // ---------------------------------------------------------------------------
 
-CONSOLE::STREAM*   CONSOLE::Stream_Open       (const CONTEXT::CONTAINER::CID* pCID)           { return m_pImpl->Stream_Open       (pCID); }
+CONSOLE::STREAM*   CONSOLE::Stream_Open       (const CONTAINER::CID* pCID)           { return m_pImpl->Stream_Open       (pCID); }
 void               CONSOLE::Stream_Close      (STREAM* pStream)                               {        m_pImpl->Stream_Close      (pStream); }
 void               CONSOLE::Stream_Enum       (IENUM_STREAM* pEnum)                           {        m_pImpl->Stream_Enum       (pEnum); }
 

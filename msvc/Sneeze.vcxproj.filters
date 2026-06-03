@@ -97,6 +97,9 @@
     <ClCompile Include="..\src\context\Context.cpp">
       <Filter>src\context</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\context\Container.cpp">
+      <Filter>src\context</Filter>
+    </ClCompile>
     <ClCompile Include="..\src\sneeze\Thread.cpp">
       <Filter>src\sneeze</Filter>
     </ClCompile>

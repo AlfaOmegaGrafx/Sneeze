@@ -125,6 +125,7 @@
     <!-- sneeze core -->
     <ClCompile Include="..\src\sneeze\Engine.cpp" />
     <ClCompile Include="..\src\context\Context.cpp" />
+    <ClCompile Include="..\src\context\Container.cpp" />
     <ClCompile Include="..\src\sneeze\Thread.cpp" />
     <ClCompile Include="..\src\sneeze\control\Agent.cpp" />
     <ClCompile Include="..\src\sneeze\control\Control.cpp" />

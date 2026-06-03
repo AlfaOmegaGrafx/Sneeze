@@ -239,7 +239,7 @@ public:
          Load (); 
    }
 
-   void Detach (const CONTEXT::CONTAINER::CID* pCID)
+   void Detach (const CONTAINER::CID* pCID)
    {
       if (m_nCount_Load > 0 && --m_nCount_Load == 0)
       {
@@ -339,7 +339,7 @@ public:
       m_nAccessCount++;
    }
 
-   void Meta_Save (const CONTEXT::CONTAINER::CID* pCID)
+   void Meta_Save (const CONTAINER::CID* pCID)
    {
       std::string sMetaPath = m_sPathname + ".meta";
 
@@ -559,14 +559,14 @@ uint32_t       UNIT::Open       ()                                              
 uint32_t       UNIT::Close      ()                                                        { return --m_pImpl->m_nCount_Open; }
 
 void           UNIT::Attach     ()                                                        {        m_pImpl->Attach      (); }
-void           UNIT::Detach     (const CONTEXT::CONTAINER::CID* pCID)                     {        m_pImpl->Detach      (pCID); }
+void           UNIT::Detach     (const CONTAINER::CID* pCID)                     {        m_pImpl->Detach      (pCID); }
 
 void           UNIT::Load       ()                                                        {        m_pImpl->Load        (); }
 void           UNIT::Save       ()                                                        {        m_pImpl->Save        (); }
 void           UNIT::Evict      ()                                                        {        m_pImpl->Evict       (); }
 
 void           UNIT::TouchAccess ()                                                       {        m_pImpl->TouchAccess (); }
-void           UNIT::Meta_Save  (const CONTEXT::CONTAINER::CID* pCID)                     {        m_pImpl->Meta_Save   (pCID); }
+void           UNIT::Meta_Save  (const CONTAINER::CID* pCID)                     {        m_pImpl->Meta_Save   (pCID); }
 
 nlohmann::json UNIT::Get        (const std::string& sPath)                          const { return m_pImpl->Get         (sPath); }
 void           UNIT::Set        (const std::string& sPath, const nlohmann::json& j)       {        m_pImpl->Set         (sPath, j); }

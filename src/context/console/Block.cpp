@@ -43,7 +43,7 @@ public:
          Load (nullptr);
    }
 
-   void Detach (const CONTEXT::CONTAINER::CID* pCID)
+   void Detach (const CONTAINER::CID* pCID)
    {
       if (m_nCount_Load > 0 && --m_nCount_Load == 0)
          Evict ();
@@ -64,7 +64,7 @@ public:
    // Load — read the JSONL file into the in-memory entry cache.
    // ---------------------------------------------------------------------------
 
-   void Load (const CONTEXT::CONTAINER::CID* pCID)
+   void Load (const CONTAINER::CID* pCID)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -191,10 +191,10 @@ uint32_t             BLOCK::EntryCount  () const { return m_pImpl->m_nEntryCount
 // ---------------------------------------------------------------------------
 
 void     BLOCK::Attach     ()                                             { m_pImpl->Attach     (); }
-void     BLOCK::Detach     (const CONTEXT::CONTAINER::CID* pCID)          { m_pImpl->Detach     (pCID); }
+void     BLOCK::Detach     (const CONTAINER::CID* pCID)                   { m_pImpl->Detach     (pCID); }
 void     BLOCK::Entry_Enum (CONSOLE::IENUM_ENTRY* pEnum)            const { m_pImpl->Entry_Enum (pEnum); }
 
-void     BLOCK::Load       (const CONTEXT::CONTAINER::CID* pCID)          { m_pImpl->Load       (pCID); }
+void     BLOCK::Load       (const CONTAINER::CID* pCID)                   { m_pImpl->Load       (pCID); }
 void     BLOCK::Evict      ()                                             { m_pImpl->Evict      (); }
 
 void     BLOCK::Write      (std::shared_ptr<const CONSOLE::ENTRY> pEntry) { m_pImpl->Write      (pEntry); }

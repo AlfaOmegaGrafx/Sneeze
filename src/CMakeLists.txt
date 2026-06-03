@@ -525,6 +525,7 @@ endif ()
 set (CORE_SOURCES
    sneeze/Engine.cpp
    context/Context.cpp
+   context/Container.cpp
    sneeze/Thread.cpp
    sneeze/control/Agent.cpp
    sneeze/control/Control.cpp

@@ -24,7 +24,7 @@ using namespace SNEEZE;
 class NETWORK::FILE::Impl
 {
 public:
-   Impl (FILE* pFile, INETWORK_IMPL* pINetwork_Impl, CONTEXT::CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
+   Impl (FILE* pFile, INETWORK_IMPL* pINetwork_Impl, CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
       m_pFile            (pFile),
       m_pINetwork_Impl   (pINetwork_Impl),
       m_pCID             (pCID),
@@ -253,7 +253,7 @@ public:
 public:
    FILE*                          m_pFile;
    INETWORK_IMPL*                 m_pINetwork_Impl;
-   const CONTEXT::CONTAINER::CID* m_pCID;
+   const CONTAINER::CID* m_pCID;
    ASSET*                         m_pAsset;
    IFILE*                         m_pListener;
    uint32_t                       m_nCount_Attach;
@@ -285,7 +285,7 @@ public:
 // Constructor / Destructor
 // ---------------------------------------------------------------------------
 
-NETWORK::FILE::FILE (INETWORK_IMPL* pINetwork_Impl, CONTEXT::CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
+NETWORK::FILE::FILE (INETWORK_IMPL* pINetwork_Impl, CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
    m_pImpl (new Impl (this, pINetwork_Impl, pCID, nFileIx, sUrl, sHash, bCacheEnabled))
 {
 }

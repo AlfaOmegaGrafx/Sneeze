@@ -90,7 +90,7 @@ namespace SNEEZE
       class FILE
       {
       public:
-         FILE (INETWORK_IMPL* pINetwork_Impl, CONTEXT::CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled);
+         FILE (INETWORK_IMPL* pINetwork_Impl, CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled);
          ~FILE ();
 
          // --- Snapshot fields (always available, even after Close) ---
@@ -186,8 +186,8 @@ namespace SNEEZE
 
       // --- Primary API ---
 
-      FILE* File_Open (CONTEXT::CONTAINER::CID* pCID, const std::string& sUrl, IFILE* pListener);
-      FILE* File_Open (CONTEXT::CONTAINER::CID* pCID, const std::string& sUrl, const std::string& sHash, uint32_t nAssetIx = 0, IFILE* pListener = nullptr);
+      FILE* File_Open (CONTAINER::CID* pCID, const std::string& sUrl, IFILE* pListener);
+      FILE* File_Open (CONTAINER::CID* pCID, const std::string& sUrl, const std::string& sHash, uint32_t nAssetIx = 0, IFILE* pListener = nullptr);
 
       // --- Cache management ---
 

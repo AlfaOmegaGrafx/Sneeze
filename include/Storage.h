@@ -63,7 +63,7 @@ namespace SNEEZE
       class SILO
       {
       public:
-         SILO (ISTORAGE_IMPL* pIStorage_Impl, const CONTEXT::CONTAINER::CID* pCID);
+         SILO (ISTORAGE_IMPL* pIStorage_Impl, const CONTAINER::CID* pCID);
         ~SILO ();
 
          void Initialize ();
@@ -123,7 +123,7 @@ namespace SNEEZE
 
       // --- Container lifecycle ---
 
-      SILO*   Silo_Open  (const CONTEXT::CONTAINER::CID* pCID);
+      SILO*   Silo_Open  (const CONTAINER::CID* pCID);
       void    Silo_Close (SILO* pSilo);
       void    Silo_Enum  (IENUM_SILO* pEnum);
 

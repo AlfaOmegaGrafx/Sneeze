@@ -24,7 +24,7 @@ using namespace SNEEZE;
 class CONSOLE::STREAM::Impl
 {
 public:
-   Impl (ICONSOLE_IMPL* pIConsole_Impl, const CONTEXT::CONTAINER::CID* pCID) :
+   Impl (ICONSOLE_IMPL* pIConsole_Impl, const CONTAINER::CID* pCID) :
       m_pIConsole_Impl   (pIConsole_Impl),
       m_pCID             (pCID),
       m_bAttached        (false),
@@ -318,7 +318,7 @@ public:
 
 public:
    ICONSOLE_IMPL*                                                         m_pIConsole_Impl;
-   const CONTEXT::CONTAINER::CID*                                         m_pCID;
+   const CONTAINER::CID*                                                  m_pCID;
    std::vector<BLOCK*>                                                    m_apBlock;
    std::recursive_mutex                                                   m_mxStream;
    bool                                                                   m_bAttached;
@@ -338,7 +338,7 @@ public:
 // CONSOLE::STREAM
 // ===========================================================================
 
-CONSOLE::STREAM::STREAM (ICONSOLE_IMPL* pIConsole_Impl, const CONTEXT::CONTAINER::CID* pCID) :
+CONSOLE::STREAM::STREAM (ICONSOLE_IMPL* pIConsole_Impl, const CONTAINER::CID* pCID) :
    m_pImpl (new Impl (pIConsole_Impl, pCID))
 {
 }

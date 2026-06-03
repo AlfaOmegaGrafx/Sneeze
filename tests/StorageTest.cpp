@@ -84,9 +84,9 @@ static ENGINE*                     s_pSneeze      = nullptr;
 static STORAGE*                    s_pStorage     = nullptr;
 static CONTEXT*                    s_pContext     = nullptr;
 
-static CONTEXT::CONTAINER::CID MakeTestCID (const std::string& sContainer = "poker")
+static CONTAINER::CID MakeTestCID (const std::string& sContainer = "poker")
 {
-   CONTEXT::CONTAINER::CID CID;
+   CONTAINER::CID CID;
    CID.sFingerprint   = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
    CID.sOrganization  = "TestOrg";
    CID.sCommonName    = "TestOrg";

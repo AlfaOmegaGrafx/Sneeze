@@ -124,7 +124,7 @@ int RunConsoleTests (int nArgc, char** aArgv)
    engine.Login ("Test", "User");
 
    // Create a CID for testing
-   CONTEXT::CONTAINER::CID cid;
+   CONTAINER::CID cid;
    cid.sFingerprint    = "abcdef0123456789abcdef01234567890123456789abcdef0123456789abcd";
    cid.sOrganization   = "TestOrg";
    cid.sCommonName     = "TestProvider";

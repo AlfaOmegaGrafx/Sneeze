@@ -23,7 +23,7 @@ using namespace SNEEZE;
 class STORAGE::SILO::Impl
 {
 public:
-   Impl (ISTORAGE_IMPL* pIStorage_Impl, const CONTEXT::CONTAINER::CID* pCID) :
+   Impl (ISTORAGE_IMPL* pIStorage_Impl, const CONTAINER::CID* pCID) :
       m_pIStorage_Impl (pIStorage_Impl),
       m_pCID           (pCID),
       m_bAttached      (false)
@@ -154,8 +154,8 @@ public:
 
 public:
    ISTORAGE_IMPL*                   m_pIStorage_Impl;
-   const CONTEXT::CONTAINER::CID*   m_pCID;
-   UNIT*                          m_apUnit[STORAGE::kSCOPE_COUNT];
+   const CONTAINER::CID*            m_pCID;
+   UNIT*                            m_apUnit[STORAGE::kSCOPE_COUNT];
    std::mutex                       m_mxSilo;
    bool                             m_bAttached;
 };
@@ -164,7 +164,7 @@ public:
 // STORAGE::SILO
 // ===========================================================================
 
-STORAGE::SILO::SILO (ISTORAGE_IMPL* pIStorage_Impl, const CONTEXT::CONTAINER::CID* pCID) :
+STORAGE::SILO::SILO (ISTORAGE_IMPL* pIStorage_Impl, const CONTAINER::CID* pCID) :
    m_pImpl (new Impl (pIStorage_Impl, pCID))
 {
 }

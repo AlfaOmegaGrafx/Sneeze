@@ -153,7 +153,7 @@ static CACHE_TEST_CONTEXT_HOST*   s_pContextHost  = nullptr;
 static SNEEZE::ENGINE*            s_pSneeze       = nullptr;
 static CONTEXT*                   s_pContext      = nullptr;
 
-static auto s_pTestCID = CONTEXT::CONTAINER::CID {
+static auto s_pTestCID = CONTAINER::CID {
    "TestFingerprint_0123456789abcdef",
    "TestOrg",
    "TestCommon",

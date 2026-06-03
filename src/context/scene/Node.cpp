@@ -24,7 +24,7 @@ using namespace SNEEZE;
 
 using FABRIC    = SCENE::FABRIC;
 using NODE      = SCENE::FABRIC::NODE;
-using CONTAINER = SNEEZE::CONTEXT::CONTAINER;
+using CONTAINER = SNEEZE::CONTAINER;
 
 // ---------------------------------------------------------------------------
 // SEQLOCK

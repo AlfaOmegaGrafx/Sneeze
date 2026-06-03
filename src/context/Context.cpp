@@ -111,7 +111,7 @@ public:
    SCENE*      m_pScene;
    VIEWPORT*   m_pViewport;
 
-   std::unordered_map<std::string, CONTEXT::CONTAINER::CID> m_umCID;
+   std::unordered_map<std::string, CONTAINER::CID> m_umCID;
 };
 
 /***********************************************************************************************************************************
@@ -154,7 +154,7 @@ SNEEZE::VIEWPORT*  SNEEZE::CONTEXT::Viewport () const { return m_pImpl->m_pViewp
 const std::string& SNEEZE::CONTEXT::Path_Permanent () const { return m_pImpl->m_sPath_Permanent; }
 const std::string& SNEEZE::CONTEXT::Path_Temporary () const { return m_pImpl->m_sPath_Temporary; }
 
-const SNEEZE::CONTEXT::CONTAINER::CID* SNEEZE::CONTEXT::CID_Pool (const CONTAINER::CID* pCID)
+const SNEEZE::CONTAINER::CID* SNEEZE::CONTEXT::CID_Pool (const CONTAINER::CID* pCID)
 {
    const CONTAINER::CID* pCID_Result = nullptr;
 

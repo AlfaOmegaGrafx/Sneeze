@@ -15,6 +15,8 @@
 #ifndef SNEEZE_CONTEXT_H
 #define SNEEZE_CONTEXT_H
 
+#include "Container.h"
+
 namespace SNEEZE
 {
    class ENGINE;
@@ -29,31 +31,6 @@ namespace SNEEZE
    class CONTEXT
    {
    public:
-
-      // ---------------------------------------------------------------------------
-      // CONTEXT::CONTAINER - the runtime manifestation of an MSF file.
-      //
-      // CID is the identity record for a container. Uniqueness is determined by
-      // the tuple (persona hash, fingerprint, container name).
-      // ---------------------------------------------------------------------------
-
-      class CONTAINER
-      {
-      public:
-         class CID
-         {
-         public:
-            std::string sFingerprint;
-            std::string sOrganization;
-            std::string sCommonName;
-            std::string sContainerName;
-            std::string sPersonaHash;
-            bool        bValidated;
-
-            std::string DisplayName () const { return sCommonName + "/" + sContainerName; }
-            std::string Key         () const { return sPersonaHash.substr (0, 12) + "/" + sFingerprint.substr (0, 2) + "/" + sFingerprint.substr (2, 22) + "/" + sContainerName; }
-         };
-      };
 
       enum eSESSION
       {

@@ -18,7 +18,7 @@ using namespace SNEEZE;
 // CONSOLE::ENTRY
 // ===========================================================================
 
-CONSOLE::ENTRY::ENTRY (const CONTEXT::CONTAINER::CID* pCID, eLEVEL eLevel, const std::string& sMessage, uint32_t nIndex, uint32_t nGroupDepth, bool bCollapsed, const std::string& sStackTrace, const std::string& sSource) :
+CONSOLE::ENTRY::ENTRY (const CONTAINER::CID* pCID, eLEVEL eLevel, const std::string& sMessage, uint32_t nIndex, uint32_t nGroupDepth, bool bCollapsed, const std::string& sStackTrace, const std::string& sSource) :
    m_pCID        (pCID),
    m_eLevel      (eLevel),
    m_sMessage    (sMessage),
@@ -35,7 +35,7 @@ CONSOLE::ENTRY::ENTRY (const CONTEXT::CONTAINER::CID* pCID, eLEVEL eLevel, const
 // Const accessors
 // ---------------------------------------------------------------------------
 
-const SNEEZE::CONTEXT::CONTAINER::CID*       CONSOLE::ENTRY::CID         () const { return m_pCID; }
+const SNEEZE::CONTAINER::CID*       CONSOLE::ENTRY::CID         () const { return m_pCID; }
 CONSOLE::eLEVEL                              CONSOLE::ENTRY::Level       () const { return m_eLevel; }
 const std::string&                           CONSOLE::ENTRY::Message     () const { return m_sMessage; }
 uint32_t                                     CONSOLE::ENTRY::Index       () const { return m_nIndex; }
@@ -155,7 +155,7 @@ nlohmann::json CONSOLE::ENTRY::ToJson () const
 // the STREAM that owns the block file (ENTRY does not resolve CIDs itself).
 // ---------------------------------------------------------------------------
 
-std::shared_ptr<const CONSOLE::ENTRY> CONSOLE::ENTRY::FromJson (const nlohmann::json& jEntry, const CONTEXT::CONTAINER::CID* pCID)
+std::shared_ptr<const CONSOLE::ENTRY> CONSOLE::ENTRY::FromJson (const nlohmann::json& jEntry, const CONTAINER::CID* pCID)
 {
    eLEVEL eLevel = kLEVEL_LOG;
    std::string sLevelStr = jEntry.value ("level", "log");

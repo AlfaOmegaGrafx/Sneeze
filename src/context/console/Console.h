@@ -25,7 +25,7 @@ namespace SNEEZE
 
       virtual const std::string& Path_Temporary () const                         = 0;
 
-      virtual std::shared_ptr<const CONSOLE::ENTRY> Entry_Create (const CONTEXT::CONTAINER::CID* pCID, CONSOLE::eLEVEL eLevel, const std::string& sMessage, uint32_t nGroupDepth, bool bCollapsed) = 0;
+      virtual std::shared_ptr<const CONSOLE::ENTRY> Entry_Create (const CONTAINER::CID* pCID, CONSOLE::eLEVEL eLevel, const std::string& sMessage, uint32_t nGroupDepth, bool bCollapsed) = 0;
       virtual std::shared_ptr<const CONSOLE::ENTRY> Entry_Find   (uint32_t nIndex) = 0;
 
    private:
@@ -57,9 +57,9 @@ namespace SNEEZE
       // --- Lifecycle ---
 
       void                Attach ();
-      void                Detach (const CONTEXT::CONTAINER::CID* pCID);
-      void                Load (const CONTEXT::CONTAINER::CID* pCID);
-      void                Evict ();
+      void                Detach (const CONTAINER::CID* pCID);
+      void                Load   (const CONTAINER::CID* pCID);
+      void                Evict  ();
 
       // --- Meta ---
 
