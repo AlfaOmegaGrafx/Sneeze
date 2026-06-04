@@ -14,78 +14,56 @@
 
 #include <Sneeze.h>
 #include <Scene.h>
-#include "Fabric.h"
-#include "Node.h"
-#include "astro/BodyData.h"
 
 using namespace SNEEZE;
 
-using FABRIC   = SCENE::FABRIC;
-using NODE     = SCENE::FABRIC::NODE;
 
 SCENE::SCENE (CONTEXT* pContext) :
-   m_pContext        (pContext),
-   m_pFabric_Root    (nullptr),
-   m_pFabric_Primary (nullptr)
+   m_pContext     (pContext),
+   m_pFabric_Root (nullptr)
 {
 }
 
 bool SCENE::Initialize (const std::string& sUrl)
 {
-   m_pFabric_Root = new FABRIC (this);
-   auto* pNode_Root = new NODE (m_pFabric_Root);
-   m_pFabric_Root->Node_Set_Root (pNode_Root);
+   m_pFabric_Root = new FABRIC_ROOT (this);
 
-   auto* pNode_Attach = new NODE (m_pFabric_Root);
-   pNode_Attach->SetPrimary (true);
-   pNode_Root->Node_Add (pNode_Attach);
+   if (m_pFabric_Root->Initialize (sUrl))
+   {
+      Engine ()->Log (IENGINE::kLOGLEVEL_Info, "SCENE", "Initialized (root fabric + primary fabric)");
+   }
+   else
+   {
+      delete m_pFabric_Root;
+      m_pFabric_Root = nullptr;
+   }
 
-   m_pFabric_Primary = new FABRIC (this);
-   auto* pNode_PrimaryRoot = new NODE (m_pFabric_Primary);
-   m_pFabric_Primary->Node_Set_Root (pNode_PrimaryRoot);
-   m_pFabric_Primary->Fabric_Set_Parent (m_pFabric_Root);
-   m_pFabric_Primary->Node_Set_Attaching (pNode_Attach);
-   pNode_Attach->Fabric_Set_Attached (m_pFabric_Primary);
-   m_pFabric_Root->Fabric_Add (m_pFabric_Primary);
-
-   Engine ()->Log (IENGINE::kLOGLEVEL_Info, "SCENE", "Initialized (root fabric + primary fabric)");
-
-   return Fabric_Open_Primary (sUrl);
+   return (m_pFabric_Root != nullptr);
 }
 
 SCENE::~SCENE ()
 {
-   if (m_pFabric_Primary)
-   {
-      delete m_pFabric_Primary->Node_Root ();
-      delete m_pFabric_Primary;
-      m_pFabric_Primary = nullptr;
-   }
+   // Deleting the root fabric triggers a cascade: deleting its nodes will
+   // recursively delete all child nodes. When a node is an attachment
+   // point, the fabric attached to it will also be deleted. By the time
+   // the root fabric is fully destroyed, all descendant fabrics (including
+   // the primary) should have been deleted as well.
 
-   if (m_pFabric_Root)
-   {
-      auto* pNode_Root = m_pFabric_Root->Node_Root ();
-      if (pNode_Root)
-      {
-         for (auto* pChild : pNode_Root->Node_Children ())
-            delete pChild;
-         delete pNode_Root;
-      }
-      delete m_pFabric_Root;
-      m_pFabric_Root = nullptr;
-   }
+   delete m_pFabric_Root;
+   m_pFabric_Root = nullptr;
+}
+
+void SCENE::Url (const std::string& sUrl)
+{
+   // URL change (tab navigation). Not yet implemented.
+   // When implemented: delete root fabric (cascades through all
+   // fabrics/nodes/containers), create new root fabric with sUrl,
+   // initialize it.
 }
 
 SNEEZE::CONTEXT* SCENE::Context        () const { return m_pContext; }
 
 SNEEZE::ENGINE*  SCENE::Engine         () const { return m_pContext->Engine (); }
 SNEEZE::NETWORK* SCENE::Network        () const { return m_pContext->Network (); }
-FABRIC*          SCENE::Fabric_Root    () const { return m_pFabric_Root; }
-FABRIC*          SCENE::Fabric_Primary () const { return m_pFabric_Primary; }
-
-bool SCENE::Fabric_Open_Primary (const std::string& /*sUrl*/)
-{
-   astro::InjectSolarSystem (m_pFabric_Primary);
-
-   return true;
-}
+FABRIC_ROOT*     SCENE::Fabric_Root    () const { return m_pFabric_Root; }
+FABRIC*          SCENE::Fabric_Primary () const { return m_pFabric_Root ? m_pFabric_Root->Node_Primary ()->Fabric_Attachment () : nullptr; }

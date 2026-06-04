@@ -72,10 +72,10 @@ namespace SNEEZE
          virtual void OnFileFailed (FILE* pFile) = 0;
       };
 
-      class IENUM
+      class IENUM_FILE
       {
       public:
-         virtual ~IENUM () {}
+         virtual ~IENUM_FILE () {}
          virtual void OnAsset (FILE* pFile) = 0;
       };
 
@@ -196,7 +196,7 @@ namespace SNEEZE
 
       void Clear ();
       void Reset ();
-      void File_Enum (IENUM* pEnum);
+      void File_Enum (IENUM_FILE* pEnum);
 
       void Rules_Add (const std::string& sContentType, const std::string& sOlderThan);
 

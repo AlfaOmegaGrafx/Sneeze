@@ -58,7 +58,8 @@ private:
 class ASSET::Impl
 {
 public:
-   Impl (INETWORK_IMPL* pINetwork_Impl, const std::string& sUrl, const std::string& sPathname, uint32_t nAssetIx) :
+   Impl (ASSET* pAsset, INETWORK_IMPL* pINetwork_Impl, const std::string& sUrl, const std::string& sPathname, uint32_t nAssetIx) :
+      m_pAsset (pAsset),
       m_pINetwork_Impl (pINetwork_Impl),
       m_sUrl (sUrl),
       m_sPathname (sPathname),
@@ -82,6 +83,11 @@ public:
 
    ~Impl ()
    {
+      if (m_pAsset_Fetch)
+      {
+         m_pAsset_Fetch->Cancel ();
+         m_pAsset_Fetch = nullptr;
+      }
    }
 
    void TouchAccess ()
@@ -336,7 +342,343 @@ public:
       return sResult;
    }
 
+   // ---------------------------------------------------------------------------
+   // Lifecycle
+   // ---------------------------------------------------------------------------
+
+   void Open (NETWORK::FILE* pFile)
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mxAsset);
+
+      m_apFiles.push_back (pFile);
+
+      m_nCount_Open++;
+   }
+
+   size_t Close (NETWORK::FILE* pFile)
+   {
+      // if pFile == nullptr, the fetch thread is releasing its implicit lock
+
+      std::lock_guard<std::recursive_mutex> guard (m_mxAsset);
+
+      m_nCount_Open--;
+
+      if (pFile)
+      {
+         auto it = std::find (m_apFiles.begin (), m_apFiles.end (), pFile);
+         if (it != m_apFiles.end ())
+            m_apFiles.erase (it);
+      }
+
+      return m_nCount_Open;
+   }
+
+   bool Attach (NETWORK::FILE* pFile, bool bFetch_Allowed)
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mxAsset);
+
+      bool bResult = false;
+
+      if (pFile->AssetIx () == 0  ||  pFile->AssetIx () == m_nAssetIx)
+      {
+         m_nCount_Attach++;
+
+         if (m_nCount_Attach == 1)
+            Meta_Load ();
+
+         pFile->SnapshotInitial ();
+
+         std::string sHash         = pFile->OpenHash ();
+         bool        bCacheEnabled = pFile->CacheEnabled ();
+         bool        bStale        = m_bState == NETWORK::STATE_READY  &&  m_pINetwork_Impl->Rules_Stale (m_pAsset);
+
+         bool bFetch  = false;
+         bool bReady  = false;
+         bool bFailed = false;
+
+         NETWORK::STATE bState = m_bState;
+
+         if (bState == NETWORK::STATE_READY  &&  bStale)
+         {
+            // Cached but stale per rules — discard and re-fetch
+            Meta_Reset ();
+            bFetch = true;
+         }
+         else if (bState == NETWORK::STATE_READY  &&  !sHash.empty ()  &&  m_sHash.empty ())
+         {
+            // Cached without hash — caller now requires integrity verification
+            if (VerifyHash (Path (NETWORK::DISKFILE_DATA), sHash))
+            {
+               m_sHash = sHash;
+               TouchAccess ();
+               m_bServedFromCache = true;
+               bReady  = true;
+            }
+            else
+            {
+               // Hash mismatch — cached data is stale or corrupt, re-fetch
+               m_sHash = sHash;
+               bFetch = true;
+            }
+         }
+         else if (bState != NETWORK::STATE_FETCHING  &&  !sHash.empty ()  &&  !m_sHash.empty ()  &&  m_sHash != sHash)
+         {
+            // Caller's hash differs from the asset's — content has been revised, re-fetch
+            m_sHash = sHash;
+            bFetch = true;
+         }
+         else if (bState == NETWORK::STATE_READY  &&  !bCacheEnabled)
+         {
+            // Cached but caller has caching disabled — force a fresh fetch
+            m_bServedFromCache = false;
+            bFetch = true;
+         }
+         else if (bState == NETWORK::STATE_READY)
+         {
+            // Cached and valid — serve from disk
+            TouchAccess ();
+            m_bServedFromCache = true;
+            bReady  = true;
+         }
+         else if (bState == NETWORK::STATE_FAILED)
+         {
+            // Previous fetch failed — propagate the failure to this caller
+            bFailed = true;
+         }
+         else if (bState == NETWORK::STATE_IDLE)
+         {
+            // Never fetched — first request for this URL
+            if (!sHash.empty ())
+               m_sHash = sHash;
+
+            bFetch = true;
+         }
+         // TODO: second attach with a different hash triggers re-fetch, which will
+         // notify the first file again with OnFileReady — need to decide whether
+         // to suppress re-notification or version-gate callbacks.
+
+         else if (bState == NETWORK::STATE_FETCHING)
+         {
+            // Already in flight — this caller will be notified when it completes
+         }
+
+         if (bFetch  &&  bFetch_Allowed)
+         {
+            if (m_pAsset_Fetch)
+            {
+               m_pAsset_Fetch->Cancel ();
+               m_pAsset_Fetch = nullptr;
+            }
+
+            m_bState = NETWORK::STATE_FETCHING;
+            m_dFetchStartTime = m_pINetwork_Impl->SecondsSinceEpoch ();
+            pFile->SnapshotProgress ();
+
+            m_nCount_Open++;
+            m_nCount_Attach++;
+
+            std::unordered_map<std::string, std::string> mapReqHeaders;
+
+            mapReqHeaders.insert ({ "User-Agent", "Artemis/1.0 Sneeze/1.0 (Windows NT 10.0; Win64; x64)" });
+
+            auto* pJob = new ASSET_FETCH (m_pAsset, m_sUrl, Path (NETWORK::DISKFILE_TEMP), Path (NETWORK::DISKFILE_DATA), m_sHash, mapReqHeaders);
+
+            m_pAsset_Fetch = pJob;
+            m_pINetwork_Impl->Queue_Post_Fetch (pJob);
+         }
+         else if (bReady  ||  bFailed)
+         {
+            pFile->SnapshotFinal ();
+
+            m_nCount_Open++;
+            m_nCount_Attach++;
+
+            auto* pJob = new ASSET_FETCH (m_pAsset, pFile, bState);
+
+            m_pAsset_Fetch = pJob;
+            m_pINetwork_Impl->Queue_Post_Fetch (pJob);
+         }
+
+         bResult = true;
+      }
+      else
+      {
+         // Asset index mismatch — caller holds a stale version, reject the attach
+      }
+
+      return bResult;
+   }
+
+   void Detach (NETWORK::FILE* pFile)
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mxAsset);
+
+      m_nCount_Attach--;
+
+      if (m_nCount_Attach == 0)
+      {
+         if (m_bState == NETWORK::STATE_READY)
+            Meta_Save ();
+         else if (m_bState == NETWORK::STATE_FAILED)
+            Meta_Reset ();
+
+         Evict ();
+      }
+   }
+
+   void Reset ()
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mxAsset);
+
+      if (m_bState == NETWORK::STATE_READY)
+      {
+         m_bReset = true;
+
+         Meta_Save ();
+      }
+      else Meta_Reset ();
+   }
+
+   // ---------------------------------------------------------------------------
+   // Fetch
+   // ---------------------------------------------------------------------------
+
+   void FetchComplete (const FETCH_RESULT& Fetch_Result)
+   {
+      {
+         std::lock_guard<std::recursive_mutex> guard (m_mxAsset);
+
+         m_nHttpStatus     = Fetch_Result.nHttpStatus;
+         m_dFetchEndTime   = m_pINetwork_Impl->SecondsSinceEpoch ();
+         m_sRemoteAddress  = Fetch_Result.sRemoteAddress;
+
+         if (Fetch_Result.bSuccess)
+         {
+            m_nSizeBytes = Fetch_Result.nSizeBytes;
+            m_mapReqHeaders = Fetch_Result.mapReqHeaders;
+            m_mapRspHeaders = Fetch_Result.mapRspHeaders;
+            m_bState     = NETWORK::STATE_READY;
+         }
+         else
+         {
+            if (!Fetch_Result.mapReqHeaders.empty ())
+               m_mapReqHeaders = Fetch_Result.mapReqHeaders;
+
+            if (!Fetch_Result.mapRspHeaders.empty ())
+               m_mapRspHeaders = Fetch_Result.mapRspHeaders;
+            m_bState     = NETWORK::STATE_FAILED;
+         }
+
+         for (auto* pFile : m_apFiles)
+         {
+            pFile->SnapshotFinal ();
+            pFile->Notify_Changed ();
+
+            NETWORK::IFILE* pListener = pFile->Listener ();
+            if (pListener)
+            {
+               if (Fetch_Result.bSuccess)
+                  pListener->OnFileReady (pFile);
+               else pListener->OnFileFailed (pFile);
+            }   
+
+            // the listener may close the file, so it may not be referenced after the notification is called
+         }
+
+         m_pINetwork_Impl->Log (IENGINE::kLOGLEVEL_Trace, "NETWORK", (Fetch_Result.bSuccess ? "Cached " : "Failed ") + m_sUrl + " (" + std::to_string (Fetch_Result.nSizeBytes) + " bytes)");
+
+         m_pAsset_Fetch = nullptr;
+      }
+   
+      Detach (nullptr);
+      m_pINetwork_Impl->Asset_Close (nullptr, m_pAsset);
+   }
+
+   void FetchComplete (NETWORK::FILE* pFile, NETWORK::STATE bState)
+   {
+      {
+         std::lock_guard<std::recursive_mutex> guard (m_mxAsset);
+
+         NETWORK::IFILE* pListener = pFile->Listener ();
+         if (pListener)
+         {
+            if (bState == NETWORK::STATE_READY)
+               pListener->OnFileReady (pFile);
+            else pListener->OnFileFailed (pFile);
+
+            // the listener may close the file, so it may not be referenced after the notification is called
+         }
+
+         m_pAsset_Fetch = nullptr;
+      }
+   
+      Detach (nullptr);
+      m_pINetwork_Impl->Asset_Close (nullptr, m_pAsset);
+   }
+
+   // ---------------------------------------------------------------------------
+   // Data access
+   // ---------------------------------------------------------------------------
+
+   void ReadData (std::vector<uint8_t>& aData) const
+   {
+      aData.clear ();
+
+      std::lock_guard<std::recursive_mutex> guard (m_mxAsset);
+
+      if (m_bState == NETWORK::STATE_READY)
+      {
+         std::ifstream file (Path (NETWORK::DISKFILE_DATA), std::ios::binary | std::ios::ate);
+         if (file.is_open ())
+         {
+            auto nSize = file.tellg ();
+            if (nSize > 0)
+            {
+               aData.resize (static_cast<size_t> (nSize));
+               file.seekg (0, std::ios::beg);
+               file.read (reinterpret_cast<char*> (aData.data ()), nSize);
+            }
+         }
+      }
+   }
+
+   std::string RspHeader (const std::string& sName) const
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mxAsset);
+
+      std::string sResult;
+
+      auto it = m_mapRspHeaders.find (sName);
+      if (it != m_mapRspHeaders.end ())
+         sResult = it->second;
+
+      return sResult;
+   }
+
+   // ---------------------------------------------------------------------------
+   // Hash verification
+   // ---------------------------------------------------------------------------
+
+   bool VerifyHash (const std::string& sFilePath, const std::string& sHash) const
+   {
+      bool bResult = true;
+
+      if (!sHash.empty ())
+      {
+         bResult = false;
+         std::string sAlgo, sExpected;
+         if (ParseSriHash (sHash, sAlgo, sExpected))
+         {
+            std::string sActual = ComputeFileHash (sFilePath, sAlgo);
+            bResult = (sActual == sExpected);
+         }
+      }
+
+      return bResult;
+   }
+
 public:
+   ASSET*                        m_pAsset;
    INETWORK_IMPL*                m_pINetwork_Impl;
    std::string                   m_sUrl;
    std::string                   m_sHash;
@@ -364,7 +706,7 @@ public:
 
    std::vector<NETWORK::FILE*>   m_apFiles;
 
-   std::recursive_mutex          m_mxAsset;
+   mutable std::recursive_mutex  m_mxAsset;
 
    std::unordered_map<std::string, std::string> m_mapRspHeaders;
    std::unordered_map<std::string, std::string> m_mapReqHeaders;
@@ -375,18 +717,12 @@ public:
 // ---------------------------------------------------------------------------
 
 ASSET::ASSET (INETWORK_IMPL* pINetwork_Impl, const std::string& sUrl, const std::string& sPathname, uint32_t nAssetIx) :
-   m_pImpl (new Impl (pINetwork_Impl, sUrl, sPathname, nAssetIx))
+   m_pImpl (new Impl (this, pINetwork_Impl, sUrl, sPathname, nAssetIx))
 {
 }
 
 ASSET::~ASSET ()
 {
-   if (m_pImpl->m_pAsset_Fetch)
-   {
-      m_pImpl->m_pAsset_Fetch->Cancel ();
-      m_pImpl->m_pAsset_Fetch = nullptr;
-   }
-
    delete m_pImpl;
 }
 
@@ -394,337 +730,31 @@ ASSET::~ASSET ()
 // Lifecycle
 // ---------------------------------------------------------------------------
 
-void ASSET::Open (NETWORK::FILE* pFile)
-{
-   std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
-
-   m_pImpl->m_apFiles.push_back (pFile);
-
-   m_pImpl->m_nCount_Open++;
-}
-
-size_t ASSET::Close (NETWORK::FILE* pFile)
-{
-   // if pFile == nullptr, the fetch thread is releasing its implicit lock
-
-   std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
-
-   m_pImpl->m_nCount_Open--;
-
-   if (pFile)
-   {
-      auto it = std::find (m_pImpl->m_apFiles.begin (), m_pImpl->m_apFiles.end (), pFile);
-      if (it != m_pImpl->m_apFiles.end ())
-         m_pImpl->m_apFiles.erase (it);
-   }
-
-   return m_pImpl->m_nCount_Open;
-}
-
-bool ASSET::Attach (NETWORK::FILE* pFile, bool bFetch_Allowed)
-{
-   std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
-
-   bool bResult = false;
-
-   if (pFile->AssetIx () == 0  ||  pFile->AssetIx () == m_pImpl->m_nAssetIx)
-   {
-      m_pImpl->m_nCount_Attach++;
-
-      if (m_pImpl->m_nCount_Attach == 1)
-         m_pImpl->Meta_Load ();
-
-      pFile->SnapshotInitial ();
-
-      std::string sHash         = pFile->OpenHash ();
-      bool        bCacheEnabled = pFile->CacheEnabled ();
-      bool        bStale        = m_pImpl->m_bState == NETWORK::STATE_READY  &&  m_pImpl->m_pINetwork_Impl->Rules_Stale (this);
-
-      bool bFetch  = false;
-      bool bReady  = false;
-      bool bFailed = false;
-
-      NETWORK::STATE bState = m_pImpl->m_bState;
-
-      if (bState == NETWORK::STATE_READY  &&  bStale)
-      {
-         // Cached but stale per rules — discard and re-fetch
-         m_pImpl->Meta_Reset ();
-         bFetch = true;
-      }
-      else if (bState == NETWORK::STATE_READY  &&  !sHash.empty ()  &&  !IsHashed ())
-      {
-         // Cached without hash — caller now requires integrity verification
-         if (VerifyHash (m_pImpl->Path (NETWORK::DISKFILE_DATA), sHash))
-         {
-            m_pImpl->m_sHash = sHash;
-            m_pImpl->TouchAccess ();
-            m_pImpl->m_bServedFromCache = true;
-            bReady  = true;
-         }
-         else
-         {
-            // Hash mismatch — cached data is stale or corrupt, re-fetch
-            m_pImpl->m_sHash = sHash;
-            bFetch = true;
-         }
-      }
-      else if (bState != NETWORK::STATE_FETCHING  &&  !sHash.empty ()  &&  IsHashed ()  &&  Hash () != sHash)
-      {
-         // Caller's hash differs from the asset's — content has been revised, re-fetch
-         m_pImpl->m_sHash = sHash;
-         bFetch = true;
-      }
-      else if (bState == NETWORK::STATE_READY  &&  !bCacheEnabled)
-      {
-         // Cached but caller has caching disabled — force a fresh fetch
-         m_pImpl->m_bServedFromCache = false;
-         bFetch = true;
-      }
-      else if (bState == NETWORK::STATE_READY)
-      {
-         // Cached and valid — serve from disk
-         m_pImpl->TouchAccess ();
-         m_pImpl->m_bServedFromCache = true;
-         bReady  = true;
-      }
-      else if (bState == NETWORK::STATE_FAILED)
-      {
-         // Previous fetch failed — propagate the failure to this caller
-         bFailed = true;
-      }
-      else if (bState == NETWORK::STATE_IDLE)
-      {
-         // Never fetched — first request for this URL
-         if (!sHash.empty ())
-            m_pImpl->m_sHash = sHash;
-
-         bFetch = true;
-      }
-      // TODO: second attach with a different hash triggers re-fetch, which will
-      // notify the first file again with OnFileReady — need to decide whether
-      // to suppress re-notification or version-gate callbacks.
-
-      else if (bState == NETWORK::STATE_FETCHING)
-      {
-         // Already in flight — this caller will be notified when it completes
-      }
-
-      if (bFetch  &&  bFetch_Allowed)
-      {
-         if (m_pImpl->m_pAsset_Fetch)
-         {
-            m_pImpl->m_pAsset_Fetch->Cancel ();
-            m_pImpl->m_pAsset_Fetch = nullptr;
-         }
-
-         m_pImpl->m_bState = NETWORK::STATE_FETCHING;
-         m_pImpl->m_dFetchStartTime = m_pImpl->m_pINetwork_Impl->SecondsSinceEpoch ();
-         pFile->SnapshotProgress ();
-
-         m_pImpl->m_nCount_Open++;
-         m_pImpl->m_nCount_Attach++;
-
-         std::unordered_map<std::string, std::string> mapReqHeaders;
-
-         mapReqHeaders.insert ({ "User-Agent", "Artemis/1.0 Sneeze/1.0 (Windows NT 10.0; Win64; x64)" });
-
-         auto* pJob = new ASSET_FETCH (this, m_pImpl->m_sUrl, m_pImpl->Path (NETWORK::DISKFILE_TEMP), m_pImpl->Path (NETWORK::DISKFILE_DATA), m_pImpl->m_sHash, mapReqHeaders);
-
-         m_pImpl->m_pAsset_Fetch = pJob;
-         m_pImpl->m_pINetwork_Impl->Queue_Post_Fetch (pJob);
-      }
-      else if (bReady  ||  bFailed)
-      {
-         pFile->SnapshotFinal ();
-
-         m_pImpl->m_nCount_Open++;
-         m_pImpl->m_nCount_Attach++;
-
-         auto* pJob = new ASSET_FETCH (this, pFile, bState);
-
-         m_pImpl->m_pAsset_Fetch = pJob;
-         m_pImpl->m_pINetwork_Impl->Queue_Post_Fetch (pJob);
-      }
-
-      bResult = true;
-   }
-   else
-   {
-      // Asset index mismatch — caller holds a stale version, reject the attach
-   }
-
-   return bResult;
-}
-
-void ASSET::Detach (NETWORK::FILE* pFile)
-{
-   std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
-
-   m_pImpl->m_nCount_Attach--;
-
-   if (m_pImpl->m_nCount_Attach == 0)
-   {
-      if (m_pImpl->m_bState == NETWORK::STATE_READY)
-         m_pImpl->Meta_Save ();
-      else if (m_pImpl->m_bState == NETWORK::STATE_FAILED)
-         m_pImpl->Meta_Reset ();
-
-      m_pImpl->Evict ();
-   }
-}
-
-void ASSET::Reset ()
-{
-   std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
-
-   if (m_pImpl->m_bState == NETWORK::STATE_READY)
-   {
-      m_pImpl->m_bReset = true;
-
-      m_pImpl->Meta_Save ();
-   }
-   else m_pImpl->Meta_Reset ();
-}
+void        ASSET::Open          (NETWORK::FILE* pFile)                              {        m_pImpl->Open          (pFile); }
+size_t      ASSET::Close         (NETWORK::FILE* pFile)                              { return m_pImpl->Close         (pFile); }
+bool        ASSET::Attach        (NETWORK::FILE* pFile, bool bFetch_Allowed)         { return m_pImpl->Attach        (pFile, bFetch_Allowed); }
+void        ASSET::Detach        (NETWORK::FILE* pFile)                              {        m_pImpl->Detach        (pFile); }
+void        ASSET::Reset         ()                                                  {        m_pImpl->Reset         (); }
 
 // ---------------------------------------------------------------------------
 // Fetch
 // ---------------------------------------------------------------------------
 
-void ASSET::FetchComplete (const FETCH_RESULT& Fetch_Result)
-{
-   {
-      std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
-
-      m_pImpl->m_nHttpStatus     = Fetch_Result.nHttpStatus;
-      m_pImpl->m_dFetchEndTime   = m_pImpl->m_pINetwork_Impl->SecondsSinceEpoch ();
-      m_pImpl->m_sRemoteAddress  = Fetch_Result.sRemoteAddress;
-
-      if (Fetch_Result.bSuccess)
-      {
-         m_pImpl->m_nSizeBytes = Fetch_Result.nSizeBytes;
-         m_pImpl->m_mapReqHeaders = Fetch_Result.mapReqHeaders;
-         m_pImpl->m_mapRspHeaders = Fetch_Result.mapRspHeaders;
-         m_pImpl->m_bState     = NETWORK::STATE_READY;
-      }
-      else
-      {
-         if (!Fetch_Result.mapReqHeaders.empty ())
-            m_pImpl->m_mapReqHeaders = Fetch_Result.mapReqHeaders;
-
-         if (!Fetch_Result.mapRspHeaders.empty ())
-            m_pImpl->m_mapRspHeaders = Fetch_Result.mapRspHeaders;
-         m_pImpl->m_bState     = NETWORK::STATE_FAILED;
-      }
-
-      for (auto* pFile : m_pImpl->m_apFiles)
-      {
-         pFile->SnapshotFinal ();
-         pFile->Notify_Changed ();
-
-         NETWORK::IFILE* pListener = pFile->Listener ();
-         if (pListener)
-         {
-            if (Fetch_Result.bSuccess)
-               pListener->OnFileReady (pFile);
-            else pListener->OnFileFailed (pFile);
-         }   
-
-         // the listener may close the file, so it may not be referenced after the notification is called
-      }
-
-      m_pImpl->m_pINetwork_Impl->Log (IENGINE::kLOGLEVEL_Trace, "NETWORK", (Fetch_Result.bSuccess ? "Cached " : "Failed ") + m_pImpl->m_sUrl + " (" + std::to_string (Fetch_Result.nSizeBytes) + " bytes)");
-
-      m_pImpl->m_pAsset_Fetch = nullptr;
-   }
-   
-   Detach (nullptr);
-   m_pImpl->m_pINetwork_Impl->Asset_Close (this, nullptr);
-}
-
-void ASSET::FetchComplete (NETWORK::FILE* pFile, NETWORK::STATE bState)
-{
-   {
-      std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
-
-      NETWORK::IFILE* pListener = pFile->Listener ();
-      if (pListener)
-      {
-         if (bState == NETWORK::STATE_READY)
-            pListener->OnFileReady (pFile);
-         else pListener->OnFileFailed (pFile);
-
-         // the listener may close the file, so it may not be referenced after the notification is called
-      }
-
-      m_pImpl->m_pAsset_Fetch = nullptr;
-   }
-   
-   Detach (nullptr);
-   m_pImpl->m_pINetwork_Impl->Asset_Close (this, nullptr);
-}
-
+void        ASSET::FetchComplete (const FETCH_RESULT& Fetch_Result)                  {        m_pImpl->FetchComplete (Fetch_Result); }
+void        ASSET::FetchComplete (NETWORK::FILE* pFile, NETWORK::STATE bState)       {        m_pImpl->FetchComplete (pFile, bState); }
 
 // ---------------------------------------------------------------------------
 // Data access
 // ---------------------------------------------------------------------------
 
-void ASSET::ReadData (std::vector<uint8_t>& aData) const
-{
-   aData.clear ();
-
-   std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
-
-   if (m_pImpl->m_bState == NETWORK::STATE_READY)
-   {
-      std::ifstream file (m_pImpl->Path (NETWORK::DISKFILE_DATA), std::ios::binary | std::ios::ate);
-      if (file.is_open ())
-      {
-         auto nSize = file.tellg ();
-         if (nSize > 0)
-         {
-            aData.resize (static_cast<size_t> (nSize));
-            file.seekg (0, std::ios::beg);
-            file.read (reinterpret_cast<char*> (aData.data ()), nSize);
-         }
-      }
-   }
-}
-
-std::string ASSET::RspHeader (const std::string& sName) const
-{
-   std::lock_guard<std::recursive_mutex> guard (m_pImpl->m_mxAsset);
-
-   std::string sResult;
-
-   auto it = m_pImpl->m_mapRspHeaders.find (sName);
-   if (it != m_pImpl->m_mapRspHeaders.end ())
-      sResult = it->second;
-
-   return sResult;
-}
+void        ASSET::ReadData      (std::vector<uint8_t>& aData) const                 {        m_pImpl->ReadData      (aData); }
+std::string ASSET::RspHeader     (const std::string& sName) const                    { return m_pImpl->RspHeader     (sName); }
 
 // ---------------------------------------------------------------------------
 // Hash verification
 // ---------------------------------------------------------------------------
 
-bool ASSET::VerifyHash (const std::string& sFilePath, const std::string& sHash) const
-{
-   bool bResult = true;
-
-   if (!sHash.empty ())
-   {
-      bResult = false;
-      std::string sAlgo, sExpected;
-      if (Impl::ParseSriHash (sHash, sAlgo, sExpected))
-      {
-         std::string sActual = Impl::ComputeFileHash (sFilePath, sAlgo);
-         bResult = (sActual == sExpected);
-      }
-   }
-
-   return bResult;
-}
+bool        ASSET::VerifyHash    (const std::string& sFilePath, const std::string& sHash) const { return m_pImpl->VerifyHash (sFilePath, sHash); }
 
 // ---------------------------------------------------------------------------
 // Accessors

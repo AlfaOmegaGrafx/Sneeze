@@ -26,3 +26,18 @@
 - Updated subsystem documentation (Scene.md, Console.md, Storage.md) for new file paths
 - Updated project.mdc for new directory structure and SCENE ownership model
 - All tests passing, solar system renders correctly
+
+## June 3, 2026 — ~5:00 PM – 6:10 PM PDT
+
+**Phase 2 cleanup: pImpl for NODE and FABRIC, un-nesting into public header**
+
+- Implemented pImpl for NODE: moved all internal members and NETWORK::IFILE inheritance into NODE::Impl in Node.cpp. Removed m_umpNode (unordered_map keyed by twObjectIx — unreliable at construction time), simplified to linear vector only. Removed unused public methods (Node_Children, Node_Find, ObjectIx_Set, IsPrimary, SetPrimary)
+- Implemented pImpl for FABRIC: moved all internal members into FABRIC::Impl in Fabric.cpp
+- Fixed crash in NODE construction: m_pImpl was uninitialized when Node_Add was called from Impl's constructor. Fix: moved parent-child linking from Impl constructor to NODE constructor body
+- Two-step NODE construction pattern: constructor links into tree, Initialize(MAP_OBJECT*) assigns 3D payload
+- Un-nested NODE from FABRIC: moved from SCENE::FABRIC::NODE to top-level SNEEZE::NODE in include/Scene.h. Deleted src/context/scene/Node.h. Updated all SCENE::FABRIC::NODE references across codebase
+- Un-nested FABRIC and FABRIC_ROOT from SCENE: moved from SCENE::FABRIC to top-level SNEEZE::FABRIC in include/Scene.h. Deleted src/context/scene/Fabric.h. Updated all SCENE::FABRIC / SCENE::FABRIC_ROOT references across codebase
+- All four scene classes (SCENE, FABRIC, FABRIC_ROOT, NODE) are now peers in the SNEEZE namespace, all declared in include/Scene.h
+- Dean renamed NETWORK::IENUM to IENUM_FILE
+- Updated project.mdc with new architecture
+- Builds and runs correctly

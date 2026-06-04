@@ -277,7 +277,7 @@ public:
       return pFile;
    }
 
-   void File_Enum (IENUM* pEnum)
+   void File_Enum (IENUM_FILE* pEnum)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -379,7 +379,7 @@ public:
       return pAsset;
    }
 
-   void Asset_Close (ASSET* pAsset, NETWORK::FILE* pFile) override
+   void Asset_Close (NETWORK::FILE* pFile, ASSET* pAsset) override
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -527,7 +527,7 @@ NETWORK::FILE* NETWORK::File_Open (CONTAINER::CID* pCID, const std::string& sUrl
    return m_pImpl->File_Open (pCID, sUrl, sHash, nAssetIx, pListener);
 }
 
-void NETWORK::File_Enum  (IENUM* pEnum) { m_pImpl->File_Enum (pEnum); }
+void NETWORK::File_Enum  (IENUM_FILE* pEnum) { m_pImpl->File_Enum (pEnum); }
 
 // ---------------------------------------------------------------------------
 // Cache management

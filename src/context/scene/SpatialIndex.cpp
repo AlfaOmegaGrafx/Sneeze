@@ -14,7 +14,6 @@
 
 #include <Sneeze.h>
 #include "SpatialIndex.h"
-#include "Node.h"
 #include "MapObject.h"
 #include <algorithm>
 #include <cmath>
@@ -22,7 +21,6 @@
 
 using namespace SNEEZE;
 
-using NODE = SCENE::FABRIC::NODE;
 
 // ===========================================================================
 // AABB

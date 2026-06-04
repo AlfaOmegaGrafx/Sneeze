@@ -21,7 +21,7 @@ namespace SNEEZE
 {
    namespace astro
    {
-      void InjectSolarSystem (SCENE::FABRIC* pFabric);
+      void InjectSolarSystem (FABRIC* pFabric);
    } // namespace astro
 }
 

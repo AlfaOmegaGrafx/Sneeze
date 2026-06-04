@@ -55,7 +55,7 @@ public:
             {
                m_pScene = new SCENE (m_pContext);
 
-               if (m_pScene->Initialize (sUrl))
+               if (m_pScene->Initialize ("<primary>"))   // sUrl
                {
                   m_pViewport = new VIEWPORT (m_pContext);
 
@@ -83,8 +83,19 @@ public:
       delete m_pViewport;
       m_pViewport = nullptr;
 
+      // Deleting the scene triggers a cascade: the root fabric's nodes are
+      // recursively deleted, and each attachment-point node deletes the
+      // fabric attached to it. Each fabric, on destruction, closes its
+      // container (decrementing its refcount). By the time the scene is
+      // fully deleted, all containers should have been freed as well.
+
       delete m_pScene;
       m_pScene = nullptr;
+
+      if (!m_umpContainer.empty ())
+         m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "CONTEXT", "Leaked " + std::to_string (m_umpContainer.size ()) + " container(s)");
+
+      m_umCID.clear ();
 
       delete m_pStorage;
       m_pStorage = nullptr;
@@ -96,22 +107,121 @@ public:
       m_pConsole = nullptr;
    }
 
+   void Url (const std::string& sUrl)
+   {
+      // URL change (tab navigation). Not yet implemented.
+      // Known architectural flaw must be resolved first.
+      // When implemented: deactivate viewport, destroy scene (cascades
+      // through all fabrics/nodes/containers), recreate scene with new URL,
+      // reactivate viewport.
+
+      if (m_pScene)
+         m_pScene->Url (sUrl);
+   }
+
+   void Logout ()
+   {
+      if (m_pNetwork)
+         m_pNetwork->Clear ();
+   }
+
+   CONTAINER* Container_Open (void* pFabric)
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mxContainer);
+
+      CONTAINER* pContainer = nullptr;
+
+      // TODO Phase 3: extract identity fields from pFabric->Msf()
+      CONTAINER::CID CID;
+      CID.sFingerprint    = "0000000000000000000000000000000000000000000000000000000000000000";
+      CID.sOrganization   = "placeholder-org";
+      CID.sCommonName     = "placeholder-cn";
+      CID.sContainerName  = "placeholder-container";
+      CID.sPersonaHash    = m_pEngine->Persona ()->Hash ();
+      CID.bValidated      = false;
+
+      std::string sKey = CID.Key ();
+
+      bool bCreated = false;
+
+      auto it = m_umpContainer.find (sKey);
+      if (it == m_umpContainer.end ())
+      {
+         pContainer = new CONTAINER (m_pContext, &CID);
+
+         m_umpContainer[sKey] = pContainer;
+
+         bCreated = true;
+      }
+      else pContainer = it->second;
+
+      if (!pContainer->Open (pFabric))
+      {
+         if (bCreated)
+         {
+            m_umpContainer.erase (sKey);
+            delete pContainer;
+         }
+
+         pContainer = nullptr;
+      }
+
+      return pContainer;
+   }
+
+   void Container_Close (void* pFabric, CONTAINER* pContainer)
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mxContainer);
+
+      if (pContainer->Close (pFabric) == 0)
+      {
+         m_umpContainer.erase (pContainer->Key ());
+
+         delete pContainer;
+      }
+   }
+
+   const CONTAINER::CID* CID_Pool (const CONTAINER::CID* pCID)
+   {
+      const CONTAINER::CID* pCID_Result = nullptr;
+
+      if (pCID)
+      {
+         std::string sKey = pCID->Key ();
+
+         auto it = m_umCID.find (sKey);
+         if (it == m_umCID.end ())
+         {
+            m_umCID[sKey] = *pCID;
+
+            it = m_umCID.find (sKey);
+         }
+
+         pCID_Result = &it->second;
+      }
+
+      return pCID_Result;
+   }
+
 public:
-   CONTEXT*    m_pContext;
-   ENGINE*     m_pEngine;
-   ICONTEXT*   m_pHost;
+   CONTEXT*                                        m_pContext;
+   ENGINE*                                         m_pEngine;
+   ICONTEXT*                                       m_pHost;
 
-   eSESSION    m_kSession;
-   std::string m_sPath_Permanent;
-   std::string m_sPath_Temporary;
+   eSESSION                                        m_kSession;
+   std::string                                     m_sPath_Permanent;
+   std::string                                     m_sPath_Temporary;
 
-   CONSOLE*    m_pConsole;
-   NETWORK*    m_pNetwork;
-   STORAGE*    m_pStorage;
-   SCENE*      m_pScene;
-   VIEWPORT*   m_pViewport;
+   CONSOLE*                                        m_pConsole;
+   NETWORK*                                        m_pNetwork;
+   STORAGE*                                        m_pStorage;
+   SCENE*                                          m_pScene;
+   VIEWPORT*                                       m_pViewport;
 
    std::unordered_map<std::string, CONTAINER::CID> m_umCID;
+
+   std::unordered_map<std::string, CONTAINER*>     m_umpContainer;
+   std::recursive_mutex                            m_mxContainer;
 };
 
 /***********************************************************************************************************************************
@@ -128,12 +238,6 @@ bool SNEEZE::CONTEXT::Initialize (const std::string& sUrl)
    return m_pImpl->Initialize (sUrl);
 }
 
-void SNEEZE::CONTEXT::Logout ()
-{
-   if (m_pImpl->m_pNetwork)
-      m_pImpl->m_pNetwork->Clear ();
-}
-
 SNEEZE::CONTEXT::~CONTEXT ()
 {
    delete m_pImpl;
@@ -143,35 +247,26 @@ SNEEZE::CONTEXT::~CONTEXT ()
 // Accessors
 // ---------------------------------------------------------------------------
 
-SNEEZE::ENGINE*    SNEEZE::CONTEXT::Engine   () const { return m_pImpl->m_pEngine;   }
-SNEEZE::ICONTEXT*  SNEEZE::CONTEXT::Host     () const { return m_pImpl->m_pHost;     }
-SNEEZE::CONSOLE*   SNEEZE::CONTEXT::Console  () const { return m_pImpl->m_pConsole;  }
-SNEEZE::NETWORK*   SNEEZE::CONTEXT::Network  () const { return m_pImpl->m_pNetwork;  }
-SNEEZE::STORAGE*   SNEEZE::CONTEXT::Storage  () const { return m_pImpl->m_pStorage;  }
-SNEEZE::SCENE*     SNEEZE::CONTEXT::Scene    () const { return m_pImpl->m_pScene;    }
-SNEEZE::VIEWPORT*  SNEEZE::CONTEXT::Viewport () const { return m_pImpl->m_pViewport; }
-
+SNEEZE::ENGINE*    SNEEZE::CONTEXT::Engine         () const { return m_pImpl->m_pEngine;         }
+SNEEZE::ICONTEXT*  SNEEZE::CONTEXT::Host           () const { return m_pImpl->m_pHost;           }
+SNEEZE::CONSOLE*   SNEEZE::CONTEXT::Console        () const { return m_pImpl->m_pConsole;        }
+SNEEZE::NETWORK*   SNEEZE::CONTEXT::Network        () const { return m_pImpl->m_pNetwork;        }
+SNEEZE::STORAGE*   SNEEZE::CONTEXT::Storage        () const { return m_pImpl->m_pStorage;        }
+SNEEZE::SCENE*     SNEEZE::CONTEXT::Scene          () const { return m_pImpl->m_pScene;          }
+SNEEZE::VIEWPORT*  SNEEZE::CONTEXT::Viewport       () const { return m_pImpl->m_pViewport;       }
 const std::string& SNEEZE::CONTEXT::Path_Permanent () const { return m_pImpl->m_sPath_Permanent; }
 const std::string& SNEEZE::CONTEXT::Path_Temporary () const { return m_pImpl->m_sPath_Temporary; }
 
-const SNEEZE::CONTAINER::CID* SNEEZE::CONTEXT::CID_Pool (const CONTAINER::CID* pCID)
-{
-   const CONTAINER::CID* pCID_Result = nullptr;
+// ---------------------------------------------------------------------------
+// Methods
+// ---------------------------------------------------------------------------
 
-   if (pCID)
-   {
-      std::string sKey = pCID->Key ();
+void                          SNEEZE::CONTEXT::Url             (const std::string& sUrl)              {        m_pImpl->Url (sUrl); }
+void                          SNEEZE::CONTEXT::Logout          ()                                     {        m_pImpl->Logout (); }
 
-      auto it = m_pImpl->m_umCID.find (sKey);
-      if (it == m_pImpl->m_umCID.end ())
-      {
-         m_pImpl->m_umCID[sKey] = *pCID;
+SNEEZE::CONTAINER*            SNEEZE::CONTEXT::Container_Open  (void* pFabric)                        { return m_pImpl->Container_Open  (pFabric); }
+void                          SNEEZE::CONTEXT::Container_Close (void* pFabric, CONTAINER* pContainer) {        m_pImpl->Container_Close (pFabric, pContainer); }
 
-         it = m_pImpl->m_umCID.find (sKey);
-      }
 
-      pCID_Result = &it->second;
-   }
-
-   return pCID_Result;
-}
+/// DEPRECATED
+const SNEEZE::CONTAINER::CID* SNEEZE::CONTEXT::CID_Pool        (const CONTAINER::CID* pCID)           { return m_pImpl->CID_Pool (pCID); }

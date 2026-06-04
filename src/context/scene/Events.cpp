@@ -14,12 +14,10 @@
 
 #include <Sneeze.h>
 #include "Events.h"
-#include "Node.h"
 #include <algorithm>
 
 using namespace SNEEZE;
 
-using NODE = SCENE::FABRIC::NODE;
 
 EVENT_SYSTEM::EVENT_SYSTEM ()
    : m_twNextWatchId (1)

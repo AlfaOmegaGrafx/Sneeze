@@ -40,10 +40,9 @@
 #include "Types.h"
 #include "renderer/Renderer.h"
 #include "scene/Epoch.h"
-#include "scene/Node.h"
-#include "scene/Fabric.h"
 #include "scene/MapObject.h"
 #include <cmath>
+#include <functional>
 
 using namespace SNEEZE;
 
@@ -255,6 +254,27 @@ void AGENT::COMPOSITOR::Execute_Destroy (JOB_COMPOSITOR* pJob_Compositor)
    else pJob_Compositor->Return (JOB_COMPOSITOR::kSTATE_DESTROY);
 }
 
+static void TraverseNode (NODE* pNode, std::function<void (NODE*)> fnVisit)
+{
+   if (!pNode)
+      return;
+
+   fnVisit (pNode);
+
+   for (int i = 0; i < pNode->Node_Count (); i++)
+   {
+      NODE* pChild = pNode->Child (i);
+      if (pChild)
+      {
+         TraverseNode (pChild, fnVisit);
+
+         FABRIC* pAttached = pChild->Fabric_Attachment ();
+         if (pAttached  &&  pAttached->Node_Root ())
+            TraverseNode (pAttached->Node_Root (), fnVisit);
+      }
+   }
+}
+
 void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
 {
    VIEWPORT*           pViewport = pJob_Compositor->Viewport ();
@@ -319,18 +339,18 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
       std::vector<CURVE_DATA>  aCurves;
 
       SCENE* pScene = pViewport->Scene ();
-      SCENE::FABRIC* pPrimaryFabric = pScene ? pScene->Fabric_Primary () : nullptr;
-      SCENE::FABRIC::NODE* pSomRoot = pPrimaryFabric ? pPrimaryFabric->Node_Root () : nullptr;
+      FABRIC_ROOT* pFabric_Root = pScene ? pScene->Fabric_Root () : nullptr;
+      NODE* pSomRoot = pFabric_Root ? pFabric_Root->Node_Root () : nullptr;
 
       if (pSomRoot)
       {
          ORBIT_POSITION pos;
 
-         for (SCENE::FABRIC::NODE* pNode : pSomRoot->Node_Children ())
+         TraverseNode (pSomRoot, [&] (NODE* pNode)
          {
             MAP_OBJECT* pObj = pNode->MapObject ();
             if (!pObj  ||  pObj->GetType () != MAP_OBJECT_TYPE_CELESTIAL)
-               continue;
+               return;
 
             auto* pCelestial = static_cast<MAP_OBJECT_CELESTIAL*> (pObj);
 
@@ -338,7 +358,7 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
             if (pCelestial->HasOrbit ())
             {
                ORBIT_POSITION* pPos = pCelestial->m_orbit.PositionAtTick (tmNow, pos);
-               if (!pPos) continue;
+               if (!pPos) return;
                dBodyX = static_cast<float> (pPos->x * METERS_TO_AU);
                dBodyY = static_cast<float> (pPos->y * METERS_TO_AU);
                dBodyZ = static_cast<float> (pPos->z * METERS_TO_AU);
@@ -410,7 +430,7 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
 
                aCurves.push_back (std::move (curve));
             }
-         }
+         });
       }
 
       pViewport->Accumulate (VIEWPORT::kACCUMULATE_SCENE, tpSceneStart);

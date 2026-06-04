@@ -47,6 +47,7 @@ namespace SNEEZE
       ~CONTEXT            ();
 
       bool Initialize (const std::string& sUrl);
+      void Url (const std::string& sUrl);
       void Logout ();
 
       ENGINE*    Engine   () const;
@@ -60,6 +61,9 @@ namespace SNEEZE
 
       const std::string& Path_Permanent () const;
       const std::string& Path_Temporary () const;
+
+      CONTAINER* Container_Open  (void* pFabric);
+      void       Container_Close (void* pFabric, CONTAINER* pContainer);
 
       const CONTAINER::CID* CID_Pool (const CONTAINER::CID* pCID);
 

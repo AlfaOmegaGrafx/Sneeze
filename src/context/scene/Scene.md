@@ -34,7 +34,7 @@ fabric.Url_Set ("https://example.com/world.msf");
 fabric.Owner_Set (pMyStore);
 fabric.Node_Set_Root (pRootNode);
 fabric.Node_Set_Attaching (pParentLeafNode);   // node in parent fabric
-fabric.SetPrivate (false);
+fabric.Private (false);
 ```
 
 | Accessor              | Description                                          |
@@ -43,7 +43,7 @@ fabric.SetPrivate (false);
 | Node_Root             | The single root node of this fabric's subtree         |
 | Node_Attaching        | The node in the parent fabric where this hangs        |
 | Owner                 | Opaque pointer to the owning WASM_STORE               |
-| IsPrivate / SetPrivate| If true, non-owning containers cannot read into it    |
+| IsPrivate / Private   | If true, non-owning containers cannot read into it    |
 | Url                   | Source MSF URL for this fabric                        |
 
 ## NODE

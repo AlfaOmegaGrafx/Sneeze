@@ -56,7 +56,7 @@ public:
 
       if (m_pAsset)
       {
-         m_pINetwork_Impl->Asset_Close (m_pAsset, m_pFile);
+         m_pINetwork_Impl->Asset_Close (m_pFile, m_pAsset);
          m_pAsset = nullptr;
       }
    }

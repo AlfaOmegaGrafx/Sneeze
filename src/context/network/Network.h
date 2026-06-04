@@ -26,7 +26,7 @@ namespace SNEEZE
       virtual ~INETWORK_IMPL ();
 
       virtual ASSET*             Asset_Open  (NETWORK::FILE* pFile)                                                        = 0;
-      virtual void               Asset_Close (ASSET* pAsset, NETWORK::FILE* pFile)                                         = 0;
+      virtual void               Asset_Close (NETWORK::FILE* pFile, ASSET* pAsset)                                         = 0;
       virtual uint32_t           Asset_Index ()                                                                            = 0;
 
       virtual bool               Rules_Stale (ASSET* pAsset) const                                                         = 0;

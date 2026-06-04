@@ -45,15 +45,10 @@ namespace SNEEZE
       CONTAINER             (CONTAINER const  & other) = delete;
       CONTAINER             (CONTAINER       && other) = delete;
 
-      bool Initialize ();
-      void Shutdown   ();
+      bool    Open  (void* pFabric);
+      size_t  Close (void* pFabric);
 
-      int  Open  ();
-      int  Close ();
-      int  Count () const;
-
-      CONTEXT*   Context () const;
-      const CID* CID_Get () const;
+      const std::string& Key () const;
 
    private:
       class Impl;

@@ -79,8 +79,11 @@ namespace SNEEZE
       // Visual color (0xRRGGBB)
       uint32_t m_nColor = 0xcccccc;
 
+      // Fabric
+      std::string              m_sUrl_Fabric;
+
       // Texture
-      std::string              m_sTextureUrl;
+      std::string              m_sUrl_Texture;
       std::vector<uint8_t>     m_aTexturePixels;
       int                      m_nTextureWidth  = 0;
       int                      m_nTextureHeight = 0;

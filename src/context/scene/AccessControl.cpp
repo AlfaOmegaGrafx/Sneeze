@@ -14,13 +14,9 @@
 
 #include <Sneeze.h>
 #include "AccessControl.h"
-#include "Node.h"
-#include "Fabric.h"
 
 using namespace SNEEZE;
 
-using NODE   = SCENE::FABRIC::NODE;
-using FABRIC = SCENE::FABRIC;
 
 // ---------------------------------------------------------------------------
 // CanRead -- determines if pRequestingOwner may read this node's data.
@@ -44,10 +40,7 @@ bool CanRead (const NODE* pNode, const void* pRequestingOwner)
    if (!pFabric)
       return true;
 
-   if (pNode->IsPrivate ()  &&  pFabric->Owner () != pRequestingOwner)
-      return false;
-
-   if (pFabric->IsPrivate ()  &&  pFabric->Owner () != pRequestingOwner)
+   if (pNode->IsPrivate ()  &&  pFabric->Container () != pRequestingOwner)
       return false;
 
    return true;
@@ -73,7 +66,7 @@ bool CanWrite (const NODE* pNode, const void* pRequestingOwner)
    if (!pFabric)
       return false;
 
-   return pFabric->Owner () == pRequestingOwner;
+   return pFabric->Container () == pRequestingOwner;
 }
 
 // ---------------------------------------------------------------------------
@@ -88,9 +81,6 @@ bool CanReadFabric (const FABRIC* pFabric, const void* pRequestingOwner)
    if (!pFabric)
       return false;
 
-   if (pFabric->IsPrivate ()  &&  pFabric->Owner () != pRequestingOwner)
-      return false;
-
    return true;
 }
 
@@ -102,5 +92,5 @@ bool CanWriteFabric (const FABRIC* pFabric, const void* pRequestingOwner)
    if (!pFabric)
       return false;
 
-   return pFabric->Owner () == pRequestingOwner;
+   return pFabric->Container () == pRequestingOwner;
 }

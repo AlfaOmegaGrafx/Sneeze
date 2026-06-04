@@ -14,8 +14,6 @@
 
 #include "BodyData.h"
 #include "RMCObject.h"
-#include "scene/Fabric.h"
-#include "scene/Node.h"
 #include "scene/MapObject.h"
 
 namespace SNEEZE
@@ -446,12 +444,12 @@ namespace SNEEZE
       // fabric, then cleans up all temporary RMCOBJECT data before returning.
       // -----------------------------------------------------------------------
 
-      void InjectSolarSystem (SCENE::FABRIC* pFabric)
+      void InjectSolarSystem (FABRIC* pFabric)
       {
          if (!pFabric  ||  !pFabric->Node_Root ())
             return;
 
-         SCENE::FABRIC::NODE* pRoot = pFabric->Node_Root ();
+         NODE* pRoot = pFabric->Node_Root ();
 
          std::vector<RMCOBJECT*>            aBodies;
          std::map<std::string, RMCOBJECT*>  registry;
@@ -478,11 +476,10 @@ namespace SNEEZE
             pMapObj->m_nColorDim       = 0x7F7333;
             pMapObj->m_nColorBright    = 0xFFFF9A;
             pMapObj->m_dMass           = 1.98841e30;
-            pMapObj->m_sTextureUrl     = (itSun != registry.end ()) ? itSun->second->sTexture : "";
+            pMapObj->m_sUrl_Texture    = (itSun != registry.end ()) ? itSun->second->sTexture : "";
 
-            auto* pNode = new SCENE::FABRIC::NODE (pFabric);
-            pNode->MapObject_Set (pMapObj);
-            pRoot->Node_Add (pNode);
+            auto* pNode = new NODE (pFabric, pRoot);
+            pNode->Initialize (pMapObj);
          }
 
          // --- Orbit bodies ---
@@ -529,12 +526,11 @@ namespace SNEEZE
             pMapObj->m_dMass           = pBody->dMass;
             pMapObj->m_dGM             = pBody->dGM;
             pMapObj->m_dSystemRadiusKm = pBody->dSystemRadiusKm;
-            pMapObj->m_sTextureUrl     = sTexture;
+            pMapObj->m_sUrl_Texture    = sTexture;
             pMapObj->m_orbit           = *pBody->pOrbit;
 
-            auto* pNode = new SCENE::FABRIC::NODE (pFabric);
-            pNode->MapObject_Set (pMapObj);
-            pRoot->Node_Add (pNode);
+            auto* pNode = new NODE (pFabric, pRoot);
+            pNode->Initialize (pMapObj);
          }
 
          // --- Clean up all temporary body data ---

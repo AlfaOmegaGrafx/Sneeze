@@ -14,6 +14,8 @@
 
 #include <Container.h>
 #include <Context.h>
+#include <Console.h>
+#include <Storage.h>
 
 using namespace SNEEZE;
 
@@ -27,78 +29,106 @@ class CONTAINER::Impl
 public:
 
    Impl (CONTEXT* pContext, const CID* pCID) :
-      m_pContext  (pContext),
-      m_CID      (*pCID),
-      m_nCount   (0),
-      m_bInitialized (false)
+      m_pContext     (pContext),
+      m_CID         (*pCID),
+      m_sKey        (m_CID.Key ()),
+      m_nCount_Open (0),
+      m_pStream     (nullptr),
+      m_pSilo       (nullptr)
    {
    }
 
   ~Impl ()
    {
-      if (m_bInitialized)
-         Shutdown ();
    }
 
    // -----------------------------------------------------------------------
    // Lifecycle
    // -----------------------------------------------------------------------
 
-   bool Initialize ()
+   bool Open (void* pFabric)
    {
-      bool bResult = false;
+      std::lock_guard<std::recursive_mutex> guard (m_mxContainer);
 
-      if (!m_bInitialized)
+      bool bResult = true;
+
+      if (m_nCount_Open == 0)
       {
-         m_bInitialized = true;
-         bResult = true;
+         if ((m_pStream = m_pContext->Console ()->Stream_Open (&m_CID)))
+         {
+            if ((m_pSilo = m_pContext->Storage ()->Silo_Open (&m_CID)))
+            {
+               m_pSilo->Attach ();
+
+               // TODO: WASM store (FindOrCreateStore) once ENGINE exposes WASM_RUNTIME
+            }
+            else
+            {
+               m_pContext->Console ()->Stream_Close (m_pStream);
+               m_pStream = nullptr;
+               bResult = false;
+            }
+         }
+         else bResult = false;
+      }
+
+      if (bResult)
+      {
+         m_apFabric.push_back (pFabric);
+         m_nCount_Open++;
       }
 
       return bResult;
    }
 
-   void Shutdown ()
+   size_t Close (void* pFabric)
    {
-      if (m_bInitialized)
+      std::lock_guard<std::recursive_mutex> guard (m_mxContainer);
+
+      m_nCount_Open--;
+
+      if (pFabric)
       {
-         m_bInitialized = false;
+         auto it = std::find (m_apFabric.begin (), m_apFabric.end (), pFabric);
+         if (it != m_apFabric.end ())
+            m_apFabric.erase (it);
       }
+
+      if (m_nCount_Open == 0)
+      {
+         // TODO: WASM store (DestroyStore) once ENGINE exposes WASM_RUNTIME
+
+         if (m_pSilo)
+         {
+            m_pSilo->Detach ();
+            m_pContext->Storage ()->Silo_Close (m_pSilo);
+            m_pSilo = nullptr;
+         }
+
+         if (m_pStream)
+         {
+            m_pContext->Console ()->Stream_Close (m_pStream);
+            m_pStream = nullptr;
+         }
+      }
+
+      return m_nCount_Open;
    }
-
-   // -----------------------------------------------------------------------
-   // Reference counting
-   // -----------------------------------------------------------------------
-
-   int Open ()
-   {
-      return ++m_nCount;
-   }
-
-   int Close ()
-   {
-      return --m_nCount;
-   }
-
-   int Count () const
-   {
-      return m_nCount;
-   }
-
-   // -----------------------------------------------------------------------
-   // Accessors
-   // -----------------------------------------------------------------------
-
-   CONTEXT*   Context () const { return m_pContext; }
-   const CID* CID_Get () const { return &m_CID; }
 
    // -----------------------------------------------------------------------
    // Members
    // -----------------------------------------------------------------------
 
-   CONTEXT*   m_pContext;
-   CID        m_CID;
-   int        m_nCount;
-   bool       m_bInitialized;
+   CONTEXT*                   m_pContext;
+   CID                        m_CID;
+   std::string                m_sKey;
+
+   uint32_t                   m_nCount_Open;
+   std::vector<void*>         m_apFabric;
+   std::recursive_mutex       m_mxContainer;
+
+   CONSOLE::STREAM*           m_pStream;
+   STORAGE::SILO*             m_pSilo;
 };
 
 
@@ -116,12 +146,7 @@ CONTAINER::~CONTAINER ()
    delete m_pImpl;
 }
 
-bool           CONTAINER::Initialize ()              { return m_pImpl->Initialize (); }
-void           CONTAINER::Shutdown   ()              {        m_pImpl->Shutdown   (); }
+bool                  CONTAINER::Open  (void* pFabric) { return m_pImpl->Open  (pFabric); }
+size_t                CONTAINER::Close (void* pFabric) { return m_pImpl->Close (pFabric); }
 
-int            CONTAINER::Open       ()              { return m_pImpl->Open       (); }
-int            CONTAINER::Close      ()              { return m_pImpl->Close      (); }
-int            CONTAINER::Count      () const        { return m_pImpl->Count      (); }
-
-SNEEZE::CONTEXT* CONTAINER::Context  () const        { return m_pImpl->Context    (); }
-const CONTAINER::CID* CONTAINER::CID_Get () const    { return m_pImpl->CID_Get   (); }
+const std::string&    CONTAINER::Key   () const        { return m_pImpl->m_sKey; }

@@ -527,7 +527,7 @@ Fetches are dispatched as `JOB_FETCH` jobs through the engine's thread pool infr
 
 ASSET stores `IJOB* m_pAsset_Fetch` (not a typed FETCH pointer). On re-fetch, the existing job is cancelled (`Cancel()`) and the pointer nulled before creating a new job. On fetch completion, `ASSET_FETCH::OnFetch_Complete` checks `IsFetch()`: if true, calls `ASSET::FetchComplete(FETCH_RESULT)` (real fetch — sets state fields, notifies all attached FILEs); if false, calls `ASSET::FetchComplete(FILE*, STATE)` (notify-only — notifies single FILE's listener). Both overloads null `m_pAsset_Fetch` and release implicit counts. The destructor cancels any outstanding job.
 
-The ASSET increments `m_nCount_Open` and `m_nCount_Attach` before posting the job (implicit counts that keep the ASSET alive during the fetch). `FetchComplete` releases these via `Detach(nullptr)` and `Asset_Close(this, nullptr)` — routing through the proper lifecycle methods so `Meta_Save`/`Meta_Reset`/`Evict` trigger when counts reach zero. `Close(nullptr)` was designed for this case (comment at line 394: "if pFile == nullptr, the fetch thread is releasing its implicit lock").
+The ASSET increments `m_nCount_Open` and `m_nCount_Attach` before posting the job (implicit counts that keep the ASSET alive during the fetch). `FetchComplete` releases these via `Detach(nullptr)` and `Asset_Close(nullptr, this)` — routing through the proper lifecycle methods so `Meta_Save`/`Meta_Reset`/`Evict` trigger when counts reach zero. `Close(nullptr)` was designed for this case (comment at line 394: "if pFile == nullptr, the fetch thread is releasing its implicit lock").
 
 ### Race Condition Mitigations
 
@@ -539,7 +539,7 @@ Three specific concerns and their mitigations:
 
 3. **`.meta` files are written only on last detach or shutdown** — sidecar files are saved when the last FILE detaches (ASSET::Detach calls Meta_Save if READY) or during `Shutdown()`. No concurrent fetch activity exists at shutdown (all threads are joined first).
 
-4. **Fetch job count release** — `ASSET::FetchComplete()` is called on an `AGENT::FETCH` worker thread. It releases the fetch's implicit counts via `Detach(nullptr)` (triggers `Meta_Save`/`Meta_Reset`/`Evict` when attach count reaches zero) and `m_pNetwork->Asset_Close(this, nullptr)` (removes the ASSET from the map and deletes it when open count reaches zero). Both methods accept `nullptr` for `pFile` — `Detach` ignores it, `Close(nullptr)` skips the file-list erase, and `Asset_Close` uses `pAsset->Pathname()` for the map key.
+4. **Fetch job count release** — `ASSET::FetchComplete()` is called on an `AGENT::FETCH` worker thread. It releases the fetch's implicit counts via `Detach(nullptr)` (triggers `Meta_Save`/`Meta_Reset`/`Evict` when attach count reaches zero) and `m_pNetwork->Asset_Close(nullptr, this)` (removes the ASSET from the map and deletes it when open count reaches zero). Both methods accept `nullptr` for `pFile` — `Detach` ignores it, `Close(nullptr)` skips the file-list erase, and `Asset_Close` uses `pAsset->Pathname()` for the map key.
 
 ### Future: Non-Blocking I/O (curl_multi)
 
@@ -655,7 +655,7 @@ The NETWORK module completed a multi-session bottom-up refactoring. Build errors
 - curl_global_init/cleanup moved from NETWORK to ENGINE (truly global, reference-counted).
 - ASSET::Attach branches documented with state comments.
 - **Per-ASSET FETCH threads replaced with pooled JOB_FETCH jobs.** `m_pJob_Fetch` (FETCH*) replaced by `m_pAsset_Fetch` (IJOB*). ASSET_FETCH bridge class in Asset.cpp passes `SNEEZE::FETCH_RESULT` directly (no conversion — `NETWORK::FETCH_RESULT` was eliminated). Legacy thread pool (16 FETCH_SLOTs + overflow queue) removed from Network.cpp.
-- **FetchComplete lifecycle fix.** Raw counter decrements (`m_nCount_Attach--`, `m_nCount_Open--`) replaced by `Detach(nullptr)` + `m_pNetwork->Asset_Close(this, nullptr)`. This routes through the proper lifecycle methods, triggering Meta_Save when attach count reaches zero. Fixes the long-standing "temporary ungraceful solution" noted in the architecture docs.
+- **FetchComplete lifecycle fix.** Raw counter decrements (`m_nCount_Attach--`, `m_nCount_Open--`) replaced by `Detach(nullptr)` + `m_pNetwork->Asset_Close(nullptr, this)`. This routes through the proper lifecycle methods, triggering Meta_Save when attach count reaches zero. Fixes the long-standing "temporary ungraceful solution" noted in the architecture docs.
 - **Asset_Close simplified.** Uses `pAsset->Pathname()` unconditionally instead of branching on `pFile ? pFile->Pathname("") : pAsset->Pathname()` — both are always equal.
 - **Queue_Post_Fetch routing.** `NETWORK::Queue_Post_Fetch(JOB_FETCH*)` -> `ENGINE::Queue_Post_Fetch` -> `ENGINE::Impl::Queue_Post_Fetch` -> `CONTROL::Queue_Post_Fetch` -> `POOL_QUEUE<JOB_FETCH*>::Post`. ENGINE::Impl keeps `m_pControl` private; the forwarding method provides controlled access.
 - **All FILE notifications are asynchronous.** Even for already-cached files, OnFileReady/OnFileFailed are delivered via notify-only `ASSET_FETCH` jobs (`IsFetch()==false`) posted to the fetch pool. This eliminates re-entrancy bugs where synchronous notification during `File_Open`/`Initialize`/`Attach` could destroy the FILE mid-initialization.

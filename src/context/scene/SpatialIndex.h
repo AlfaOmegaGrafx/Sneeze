@@ -15,7 +15,7 @@
 #ifndef SNEEZE_SOM_SPATIALINDEX_H
 #define SNEEZE_SOM_SPATIALINDEX_H
 
-#include "Fabric.h"
+#include <Scene.h>
 
 namespace SNEEZE
 {
@@ -81,24 +81,24 @@ namespace SNEEZE
 
       // --- Build/rebuild from a flat list of nodes ---
 
-      void Build (const std::vector<SCENE::FABRIC::NODE*>& apNodes);
+      void Build (const std::vector<NODE*>& apNodes);
       void Clear ();
 
       // --- Queries ---
 
-      void QueryFrustum (const FRUSTUM& pFrustum, std::vector<SCENE::FABRIC::NODE*>& aResults) const;
-      void QuerySphere (double x, double y, double z, double dRadius, std::vector<SCENE::FABRIC::NODE*>& aResults) const;
+      void QueryFrustum (const FRUSTUM& pFrustum, std::vector<NODE*>& aResults) const;
+      void QuerySphere (double x, double y, double z, double dRadius, std::vector<NODE*>& aResults) const;
 
       int  GetNodeCount () const { return static_cast<int> (m_apLeaves.size ()); }
 
    private:
       int  BuildRecursive (std::vector<int>& aIndices, int nStart, int nEnd);
       AABB ComputeBounds (const std::vector<int>& aIndices, int nStart, int nEnd) const;
-      void QueryFrustumRecursive (int nBvhIndex, const FRUSTUM& pFrustum, std::vector<SCENE::FABRIC::NODE*>& aResults) const;
-      void QuerySphereRecursive (int nBvhIndex, double x, double y, double z, double dRadius, std::vector<SCENE::FABRIC::NODE*>& aResults) const;
+      void QueryFrustumRecursive (int nBvhIndex, const FRUSTUM& pFrustum, std::vector<NODE*>& aResults) const;
+      void QuerySphereRecursive (int nBvhIndex, double x, double y, double z, double dRadius, std::vector<NODE*>& aResults) const;
 
       std::vector<BVH_NODE>  m_aBvhNodes;
-      std::vector<SCENE::FABRIC::NODE*>     m_apLeaves;
+      std::vector<NODE*>     m_apLeaves;
       std::vector<AABB>      m_aLeafBounds;
       int                    m_nRootIndex;
    };
