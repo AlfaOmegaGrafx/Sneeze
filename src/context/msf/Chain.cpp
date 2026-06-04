@@ -329,10 +329,10 @@ std::string CHAIN::GetLeafFingerprint () const
 }
 
 // ---------------------------------------------------------------------------
-// GetCertInfos
+// CertInfos
 // ---------------------------------------------------------------------------
 
-const std::vector<MSF_CERT>& CHAIN::GetCertInfos () const
+const std::vector<MSF_CERT>& CHAIN::CertInfos () const
 {
    return m_aCertInfos;
 }

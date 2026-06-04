@@ -64,3 +64,26 @@
 - Updated subsystem documentation (Console.md, Storage.md, Network.md) for new CID fields
 - Builds and runs (both Sneeze and Artemis)
 - Planned next step: create first official MSF file via SignMsf, then wire fetch/parse/verify pipeline in Fabric::Initialize
+
+## June 3–4, 2026 — ~late evening through June 4 ~12:30 PM PDT
+
+**Phase 3 completion: first official MSF file + async fetch/parse/verify pipeline**
+
+- Created first official MSF file: `tests/data/solar-system.json` (payload) + `tests/data/solar-system.msf` (signed JWS via SignMsf with test certs, container name "solar-system", empty services/modules)
+- MSF hosted at `https://cdn.rp1.com/test/solar-system.msf` for live testing
+- Wired async MSF loading pipeline in FABRIC::Impl:
+  - FABRIC::Impl now implements NETWORK::IFILE (OnFileReady/OnFileFailed)
+  - Added MSF*, NETWORK::FILE*, CONTAINER* members to FABRIC::Impl
+  - Initialize(sUrl) fetches MSF via NETWORK::File_Open using parent fabric's Container()->Identity() as CID
+  - OnFileReady: reads data, parses MSF, verifies signature+chain, calls Container_Open to create container
+  - astro::InjectSolarSystem moved from FABRIC_ROOT::Initialize to FABRIC::Impl::OnFileReady (conditional on MSF "container" == "solar-system")
+- Resolved CID chicken-and-egg problem: FABRIC_ROOT gets synthetic root CID (sFingerprint="Sneeze", sContainer="Root", eTrust=kTRUST_ROOT) via Container_Open detecting null Msf(); child fabrics borrow parent's CID for MSF fetch caching
+- Added kTRUST_ROOT to eTRUST enum (6 levels now)
+- Changed Container_Open/Close signatures from void* to FABRIC*; added FABRIC forward declaration in Context.h
+- Changed CONTAINER::Identity() from const CID& to const CID* (pointer identity required for deduplication)
+- Changed all NETWORK::File_Open overloads + FILE constructors to accept const CONTAINER::CID* (const-correctness)
+- FABRIC::~Impl destructor: close m_pFile_Msf, delete m_pNode_Root, Container_Close, delete m_pMsf, detach from parent
+- Fixed build script: PCH clearing in build-windows.ps1 now conditional on -Fresh or -Rebuild only (was causing full rebuilds on every invocation)
+- End-to-end verified: MSF fetched from CDN, parsed, cert data extracted, container created with correct CID and kTRUST_UNVERIFIED
+- Discovered bug: inspector attachment re-triggers OnFileReady after Close() due to m_pListener not being nulled in Pending_Close() — Dean studying and fixing
+- Phase 3 declared complete; next steps: fix OnFileReady bug, polish Phases 1-4, then Phase 5+6 (WASM solar system)

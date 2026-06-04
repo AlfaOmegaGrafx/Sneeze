@@ -55,7 +55,7 @@ public:
             {
                m_pScene = new SCENE (m_pContext);
 
-               if (m_pScene->Initialize ("<primary>"))   // sUrl
+               if (m_pScene->Initialize (sUrl))
                {
                   m_pViewport = new VIEWPORT (m_pContext);
 
@@ -124,20 +124,40 @@ public:
          m_pNetwork->Clear ();
    }
 
-   CONTAINER* Container_Open (void* pFabric)
+   CONTAINER* Container_Open (FABRIC* pFabric)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxContainer);
 
       CONTAINER* pContainer = nullptr;
-
-      // TODO Phase 3: extract identity fields from pFabric->Msf()
       CONTAINER::CID CID;
-      CID.sFingerprint       = "0123456789FINGERPRINT0123456789FINGERPRINT0123456789FINGERPRINT0";
-      CID.sOrganization      = "Metaversal Corporation";
-      CID.sOrganizationHash  = "012345abcdef";
-      CID.sContainer         = "Solar System";
-      CID.sPersonaHash       = m_pEngine->Persona ()->Hash ();
-      CID.eTrust             = kTRUST_VERIFIED;
+
+      MSF* pMsf = pFabric->Msf ();
+
+      if (pMsf)
+      {
+         CID.sFingerprint       = pMsf->Fingerprint ();
+         CID.sOrganization      = pMsf->Organization ();
+         CID.sOrganizationHash  = pMsf->OrganizationHash ();
+         CID.sContainer         = pMsf->Container ();
+         CID.sPersonaHash       = m_pEngine->Persona ()->Hash ();
+
+         if (!pMsf->IsSignatureValid ())
+            CID.eTrust = kTRUST_UNTRUSTED;
+         else if (!pMsf->IsChainTrusted ())
+            CID.eTrust = kTRUST_UNVERIFIED;
+         else if (pMsf->IsChainExpired ())
+            CID.eTrust = kTRUST_EXPIRED;
+         else CID.eTrust = kTRUST_VERIFIED;
+      }
+      else
+      {
+         CID.sFingerprint       = std::string (64, '0');
+         CID.sOrganization      = "Sneeze";
+         CID.sOrganizationHash  = std::string (64, '0');
+         CID.sContainer         = "Root";
+         CID.sPersonaHash       = m_pEngine->Persona ()->Hash ();
+         CID.eTrust             = kTRUST_ROOT;
+      }   
 
       std::string sKey = CID.Key ();
 
@@ -156,7 +176,7 @@ public:
       return pContainer;
    }
 
-   void Container_Close (void* pFabric, CONTAINER* pContainer)
+   void Container_Close (FABRIC* pFabric, CONTAINER* pContainer)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxContainer);
 
@@ -219,8 +239,8 @@ const std::string& SNEEZE::CONTEXT::Path_Temporary () const { return m_pImpl->m_
 // Methods
 // ---------------------------------------------------------------------------
 
-void                          SNEEZE::CONTEXT::Url             (const std::string& sUrl)              {        m_pImpl->Url (sUrl); }
-void                          SNEEZE::CONTEXT::Logout          ()                                     {        m_pImpl->Logout (); }
+void                          SNEEZE::CONTEXT::Url             (const std::string& sUrl)                {        m_pImpl->Url (sUrl); }
+void                          SNEEZE::CONTEXT::Logout          ()                                       {        m_pImpl->Logout (); }
 
-SNEEZE::CONTAINER*            SNEEZE::CONTEXT::Container_Open  (void* pFabric)                        { return m_pImpl->Container_Open  (pFabric); }
-void                          SNEEZE::CONTEXT::Container_Close (void* pFabric, CONTAINER* pContainer) {        m_pImpl->Container_Close (pFabric, pContainer); }
+SNEEZE::CONTAINER*            SNEEZE::CONTEXT::Container_Open  (FABRIC* pFabric)                        { return m_pImpl->Container_Open  (pFabric); }
+void                          SNEEZE::CONTEXT::Container_Close (FABRIC* pFabric, CONTAINER* pContainer) {        m_pImpl->Container_Close (pFabric, pContainer); }

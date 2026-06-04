@@ -48,7 +48,7 @@ public:
    // Lifecycle
    // -----------------------------------------------------------------------
 
-   bool Open (void* pFabric)
+   bool Open (FABRIC* pFabric)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxContainer);
 
@@ -83,7 +83,7 @@ public:
       return bResult;
    }
 
-   size_t Close (void* pFabric)
+   size_t Close (FABRIC* pFabric)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxContainer);
 
@@ -126,7 +126,7 @@ public:
    std::string                m_sKey;
 
    uint32_t                   m_nCount_Open;
-   std::vector<void*>         m_apFabric;
+   std::vector<FABRIC*>       m_apFabric;
    std::recursive_mutex       m_mxContainer;
 
    CONSOLE::STREAM*           m_pStream;
@@ -148,8 +148,8 @@ CONTAINER::~CONTAINER ()
    delete m_pImpl;
 }
 
-bool                  CONTAINER::Open     (void* pFabric) { return m_pImpl->Open  (pFabric); }
-size_t                CONTAINER::Close    (void* pFabric) { return m_pImpl->Close (pFabric); }
+bool                  CONTAINER::Open     (FABRIC* pFabric) { return m_pImpl->Open  (pFabric); }
+size_t                CONTAINER::Close    (FABRIC* pFabric) { return m_pImpl->Close (pFabric); }
 
-const CONTAINER::CID& CONTAINER::Identity () const        { return m_pImpl->m_CID; }
-const std::string&    CONTAINER::Key      () const        { return m_pImpl->m_sKey; }
+const CONTAINER::CID* CONTAINER::Identity () const        { return &m_pImpl->m_CID; }
+const std::string&    CONTAINER::Key      () const        { return  m_pImpl->m_sKey; }

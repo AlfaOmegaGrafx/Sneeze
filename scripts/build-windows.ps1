@@ -492,9 +492,9 @@ Fix on this agent:
    } else {
       Write-Host ''
       Write-Host "==> Building Sneeze ($Platform, $Config)"
-      # After origin/main moves, MSVC can keep a PCH baked with an older include/
-      # (e.g. Viewport.h without Size/Resize) while src/ already calls the new API.
-      Clear-SneezePrecompiledHeaders $SneezeBuildDir
+      if ($Fresh -or $Rebuild) {
+         Clear-SneezePrecompiledHeaders $SneezeBuildDir
+      }
       & cmake --build $SneezeBuildDir --config $Config
       if ($LASTEXITCODE -ne 0) {
          Write-Error 'Sneeze build failed'

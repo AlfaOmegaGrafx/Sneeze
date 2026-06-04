@@ -46,7 +46,7 @@ bool MSF::Parse (const std::string& sJws)
 {
    bool bResult = false;
 
-   m_payload         = nlohmann::json ();
+   m_pJson_Payload         = nlohmann::json ();
    m_sAlgorithm.clear ();
    m_sFingerprint.clear ();
    m_sOrganization.clear ();
@@ -99,11 +99,11 @@ bool MSF::Parse (const std::string& sJws)
                std::string sPayloadStr = decoded.get_payload_claim ("data").as_string ();
                try
                {
-                  m_payload = nlohmann::json::parse (sPayloadStr);
+                  m_pJson_Payload = nlohmann::json::parse (sPayloadStr);
                }
                catch (...)
                {
-                  m_payload = sPayloadStr;
+                  m_pJson_Payload = sPayloadStr;
                }
             }
 
@@ -120,7 +120,7 @@ bool MSF::Parse (const std::string& sJws)
       {
          try
          {
-            m_payload = nlohmann::json::parse (sJws);
+            m_pJson_Payload = nlohmann::json::parse (sJws);
             m_bParsed = true;
             bResult   = true;
          }
@@ -160,7 +160,7 @@ std::string MSF::Sign (const std::string& sPrivateKeyPem,
 
       if (bCertsOk)
       {
-         std::string sPayloadStr = m_payload.dump ();
+         std::string sPayloadStr = m_pJson_Payload.dump ();
 
          auto pBuilder = jwt::create ()
             .set_type ("JWS")
@@ -325,12 +325,12 @@ bool MSF::RemoveCert (int nIndex)
    return bResult;
 }
 
-const std::vector<MSF::CERT>& MSF::GetCertInfos () const
+const std::vector<MSF::CERT>& MSF::CertInfos () const
 {
    return m_aCertInfos;
 }
 
-int MSF::GetCertCount () const
+int MSF::CertCount () const
 {
    return (int) m_aCertInfos.size ();
 }
@@ -339,14 +339,14 @@ int MSF::GetCertCount () const
 // Payload (bulk)
 // ---------------------------------------------------------------------------
 
-void MSF::SetPayload (const nlohmann::json& payload)
+void MSF::SetPayload (const nlohmann::json& pJson_Payload)
 {
-   m_payload = payload;
+   m_pJson_Payload = pJson_Payload;
 }
 
-nlohmann::json MSF::GetPayload () const
+nlohmann::json MSF::Payload () const
 {
-   return m_payload;
+   return m_pJson_Payload;
 }
 
 // ---------------------------------------------------------------------------
@@ -355,31 +355,31 @@ nlohmann::json MSF::GetPayload () const
 
 void MSF::SetContainer (const std::string& sContainer)
 {
-   if (!m_payload.is_object ())
-      m_payload = nlohmann::json::object ();
-   m_payload["container"] = sContainer;
+   if (!m_pJson_Payload.is_object ())
+      m_pJson_Payload = nlohmann::json::object ();
+   m_pJson_Payload["container"] = sContainer;
 }
 
 std::string MSF::Container () const
 {
    std::string sResult;
-   if (m_payload.is_object ()  &&  m_payload.contains ("container"))
-      sResult = m_payload["container"].get<std::string> ();
+   if (m_pJson_Payload.is_object ()  &&  m_pJson_Payload.contains ("container"))
+      sResult = m_pJson_Payload["container"].get<std::string> ();
    return sResult;
 }
 
 void MSF::SetSuccessor (const std::string& sSuccessor)
 {
-   if (!m_payload.is_object ())
-      m_payload = nlohmann::json::object ();
-   m_payload["successor"] = sSuccessor;
+   if (!m_pJson_Payload.is_object ())
+      m_pJson_Payload = nlohmann::json::object ();
+      m_pJson_Payload["successor"] = sSuccessor;
 }
 
-std::string MSF::GetSuccessor () const
+std::string MSF::Successor () const
 {
    std::string sResult;
-   if (m_payload.is_object ()  &&  m_payload.contains ("successor"))
-      sResult = m_payload["successor"].get<std::string> ();
+   if (m_pJson_Payload.is_object ()  &&  m_pJson_Payload.contains ("successor"))
+      sResult = m_pJson_Payload["successor"].get<std::string> ();
    return sResult;
 }
 
@@ -389,10 +389,10 @@ std::string MSF::GetSuccessor () const
 
 void MSF::AddService (const SERVICE& service)
 {
-   if (!m_payload.is_object ())
-      m_payload = nlohmann::json::object ();
-   if (!m_payload.contains ("services"))
-      m_payload["services"] = nlohmann::json::array ();
+   if (!m_pJson_Payload.is_object ())
+      m_pJson_Payload = nlohmann::json::object ();
+   if (!m_pJson_Payload.contains ("services"))
+      m_pJson_Payload["services"] = nlohmann::json::array ();
 
    nlohmann::json svc;
    svc["name"]     = service.sName;
@@ -401,17 +401,16 @@ void MSF::AddService (const SERVICE& service)
    if (!service.aModules.empty ())
       svc["modules"] = service.aModules;
 
-   m_payload["services"].push_back (svc);
+      m_pJson_Payload["services"].push_back (svc);
 }
 
 bool MSF::RemoveService (const std::string& sName)
 {
    bool bResult = false;
 
-   if (m_payload.is_object ()  &&  m_payload.contains ("services")
-       &&  m_payload["services"].is_array ())
+   if (m_pJson_Payload.is_object ()  &&  m_pJson_Payload.contains ("services")  &&  m_pJson_Payload["services"].is_array ())
    {
-      auto& aServices = m_payload["services"];
+      auto& aServices = m_pJson_Payload["services"];
       for (auto it = aServices.begin (); it != aServices.end (); ++it)
       {
          if (it->contains ("name")  &&  (*it)["name"].get<std::string> () == sName)
@@ -426,14 +425,13 @@ bool MSF::RemoveService (const std::string& sName)
    return bResult;
 }
 
-std::vector<SERVICE> MSF::GetServices () const
+std::vector<SERVICE> MSF::Services () const
 {
    std::vector<SERVICE> aResult;
 
-   if (m_payload.is_object ()  &&  m_payload.contains ("services")
-       &&  m_payload["services"].is_array ())
+   if (m_pJson_Payload.is_object ()  &&  m_pJson_Payload.contains ("services")  &&  m_pJson_Payload["services"].is_array ())
    {
-      for (const auto& svc : m_payload["services"])
+      for (const auto& svc : m_pJson_Payload["services"])
       {
          SERVICE entry;
          if (svc.contains ("name"))     entry.sName     = svc["name"].get<std::string> ();
@@ -459,39 +457,37 @@ void MSF::AddModule (const std::string& sName,
                      const std::string& sUrl,
                      const std::string& sSha256)
 {
-   if (!m_payload.is_object ())
-      m_payload = nlohmann::json::object ();
-   if (!m_payload.contains ("modules"))
-      m_payload["modules"] = nlohmann::json::object ();
+   if (!m_pJson_Payload.is_object ())
+      m_pJson_Payload = nlohmann::json::object ();
+   if (!m_pJson_Payload.contains ("modules"))
+      m_pJson_Payload["modules"] = nlohmann::json::object ();
 
    nlohmann::json mod;
    mod["url"]    = sUrl;
    mod["sha256"] = sSha256;
-   m_payload["modules"][sName] = mod;
+   m_pJson_Payload["modules"][sName] = mod;
 }
 
 bool MSF::RemoveModule (const std::string& sName)
 {
    bool bResult = false;
 
-   if (m_payload.is_object ()  &&  m_payload.contains ("modules")
-       &&  m_payload["modules"].is_object ()  &&  m_payload["modules"].contains (sName))
+   if (m_pJson_Payload.is_object ()  &&  m_pJson_Payload.contains ("modules")  &&  m_pJson_Payload["modules"].is_object ()  &&  m_pJson_Payload["modules"].contains (sName))
    {
-      m_payload["modules"].erase (sName);
+      m_pJson_Payload["modules"].erase (sName);
       bResult = true;
    }
 
    return bResult;
 }
 
-std::map<std::string, MODULE> MSF::GetModules () const
+std::map<std::string, MODULE> MSF::Modules () const
 {
    std::map<std::string, MODULE> aResult;
 
-   if (m_payload.is_object ()  &&  m_payload.contains ("modules")
-       &&  m_payload["modules"].is_object ())
+   if (m_pJson_Payload.is_object ()  &&  m_pJson_Payload.contains ("modules")  &&  m_pJson_Payload["modules"].is_object ())
    {
-      for (auto it = m_payload["modules"].begin (); it != m_payload["modules"].end (); ++it)
+      for (auto it = m_pJson_Payload["modules"].begin (); it != m_pJson_Payload["modules"].end (); ++it)
       {
          MODULE mod;
          if (it.value ().contains ("url"))    mod.sUrl    = it.value ()["url"].get<std::string> ();
@@ -507,15 +503,16 @@ std::map<std::string, MODULE> MSF::GetModules () const
 // Status
 // ---------------------------------------------------------------------------
 
-std::string MSF::GetAlgorithm ()        const { return m_sAlgorithm; }
-std::string MSF::GetFingerprint ()      const { return m_sFingerprint; }
-std::string MSF::GetOrganization ()     const { return m_sOrganization; }
-std::string MSF::GetOrganizationHash () const { return m_sOrganizationHash; }
-bool        MSF::IsSignatureValid ()    const { return m_bSignatureValid; }
-bool        MSF::IsChainTrusted ()      const { return m_bChainTrusted; }
-bool        MSF::IsChainExpired ()      const { return m_bChainExpired; }
-std::string MSF::GetSignatureError ()   const { return m_sSignatureError; }
-std::string MSF::GetChainError ()       const { return m_sChainError; }
+bool        MSF::IsSignatureValid  () const { return m_bSignatureValid; }
+bool        MSF::IsChainTrusted    () const { return m_bChainTrusted; }
+bool        MSF::IsChainExpired    () const { return m_bChainExpired; }
+
+std::string MSF::Algorithm         () const { return m_sAlgorithm; }
+std::string MSF::Fingerprint       () const { return m_sFingerprint; }
+std::string MSF::Organization      () const { return m_sOrganization; }
+std::string MSF::OrganizationHash  () const { return m_sOrganizationHash; }
+std::string MSF::SignatureError    () const { return m_sSignatureError; }
+std::string MSF::ChainError        () const { return m_sChainError; }
 
 std::string MSF::DisplayOrganization () const
 {

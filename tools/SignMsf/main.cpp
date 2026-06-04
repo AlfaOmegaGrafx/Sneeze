@@ -74,7 +74,7 @@ static void PrintUsage ()
 
 static void PrintCertChain (const MSF& msf)
 {
-   const auto& aCerts = msf.GetCertInfos ();
+   const auto& aCerts = msf.CertInfos ();
 
    for (size_t i = 0; i < aCerts.size (); ++i)
    {
@@ -125,10 +125,10 @@ static int DoVerify (const char* sMsfPath,
          msf.VerifyChain ();
 
          std::cout << "File:        " << sMsfPath << "\n";
-         std::cout << "Algorithm:   " << msf.GetAlgorithm () << "\n";
-         std::cout << "Fingerprint: " << msf.GetFingerprint () << "\n";
+         std::cout << "Algorithm:   " << msf.Algorithm () << "\n";
+         std::cout << "Fingerprint: " << msf.Fingerprint () << "\n";
 
-         std::string sSuccessor = msf.GetSuccessor ();
+         std::string sSuccessor = msf.Successor ();
          if (!sSuccessor.empty ())
             std::cout << "Successor:   " << sSuccessor << "\n";
 
@@ -140,17 +140,17 @@ static int DoVerify (const char* sMsfPath,
          else
          {
             std::cout << "Signature:   FAILED\n";
-            if (!msf.GetSignatureError ().empty ())
-               std::cerr << "Sig error:   " << msf.GetSignatureError () << "\n";
-            if (!msf.GetChainError ().empty ())
-               std::cerr << "Chain error: " << msf.GetChainError () << "\n";
+            if (!msf.SignatureError ().empty ())
+               std::cerr << "Sig error:   " << msf.SignatureError () << "\n";
+            if (!msf.ChainError ().empty ())
+               std::cerr << "Chain error: " << msf.ChainError () << "\n";
          }
 
          std::cout << "\n--- Certificate Chain ---";
          PrintCertChain (msf);
 
          std::cout << "\n--- Payload ---\n\n";
-         nlohmann::json payload = msf.GetPayload ();
+         nlohmann::json payload = msf.Payload ();
          if (!payload.is_null ())
             std::cout << payload.dump (3) << "\n";
          else

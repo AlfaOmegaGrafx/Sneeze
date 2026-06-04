@@ -25,7 +25,7 @@ using namespace SNEEZE;
 // FABRIC::Impl
 // ---------------------------------------------------------------------------
 
-class FABRIC::Impl
+class FABRIC::Impl : public NETWORK::IFILE
 {
 public:
    Impl (FABRIC* pFabric, SCENE* pScene, NODE* pNode_Attach) :
@@ -34,7 +34,9 @@ public:
       m_pNode_Attach   (pNode_Attach),
       m_pFabric_Parent (pNode_Attach ? pNode_Attach->Fabric () : nullptr),
       m_pNode_Root     (nullptr),
-      m_pContainer     (nullptr)
+      m_pContainer     (nullptr),
+      m_pMsf           (nullptr),
+      m_pFile_Msf      (nullptr)
    {
       if (m_pFabric_Parent)
          m_pFabric_Parent->Fabric_Add (m_pFabric);
@@ -46,16 +48,11 @@ public:
 
       m_sUrl = sUrl;
 
-      if (m_sUrl == "<primary>")
+      if (m_pFabric_Parent)
       {
-         auto* pNode_Root = new NODE (m_pFabric, nullptr);
+         m_pFile_Msf = m_pScene->Network ()->File_Open (m_pFabric_Parent->Container ()->Identity (), m_sUrl, this);
 
-         if (pNode_Root->Initialize (nullptr))
-         {
-            astro::InjectSolarSystem (m_pFabric);
-
-            bResult = true;
-         }
+         bResult = (m_pFile_Msf != nullptr);
       }
 
       return bResult;
@@ -63,6 +60,12 @@ public:
 
    ~Impl ()
    {
+      if (m_pFile_Msf)
+      {
+         m_pFile_Msf->Close ();
+         m_pFile_Msf = nullptr;
+      }
+
       if (m_pNode_Root)
       {
          delete m_pNode_Root;
@@ -72,8 +75,82 @@ public:
       if (!m_apFabric.empty ())
          m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "FABRIC", "Leaked " + std::to_string (m_apFabric.size ()) + " child fabric(s)");
 
+      if (m_pContainer)
+      {
+         m_pScene->Context ()->Container_Close (m_pFabric, m_pContainer);
+         m_pContainer = nullptr;
+      }
+
+      delete m_pMsf;
+      m_pMsf = nullptr;
+
       if (m_pFabric_Parent)
          m_pFabric_Parent->Fabric_Remove (m_pFabric);
+   }
+
+// -----------------------------------------------------------------------
+// NETWORK::IFILE callbacks
+// -----------------------------------------------------------------------
+
+   void OnFileReady (NETWORK::FILE* pFile) override
+   {
+      std::vector<uint8_t> aData;
+
+      pFile->ReadData (aData);
+
+      pFile->Close ();
+
+      m_pFile_Msf = nullptr;
+
+      if (!aData.empty ())
+      {
+         std::string sMsf (aData.begin (), aData.end ());
+
+         m_pMsf = new MSF (m_pScene->Engine ()); // pEngine is for logging only
+
+         if (m_pMsf->Parse (sMsf))
+         {
+            m_pMsf->VerifySignature ();
+            m_pMsf->VerifyChain ();
+
+            m_pContainer = m_pScene->Context ()->Container_Open (m_pFabric);
+
+            if (m_pContainer)
+            {
+               m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "FABRIC", "Loaded MSF: " + m_pContainer->Identity ()->DisplayName () + " (trust: " + std::to_string (m_pContainer->Identity ()->eTrust) + ")");
+
+// temporary kludge to inject the solar system into the primary fabric      
+if (m_pMsf->Payload ()["container"] == "solar-system")
+{
+   auto* pNode_Root = new NODE (m_pFabric, nullptr);
+
+   if (pNode_Root->Initialize (nullptr))
+   {
+      astro::InjectSolarSystem (m_pFabric);
+   }
+}
+            }
+            else m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "FABRIC", "Container_Open failed for " + m_sUrl);
+         }
+         else
+         {
+            m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "FABRIC", "Failed to parse MSF from " + m_sUrl);
+
+            delete m_pMsf;
+            m_pMsf = nullptr;
+         }
+      }
+   }
+
+   void OnFileFailed (NETWORK::FILE* pFile) override
+   {
+      pFile->Close ();
+
+      m_pFile_Msf = nullptr;
+
+      m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "FABRIC", "Failed to fetch MSF from " + m_sUrl);
+
+      // We should add a node that signifies that the fabric failed to load.
    }
 
    void Url (const std::string& sUrl)
@@ -116,6 +193,8 @@ public:
    NODE*                         m_pNode_Root;
    NODE*                         m_pNode_Attach;
    CONTAINER*                    m_pContainer;
+   MSF*                          m_pMsf;
+   NETWORK::FILE*                m_pFile_Msf;
    std::string                   m_sUrl;
    mutable std::recursive_mutex  m_mxFabric;
 };
@@ -146,6 +225,7 @@ FABRIC::~FABRIC ()
 
 SCENE*             FABRIC::Scene          ()                         const { return m_pImpl->m_pScene; }
 CONTAINER*         FABRIC::Container      ()                         const { return m_pImpl->m_pContainer; }
+MSF*               FABRIC::Msf            ()                         const { return m_pImpl->m_pMsf; }
 FABRIC*            FABRIC::Fabric_Parent  ()                         const { return m_pImpl->m_pFabric_Parent; }
 NODE*              FABRIC::Node_Root      ()                         const { return m_pImpl->m_pNode_Root; }
 NODE*              FABRIC::Node_Attach    ()                         const { return m_pImpl->m_pNode_Attach; }
@@ -181,16 +261,21 @@ bool FABRIC_ROOT::Initialize (const std::string& sUrl)
 {
    bool bResult = false;
 
-   auto* pNode_Root = new NODE (this, nullptr);
+   m_pImpl->m_pContainer = Scene ()->Context ()->Container_Open (this);
 
-   if (pNode_Root->Initialize (nullptr))
+   if (m_pImpl->m_pContainer)
    {
-      auto* pMap_Object  = new MAP_OBJECT_ROOT ();
-      pMap_Object->m_sUrl_Fabric = sUrl;
+      auto* pNode_Root = new NODE (this, nullptr);
 
-      m_pNode_Primary = new NODE (this, pNode_Root);
+      if (pNode_Root->Initialize (nullptr))
+      {
+         auto* pMap_Object  = new MAP_OBJECT_ROOT ();
+         pMap_Object->m_sUrl_Fabric = sUrl;
 
-      bResult = m_pNode_Primary->Initialize (pMap_Object);
+         m_pNode_Primary = new NODE (this, pNode_Root);
+
+         bResult = m_pNode_Primary->Initialize (pMap_Object);
+      }
    }
 
    return bResult;

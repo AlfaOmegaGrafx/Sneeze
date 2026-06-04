@@ -27,6 +27,7 @@ namespace SNEEZE
    class STORAGE;
    class SCENE;
    class VIEWPORT;
+   class FABRIC;
 
    class CONTEXT
    {
@@ -62,8 +63,8 @@ namespace SNEEZE
       const std::string& Path_Permanent () const;
       const std::string& Path_Temporary () const;
 
-      CONTAINER* Container_Open  (void* pFabric);
-      void       Container_Close (void* pFabric, CONTAINER* pContainer);
+      CONTAINER* Container_Open  (FABRIC* pFabric);
+      void       Container_Close (FABRIC* pFabric, CONTAINER* pContainer);
 
    private:
       class Impl;

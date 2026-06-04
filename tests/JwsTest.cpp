@@ -131,10 +131,10 @@ int RunJwsTests (int nArgc, char** aArgv)
    verifier.VerifySignature ();
    verifier.VerifyChain ();
    ASSERT (verifier.IsSignatureValid ()  &&  verifier.IsChainTrusted (), "Verification succeeded (no error)");
-   ASSERT (verifier.GetAlgorithm () == "RS256", "Algorithm is RS256");
-   ASSERT (!verifier.GetFingerprint ().empty (), "Signer fingerprint computed");
+   ASSERT (verifier.Algorithm () == "RS256", "Algorithm is RS256");
+   ASSERT (!verifier.Fingerprint ().empty (), "Signer fingerprint computed");
 
-   printf ("  Fingerprint: %s\n", verifier.GetFingerprint ().c_str ());
+   printf ("  Fingerprint: %s\n", verifier.Fingerprint ().c_str ());
 
    // -----------------------------------------------------------------------
    // Test 2: MSF_FILE parses MSS payload
@@ -172,10 +172,10 @@ int RunJwsTests (int nArgc, char** aArgv)
    ASSERT (svc.IsSignatureValid ()  &&  svc.IsChainTrusted (), "MSS verification succeeded");
 
    ASSERT (svc.Container () == "poker-table", "Container parsed correctly");
-   ASSERT (!svc.GetOrganization ().empty (), "Organization extracted from cert");
-   ASSERT (svc.GetSuccessor () == "deadbeef0123456789abcdef", "Successor parsed correctly");
+   ASSERT (!svc.Organization ().empty (), "Organization extracted from cert");
+   ASSERT (svc.Successor () == "deadbeef0123456789abcdef", "Successor parsed correctly");
 
-   auto aServices = svc.GetServices ();
+   auto aServices = svc.Services ();
    ASSERT (aServices.size () == 1, "One service declared");
    if (!aServices.empty ())
    {
@@ -185,7 +185,7 @@ int RunJwsTests (int nArgc, char** aArgv)
       ASSERT (aServices[0].aModules.size () == 1, "Service has one module");
    }
 
-   auto aModules = svc.GetModules ();
+   auto aModules = svc.Modules ();
    ASSERT (aModules.size () == 1, "One module declared");
    if (!aModules.empty ())
    {
@@ -213,7 +213,7 @@ int RunJwsTests (int nArgc, char** aArgv)
    tamperedVerifier.Parse (sTampered);
    tamperedVerifier.VerifySignature ();
    ASSERT (!tamperedVerifier.IsSignatureValid (), "Tampered payload rejected");
-   printf ("  Error: %s\n", tamperedVerifier.GetSignatureError ().c_str ());
+   printf ("  Error: %s\n", tamperedVerifier.SignatureError ().c_str ());
 
    // -----------------------------------------------------------------------
    // Test 4: Expired certificate rejected
@@ -233,7 +233,7 @@ int RunJwsTests (int nArgc, char** aArgv)
    expiredVerifier.Parse (sExpiredJws);
    expiredVerifier.VerifyChain ();
    ASSERT (!expiredVerifier.IsChainTrusted (), "Expired certificate rejected");
-   printf ("  Error: %s\n", expiredVerifier.GetChainError ().c_str ());
+   printf ("  Error: %s\n", expiredVerifier.ChainError ().c_str ());
 
    // -----------------------------------------------------------------------
    // Test 5: Untrusted chain rejected
@@ -245,7 +245,7 @@ int RunJwsTests (int nArgc, char** aArgv)
    untrustedVerifier.Parse (sJws);
    untrustedVerifier.VerifyChain ();
    ASSERT (!untrustedVerifier.IsChainTrusted (), "Untrusted chain rejected");
-   printf ("  Error: %s\n", untrustedVerifier.GetChainError ().c_str ());
+   printf ("  Error: %s\n", untrustedVerifier.ChainError ().c_str ());
 
    // -----------------------------------------------------------------------
    // Test 6: Fingerprint stability
@@ -259,7 +259,7 @@ int RunJwsTests (int nArgc, char** aArgv)
    verifier2.VerifySignature ();
    verifier2.VerifyChain ();
    ASSERT (verifier2.IsSignatureValid ()  &&  verifier2.IsChainTrusted (), "Second verification succeeded");
-   ASSERT (verifier.GetFingerprint () == verifier2.GetFingerprint (), "Fingerprint is stable across verifications");
+   ASSERT (verifier.Fingerprint () == verifier2.Fingerprint (), "Fingerprint is stable across verifications");
 
    // -----------------------------------------------------------------------
    // Test 7: Malformed JWS rejected
@@ -288,8 +288,8 @@ int RunJwsTests (int nArgc, char** aArgv)
    bool bParsed = parseOnly.Parse (sMssJws);
    ASSERT (bParsed, "Parse succeeded without verification");
    ASSERT (parseOnly.Container () == "poker-table", "Container available without verify");
-   ASSERT (!parseOnly.GetFingerprint ().empty (), "Fingerprint available without verify");
-   ASSERT (parseOnly.GetCertCount () == 2, "Cert count available without verify");
+   ASSERT (!parseOnly.Fingerprint ().empty (), "Fingerprint available without verify");
+   ASSERT (parseOnly.CertCount () == 2, "Cert count available without verify");
 
    // -----------------------------------------------------------------------
    // Test 9: Composition round-trip
@@ -314,10 +314,10 @@ int RunJwsTests (int nArgc, char** aArgv)
    reader.VerifyChain ();
    ASSERT (reader.IsSignatureValid ()  &&  reader.IsChainTrusted (), "Composed MSF verifies");
    ASSERT (reader.Container () == "my-container", "Composed container round-trips");
-   ASSERT (!reader.GetOrganization ().empty (), "Composed organization from cert");
-   ASSERT (reader.GetServices ().size () == 1, "Composed service round-trips");
-   ASSERT (reader.GetModules ().count ("mod.wasm") == 1, "Composed module round-trips");
-   ASSERT (reader.GetModules ()["mod.wasm"].sSha256 == "abcdef123456", "Composed module sha256 round-trips");
+   ASSERT (!reader.Organization ().empty (), "Composed organization from cert");
+   ASSERT (reader.Services ().size () == 1, "Composed service round-trips");
+   ASSERT (reader.Modules ().count ("mod.wasm") == 1, "Composed module round-trips");
+   ASSERT (reader.Modules ()["mod.wasm"].sSha256 == "abcdef123456", "Composed module sha256 round-trips");
 
    // -----------------------------------------------------------------------
    // Summary

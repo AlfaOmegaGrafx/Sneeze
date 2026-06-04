@@ -20,6 +20,7 @@ namespace SNEEZE
    class ENGINE;
    class CONTEXT;
    class CONTAINER;
+   class MSF;
    class NETWORK;
    class MAP_OBJECT;
    class SCENE;
@@ -97,6 +98,8 @@ namespace SNEEZE
 
       CONTAINER* Container () const;
       void       Container (CONTAINER* pContainer);
+
+      MSF*       Msf () const;
 
       const std::string& Url () const;
       void               Url (const std::string& sUrl);

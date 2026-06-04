@@ -18,6 +18,7 @@
 namespace SNEEZE
 {
    class CONTEXT;
+   class FABRIC;
 
    enum eTRUST
    {
@@ -26,6 +27,7 @@ namespace SNEEZE
       kTRUST_UNVERIFIED,
       kTRUST_EXPIRED,
       kTRUST_VERIFIED,
+      kTRUST_ROOT,
    };
 
    class CONTAINER
@@ -56,10 +58,10 @@ namespace SNEEZE
       CONTAINER             (CONTAINER const  & other) = delete;
       CONTAINER             (CONTAINER       && other) = delete;
 
-      bool    Open  (void* pFabric);
-      size_t  Close (void* pFabric);
+      bool    Open  (FABRIC* pFabric);
+      size_t  Close (FABRIC* pFabric);
 
-      const CID&         Identity () const;
+      const CID*         Identity () const;
       const std::string& Key      () const;
 
    private:

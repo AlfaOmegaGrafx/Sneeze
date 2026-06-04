@@ -24,7 +24,7 @@ using namespace SNEEZE;
 class NETWORK::FILE::Impl
 {
 public:
-   Impl (FILE* pFile, INETWORK_IMPL* pINetwork_Impl, CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
+   Impl (FILE* pFile, INETWORK_IMPL* pINetwork_Impl, const CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
       m_pFile            (pFile),
       m_pINetwork_Impl   (pINetwork_Impl),
       m_pCID             (pCID),
@@ -164,6 +164,8 @@ public:
          if (m_pListener)
             Detach ();
 
+         m_pListener = nullptr;
+
          bChanged = true;
       }
 
@@ -285,7 +287,7 @@ public:
 // Constructor / Destructor
 // ---------------------------------------------------------------------------
 
-NETWORK::FILE::FILE (INETWORK_IMPL* pINetwork_Impl, CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
+NETWORK::FILE::FILE (INETWORK_IMPL* pINetwork_Impl, const CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
    m_pImpl (new Impl (this, pINetwork_Impl, pCID, nFileIx, sUrl, sHash, bCacheEnabled))
 {
 }

@@ -29,24 +29,24 @@ msf.VerifySignature ();           // checks the cryptographic signature
 msf.VerifyChain ();               // checks the certificate chain against the trust store
 
 // 4. Read the results
-msf.GetAlgorithm ();              // "RS256"
-msf.GetFingerprint ();            // SHA-256 of leaf cert's SPKI
+msf.Algorithm ();              // "RS256"
+msf.Fingerprint ();            // SHA-256 of leaf cert's SPKI
 msf.IsSignatureValid ();          // true / false
 msf.IsChainTrusted ();            // true / false
-msf.GetSignatureError ();         // "" if valid, error message otherwise
-msf.GetChainError ();             // "" if trusted, error message otherwise
+msf.SignatureError ();         // "" if valid, error message otherwise
+msf.ChainError ();             // "" if trusted, error message otherwise
 
 // 5. Inspect the payload
 msf.Namespace ();              // "com.pokerstars.poker"
-msf.GetOrganization ();           // "PokerStars"
-msf.GetSuccessor ();              // successor fingerprint (or "")
-msf.GetServices ();               // vector of MSF_SERVICE
-msf.GetModules ();                // map of name -> MSF_MODULE
-msf.GetPayload ();                // raw nlohmann::json
+msf.Organization ();           // "PokerStars"
+msf.Successor ();              // successor fingerprint (or "")
+msf.Services ();               // vector of MSF_SERVICE
+msf.Modules ();                // map of name -> MSF_MODULE
+msf.Payload ();                // raw nlohmann::json
 
 // 6. Inspect the certificate chain
-msf.GetCertInfos ();              // vector of CERT_INFO
-msf.GetCertCount ();              // number of certs in the chain
+msf.CertInfos ();              // vector of CERT_INFO
+msf.CertCount ();              // number of certs in the chain
 ```
 
 ### Key point: Parse is unconditional
@@ -91,7 +91,7 @@ std::string sJws = msf.Sign (sPrivateKeyPem, "RS256");
 ### Bulk payload access
 
 For cases where the typed methods don't cover a field, use `SetPayload()` and
-`GetPayload()` to work with the raw JSON directly:
+`Payload()` to work with the raw JSON directly:
 
 ```cpp
 nlohmann::json payload;

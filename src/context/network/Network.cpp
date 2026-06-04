@@ -260,7 +260,7 @@ public:
    // File operations
    // ---------------------------------------------------------------------------
 
-   NETWORK::FILE* File_Open (CONTAINER::CID* pCID, const std::string& sUrl, const std::string& sHash, uint32_t nAssetIx, IFILE* pListener)
+   NETWORK::FILE* File_Open (const CONTAINER::CID* pCID, const std::string& sUrl, const std::string& sHash, uint32_t nAssetIx, IFILE* pListener)
    {
       FILE* pFile = nullptr;
 
@@ -517,12 +517,12 @@ bool               NETWORK::IsCacheEnabled    ()                                
 // Methods
 // ---------------------------------------------------------------------------
 
-NETWORK::FILE* NETWORK::File_Open (CONTAINER::CID* pCID, const std::string& sUrl, IFILE* pListener)
+NETWORK::FILE* NETWORK::File_Open (const CONTAINER::CID* pCID, const std::string& sUrl, IFILE* pListener)
 {
    return File_Open (pCID, sUrl, std::string (), 0, pListener);
 }
 
-NETWORK::FILE* NETWORK::File_Open (CONTAINER::CID* pCID, const std::string& sUrl, const std::string& sHash, uint32_t nAssetIx, IFILE* pListener)
+NETWORK::FILE* NETWORK::File_Open (const CONTAINER::CID* pCID, const std::string& sUrl, const std::string& sHash, uint32_t nAssetIx, IFILE* pListener)
 {
    return m_pImpl->File_Open (pCID, sUrl, sHash, nAssetIx, pListener);
 }

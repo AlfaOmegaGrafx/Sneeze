@@ -64,7 +64,7 @@ namespace SNEEZE
 
          std::string GetLeafFingerprint () const;
 
-         const std::vector<CERT>& GetCertInfos () const;
+         const std::vector<CERT>& CertInfos () const;
 
          void AddTrustedCert (const std::string& sPem);
 
@@ -112,48 +112,49 @@ namespace SNEEZE
 
       void                      AddCert (const std::string& sPem);
       bool                      RemoveCert (int nIndex);
-      const std::vector<CERT>&  GetCertInfos () const;
-      int                       GetCertCount () const;
+      const std::vector<CERT>&  CertInfos () const;
+      int                       CertCount () const;
 
       // --- Payload (bulk) ---
 
       void           SetPayload (const nlohmann::json& payload);
-      nlohmann::json GetPayload () const;
+      nlohmann::json Payload () const;
 
       // --- Payload (typed fields) ---
 
       void        SetContainer  (const std::string& sContainer);
       std::string Container     () const;
       void        SetSuccessor  (const std::string& sSuccessor);
-      std::string GetSuccessor  () const;
+      std::string Successor  () const;
 
       // --- Services ---
 
       void                  AddService    (const SERVICE& service);
       bool                  RemoveService (const std::string& sName);
-      std::vector<SERVICE>  GetServices   () const;
+      std::vector<SERVICE>  Services   () const;
 
       // --- Modules ---
 
       void                            AddModule    (const std::string& sName, const std::string& sUrl, const std::string& sSha256);
       bool                            RemoveModule (const std::string& sName);
-      std::map<std::string, MODULE>   GetModules   () const;
+      std::map<std::string, MODULE>   Modules   () const;
 
       // --- Status ---
 
-      std::string GetAlgorithm         () const;
-      std::string GetFingerprint       () const;
-      std::string GetOrganization      () const;
-      std::string GetOrganizationHash  () const;
-      std::string DisplayOrganization  () const;
-      bool        IsSignatureValid     () const;
-      bool        IsChainTrusted       () const;
-      bool        IsChainExpired       () const;
-      std::string GetSignatureError    () const;
-      std::string GetChainError        () const;
+      bool        IsSignatureValid    () const;
+      bool        IsChainTrusted      () const;
+      bool        IsChainExpired      () const;
+
+      std::string Algorithm           () const;
+      std::string Fingerprint         () const;
+      std::string Organization        () const;
+      std::string OrganizationHash    () const;
+      std::string DisplayOrganization () const;
+      std::string SignatureError      () const;
+      std::string ChainError          () const;
 
    private:
-      nlohmann::json             m_payload;
+      nlohmann::json             m_pJson_Payload;
       std::string                m_sAlgorithm;
       std::string                m_sFingerprint;
       std::string                m_sOrganization;
