@@ -22,7 +22,7 @@ UNIT (one per JSON file on disk, keyed by full pathname)
  └── m_mutex (recursive_mutex, per-UNIT)
 
 SILO (groups four UNITs for a specific container)
- ├── const CID* m_pCID (pooled pointer from CONTEXT::CID_Pool)
+ ├── const CID* m_pCID (pointer from CONTAINER::Identity())
  ├── UNIT* m_apUnit[4] indexed by SCOPE
  ├── m_bAttached (bool, single-owner semantics)
  ├── Permanent + Temporary paths (derived from STORAGE paths)
@@ -117,9 +117,9 @@ The fingerprint path segment uses a 2-character fan-out prefix (`fp-2`) followed
 
 Directory creation happens in `UNIT::Load()` — when an UNIT's JSON data is first loaded from disk, `std::filesystem::create_directories` ensures the full directory path exists. This runs once per UNIT, not on every Save or Meta_Save.
 
-## CID Pooling
+## Container Identity
 
-STORAGE receives raw `const CID*` pointers from callers, but immediately exchanges them for stable pooled pointers via `CONTEXT::CID_Pool()`. This ensures all modules sharing a CID (STORAGE, CONSOLE, NETWORK) point to the same CONTEXT-owned instance. The exchange happens inside `STORAGE::Impl::Silo_Open` — one step inside the Impl, symmetric with `CONSOLE::Impl::Stream_Open`.
+STORAGE receives `const CID*` pointers from callers. The authoritative CID is owned by the CONTAINER instance (accessed via `CONTAINER::Identity()`). All modules sharing a CID (STORAGE, CONSOLE, NETWORK) point to the same CONTAINER-owned instance.
 
 ## Usage
 
@@ -128,12 +128,12 @@ STORAGE receives raw `const CID*` pointers from callers, but immediately exchang
 
 // Open storage for a container (typically called by WASM runtime)
 CONTEXT::CONTAINER::CID cid;
-cid.sFingerprint   = "abc123def456abc123def456abc123def456abc123def456abc123def456abcd";
-cid.sOrganization  = "Metaversal";
-cid.sCommonName    = "Metaversal";
-cid.sContainerName = "poker";
-cid.sPersonaHash   = "def456abc123";
-cid.bValidated     = true;
+cid.sFingerprint       = "abc123def456abc123def456abc123def456abc123def456abc123def456abcd";
+cid.sOrganization      = "Metaversal";
+cid.sOrganizationHash  = "def456abc123";
+cid.sContainer         = "poker";
+cid.sPersonaHash       = "def456abc123";
+cid.eTrust             = kTRUST_VERIFIED;
 
 STORAGE::SILO* pSilo = pContext->Storage ()->Silo_Open (&cid);
 
@@ -186,7 +186,6 @@ the array with null values if the index exceeds the current size.
 ```
 Container instantiated:
    STORAGE::Impl::Silo_Open(pCID)
-   → CID_Pool exchanges the input CID for a stable pooled pointer
    → create SILO(pStorage, pCID)
    → add to m_apSilo
    → SILO::Initialize()
@@ -325,7 +324,7 @@ The Storage module follows the same structural patterns as Console and Network:
 | `Unit_Open/Close` | `Block_Open/Close` | `Unit_Open/Close` | Internal shared resource management |
 | `IENUM_SILO` | `IENUM_STREAM` | `IENUM` | Enumeration callback |
 
-All three modules: pimpl idiom, CID pooling via `CONTEXT::CID_Pool()` in the parent Impl, two-counter ownership on the data wrapper, recursive_mutex, Attach/Detach lifecycle, meta sidecar files.
+All three modules: pimpl idiom, CID from CONTAINER::Identity(), two-counter ownership on the data wrapper, recursive_mutex, Attach/Detach lifecycle, meta sidecar files.
 
 ## Files
 

@@ -30,6 +30,7 @@ namespace SNEEZE
 }
 
 #include "Context.h"
+#include "Msf.h"
 #include "Console.h"
 #include "Network.h"
 #include "Storage.h"

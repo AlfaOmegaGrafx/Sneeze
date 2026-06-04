@@ -13,12 +13,11 @@
 // limitations under the License.
 
 #include <Sneeze.h>
-#include "Msf.h"
 
 using namespace SNEEZE;
 
-using CHAIN    = VIEWPORT::MSF::CHAIN;
-using MSF_CERT = VIEWPORT::MSF::CERT;
+using CHAIN    = MSF::CHAIN;
+using MSF_CERT = MSF::CERT;
 
 struct CHAIN::IMPL
 {
@@ -93,7 +92,6 @@ static X509* DecodeDerBase64 (const std::string& sB64)
    if (nLen <= 0)
       return nullptr;
 
-   // EVP_DecodeBlock doesn't strip padding -- adjust length for '=' chars
    size_t nPad = 0;
    for (auto it = sB64.rbegin (); it != sB64.rend ()  &&  *it == '='; ++it)
       nPad++;
@@ -120,6 +118,32 @@ static std::string X509NameOneLine (X509_NAME* pName)
    if (nLen > 0)
       sResult.assign (pData, (size_t) nLen);
    BIO_free (pBio);
+   return sResult;
+}
+
+static std::string X509NameField (X509_NAME* pName, int nNid)
+{
+   std::string sResult;
+   if (!pName)
+      return sResult;
+
+   int nIndex = X509_NAME_get_index_by_NID (pName, nNid, -1);
+   if (nIndex >= 0)
+   {
+      X509_NAME_ENTRY* pEntry = X509_NAME_get_entry (pName, nIndex);
+      if (pEntry)
+      {
+         ASN1_STRING* pData = X509_NAME_ENTRY_get_data (pEntry);
+         if (pData)
+         {
+            const unsigned char* pUtf8 = ASN1_STRING_get0_data (pData);
+            int nLen = ASN1_STRING_length (pData);
+            if (pUtf8  &&  nLen > 0)
+               sResult.assign ((const char*) pUtf8, (size_t) nLen);
+         }
+      }
+   }
+
    return sResult;
 }
 
@@ -165,12 +189,13 @@ static MSF_CERT ExtractCertInfo (X509* pCert, bool bIsCA)
 {
    MSF_CERT info;
 
-   info.sSubject   = X509NameOneLine (X509_get_subject_name (pCert));
-   info.sIssuer    = X509NameOneLine (X509_get_issuer_name (pCert));
-   info.sSerial    = SerialToHex (pCert);
-   info.sNotBefore = Asn1TimeToString (X509_get_notBefore (pCert));
-   info.sNotAfter  = Asn1TimeToString (X509_get_notAfter (pCert));
-   info.bIsCA      = bIsCA;
+   info.sSubject      = X509NameOneLine (X509_get_subject_name (pCert));
+   info.sIssuer       = X509NameOneLine (X509_get_issuer_name (pCert));
+   info.sOrganization = X509NameField (X509_get_subject_name (pCert), NID_organizationName);
+   info.sSerial       = SerialToHex (pCert);
+   info.sNotBefore    = Asn1TimeToString (X509_get_notBefore (pCert));
+   info.sNotAfter     = Asn1TimeToString (X509_get_notAfter (pCert));
+   info.bIsCA         = bIsCA;
 
    EVP_PKEY* pKey = X509_get_pubkey (pCert);
    if (pKey)
@@ -304,7 +329,7 @@ std::string CHAIN::GetLeafFingerprint () const
 }
 
 // ---------------------------------------------------------------------------
-// AddTrustedCert
+// GetCertInfos
 // ---------------------------------------------------------------------------
 
 const std::vector<MSF_CERT>& CHAIN::GetCertInfos () const
@@ -427,3 +452,22 @@ std::string CHAIN::PemToDerBase64 (const std::string& sPem)
    return sResult;
 }
 
+std::string CHAIN::HashString (const std::string& sInput)
+{
+   std::string sResult;
+
+   if (!sInput.empty ())
+   {
+      unsigned char aDigest[SHA256_DIGEST_LENGTH];
+      SHA256 ((const unsigned char*) sInput.data (), sInput.size (), aDigest);
+
+      std::ostringstream oss;
+      oss << std::hex << std::setfill ('0');
+      for (int i = 0; i < 6; ++i)
+         oss << std::setw (2) << (int) aDigest[i];
+
+      sResult = oss.str ();
+   }
+
+   return sResult;
+}

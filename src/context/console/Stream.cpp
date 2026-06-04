@@ -71,7 +71,7 @@ public:
       char szBlock[5];
       snprintf (szBlock, sizeof (szBlock), "%04u", nBlock);
 
-      std::string sName = m_pCID->sContainerName + "-" + szBlock;
+      std::string sName = m_pCID->sContainer + "-" + szBlock;
 
       if (!sExt.empty ())
          sName += "." + sExt;
@@ -86,7 +86,7 @@ public:
 
    std::string Pathname_Meta () const
    {
-      return (std::filesystem::path (Path (0)) / (m_pCID->sContainerName + ".meta")).string ();
+      return (std::filesystem::path (Path (0)) / (m_pCID->sContainer + ".meta")).string ();
    }
 
    // ---------------------------------------------------------------------------
@@ -135,11 +135,11 @@ public:
       jMeta["block"]           = m_nBlock;
       jMeta["blockEntryCount"] = m_nBlockEntryCount;
 
-      jMeta["fingerprint"]     = m_pCID->sFingerprint;
-      jMeta["organization"]    = m_pCID->sOrganization;
-      jMeta["commonName"]      = m_pCID->sCommonName;
-      jMeta["containerName"]   = m_pCID->sContainerName;
-      jMeta["personaHash"]     = m_pCID->sPersonaHash;
+      jMeta["fingerprint"]       = m_pCID->sFingerprint;
+      jMeta["organization"]      = m_pCID->sOrganization;
+      jMeta["organizationHash"]  = m_pCID->sOrganizationHash;
+      jMeta["container"]         = m_pCID->sContainer;
+      jMeta["personaHash"]       = m_pCID->sPersonaHash;
 
       std::string sTmpPath = sPathname_Meta + ".temp";
       std::ofstream ofs (sTmpPath, std::ios::trunc);

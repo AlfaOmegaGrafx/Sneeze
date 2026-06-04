@@ -70,7 +70,7 @@ public:
 
    std::string Filename (eSCOPE eScope, const std::string& sExt = "") const
    {
-      std::string sName = (eScope == kSCOPE_PERMANENT_ORG || eScope == kSCOPE_TEMPORARY_ORG) ? "organization" : "container-" + m_pCID->sContainerName;
+      std::string sName = (eScope == kSCOPE_PERMANENT_ORG || eScope == kSCOPE_TEMPORARY_ORG) ? "organization" : "container-" + m_pCID->sContainer;
 
       if (!sExt.empty ())
          sName += "." + sExt;

@@ -179,12 +179,12 @@ void Texture_Request ()
             : "012PERSONABC";
 
          CONTAINER::CID CID;
-         CID.sFingerprint   = "0123456789FINGERPRINT0123456789FINGERPRINT0123456789FINGERPRINT0";
-         CID.sOrganization  = "Metaversal Corporation";
-         CID.sCommonName    = "Metaversal";
-         CID.sContainerName = "Solar System";
-         CID.sPersonaHash   = sPersonaHash;
-         CID.bValidated     = true;
+         CID.sFingerprint       = "0123456789FINGERPRINT0123456789FINGERPRINT0123456789FINGERPRINT0";
+         CID.sOrganization      = "Metaversal Corporation";
+         CID.sOrganizationHash  = "012345abcdef";
+         CID.sContainer         = "Solar System";
+         CID.sPersonaHash       = sPersonaHash;
+         CID.eTrust             = kTRUST_VERIFIED;
 
          NETWORK* pNetwork = m_pFabric->Scene ()->Network ();
          if (pNetwork)

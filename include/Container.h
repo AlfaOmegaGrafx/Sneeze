@@ -19,6 +19,15 @@ namespace SNEEZE
 {
    class CONTEXT;
 
+   enum eTRUST
+   {
+      kTRUST_NONE,
+      kTRUST_UNTRUSTED,
+      kTRUST_UNVERIFIED,
+      kTRUST_EXPIRED,
+      kTRUST_VERIFIED,
+   };
+
    class CONTAINER
    {
    public:
@@ -28,13 +37,15 @@ namespace SNEEZE
       public:
          std::string sFingerprint;
          std::string sOrganization;
-         std::string sCommonName;
-         std::string sContainerName;
+         std::string sOrganizationHash;
+         std::string sContainer;
          std::string sPersonaHash;
-         bool        bValidated;
+         eTRUST      eTrust;
 
-         std::string DisplayName () const { return sCommonName + "/" + sContainerName; }
-         std::string Key         () const { return sPersonaHash.substr (0, 12) + "/" + sFingerprint.substr (0, 2) + "/" + sFingerprint.substr (2, 22) + "/" + sContainerName; }
+         CID () : eTrust (kTRUST_NONE) {}
+
+         std::string DisplayName () const { return ((eTrust >= kTRUST_EXPIRED) ? sOrganization : sOrganizationHash) + "/" + sContainer; }
+         std::string Key         () const { return sPersonaHash.substr (0, 12) + "/" + sFingerprint.substr (0, 2) + "/" + sFingerprint.substr (2, 22) + "/" + sContainer; }
       };
 
       CONTAINER (CONTEXT* pContext, const CID* pCID);
@@ -48,7 +59,8 @@ namespace SNEEZE
       bool    Open  (void* pFabric);
       size_t  Close (void* pFabric);
 
-      const std::string& Key () const;
+      const CID&         Identity () const;
+      const std::string& Key      () const;
 
    private:
       class Impl;

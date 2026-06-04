@@ -232,7 +232,7 @@ public:
 
    std::string Path () const
    {
-      return (std::filesystem::path (m_pINetwork_Impl->Path_Permanent ()) / m_pCID->sPersonaHash / m_pCID->sFingerprint.substr (0, 2) / m_pCID->sFingerprint.substr (2, 22) / m_pCID->sContainerName / m_sDiskKey.substr (0, 2)).string ();
+      return (std::filesystem::path (m_pINetwork_Impl->Path_Permanent ()) / m_pCID->sPersonaHash / m_pCID->sFingerprint.substr (0, 2) / m_pCID->sFingerprint.substr (2, 22) / m_pCID->sContainer / m_sDiskKey.substr (0, 2)).string ();
    }
 
    std::string Filename (const std::string& sExt) const

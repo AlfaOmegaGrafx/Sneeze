@@ -92,10 +92,9 @@ public:
       delete m_pScene;
       m_pScene = nullptr;
 
-      if (!m_umpContainer.empty ())
-         m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "CONTEXT", "Leaked " + std::to_string (m_umpContainer.size ()) + " container(s)");
-
-      m_umCID.clear ();
+      for (auto& pair : m_umpContainer)
+         delete pair.second;
+      m_umpContainer.clear ();
 
       delete m_pStorage;
       m_pStorage = nullptr;
@@ -133,16 +132,14 @@ public:
 
       // TODO Phase 3: extract identity fields from pFabric->Msf()
       CONTAINER::CID CID;
-      CID.sFingerprint    = "0000000000000000000000000000000000000000000000000000000000000000";
-      CID.sOrganization   = "placeholder-org";
-      CID.sCommonName     = "placeholder-cn";
-      CID.sContainerName  = "placeholder-container";
-      CID.sPersonaHash    = m_pEngine->Persona ()->Hash ();
-      CID.bValidated      = false;
+      CID.sFingerprint       = "0123456789FINGERPRINT0123456789FINGERPRINT0123456789FINGERPRINT0";
+      CID.sOrganization      = "Metaversal Corporation";
+      CID.sOrganizationHash  = "012345abcdef";
+      CID.sContainer         = "Solar System";
+      CID.sPersonaHash       = m_pEngine->Persona ()->Hash ();
+      CID.eTrust             = kTRUST_VERIFIED;
 
       std::string sKey = CID.Key ();
-
-      bool bCreated = false;
 
       auto it = m_umpContainer.find (sKey);
       if (it == m_umpContainer.end ())
@@ -150,21 +147,11 @@ public:
          pContainer = new CONTAINER (m_pContext, &CID);
 
          m_umpContainer[sKey] = pContainer;
-
-         bCreated = true;
       }
       else pContainer = it->second;
 
       if (!pContainer->Open (pFabric))
-      {
-         if (bCreated)
-         {
-            m_umpContainer.erase (sKey);
-            delete pContainer;
-         }
-
          pContainer = nullptr;
-      }
 
       return pContainer;
    }
@@ -173,34 +160,7 @@ public:
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxContainer);
 
-      if (pContainer->Close (pFabric) == 0)
-      {
-         m_umpContainer.erase (pContainer->Key ());
-
-         delete pContainer;
-      }
-   }
-
-   const CONTAINER::CID* CID_Pool (const CONTAINER::CID* pCID)
-   {
-      const CONTAINER::CID* pCID_Result = nullptr;
-
-      if (pCID)
-      {
-         std::string sKey = pCID->Key ();
-
-         auto it = m_umCID.find (sKey);
-         if (it == m_umCID.end ())
-         {
-            m_umCID[sKey] = *pCID;
-
-            it = m_umCID.find (sKey);
-         }
-
-         pCID_Result = &it->second;
-      }
-
-      return pCID_Result;
+      pContainer->Close (pFabric);
    }
 
 public:
@@ -217,8 +177,6 @@ public:
    STORAGE*                                        m_pStorage;
    SCENE*                                          m_pScene;
    VIEWPORT*                                       m_pViewport;
-
-   std::unordered_map<std::string, CONTAINER::CID> m_umCID;
 
    std::unordered_map<std::string, CONTAINER*>     m_umpContainer;
    std::recursive_mutex                            m_mxContainer;
@@ -266,7 +224,3 @@ void                          SNEEZE::CONTEXT::Logout          ()               
 
 SNEEZE::CONTAINER*            SNEEZE::CONTEXT::Container_Open  (void* pFabric)                        { return m_pImpl->Container_Open  (pFabric); }
 void                          SNEEZE::CONTEXT::Container_Close (void* pFabric, CONTAINER* pContainer) {        m_pImpl->Container_Close (pFabric, pContainer); }
-
-
-/// DEPRECATED
-const SNEEZE::CONTAINER::CID* SNEEZE::CONTEXT::CID_Pool        (const CONTAINER::CID* pCID)           { return m_pImpl->CID_Pool (pCID); }

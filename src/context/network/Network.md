@@ -113,9 +113,9 @@ public:
 // Open a file (no hash, default flags)
 MY_LISTENER listener;
 SNEEZE::CONTEXT::CONTAINER::CID cid;
-cid.sCommonName    = "Metaversal";
-cid.sContainerName = "Solar System";
-cid.bValidated     = true;
+cid.sOrganizationHash  = "def456abc123";
+cid.sContainer         = "Solar System";
+cid.eTrust             = kTRUST_VERIFIED;
 SNEEZE::NETWORK::FILE* pFile = pNetwork->File_Open (pViewport, &cid, "https://example.com/model.glb", &listener);
 
 // ... later, when done:
@@ -165,7 +165,7 @@ SNEEZE::NETWORK::FILE* pFile2 = pNetwork->File_Open (pViewport, &cid, url, sSri,
 
 ### Container Identity
 
-Every `File_Open()` call includes a `CONTEXT::CONTAINER::CID*` identifying which container originated the request. FILE stores the CID by value (copied from the pointer at construction). CID holds: `sFingerprint` (SHA-256 of cert public key), `sOrganization`, `sCommonName`, `sContainerName`, `sPersonaHash`, and `bValidated`. The display name is `sCommonName + "/" + sContainerName` via `DisplayName()`.
+Every `File_Open()` call includes a `CONTAINER::CID*` identifying which container originated the request. FILE stores the CID by value (copied from the pointer at construction). CID holds: `sFingerprint` (SHA-256 of cert public key), `sOrganization`, `sOrganizationHash`, `sContainer`, `sPersonaHash`, and `eTrust`. The display name is derived from `sOrganization` or `sOrganizationHash` + `sContainer` via `DisplayName()`.
 
 ```cpp
 // FILE exposes the container identity

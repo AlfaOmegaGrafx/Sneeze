@@ -65,8 +65,6 @@ namespace SNEEZE
       CONTAINER* Container_Open  (void* pFabric);
       void       Container_Close (void* pFabric, CONTAINER* pContainer);
 
-      const CONTAINER::CID* CID_Pool (const CONTAINER::CID* pCID);
-
    private:
       class Impl;
       Impl* m_pImpl;

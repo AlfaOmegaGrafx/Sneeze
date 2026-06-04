@@ -20,7 +20,6 @@ namespace SNEEZE
    class VIEWPORT
    {
    public:
-      class MSF;
       class RENDERER;
 
    public:

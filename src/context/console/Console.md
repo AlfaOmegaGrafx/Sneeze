@@ -16,7 +16,7 @@ CONSOLE (per-context, constructor takes CONTEXT*)
 
 STREAM (per-container log channel, symmetric with STORAGE::SILO)
  ├── CONSOLE* m_pConsole (parent back-pointer)
- ├── const CID* m_pCID (pooled, from CONTEXT::CID_Pool)
+ ├── const CID* m_pCID (from CONTAINER::Identity())
  ├── m_apBlock: vector<BLOCK*> (rolling window, dynamically sized)
  ├── m_nBlock: current block number (-1 = no blocks yet)
  ├── m_nBlockEntryCount: entries in current block
@@ -63,7 +63,7 @@ The Console module was deliberately designed to be structurally symmetric with S
 | `IENUM_ENTRY` | `IENUM_SILO` | `IENUM` | Enumeration callback interface |
 | `IENUM_STREAM` | — | — | Stream enumeration |
 
-All three modules follow the same patterns: pimpl idiom, CID pooling in the parent Impl (`Console::Impl::Stream_Open` calls `Context::CID_Pool`), two-counter ownership on the data wrapper (BLOCK), recursive_mutex, Attach/Detach lifecycle, and meta sidecar files.
+All three modules follow the same patterns: pimpl idiom, CID from CONTAINER::Identity(), two-counter ownership on the data wrapper (BLOCK), recursive_mutex, Attach/Detach lifecycle, and meta sidecar files.
 
 ## Two-Tier Storage
 
@@ -267,4 +267,4 @@ Compiles and links clean on Windows (MSVC). Console test suite updated to route 
 - **Inspector UI** — Artemis-side console panel (RmlUi context)
 - **Stream-level entry enumeration** — walking a specific stream's cached entries (blocks support `Entry_Enum`, but there is no STREAM-level aggregation across blocks yet)
 - **Block rotation on config change** — if `m_nBlocks` or `m_nEntries_Block` change at runtime, existing streams need to adapt
-- **Null-CID stream** — `Stream_Open(nullptr)` currently returns nullptr because `CID_Pool(nullptr)` returns nullptr. Engine-internal logging needs a sentinel CID or a bypass path.
+- **Null-CID stream** — `Stream_Open(nullptr)` currently returns nullptr. Engine-internal logging needs a sentinel CID or a bypass path.

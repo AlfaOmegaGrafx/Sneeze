@@ -566,8 +566,6 @@ set (SOM_HEADERS
    context/scene/Celestial.h
    context/scene/Orbit.h
    context/scene/Epoch.h
-   context/scene/Node.h
-   context/scene/Fabric.h
    context/scene/MapObject.h
    context/scene/AccessControl.h
    context/scene/Events.h
@@ -678,9 +676,8 @@ set (COMPUTE_HEADERS deps/compute/EmbeddedKernels.h deps/compute/ComputeDispatch
 
 set (MSF_SOURCES
    context/msf/MsfFile.cpp
-   context/msf/CertChain.cpp)
-set (MSF_HEADERS
-   context/msf/Msf.h)
+   context/msf/Chain.cpp)
+set (MSF_HEADERS)
 
 set (STB_SOURCES  deps/stb/stb_image_impl.cpp deps/stb/Image.cpp)
 set (STB_HEADERS  deps/stb/stb_image.h)
@@ -695,7 +692,8 @@ set (INCLUDE_HEADERS
    ../include/Viewport.h
    ../include/Storage.h
    ../include/Console.h
-   ../include/Image.h)
+   ../include/Image.h
+   ../include/Msf.h)
 
 # ---------------------------------------------------------------------------
 # Static library

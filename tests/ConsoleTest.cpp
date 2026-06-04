@@ -125,12 +125,12 @@ int RunConsoleTests (int nArgc, char** aArgv)
 
    // Create a CID for testing
    CONTAINER::CID cid;
-   cid.sFingerprint    = "abcdef0123456789abcdef01234567890123456789abcdef0123456789abcd";
-   cid.sOrganization   = "TestOrg";
-   cid.sCommonName     = "TestProvider";
-   cid.sContainerName  = "TestContainer";
-   cid.sPersonaHash    = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2";
-   cid.bValidated      = true;
+   cid.sFingerprint       = "abcdef0123456789abcdef01234567890123456789abcdef0123456789abcd";
+   cid.sOrganization      = "TestOrg";
+   cid.sOrganizationHash  = "abcdef012345";
+   cid.sContainer         = "TestContainer";
+   cid.sPersonaHash       = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2";
+   cid.eTrust             = kTRUST_VERIFIED;
 
    // -----------------------------------------------------------------------
    // Test 1: Console initialization

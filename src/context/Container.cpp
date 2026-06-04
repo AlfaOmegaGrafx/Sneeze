@@ -40,6 +40,8 @@ public:
 
   ~Impl ()
    {
+      if (m_nCount_Open > 0)
+         m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "CONTAINER", "Destroyed with refcount " + std::to_string (m_nCount_Open) + " — " + m_CID.DisplayName ());
    }
 
    // -----------------------------------------------------------------------
@@ -146,7 +148,8 @@ CONTAINER::~CONTAINER ()
    delete m_pImpl;
 }
 
-bool                  CONTAINER::Open  (void* pFabric) { return m_pImpl->Open  (pFabric); }
-size_t                CONTAINER::Close (void* pFabric) { return m_pImpl->Close (pFabric); }
+bool                  CONTAINER::Open     (void* pFabric) { return m_pImpl->Open  (pFabric); }
+size_t                CONTAINER::Close    (void* pFabric) { return m_pImpl->Close (pFabric); }
 
-const std::string&    CONTAINER::Key   () const        { return m_pImpl->m_sKey; }
+const CONTAINER::CID& CONTAINER::Identity () const        { return m_pImpl->m_CID; }
+const std::string&    CONTAINER::Key      () const        { return m_pImpl->m_sKey; }

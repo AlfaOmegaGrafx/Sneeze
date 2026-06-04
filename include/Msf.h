@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef SNEEZE_VIEWPORT_MSF_H
-#define SNEEZE_VIEWPORT_MSF_H
+#ifndef SNEEZE_MSF_H
+#define SNEEZE_MSF_H
 
 namespace SNEEZE
 {
-   class VIEWPORT::MSF
+   class MSF
    {
    public:
       // --- Nested types ---
@@ -40,10 +40,11 @@ namespace SNEEZE
       {
          std::string sSubject;
          std::string sIssuer;
+         std::string sOrganization;
          std::string sSerial;
          std::string sNotBefore;
          std::string sNotAfter;
-         std::string sKeyType;      // "RSA", "EC", or "unknown"
+         std::string sKeyType;
          int         nKeyBits;
          bool        bIsCA;
       };
@@ -72,6 +73,7 @@ namespace SNEEZE
          static std::string ComputeFingerprint  (const std::string& sB64Der);
          static std::string ExtractPublicKeyPem (const std::string& sB64Der);
          static std::string PemToDerBase64      (const std::string& sPem);
+         static std::string HashString          (const std::string& sInput);
 
       private:
          void LoadTrustStore ();
@@ -120,12 +122,10 @@ namespace SNEEZE
 
       // --- Payload (typed fields) ---
 
-      void        SetNamespace    (const std::string& sNamespace);
-      std::string Namespace    () const;
-      void        SetOrganization (const std::string& sOrganization);
-      std::string GetOrganization () const;
-      void        SetSuccessor    (const std::string& sSuccessor);
-      std::string GetSuccessor    () const;
+      void        SetContainer  (const std::string& sContainer);
+      std::string Container     () const;
+      void        SetSuccessor  (const std::string& sSuccessor);
+      std::string GetSuccessor  () const;
 
       // --- Services ---
 
@@ -141,22 +141,29 @@ namespace SNEEZE
 
       // --- Status ---
 
-      std::string GetAlgorithm      () const;
-      std::string GetFingerprint    () const;
-      bool        IsSignatureValid  () const;
-      bool        IsChainTrusted    () const;
-      std::string GetSignatureError () const;
-      std::string GetChainError     () const;
+      std::string GetAlgorithm         () const;
+      std::string GetFingerprint       () const;
+      std::string GetOrganization      () const;
+      std::string GetOrganizationHash  () const;
+      std::string DisplayOrganization  () const;
+      bool        IsSignatureValid     () const;
+      bool        IsChainTrusted       () const;
+      bool        IsChainExpired       () const;
+      std::string GetSignatureError    () const;
+      std::string GetChainError        () const;
 
    private:
       nlohmann::json             m_payload;
       std::string                m_sAlgorithm;
       std::string                m_sFingerprint;
+      std::string                m_sOrganization;
+      std::string                m_sOrganizationHash;
       std::string                m_sRawJws;
       std::string                m_sSignatureError;
       std::string                m_sChainError;
       bool                       m_bSignatureValid;
       bool                       m_bChainTrusted;
+      bool                       m_bChainExpired;
       bool                       m_bParsed;
 
       std::vector<std::string>   m_aX5cEntries;
@@ -167,4 +174,4 @@ namespace SNEEZE
       ENGINE*                    m_pEngine;
    };
 }
-#endif // SNEEZE_VIEWPORT_MSF_H
+#endif // SNEEZE_MSF_H

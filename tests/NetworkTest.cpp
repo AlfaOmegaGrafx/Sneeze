@@ -153,14 +153,19 @@ static CACHE_TEST_CONTEXT_HOST*   s_pContextHost  = nullptr;
 static SNEEZE::ENGINE*            s_pSneeze       = nullptr;
 static CONTEXT*                   s_pContext      = nullptr;
 
-static auto s_pTestCID = CONTAINER::CID {
-   "TestFingerprint_0123456789abcdef",
-   "TestOrg",
-   "TestCommon",
-   "TestStore",
-   "TestPersona",
-   true
-};
+static CONTAINER::CID MakeTestCID ()
+{
+   CONTAINER::CID CID;
+   CID.sFingerprint       = "TestFingerprint_0123456789abcdef";
+   CID.sOrganization      = "TestOrg";
+   CID.sOrganizationHash  = "abcdef012345";
+   CID.sContainer         = "TestStore";
+   CID.sPersonaHash       = "TestPersona";
+   CID.eTrust             = kTRUST_VERIFIED;
+   return CID;
+}
+
+static CONTAINER::CID s_pTestCID = MakeTestCID ();
 
 // ---------------------------------------------------------------------------
 // Test 1: Manager initialization

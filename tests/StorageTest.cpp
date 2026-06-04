@@ -87,12 +87,12 @@ static CONTEXT*                    s_pContext     = nullptr;
 static CONTAINER::CID MakeTestCID (const std::string& sContainer = "poker")
 {
    CONTAINER::CID CID;
-   CID.sFingerprint   = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
-   CID.sOrganization  = "TestOrg";
-   CID.sCommonName    = "TestOrg";
-   CID.sContainerName = sContainer;
-   CID.sPersonaHash   = "persona_hash_test";
-   CID.bValidated     = true;
+   CID.sFingerprint       = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
+   CID.sOrganization      = "TestOrg";
+   CID.sOrganizationHash  = "abcdef012345";
+   CID.sContainer         = sContainer;
+   CID.sPersonaHash       = "persona_hash_test";
+   CID.eTrust             = kTRUST_VERIFIED;
    return CID;
 }
 

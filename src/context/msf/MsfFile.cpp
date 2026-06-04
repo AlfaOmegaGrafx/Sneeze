@@ -13,13 +13,11 @@
 // limitations under the License.
 
 #include <Sneeze.h>
-#include "Msf.h"
 
 #include <jwt-cpp/traits/nlohmann-json/defaults.h>
 
 using namespace SNEEZE;
 
-using MSF     = VIEWPORT::MSF;
 using SERVICE = MSF::SERVICE;
 using MODULE  = MSF::MODULE;
 
@@ -30,6 +28,7 @@ using MODULE  = MSF::MODULE;
 MSF::MSF (ENGINE* pEngine)
    : m_bSignatureValid (false)
    , m_bChainTrusted (false)
+   , m_bChainExpired (false)
    , m_bParsed (false)
    , m_pEngine (pEngine)
 {
@@ -50,60 +49,86 @@ bool MSF::Parse (const std::string& sJws)
    m_payload         = nlohmann::json ();
    m_sAlgorithm.clear ();
    m_sFingerprint.clear ();
+   m_sOrganization.clear ();
+   m_sOrganizationHash.clear ();
    m_sRawJws.clear ();
    m_sSignatureError.clear ();
    m_sChainError.clear ();
    m_bSignatureValid = false;
    m_bChainTrusted   = false;
+   m_bChainExpired   = false;
    m_bParsed         = false;
    m_aX5cEntries.clear ();
    m_aCertInfos.clear ();
 
    if (!sJws.empty ())
    {
-      try
+      bool bIsJws = (sJws.find ('.') != std::string::npos);
+
+      if (bIsJws)
       {
-         m_sRawJws = sJws;
-         auto decoded = jwt::decode (sJws);
-
-         m_sAlgorithm = decoded.get_algorithm ();
-
-         if (decoded.has_header_claim ("x5c"))
+         try
          {
-            auto aX5cJson = decoded.get_header_claim ("x5c").as_array ();
-            for (const auto& entry : aX5cJson)
-               m_aX5cEntries.push_back (entry.get<std::string> ());
+            m_sRawJws = sJws;
+            auto decoded = jwt::decode (sJws);
 
-            for (size_t i = 0; i < m_aX5cEntries.size (); ++i)
+            m_sAlgorithm = decoded.get_algorithm ();
+
+            if (decoded.has_header_claim ("x5c"))
             {
-               m_aCertInfos.push_back (
-                  CHAIN::DecodeInfoDerBase64 (m_aX5cEntries[i], i > 0));
+               auto aX5cJson = decoded.get_header_claim ("x5c").as_array ();
+               for (const auto& entry : aX5cJson)
+                  m_aX5cEntries.push_back (entry.get<std::string> ());
 
-               if (i == 0)
-                  m_sFingerprint = CHAIN::ComputeFingerprint (m_aX5cEntries[0]);
+               for (size_t i = 0; i < m_aX5cEntries.size (); ++i)
+               {
+                  m_aCertInfos.push_back (
+                     CHAIN::DecodeInfoDerBase64 (m_aX5cEntries[i], i > 0));
+
+                  if (i == 0)
+                  {
+                     m_sFingerprint      = CHAIN::ComputeFingerprint (m_aX5cEntries[0]);
+                     m_sOrganization     = m_aCertInfos[0].sOrganization;
+                     m_sOrganizationHash = CHAIN::HashString (m_aCertInfos[0].sSubject);
+                  }
+               }
             }
-         }
 
-         if (decoded.has_payload_claim ("data"))
+            if (decoded.has_payload_claim ("data"))
+            {
+               std::string sPayloadStr = decoded.get_payload_claim ("data").as_string ();
+               try
+               {
+                  m_payload = nlohmann::json::parse (sPayloadStr);
+               }
+               catch (...)
+               {
+                  m_payload = sPayloadStr;
+               }
+            }
+
+            m_bParsed = true;
+            bResult   = true;
+         }
+         catch (const std::exception& ex)
          {
-            std::string sPayloadStr = decoded.get_payload_claim ("data").as_string ();
-            try
-            {
-               m_payload = nlohmann::json::parse (sPayloadStr);
-            }
-            catch (...)
-            {
-               m_payload = sPayloadStr;
-            }
+            if (m_pEngine)
+               m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "MSF", std::string ("Parse: ") + ex.what ());
          }
-
-         m_bParsed = true;
-         bResult   = true;
       }
-      catch (const std::exception& ex)
+      else
       {
-         if (m_pEngine)
-            m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "MSF", std::string ("Parse: ") + ex.what ());
+         try
+         {
+            m_payload = nlohmann::json::parse (sJws);
+            m_bParsed = true;
+            bResult   = true;
+         }
+         catch (const std::exception& ex)
+         {
+            if (m_pEngine)
+               m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "MSF", std::string ("Parse (JSON): ") + ex.what ());
+         }
       }
    }
 
@@ -115,7 +140,7 @@ bool MSF::Parse (const std::string& sJws)
 // ---------------------------------------------------------------------------
 
 std::string MSF::Sign (const std::string& sPrivateKeyPem,
-                                         const std::string& sAlgorithm)
+                       const std::string& sAlgorithm)
 {
    std::string sResult;
 
@@ -236,6 +261,7 @@ bool MSF::VerifyChain ()
 {
    bool bResult = false;
    m_bChainTrusted = false;
+   m_bChainExpired = false;
    m_sChainError.clear ();
 
    if (!m_bParsed)
@@ -256,7 +282,8 @@ bool MSF::VerifyChain ()
       }
       else
       {
-         m_sChainError = sError;
+         m_sChainError   = sError;
+         m_bChainExpired = (sError.find ("expired") != std::string::npos);
       }
    }
 
@@ -326,33 +353,18 @@ nlohmann::json MSF::GetPayload () const
 // Payload (typed fields)
 // ---------------------------------------------------------------------------
 
-void MSF::SetNamespace (const std::string& sNamespace)
+void MSF::SetContainer (const std::string& sContainer)
 {
    if (!m_payload.is_object ())
       m_payload = nlohmann::json::object ();
-   m_payload["namespace"] = sNamespace;
+   m_payload["container"] = sContainer;
 }
 
-std::string MSF::Namespace () const
+std::string MSF::Container () const
 {
    std::string sResult;
-   if (m_payload.is_object ()  &&  m_payload.contains ("namespace"))
-      sResult = m_payload["namespace"].get<std::string> ();
-   return sResult;
-}
-
-void MSF::SetOrganization (const std::string& sOrganization)
-{
-   if (!m_payload.is_object ())
-      m_payload = nlohmann::json::object ();
-   m_payload["organization"] = sOrganization;
-}
-
-std::string MSF::GetOrganization () const
-{
-   std::string sResult;
-   if (m_payload.is_object ()  &&  m_payload.contains ("organization"))
-      sResult = m_payload["organization"].get<std::string> ();
+   if (m_payload.is_object ()  &&  m_payload.contains ("container"))
+      sResult = m_payload["container"].get<std::string> ();
    return sResult;
 }
 
@@ -444,8 +456,8 @@ std::vector<SERVICE> MSF::GetServices () const
 // ---------------------------------------------------------------------------
 
 void MSF::AddModule (const std::string& sName,
-                                       const std::string& sUrl,
-                                       const std::string& sSha256)
+                     const std::string& sUrl,
+                     const std::string& sSha256)
 {
    if (!m_payload.is_object ())
       m_payload = nlohmann::json::object ();
@@ -495,9 +507,24 @@ std::map<std::string, MODULE> MSF::GetModules () const
 // Status
 // ---------------------------------------------------------------------------
 
-std::string MSF::GetAlgorithm () const      { return m_sAlgorithm; }
-std::string MSF::GetFingerprint () const     { return m_sFingerprint; }
-bool        MSF::IsSignatureValid () const   { return m_bSignatureValid; }
-bool        MSF::IsChainTrusted () const     { return m_bChainTrusted; }
-std::string MSF::GetSignatureError () const  { return m_sSignatureError; }
-std::string MSF::GetChainError () const      { return m_sChainError; }
+std::string MSF::GetAlgorithm ()        const { return m_sAlgorithm; }
+std::string MSF::GetFingerprint ()      const { return m_sFingerprint; }
+std::string MSF::GetOrganization ()     const { return m_sOrganization; }
+std::string MSF::GetOrganizationHash () const { return m_sOrganizationHash; }
+bool        MSF::IsSignatureValid ()    const { return m_bSignatureValid; }
+bool        MSF::IsChainTrusted ()      const { return m_bChainTrusted; }
+bool        MSF::IsChainExpired ()      const { return m_bChainExpired; }
+std::string MSF::GetSignatureError ()   const { return m_sSignatureError; }
+std::string MSF::GetChainError ()       const { return m_sChainError; }
+
+std::string MSF::DisplayOrganization () const
+{
+   std::string sResult;
+
+   if (m_bChainTrusted  ||  m_bChainExpired)
+      sResult = m_sOrganization;
+   else if (!m_sOrganizationHash.empty ())
+      sResult = m_sOrganizationHash;
+
+   return sResult;
+}

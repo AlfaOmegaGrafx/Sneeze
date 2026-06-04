@@ -58,7 +58,7 @@ public:
    {
       SILO* pSilo = nullptr;
 
-      if (pCID = m_pContext->CID_Pool (pCID)) // Swap the input CID for the Context pooled CID
+      if (pCID)
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
 

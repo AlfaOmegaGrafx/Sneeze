@@ -41,3 +41,26 @@
 - Dean renamed NETWORK::IENUM to IENUM_FILE
 - Updated project.mdc with new architecture
 - Builds and runs correctly
+
+## June 3, 2026 — ~7:00 PM – 12:00 AM PDT
+
+**Phase 3 groundwork: MSF refactoring, CID overhaul, Container identity model**
+
+- Relocated MSF class from VIEWPORT::MSF to top-level SNEEZE::MSF in new include/Msf.h public header
+- Renamed CertChain.cpp to Chain.cpp, updated class from CERT_CHAIN to MSF::CHAIN
+- MSF now accepts both JWS compact serialization (signed) and plain JSON (unsigned) via heuristic detection
+- Implemented 5-level trust enum (eTRUST): kTRUST_NONE (black), kTRUST_UNTRUSTED (red), kTRUST_UNVERIFIED (orange), kTRUST_EXPIRED (yellow), kTRUST_VERIFIED (green)
+- Refactored CID struct: sCommonName -> sOrganizationHash, sContainerName -> sContainer, bValidated -> eTrust
+- Organization now extracted from X.509 cert O field (not MSF payload); hashed to sOrganizationHash via CHAIN::HashString
+- Removed "namespace" and "organization" as MSF payload fields; added "container" field
+- Eliminated CID_Pool / m_umCID from CONTEXT — replaced with CONTAINER as identity registry (Option B)
+- Containers now persist at refcount 0 as lightweight identity shells, deleted only on CONTEXT destruction
+- CONTAINER::Identity() returns const CID& as the single authoritative CID source
+- Added diagnostic log in CONTAINER::~Impl() for nonzero refcount at destruction
+- Updated CID field references across: Node.cpp, Stream.cpp, Silo.cpp, File.cpp, Unit.cpp, ConsoleTest.cpp, StorageTest.cpp, NetworkTest.cpp
+- Fixed NetworkTest.cpp: replaced aggregate initialization with factory function (CID has user-defined constructor, non-aggregate in C++17)
+- Synced msvc/Sneeze.vcxproj: CertChain.cpp -> Chain.cpp, removed stale Node.h/Fabric.h, updated Msf.h path
+- Removed stale Node.h and Fabric.h from src/CMakeLists.txt SOM_HEADERS
+- Updated subsystem documentation (Console.md, Storage.md, Network.md) for new CID fields
+- Builds and runs (both Sneeze and Artemis)
+- Planned next step: create first official MSF file via SignMsf, then wire fetch/parse/verify pipeline in Fabric::Initialize

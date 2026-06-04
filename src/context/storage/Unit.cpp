@@ -345,18 +345,18 @@ public:
 
       nlohmann::json jMeta;
 
-      jMeta["fingerprint"]    = pCID->sFingerprint;
-      jMeta["organization"]   = pCID->sOrganization;
-      jMeta["commonName"]     = pCID->sCommonName;
-      jMeta["containerName"]  = pCID->sContainerName;
-      jMeta["personaHash"]    = pCID->sPersonaHash;
-      jMeta["validated"]      = pCID->bValidated;
+      jMeta["fingerprint"]      = pCID->sFingerprint;
+      jMeta["organization"]     = pCID->sOrganization;
+      jMeta["organizationHash"] = pCID->sOrganizationHash;
+      jMeta["container"]        = pCID->sContainer;
+      jMeta["personaHash"]      = pCID->sPersonaHash;
+      jMeta["trust"]            = static_cast<int> (pCID->eTrust);
 
-      jMeta["scope"]          = static_cast<int> (m_eScope);
-      jMeta["sizeBytes"]      = m_nSizeBytes;
-      jMeta["createdAt"]      = m_sCreatedAt;
-      jMeta["lastAccessedAt"] = m_sLastAccessedAt;
-      jMeta["accessCount"]    = m_nAccessCount;
+      jMeta["scope"]            = static_cast<int> (m_eScope);
+      jMeta["sizeBytes"]        = m_nSizeBytes;
+      jMeta["createdAt"]        = m_sCreatedAt;
+      jMeta["lastAccessedAt"]   = m_sLastAccessedAt;
+      jMeta["accessCount"]      = m_nAccessCount;
 
       std::string sTmpPath = sMetaPath + ".temp";
       std::ofstream file (sTmpPath, std::ios::trunc);

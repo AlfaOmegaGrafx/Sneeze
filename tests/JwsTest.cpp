@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include <Sneeze.h>
-#include "msf/Msf.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -69,7 +68,7 @@ static std::string SignPayload (const std::string& sPayload,
                                 const std::vector<std::string>& aCertChain,
                                 const std::string& sAlgorithm = "RS256")
 {
-   VIEWPORT::MSF msf;
+   MSF msf;
    msf.SetPayload (nlohmann::json::parse (sPayload));
    for (const auto& sCert : aCertChain)
       msf.AddCert (sCert);
@@ -126,7 +125,7 @@ int RunJwsTests (int nArgc, char** aArgv)
    ASSERT (!sJws.empty (), "JWS signed successfully");
    ASSERT (sJws.find ('.') != std::string::npos, "JWS contains dot separators");
 
-   VIEWPORT::MSF verifier;
+   MSF verifier;
    verifier.AddTrustedCert (sCaCert);
    verifier.Parse (sJws);
    verifier.VerifySignature ();
@@ -144,8 +143,7 @@ int RunJwsTests (int nArgc, char** aArgv)
    BeginGroup ("MSF_FILE Payload Parsing");
 
    std::string sMssPayload = R"({
-      "namespace": "com.pokerstars.poker",
-      "organization": "PokerStars",
+      "container": "poker-table",
       "services": [
          {
             "name": "game-server",
@@ -166,15 +164,15 @@ int RunJwsTests (int nArgc, char** aArgv)
    std::string sMssJws = SignPayload (sMssPayload, sProviderKey, aCertChain, "RS256");
    ASSERT (!sMssJws.empty (), "MSS JWS signed successfully");
 
-   VIEWPORT::MSF svc;
+   MSF svc;
    svc.AddTrustedCert (sCaCert);
    svc.Parse (sMssJws);
    svc.VerifySignature ();
    svc.VerifyChain ();
    ASSERT (svc.IsSignatureValid ()  &&  svc.IsChainTrusted (), "MSS verification succeeded");
 
-   ASSERT (svc.Namespace () == "com.pokerstars.poker", "Namespace parsed correctly");
-   ASSERT (svc.GetOrganization () == "PokerStars", "Organization parsed correctly");
+   ASSERT (svc.Container () == "poker-table", "Container parsed correctly");
+   ASSERT (!svc.GetOrganization ().empty (), "Organization extracted from cert");
    ASSERT (svc.GetSuccessor () == "deadbeef0123456789abcdef", "Successor parsed correctly");
 
    auto aServices = svc.GetServices ();
@@ -210,7 +208,7 @@ int RunJwsTests (int nArgc, char** aArgv)
       sTampered[nMid] = (sTampered[nMid] == 'A') ? 'B' : 'A';
    }
 
-   VIEWPORT::MSF tamperedVerifier;
+   MSF tamperedVerifier;
    tamperedVerifier.AddTrustedCert (sCaCert);
    tamperedVerifier.Parse (sTampered);
    tamperedVerifier.VerifySignature ();
@@ -230,7 +228,7 @@ int RunJwsTests (int nArgc, char** aArgv)
    std::string sExpiredJws = SignPayload (sPayload, sExpiredKey, aExpiredChain, "RS256");
    ASSERT (!sExpiredJws.empty (), "Expired JWS signed successfully");
 
-   VIEWPORT::MSF expiredVerifier;
+   MSF expiredVerifier;
    expiredVerifier.AddTrustedCert (sCaCert);
    expiredVerifier.Parse (sExpiredJws);
    expiredVerifier.VerifyChain ();
@@ -243,7 +241,7 @@ int RunJwsTests (int nArgc, char** aArgv)
 
    BeginGroup ("Untrusted Chain Rejected");
 
-   VIEWPORT::MSF untrustedVerifier;
+   MSF untrustedVerifier;
    untrustedVerifier.Parse (sJws);
    untrustedVerifier.VerifyChain ();
    ASSERT (!untrustedVerifier.IsChainTrusted (), "Untrusted chain rejected");
@@ -255,7 +253,7 @@ int RunJwsTests (int nArgc, char** aArgv)
 
    BeginGroup ("Fingerprint Stability");
 
-   VIEWPORT::MSF verifier2;
+   MSF verifier2;
    verifier2.AddTrustedCert (sCaCert);
    verifier2.Parse (sJws);
    verifier2.VerifySignature ();
@@ -269,7 +267,7 @@ int RunJwsTests (int nArgc, char** aArgv)
 
    BeginGroup ("Malformed JWS Rejected");
 
-   VIEWPORT::MSF malformedVerifier;
+   MSF malformedVerifier;
 
    bool bEmpty = malformedVerifier.Parse ("");
    ASSERT (!bEmpty, "Empty string rejected");
@@ -286,10 +284,10 @@ int RunJwsTests (int nArgc, char** aArgv)
 
    BeginGroup ("Parse Populates Data Without Verification");
 
-   VIEWPORT::MSF parseOnly;
+   MSF parseOnly;
    bool bParsed = parseOnly.Parse (sMssJws);
    ASSERT (bParsed, "Parse succeeded without verification");
-   ASSERT (parseOnly.Namespace () == "com.pokerstars.poker", "Namespace available without verify");
+   ASSERT (parseOnly.Container () == "poker-table", "Container available without verify");
    ASSERT (!parseOnly.GetFingerprint ().empty (), "Fingerprint available without verify");
    ASSERT (parseOnly.GetCertCount () == 2, "Cert count available without verify");
 
@@ -299,9 +297,8 @@ int RunJwsTests (int nArgc, char** aArgv)
 
    BeginGroup ("Composition Round-Trip");
 
-   VIEWPORT::MSF composer;
-   composer.SetNamespace ("com.test.composed");
-   composer.SetOrganization ("Test Org");
+   MSF composer;
+   composer.SetContainer ("my-container");
    composer.AddService ({"my-svc", "grpc", "grpc://example.com:443", {"mod.wasm"}});
    composer.AddModule ("mod.wasm", "https://example.com/mod.wasm", "abcdef123456");
    composer.AddCert (sProviderCert);
@@ -310,14 +307,14 @@ int RunJwsTests (int nArgc, char** aArgv)
    std::string sComposedJws = composer.Sign (sProviderKey, "RS256");
    ASSERT (!sComposedJws.empty (), "Composed MSF signed successfully");
 
-   VIEWPORT::MSF reader;
+   MSF reader;
    reader.AddTrustedCert (sCaCert);
    reader.Parse (sComposedJws);
    reader.VerifySignature ();
    reader.VerifyChain ();
    ASSERT (reader.IsSignatureValid ()  &&  reader.IsChainTrusted (), "Composed MSF verifies");
-   ASSERT (reader.Namespace () == "com.test.composed", "Composed namespace round-trips");
-   ASSERT (reader.GetOrganization () == "Test Org", "Composed organization round-trips");
+   ASSERT (reader.Container () == "my-container", "Composed container round-trips");
+   ASSERT (!reader.GetOrganization ().empty (), "Composed organization from cert");
    ASSERT (reader.GetServices ().size () == 1, "Composed service round-trips");
    ASSERT (reader.GetModules ().count ("mod.wasm") == 1, "Composed module round-trips");
    ASSERT (reader.GetModules ()["mod.wasm"].sSha256 == "abcdef123456", "Composed module sha256 round-trips");

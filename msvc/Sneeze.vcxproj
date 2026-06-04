@@ -187,7 +187,7 @@
     <ClCompile Include="..\src\deps\compute\ComputeDispatch.cpp" />
     <!-- msf -->
     <ClCompile Include="..\src\context\msf\MsfFile.cpp" />
-    <ClCompile Include="..\src\context\msf\CertChain.cpp" />
+    <ClCompile Include="..\src\context\msf\Chain.cpp" />
     <!-- stb -->
     <ClCompile Include="..\src\deps\stb\stb_image_impl.cpp" />
     <ClCompile Include="..\src\deps\stb\Image.cpp" />
@@ -209,8 +209,6 @@
     <ClInclude Include="..\src\context\scene\Celestial.h" />
     <ClInclude Include="..\src\context\scene\Orbit.h" />
     <ClInclude Include="..\src\context\scene\Epoch.h" />
-    <ClInclude Include="..\src\context\scene\Node.h" />
-    <ClInclude Include="..\src\context\scene\Fabric.h" />
     <ClInclude Include="..\src\context\scene\MapObject.h" />
     <ClInclude Include="..\src\context\scene\AccessControl.h" />
     <ClInclude Include="..\src\context\scene\Events.h" />
@@ -228,7 +226,7 @@
     <ClInclude Include="..\src\deps\ui\UiContext.h" />
     <ClInclude Include="..\src\deps\compute\EmbeddedKernels.h" />
     <ClInclude Include="..\src\deps\compute\ComputeDispatch.h" />
-    <ClInclude Include="..\src\context\msf\Msf.h" />
+    <ClInclude Include="..\include\Msf.h" />
     <ClInclude Include="..\src\deps\stb\stb_image.h" />
     <!-- public headers -->
     <ClInclude Include="..\include\Sneeze.h" />
