@@ -25,8 +25,8 @@ namespace SNEEZE
       // ---------------------------------------------------------------------------
       // WASM_RUNTIME — top-level manager of the Wasmtime engine and all stores.
       //
-      // Owns the shared wasm_engine_t. Provides store creation and lookup by
-      // identity tuple (persona + fingerprint + container).
+      // Owns the shared wasm_engine_t. Stores are created/destroyed by
+      // CONTAINER — one store per container, no identity lookup needed here.
       // ---------------------------------------------------------------------------
 
       class WASM_RUNTIME
@@ -39,18 +39,16 @@ namespace SNEEZE
 
          wasm_engine_t* GetEngine () const { return m_pWsam_Engine; }
 
-         // --- Store management ---
+         // --- Store lifecycle ---
 
-         WASM_STORE* FindOrCreateStore (const STORE_IDENTITY& pIdentity);
-         WASM_STORE* FindStore (const STORE_IDENTITY& pIdentity) const;
-         void        DestroyStore (const STORE_IDENTITY& pIdentity);
-         void        DestroyAllStores ();
+         WASM_STORE* Store_Open ();
+         void        Store_Close (WASM_STORE* pStore);
 
       private:
-         ENGINE*           m_pEngine;
-         wasm_engine_t*    m_pWsam_Engine;
-         std::unordered_map<std::string, std::unique_ptr<WASM_STORE>> m_mapStores;
-         mutable std::mutex m_storesMutex;
+         ENGINE*                          m_pEngine;
+         wasm_engine_t*                   m_pWsam_Engine;
+         std::vector<WASM_STORE*>         m_apStore;
+         mutable std::mutex               m_mxStore;
       };
    } // namespace DEP
 }

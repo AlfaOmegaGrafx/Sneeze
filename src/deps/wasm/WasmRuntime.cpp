@@ -40,7 +40,9 @@ bool WASM_RUNTIME::Initialize (SNEEZE::ENGINE* pEngine)
 
 WASM_RUNTIME::~WASM_RUNTIME ()
 {
-   DestroyAllStores ();
+   for (auto* pStore : m_apStore)
+      delete pStore;
+   m_apStore.clear ();
 
    if (m_pWsam_Engine)
    {
@@ -50,51 +52,34 @@ WASM_RUNTIME::~WASM_RUNTIME ()
 }
 
 // ---------------------------------------------------------------------------
-// Store management
+// Store lifecycle
 // ---------------------------------------------------------------------------
 
-WASM_STORE* WASM_RUNTIME::FindOrCreateStore (const STORE_IDENTITY& pIdentity)
+WASM_STORE* WASM_RUNTIME::Store_Open ()
 {
-   std::string sKey = pIdentity.Key ();
+   WASM_STORE* pStore = new WASM_STORE (m_pEngine, m_pWsam_Engine);
 
-   std::lock_guard<std::mutex> guard (m_storesMutex);
+   std::lock_guard<std::mutex> guard (m_mxStore);
+   m_apStore.push_back (pStore);
 
-   auto it = m_mapStores.find (sKey);
-   if (it != m_mapStores.end ())
-      return it->second.get ();
-
-   auto pStore = std::make_unique<WASM_STORE> (m_pEngine, m_pWsam_Engine, pIdentity);
-   WASM_STORE* pRaw = pStore.get ();
-   m_mapStores[sKey] = std::move (pStore);
-
-   m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "WASM_RUNTIME",
-      "Created store [" + pIdentity.sFingerprint + "|" + pIdentity.sContainer + "]");
-
-   return pRaw;
+   return pStore;
 }
 
-WASM_STORE* WASM_RUNTIME::FindStore (const STORE_IDENTITY& pIdentity) const
+void WASM_RUNTIME::Store_Close (WASM_STORE* pStore)
 {
-   std::string sKey = pIdentity.Key ();
+   if (!pStore)
+      return;
 
-   std::lock_guard<std::mutex> guard (m_storesMutex);
+   std::lock_guard<std::mutex> guard (m_mxStore);
 
-   auto it = m_mapStores.find (sKey);
-   if (it != m_mapStores.end ())
-      return it->second.get ();
-   return nullptr;
-}
+   for (auto it = m_apStore.begin (); it != m_apStore.end (); ++it)
+   {
+      if (*it == pStore)
+      {
+         m_apStore.erase (it);
+         break;
+      }
+   }
 
-void WASM_RUNTIME::DestroyStore (const STORE_IDENTITY& pIdentity)
-{
-   std::string sKey = pIdentity.Key ();
-
-   std::lock_guard<std::mutex> guard (m_storesMutex);
-   m_mapStores.erase (sKey);
-}
-
-void WASM_RUNTIME::DestroyAllStores ()
-{
-   std::lock_guard<std::mutex> guard (m_storesMutex);
-   m_mapStores.clear ();
+   delete pStore;
 }

@@ -87,3 +87,15 @@
 - End-to-end verified: MSF fetched from CDN, parsed, cert data extracted, container created with correct CID and kTRUST_UNVERIFIED
 - Discovered bug: inspector attachment re-triggers OnFileReady after Close() due to m_pListener not being nulled in Pending_Close() — Dean studying and fixing
 - Phase 3 declared complete; next steps: fix OnFileReady bug, polish Phases 1-4, then Phase 5+6 (WASM solar system)
+
+## June 4, 2026 — ~7:30 PM – ~7:45 PM PDT
+
+**Phase 5 WASM infrastructure cleanup + WasmRuntime symmetry refactor**
+
+- Eliminated `DEP::STORE_IDENTITY` struct — redundant with CONTAINER's uniqueness enforcement
+- Simplified `WASM_RUNTIME` API: replaced `FindOrCreateStore()`/`DestroyStore()` with `Store_Open()`/`Store_Close(WASM_STORE*)`; internal storage changed from identity-keyed map to simple `vector<WASM_STORE*>` + mutex
+- Added `WasmRuntime()` accessor to `CONTEXT` (pass-through to `Engine()->WasmRuntime()`) — symmetry with `Console()`, `Network()`, `Storage()`, etc.
+- Updated `CONTAINER::Open()`/`Close()` to use `m_pContext->WasmRuntime()->Store_Open/Close()` instead of reaching through Engine
+- Fixed outdated Storage test assertions: `containerName` -> `container` (field rename), `m_nCreatedCount == 1` -> `>= 1` (root container now creates its own silo during Context_Open)
+- All tests pass: 44/44 storage, 40/40 WASM, full suite green
+- Artemis verified working

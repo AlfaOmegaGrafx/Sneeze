@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include <Sneeze.h>
-#include <Scene.h>
+
 #include "MapObject.h"
 #include "astro/BodyData.h"
 #include <algorithm>
@@ -134,12 +134,13 @@ if (m_pMsf->Payload ()["container"] == "solar-system")
          }
          else
          {
-            m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "FABRIC", "Failed to parse MSF from " + m_sUrl);
-
             delete m_pMsf;
             m_pMsf = nullptr;
+
+            m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "FABRIC", "Failed to parse MSF from " + m_sUrl);
          }
       }
+      else m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "FABRIC", "MSF was empty for " + m_sUrl);
    }
 
    void OnFileFailed (NETWORK::FILE* pFile) override

@@ -178,6 +178,60 @@ bvh.QuerySphere (x, y, z, dRadius, aNearby);
 The BVH is rebuilt on demand (not incrementally updated). It uses median
 splits along the longest axis.
 
+## MSF Content Types
+
+Each MSF payload declares a `"content"` field — an array of strings
+describing the nature and expected use of the fabric. Values follow a
+two-level `category/specific` hierarchy, similar to MIME types.
+
+```json
+{
+   "container": "poker-table",
+   "content": ["game/card", "adult/gambling"],
+   "services": [],
+   "modules": {}
+}
+```
+
+The first segment (category) is the filtering boundary. A browser configured
+to block `adult/*` filters on the prefix alone, regardless of the specific
+subtype. Fabrics typically carry 1–3 content types.
+
+Content types are **self-declared by the publisher** — the browser does not
+verify them. However, misclassification has real-world consequences:
+publishers who systematically misrepresent content can be reported and
+blacklisted via reputation services (which the browser may consult as part
+of its trust model, alongside certificate chain validation).
+
+### Reference Vocabulary
+
+Publishers may use unlisted values, but the published vocabulary is what the
+browser's UI, filtering, and discovery tools recognize. Unknown categories
+pass through without special handling.
+
+| Category | Specifics | Description |
+|----------|-----------|-------------|
+| **game** | `game/board`, `game/card`, `game/puzzle`, `game/trivia`, `game/shooter`, `game/racing`, `game/rpg`, `game/strategy`, `game/simulation`, `game/sport`, `game/arcade` | Interactive competitive or cooperative play |
+| **social** | `social/lounge`, `social/club`, `social/plaza`, `social/event`, `social/meetup`, `social/theater` | Gathering spaces, spectating, conversation |
+| **retail** | `retail/storefront`, `retail/pos`, `retail/marketplace`, `retail/showroom`, `retail/auction` | Commerce and transactions |
+| **entertainment** | `entertainment/music`, `entertainment/cinema`, `entertainment/live`, `entertainment/exhibit`, `entertainment/gallery` | Passive consumption, performance, art |
+| **education** | `education/classroom`, `education/museum`, `education/tutorial`, `education/workshop`, `education/lecture` | Learning-oriented experiences |
+| **work** | `work/office`, `work/conference`, `work/coworking`, `work/whiteboard` | Professional and productivity spaces |
+| **safety** | `safety/emergency`, `safety/wayfinding`, `safety/training`, `safety/alert` | Critical infrastructure and emergency services |
+| **advertising** | `advertising/billboard`, `advertising/kiosk`, `advertising/sponsor`, `advertising/popup` | Promoted commercial content |
+| **adult** | `adult/gambling`, `adult/nightlife`, `adult/dating`, `adult/explicit` | Age-restricted content — `adult/*` is the parental control boundary |
+| **utility** | `utility/navigation`, `utility/transport`, `utility/information`, `utility/service` | Functional infrastructure (maps, transit, kiosks) |
+| **environment** | `environment/landscape`, `environment/architecture`, `environment/nature`, `environment/weather` | Spatial context — buildings, terrain, scenery |
+| **medical** | `medical/clinic`, `medical/pharmacy`, `medical/wellness`, `medical/telehealth` | Healthcare-related, potentially regulated |
+
+### Examples
+
+- **Poker table:** `["game/card", "adult/gambling"]`
+- **Airport terminal:** `["utility/navigation", "retail/storefront", "environment/architecture"]`
+- **Concert venue:** `["entertainment/live", "social/event"]`
+- **Virtual classroom:** `["education/classroom", "work/whiteboard"]`
+- **Shopping mall:** `["retail/marketplace", "entertainment/gallery", "social/plaza"]`
+
 ## Unimplemented / Future Work
 
 - **Incremental BVH update** — currently the entire BVH is rebuilt from

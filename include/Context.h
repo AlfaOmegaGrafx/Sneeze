@@ -29,6 +29,11 @@ namespace SNEEZE
    class VIEWPORT;
    class FABRIC;
 
+   namespace DEP
+   {
+      class WASM_RUNTIME;
+   }
+
    class CONTEXT
    {
    public:
@@ -54,11 +59,12 @@ namespace SNEEZE
       ENGINE*    Engine   () const;
       ICONTEXT*  Host     () const;
 
-      CONSOLE*   Console  () const;
-      NETWORK*   Network  () const;
-      STORAGE*   Storage  () const;
-      SCENE*     Scene    () const;
-      VIEWPORT*  Viewport () const;
+      CONSOLE*            Console     () const;
+      NETWORK*            Network     () const;
+      STORAGE*            Storage     () const;
+      SCENE*              Scene       () const;
+      VIEWPORT*           Viewport    () const;
+      DEP::WASM_RUNTIME*  WasmRuntime () const;
 
       const std::string& Path_Permanent () const;
       const std::string& Path_Temporary () const;

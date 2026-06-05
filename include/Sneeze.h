@@ -27,9 +27,15 @@ namespace SNEEZE
    class JOB_COMPOSITOR;
    class ICONTEXT;
    class IVIEWPORT;
+
+   namespace DEP
+   {
+      class WASM_RUNTIME;
+   }
 }
 
 #include "Context.h"
+#include "Container.h"
 #include "Msf.h"
 #include "Console.h"
 #include "Network.h"
@@ -154,6 +160,7 @@ namespace SNEEZE
       // --- Subsystems ---
 
       persona::PERSONA*        Persona () const;
+      DEP::WASM_RUNTIME*       WasmRuntime () const;
 
       void                     Queue_Post_Fetch      (JOB_FETCH* pJob_Fetch);
       void                     Queue_Post_Compositor (JOB_COMPOSITOR* pJob_Compositor);

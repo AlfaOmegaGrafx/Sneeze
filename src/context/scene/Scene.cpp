@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include <Sneeze.h>
-#include <Scene.h>
 
 using namespace SNEEZE;
 
