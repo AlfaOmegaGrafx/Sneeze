@@ -59,13 +59,13 @@ namespace SNEEZE
       class WASM_INSTANCE
       {
       public:
-         WASM_INSTANCE (ENGINE* pEngine, WASM_STORE* pStore, const std::string& sUrl, const std::string& sSha256);
+         WASM_INSTANCE (ENGINE* pEngine, WASM_STORE* pStore, const std::string& sUrl, const std::string& sHash);
          ~WASM_INSTANCE ();
 
          // --- Identity ---
 
-         const std::string& Url () const   { return m_sUrl; }
-         const std::string& Sha256 () const { return m_sSha256; }
+         const std::string& Url   () const   { return m_sUrl; }
+         const std::string& Hash  () const  { return m_sHash; }
          WASM_STORE*        Store () const  { return m_pStore; }
          INSTANCE_STATE     State () const  { return m_bState; }
 
@@ -95,7 +95,7 @@ namespace SNEEZE
          ENGINE*      m_pEngine;
          WASM_STORE*        m_pStore;
          std::string        m_sUrl;
-         std::string        m_sSha256;
+         std::string        m_sHash;
          INSTANCE_STATE     m_bState;
          int                m_nRefCount;
 
@@ -134,21 +134,21 @@ namespace SNEEZE
          WASM_STORE (ENGINE* pEngine, wasm_engine_t* pWASM_Engine);
          ~WASM_STORE ();
 
-         ENGINE*               Engine () const        { return m_pEngine; }
+         ENGINE*               Engine      () const   { return m_pEngine; }
          wasmtime_store_t*     NativeStore () const   { return m_pStore; }
-         wasmtime_context_t*   Context () const;
+         wasmtime_context_t*   Context     () const;
 
          // --- Fabric reference counting ---
 
-         int  Fabric_AddRef ();
+         int  Fabric_AddRef    ();
          int  Fabric_ReleaseRef ();
-         int  Fabric_RefCount () const { return m_nFabricRefCount; }
+         int  Fabric_RefCount   () const { return m_nFabricRefCount; }
 
          // --- Instance management ---
 
-         bool Instance_Open (const std::string& sUrl, const std::string& sSha256, const uint8_t* pBytes, size_t nSize, uint32_t twFabricId, const uint8_t* pParams, size_t nParamsSize);
-         void Instance_Close (const std::string& sUrl, const std::string& sSha256, uint32_t twFabricId);
-         WASM_INSTANCE* Instance_Find (const std::string& sUrl, const std::string& sSha256) const;
+         bool           Instance_Open  (const std::string& sUrl, const std::string& sHash, const uint8_t* pBytes, size_t nSize, uint32_t twFabricId, const uint8_t* pParams, size_t nParamsSize);
+         void           Instance_Close (const std::string& sUrl, const std::string& sHash, uint32_t twFabricId);
+         WASM_INSTANCE* Instance_Find  (const std::string& sUrl, const std::string& sHash) const;
          const std::vector<WASM_INSTANCE*>& Instances () const { return m_apInstances; }
 
          // --- Linker and host data ---

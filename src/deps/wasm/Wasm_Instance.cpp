@@ -18,11 +18,11 @@
 
 using namespace SNEEZE::DEP;
 
-WASM_INSTANCE::WASM_INSTANCE (ENGINE* pEngine, WASM_STORE* pStore, const std::string& sUrl, const std::string& sSha256) : 
-   m_pEngine       (pEngine), 
-   m_pStore        (pStore), 
-   m_sUrl          (sUrl), 
-   m_sSha256       (sSha256), 
+WASM_INSTANCE::WASM_INSTANCE (ENGINE* pEngine, WASM_STORE* pStore, const std::string& sUrl, const std::string& sHash) :
+   m_pEngine       (pEngine),
+   m_pStore        (pStore),
+   m_sUrl          (sUrl),
+   m_sHash         (sHash),
    m_bState        (INSTANCE_STATE_DORMANT), 
    m_nRefCount     (0), 
    m_pModule       (nullptr), 

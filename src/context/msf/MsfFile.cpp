@@ -453,46 +453,52 @@ std::vector<SERVICE> MSF::Services () const
 // Modules
 // ---------------------------------------------------------------------------
 
-void MSF::AddModule (const std::string& sName,
-                     const std::string& sUrl,
-                     const std::string& sSha256)
+void MSF::AddModule (const std::string& sUrl, const std::string& sHash)
 {
    if (!m_pJson_Payload.is_object ())
       m_pJson_Payload = nlohmann::json::object ();
    if (!m_pJson_Payload.contains ("modules"))
-      m_pJson_Payload["modules"] = nlohmann::json::object ();
+      m_pJson_Payload["modules"] = nlohmann::json::array ();
 
    nlohmann::json mod;
-   mod["url"]    = sUrl;
-   mod["sha256"] = sSha256;
-   m_pJson_Payload["modules"][sName] = mod;
+   mod["url"]  = sUrl;
+   mod["hash"] = sHash;
+   m_pJson_Payload["modules"].push_back (mod);
 }
 
-bool MSF::RemoveModule (const std::string& sName)
+bool MSF::RemoveModule (const std::string& sUrl)
 {
    bool bResult = false;
 
-   if (m_pJson_Payload.is_object ()  &&  m_pJson_Payload.contains ("modules")  &&  m_pJson_Payload["modules"].is_object ()  &&  m_pJson_Payload["modules"].contains (sName))
+   if (m_pJson_Payload.is_object ()  &&  m_pJson_Payload.contains ("modules")  &&  m_pJson_Payload["modules"].is_array ())
    {
-      m_pJson_Payload["modules"].erase (sName);
-      bResult = true;
+      auto& aModules = m_pJson_Payload["modules"];
+      for (auto it = aModules.begin (); it != aModules.end (); ++it)
+      {
+         if (it->contains ("url")  &&  (*it)["url"].get<std::string> () == sUrl)
+         {
+            aModules.erase (it);
+            bResult = true;
+            break;
+         }
+      }
    }
 
    return bResult;
 }
 
-std::map<std::string, MODULE> MSF::Modules () const
+std::vector<MODULE> MSF::Modules () const
 {
-   std::map<std::string, MODULE> aResult;
+   std::vector<MODULE> aResult;
 
-   if (m_pJson_Payload.is_object ()  &&  m_pJson_Payload.contains ("modules")  &&  m_pJson_Payload["modules"].is_object ())
+   if (m_pJson_Payload.is_object ()  &&  m_pJson_Payload.contains ("modules")  &&  m_pJson_Payload["modules"].is_array ())
    {
-      for (auto it = m_pJson_Payload["modules"].begin (); it != m_pJson_Payload["modules"].end (); ++it)
+      for (auto& jModule : m_pJson_Payload["modules"])
       {
          MODULE mod;
-         if (it.value ().contains ("url"))    mod.sUrl    = it.value ()["url"].get<std::string> ();
-         if (it.value ().contains ("sha256")) mod.sSha256 = it.value ()["sha256"].get<std::string> ();
-         aResult[it.key ()] = mod;
+         if (jModule.contains ("url"))  mod.sUrl  = jModule["url"].get<std::string> ();
+         if (jModule.contains ("hash")) mod.sHash = jModule["hash"].get<std::string> ();
+         aResult.push_back (mod);
       }
    }
 

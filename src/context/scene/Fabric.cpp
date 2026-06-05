@@ -67,18 +67,18 @@ public:
 class WASM_FETCH : public NETWORK::IFILE
 {
 public:
-   WASM_FETCH (FABRIC* pFabric, SCENE* pScene, const std::string& sUrl, const std::string& sSha256) :
+   WASM_FETCH (FABRIC* pFabric, SCENE* pScene, const std::string& sUrl, const std::string& sHash) :
       m_pFabric (pFabric),
       m_pScene  (pScene),
       m_sUrl    (sUrl),
-      m_sSha256 (sSha256),
+      m_sHash   (sHash),
       m_pFile   (nullptr)
    {
    }
 
    bool Initialize (const CONTAINER::CID* pCID)
    {
-      m_pFile = m_pScene->Network ()->File_Open (pCID, m_sUrl, m_sSha256, 0, this);
+      m_pFile = m_pScene->Network ()->File_Open (pCID, m_sUrl, m_sHash, 0, this);
 
       return (m_pFile != nullptr);
    }
@@ -92,13 +92,13 @@ public:
       }
    }
 
-   void OnFileReady  (NETWORK::FILE* pFile) override { m_pFabric->OnWasmReady  (pFile, m_sUrl, m_sSha256); delete this; }
-   void OnFileFailed (NETWORK::FILE* pFile) override { m_pFabric->OnWasmFailed (pFile, m_sUrl           ); delete this; }
+   void OnFileReady  (NETWORK::FILE* pFile) override { m_pFabric->OnWasmReady  (pFile, m_sUrl, m_sHash); delete this; }
+   void OnFileFailed (NETWORK::FILE* pFile) override { m_pFabric->OnWasmFailed (pFile, m_sUrl         ); delete this; }
 
    FABRIC*        m_pFabric;
    SCENE*         m_pScene;
    std::string    m_sUrl;
-   std::string    m_sSha256;
+   std::string    m_sHash;
    NETWORK::FILE* m_pFile;
 };
 
@@ -205,22 +205,20 @@ public:
             {
                m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "FABRIC", "Loaded MSF: " + m_pContainer->Identity ()->DisplayName () + " (trust: " + std::to_string (m_pContainer->Identity ()->eTrust) + ")");
 
-               auto mapModule = m_pMsf->Modules ();
+               auto aModule = m_pMsf->Modules ();
 
-               if (!mapModule.empty ())
+               if (!aModule.empty ())
                {
-                  for (auto& pair : mapModule)
+                  for (auto& Module : aModule)
                   {
-                     const MSF::MODULE& Module = pair.second;
-
-                     WASM_FETCH* pWasm_Fetch = new WASM_FETCH (m_pFabric, m_pScene, Module.sUrl, Module.sSha256);
+                     WASM_FETCH* pWasm_Fetch = new WASM_FETCH (m_pFabric, m_pScene, Module.sUrl, Module.sHash);
 
                      m_apWasm_Fetch.push_back (pWasm_Fetch);
 
                      pWasm_Fetch->Initialize (m_pContainer->Identity ());
                   }
 
-                  m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "FABRIC", "Fetching " + std::to_string (mapModule.size ()) + " WASM module(s)");
+                  m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "FABRIC", "Fetching " + std::to_string (aModule.size ()) + " WASM module(s)");
                }
 
                if (m_apWasm_Fetch.empty ())
@@ -252,7 +250,7 @@ public:
 // WASM module fetched — compile and insert into container
 // -----------------------------------------------------------------------
 
-   void OnWasmReady (NETWORK::FILE* pFile, const std::string& sUrl, const std::string& sSha256)
+   void OnWasmReady (NETWORK::FILE* pFile, const std::string& sUrl, const std::string& sHash)
    {
       std::vector<uint8_t> aData;
 
@@ -260,9 +258,9 @@ public:
 
       if (!aData.empty ()  &&  m_pContainer)
       {
-         if (m_pContainer->Instance_Open (sUrl, sSha256, aData))
+         if (m_pContainer->Instance_Open (sUrl, sHash, aData))
          {
-            m_aModule.push_back (std::make_pair (sUrl, sSha256));
+            m_aModule.push_back (std::make_pair (sUrl, sHash));
 
             m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "FABRIC", "Loaded WASM: " + sUrl);
          }
@@ -300,7 +298,9 @@ public:
          m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "FABRIC", std::to_string (m_aModule.size ()) + " WASM instance(s) active");
 
 // temporary kludge to inject the solar system into the primary fabric
-if (m_pMsf  &&  m_pMsf->Payload ()["container"] == "solar-system")
+if (m_pMsf  &&  m_pMsf->Payload ()["container"] == "solar-system"
+|| true
+)
 {
    auto* pNode_Root = new NODE (m_pFabric, nullptr);
 
@@ -414,9 +414,9 @@ void               FABRIC::Fabric_Remove  (FABRIC* pFabric_Child)         { m_pI
 // Fetch callbacks (delegated from MSF_FETCH / WASM_FETCH helpers)
 // -----------------------------------------------------------------------
 
-void               FABRIC::OnMsfReady    (NETWORK::FILE* pFile)                                                      { m_pImpl->OnMsfReady (pFile); }
-void               FABRIC::OnMsfFailed   (NETWORK::FILE* pFile)                                                      { m_pImpl->OnMsfFailed (pFile); }
-void               FABRIC::OnWasmReady   (NETWORK::FILE* pFile, const std::string& sUrl, const std::string& sSha256) { m_pImpl->OnWasmReady (pFile, sUrl, sSha256); }
+void               FABRIC::OnMsfReady    (NETWORK::FILE* pFile)                                                      { m_pImpl->OnMsfReady   (pFile); }
+void               FABRIC::OnMsfFailed   (NETWORK::FILE* pFile)                                                      { m_pImpl->OnMsfFailed  (pFile); }
+void               FABRIC::OnWasmReady   (NETWORK::FILE* pFile, const std::string& sUrl, const std::string& sHash)   { m_pImpl->OnWasmReady  (pFile, sUrl, sHash); }
 void               FABRIC::OnWasmFailed  (NETWORK::FILE* pFile, const std::string& sUrl)                             { m_pImpl->OnWasmFailed (pFile, sUrl); } 
 
 // ===========================================================================

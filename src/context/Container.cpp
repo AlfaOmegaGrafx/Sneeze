@@ -120,14 +120,14 @@ public:
    // WASM Instance Lifecycle
    // -----------------------------------------------------------------------
 
-   bool Instance_Open (const std::string& sUrl, const std::string& sSha256, const std::vector<uint8_t>& aWasmBytes)
+   bool Instance_Open (const std::string& sUrl, const std::string& sHash, const std::vector<uint8_t>& aWasmBytes)
    {
-      return m_pWasm_Store->Instance_Open (sUrl, sSha256, aWasmBytes.data (), aWasmBytes.size (), 0, nullptr, 0);
+      return m_pWasm_Store->Instance_Open (sUrl, sHash, aWasmBytes.data (), aWasmBytes.size (), 0, nullptr, 0);
    }
 
-   void Instance_Close (const std::string& sUrl, const std::string& sSha256)
+   void Instance_Close (const std::string& sUrl, const std::string& sHash)
    {
-      m_pWasm_Store->Instance_Close (sUrl, sSha256, 0);
+      m_pWasm_Store->Instance_Close (sUrl, sHash, 0);
    }
 
    // -----------------------------------------------------------------------
@@ -162,11 +162,11 @@ CONTAINER::~CONTAINER ()
    delete m_pImpl;
 }
 
-bool                  CONTAINER::Open           (FABRIC* pFabric)                                                                    { return m_pImpl->Open (pFabric); }
-size_t                CONTAINER::Close          (FABRIC* pFabric)                                                                    { return m_pImpl->Close (pFabric); }
+bool                  CONTAINER::Open           (FABRIC* pFabric)                                                                  { return m_pImpl->Open  (pFabric); }
+size_t                CONTAINER::Close          (FABRIC* pFabric)                                                                  { return m_pImpl->Close (pFabric); }
 
-bool                  CONTAINER::Instance_Open  (const std::string& sUrl, const std::string& sSha256, const std::vector<uint8_t>& a) { return m_pImpl->Instance_Open (sUrl, sSha256, a); }
-void                  CONTAINER::Instance_Close (const std::string& sUrl, const std::string& sSha256)                                { m_pImpl->Instance_Close (sUrl, sSha256); }
+bool                  CONTAINER::Instance_Open  (const std::string& sUrl, const std::string& sHash, const std::vector<uint8_t>& a) { return m_pImpl->Instance_Open  (sUrl, sHash, a); }
+void                  CONTAINER::Instance_Close (const std::string& sUrl, const std::string& sHash)                                {        m_pImpl->Instance_Close (sUrl, sHash); }
 
 const CONTAINER::CID* CONTAINER::Identity       () const        { return &m_pImpl->m_CID; }
 const std::string&    CONTAINER::Key            () const        { return  m_pImpl->m_sKey; }

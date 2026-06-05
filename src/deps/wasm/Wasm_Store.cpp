@@ -78,7 +78,7 @@ int WASM_STORE::Fabric_ReleaseRef ()
    return m_nFabricRefCount;
 }
 
-bool WASM_STORE::Instance_Open (const std::string& sUrl, const std::string& sSha256, const uint8_t* pBytes, size_t nSize, uint32_t twFabricId, const uint8_t* pParams, size_t nParamsSize)
+bool WASM_STORE::Instance_Open (const std::string& sUrl, const std::string& sHash, const uint8_t* pBytes, size_t nSize, uint32_t twFabricId, const uint8_t* pParams, size_t nParamsSize)
 {
    std::lock_guard<std::mutex> guard (m_mutex);
 
@@ -88,13 +88,13 @@ bool WASM_STORE::Instance_Open (const std::string& sUrl, const std::string& sSha
 
    for (auto* pCandidate : m_apInstances)
    {
-      if (pCandidate->Url () == sUrl  &&  pCandidate->Sha256 () == sSha256)
+      if (pCandidate->Url () == sUrl  &&  pCandidate->Hash () == sHash)
          pInstance = pCandidate;
    }
 
    if (!pInstance)
    {
-      pInstance = new WASM_INSTANCE (m_pEngine, this, sUrl, sSha256);
+      pInstance = new WASM_INSTANCE (m_pEngine, this, sUrl, sHash);
 
       if (pInstance->Compile (m_pWasmEngine, pBytes, nSize)  &&  pInstance->Instantiate ())
          m_apInstances.push_back (pInstance);
@@ -111,18 +111,18 @@ bool WASM_STORE::Instance_Open (const std::string& sUrl, const std::string& sSha
    return bResult;
 }
 
-void WASM_STORE::Instance_Close (const std::string& sUrl, const std::string& sSha256, uint32_t twFabricId)
+void WASM_STORE::Instance_Close (const std::string& sUrl, const std::string& sHash, uint32_t twFabricId)
 {
    std::lock_guard<std::mutex> guard (m_mutex);
 
    for (auto* pInstance : m_apInstances)
    {
-      if (pInstance->Url () == sUrl  &&  pInstance->Sha256 () == sSha256)
+      if (pInstance->Url () == sUrl  &&  pInstance->Hash () == sHash)
          pInstance->Close (twFabricId);
    }
 }
 
-WASM_INSTANCE* WASM_STORE::Instance_Find (const std::string& sUrl, const std::string& sSha256) const
+WASM_INSTANCE* WASM_STORE::Instance_Find (const std::string& sUrl, const std::string& sHash) const
 {
    std::lock_guard<std::mutex> guard (m_mutex);
 
@@ -130,7 +130,7 @@ WASM_INSTANCE* WASM_STORE::Instance_Find (const std::string& sUrl, const std::st
 
    for (auto* pInstance : m_apInstances)
    {
-      if (pInstance->Url () == sUrl  &&  pInstance->Sha256 () == sSha256)
+      if (pInstance->Url () == sUrl  &&  pInstance->Hash () == sHash)
          pResult = pInstance;
    }
 

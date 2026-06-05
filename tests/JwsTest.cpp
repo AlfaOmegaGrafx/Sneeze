@@ -152,12 +152,12 @@ int RunJwsTests (int nArgc, char** aArgv)
             "modules": ["game-client.wasm"]
          }
       ],
-      "modules": {
-         "game-client.wasm": {
+      "modules": [
+         {
             "url": "https://cdn.pokerstars.com/modules/game-client.wasm",
-            "sha256": "a1b2c3d4e5f6"
+            "hash": "sha256-a1b2c3d4e5f6"
          }
-      },
+      ],
       "successor": "deadbeef0123456789abcdef"
    })";
 
@@ -189,8 +189,8 @@ int RunJwsTests (int nArgc, char** aArgv)
    ASSERT (aModules.size () == 1, "One module declared");
    if (!aModules.empty ())
    {
-      ASSERT (aModules.count ("game-client.wasm") == 1, "Module key found");
-      ASSERT (aModules["game-client.wasm"].sSha256 == "a1b2c3d4e5f6", "Module sha256 correct");
+      ASSERT (aModules[0].sUrl == "https://cdn.pokerstars.com/modules/game-client.wasm", "Module url correct");
+      ASSERT (aModules[0].sHash == "sha256-a1b2c3d4e5f6", "Module hash correct");
    }
 
    // -----------------------------------------------------------------------
@@ -300,7 +300,7 @@ int RunJwsTests (int nArgc, char** aArgv)
    MSF composer;
    composer.SetContainer ("my-container");
    composer.AddService ({"my-svc", "grpc", "grpc://example.com:443", {"mod.wasm"}});
-   composer.AddModule ("mod.wasm", "https://example.com/mod.wasm", "abcdef123456");
+   composer.AddModule ("https://example.com/mod.wasm", "sha256-abcdef123456");
    composer.AddCert (sProviderCert);
    composer.AddCert (sCaCert);
 
@@ -316,8 +316,9 @@ int RunJwsTests (int nArgc, char** aArgv)
    ASSERT (reader.Container () == "my-container", "Composed container round-trips");
    ASSERT (!reader.Organization ().empty (), "Composed organization from cert");
    ASSERT (reader.Services ().size () == 1, "Composed service round-trips");
-   ASSERT (reader.Modules ().count ("mod.wasm") == 1, "Composed module round-trips");
-   ASSERT (reader.Modules ()["mod.wasm"].sSha256 == "abcdef123456", "Composed module sha256 round-trips");
+   ASSERT (reader.Modules ().size () == 1, "Composed module round-trips");
+   ASSERT (reader.Modules ()[0].sUrl == "https://example.com/mod.wasm", "Composed module url round-trips");
+   ASSERT (reader.Modules ()[0].sHash == "sha256-abcdef123456", "Composed module hash round-trips");
 
    // -----------------------------------------------------------------------
    // Summary

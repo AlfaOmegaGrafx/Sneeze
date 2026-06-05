@@ -33,7 +33,7 @@ namespace SNEEZE
       struct MODULE
       {
          std::string sUrl;
-         std::string sSha256;
+         std::string sHash;
       };
 
       struct CERT
@@ -135,9 +135,9 @@ namespace SNEEZE
 
       // --- Modules ---
 
-      void                            AddModule    (const std::string& sName, const std::string& sUrl, const std::string& sSha256);
-      bool                            RemoveModule (const std::string& sName);
-      std::map<std::string, MODULE>   Modules   () const;
+      void                  AddModule    (const std::string& sUrl, const std::string& sHash);
+      bool                  RemoveModule (const std::string& sUrl);
+      std::vector<MODULE>   Modules      () const;
 
       // --- Status ---
 

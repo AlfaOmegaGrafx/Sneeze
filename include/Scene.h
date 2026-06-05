@@ -106,7 +106,7 @@ namespace SNEEZE
 
       void OnMsfReady    (NETWORK::FILE* pFile);
       void OnMsfFailed   (NETWORK::FILE* pFile);
-      void OnWasmReady   (NETWORK::FILE* pFile, const std::string& sUrl, const std::string& sSha256);
+      void OnWasmReady   (NETWORK::FILE* pFile, const std::string& sUrl, const std::string& sHash);
       void OnWasmFailed  (NETWORK::FILE* pFile, const std::string& sUrl);
 
    protected:

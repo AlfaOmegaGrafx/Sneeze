@@ -814,16 +814,16 @@ function renderMssView(payload) {
     }
   }
 
-  if (payload.modules && typeof payload.modules === "object") {
+  if (Array.isArray(payload.modules) && payload.modules.length > 0) {
     children.push(el("h3", {
       text:  "Modules",
       style: "margin: 12px 0 6px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;",
     }));
-    for (const [key, mod] of Object.entries(payload.modules)) {
+    for (const mod of payload.modules) {
       if (typeof mod !== "object") continue;
       const modChildren = [
-        el("div", { class: "name", text: key }),
-        el("div", { class: "meta", text: `${mod.url || ""}  sha256=${mod.sha256 || ""}` }),
+        el("div", { class: "name", text: mod.url || "(no url)" }),
+        el("div", { class: "meta", text: `hash=${mod.hash || ""}` }),
       ];
       children.push(el("div", { class: "mss-service" }, modChildren));
     }

@@ -1,18 +1,11 @@
 {
-   "namespace": "com.metaversal.test",
-   "organization": "Metaversal",
-   "services": [
+   "container": "hello-world",
+   "services": [],
+   "modules":
+   [
       {
-         "name": "hello-world",
-         "type": "local",
-         "endpoint": "",
-         "modules": ["hello_wasm.wasm"]
-      }
-   ],
-   "modules": {
-      "hello_wasm.wasm": {
          "url": "https://cdn.rp1.com/test/hello_wasm.wasm",
-         "sha256": "c816eb074d864b9a9637213b613536b5447f982573513f6cf7d0f76485bba77a"
+         "hash": "sha256-c816eb074d864b9a9637213b613536b5447f982573513f6cf7d0f76485bba77a"
       }
-   }
+   ]
 }
