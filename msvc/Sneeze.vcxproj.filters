@@ -214,19 +214,16 @@
     <ClCompile Include="..\src\persona\Persona.cpp">
       <Filter>src\persona</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\deps\wasm\WasmRuntime.cpp">
+    <ClCompile Include="..\src\deps\wasm\Wasm_Runtime.cpp">
       <Filter>src\deps\wasm</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\deps\wasm\WasmStore.cpp">
+    <ClCompile Include="..\src\deps\wasm\Wasm_Store.cpp">
       <Filter>src\deps\wasm</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\deps\wasm\WasmInstance.cpp">
+    <ClCompile Include="..\src\deps\wasm\Wasm_Instance.cpp">
       <Filter>src\deps\wasm</Filter>
     </ClCompile>
     <ClCompile Include="..\src\deps\wasm\HostFunctions.cpp">
-      <Filter>src\deps\wasm</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\deps\wasm\ThreadPool.cpp">
       <Filter>src\deps\wasm</Filter>
     </ClCompile>
     <ClCompile Include="..\src\deps\spirv\SpvPipeline.cpp">
@@ -313,13 +310,7 @@
     <ClInclude Include="..\src\context\msf\Msf.h">
       <Filter>src\context\msf</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\deps\wasm\WasmRuntime.h">
-      <Filter>src\deps\wasm</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\deps\wasm\WasmStore.h">
-      <Filter>src\deps\wasm</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\deps\wasm\WasmInstance.h">
+    <ClInclude Include="..\src\deps\wasm\Wasm.h">
       <Filter>src\deps\wasm</Filter>
     </ClInclude>
     <ClInclude Include="..\src\deps\wasm\HostFunctions.h">

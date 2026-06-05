@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "WasmRuntime.h"
+#include "Wasm.h"
 
 using namespace SNEEZE::DEP;
 
 WASM_RUNTIME::WASM_RUNTIME () : 
-   m_pEngine (nullptr), 
+   m_pEngine (nullptr),
    m_pWsam_Engine (nullptr)
 {
 }
@@ -26,16 +26,19 @@ bool WASM_RUNTIME::Initialize (SNEEZE::ENGINE* pEngine)
 {
    m_pEngine = pEngine;
 
+   bool bResult = false;
+
    m_pWsam_Engine = wasm_engine_new ();
-   if (!m_pWsam_Engine)
+
+   if (m_pWsam_Engine)
    {
-      m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "WASM_RUNTIME", "Failed to create Wasmtime engine");
-      return false;
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "WASM_RUNTIME", "Wasmtime " + std::string (WASMTIME_VERSION) + " initialized");
+      bResult = true;
    }
+   else
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "WASM_RUNTIME", "Failed to create Wasmtime engine");
 
-   m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "WASM_RUNTIME", "Wasmtime " + std::string (WASMTIME_VERSION) + " initialized");
-
-   return true;
+   return bResult;
 }
 
 WASM_RUNTIME::~WASM_RUNTIME ()
@@ -57,9 +60,10 @@ WASM_RUNTIME::~WASM_RUNTIME ()
 
 WASM_STORE* WASM_RUNTIME::Store_Open ()
 {
+   std::lock_guard<std::mutex> guard (m_mxStore);
+
    WASM_STORE* pStore = new WASM_STORE (m_pEngine, m_pWsam_Engine);
 
-   std::lock_guard<std::mutex> guard (m_mxStore);
    m_apStore.push_back (pStore);
 
    return pStore;
@@ -67,9 +71,6 @@ WASM_STORE* WASM_RUNTIME::Store_Open ()
 
 void WASM_RUNTIME::Store_Close (WASM_STORE* pStore)
 {
-   if (!pStore)
-      return;
-
    std::lock_guard<std::mutex> guard (m_mxStore);
 
    for (auto it = m_apStore.begin (); it != m_apStore.end (); ++it)

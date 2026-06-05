@@ -61,6 +61,9 @@ namespace SNEEZE
       bool    Open  (FABRIC* pFabric);
       size_t  Close (FABRIC* pFabric);
 
+      bool    Instance_Open  (const std::string& sUrl, const std::string& sSha256, const std::vector<uint8_t>& aWasmBytes);
+      void    Instance_Close (const std::string& sUrl, const std::string& sSha256);
+
       const CID*         Identity () const;
       const std::string& Key      () const;
 

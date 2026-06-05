@@ -641,17 +641,13 @@ set (RENDERER_HEADERS  viewport/renderer/Renderer.h  viewport/renderer/AnariRend
 
 if (SNEEZE_ENABLE_WASM)
    set (WASM_SOURCES
-      deps/wasm/WasmRuntime.cpp
-      deps/wasm/WasmStore.cpp
-      deps/wasm/WasmInstance.cpp
-      deps/wasm/HostFunctions.cpp
-      deps/wasm/ThreadPool.cpp)
+      deps/wasm/Wasm_Runtime.cpp
+      deps/wasm/Wasm_Store.cpp
+      deps/wasm/Wasm_Instance.cpp
+      deps/wasm/HostFunctions.cpp)
    set (WASM_HEADERS
-      deps/wasm/WasmRuntime.h
-      deps/wasm/WasmStore.h
-      deps/wasm/WasmInstance.h
-      deps/wasm/HostFunctions.h
-      deps/wasm/ThreadPool.h)
+      deps/wasm/Wasm.h
+      deps/wasm/HostFunctions.h)
 endif ()
 
 set (SPIRV_SOURCES   deps/spirv/SpvPipeline.cpp)

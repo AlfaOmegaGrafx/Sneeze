@@ -171,11 +171,10 @@
     <ClCompile Include="..\src\viewport\renderer\AnariRenderer.cpp" />
     <ClCompile Include="..\src\viewport\renderer\UVSphere.cpp" />
     <!-- deps: wasm -->
-    <ClCompile Include="..\src\deps\wasm\WasmRuntime.cpp" />
-    <ClCompile Include="..\src\deps\wasm\WasmStore.cpp" />
-    <ClCompile Include="..\src\deps\wasm\WasmInstance.cpp" />
+    <ClCompile Include="..\src\deps\wasm\Wasm_Runtime.cpp" />
+    <ClCompile Include="..\src\deps\wasm\Wasm_Store.cpp" />
+    <ClCompile Include="..\src\deps\wasm\Wasm_Instance.cpp" />
     <ClCompile Include="..\src\deps\wasm\HostFunctions.cpp" />
-    <ClCompile Include="..\src\deps\wasm\ThreadPool.cpp" />
     <!-- deps: spirv -->
     <ClCompile Include="..\src\deps\spirv\SpvPipeline.cpp" />
     <!-- deps: xr -->
@@ -216,9 +215,7 @@
     <ClInclude Include="..\src\viewport\renderer\Renderer.h" />
     <ClInclude Include="..\src\viewport\renderer\AnariRenderer.h" />
     <ClInclude Include="..\src\viewport\renderer\UVSphere.h" />
-    <ClInclude Include="..\src\deps\wasm\WasmRuntime.h" />
-    <ClInclude Include="..\src\deps\wasm\WasmStore.h" />
-    <ClInclude Include="..\src\deps\wasm\WasmInstance.h" />
+    <ClInclude Include="..\src\deps\wasm\Wasm.h" />
     <ClInclude Include="..\src\deps\wasm\HostFunctions.h" />
     <ClInclude Include="..\src\deps\wasm\ThreadPool.h" />
     <ClInclude Include="..\src\deps\spirv\SpvPipeline.h" />

@@ -9,12 +9,11 @@ bindings, and a thread pool for parallel execution.
 
 ```
 WASM_RUNTIME (owns wasm_engine_t)
-  ├─ WASM_STORE (persona + fingerprint + container)
+  ├─ WASM_STORE (one per CONTAINER)
   │    ├─ WASM_INSTANCE (url + sha256) — refcount: 2
   │    └─ WASM_INSTANCE (url + sha256) — refcount: 1
-  ├─ WASM_STORE (another identity triple)
-  │    └─ ...
-  └─ THREAD_POOL (N worker threads)
+  └─ WASM_STORE (another container)
+       └─ ...
 ```
 
 ## WASM_RUNTIME
@@ -22,21 +21,15 @@ WASM_RUNTIME (owns wasm_engine_t)
 Top-level manager. Owns the shared Wasmtime engine and all active stores.
 
 ```cpp
-#include "wasm/WasmRuntime.h"
+#include "wasm/Wasm.h"
 
 DEP::WASM_RUNTIME runtime;
 runtime.Initialize ();
 
-DEP::STORE_IDENTITY id;
-id.sPersonaHash = "a3f1...";
-id.sFingerprint = "b2c4...";
-id.sContainer   = "poker";
-
-auto* pStore = runtime.FindOrCreateStore (id);
+auto* pStore = runtime.Store_Open ();
 // ... add instances, bump fabric refs ...
 
-runtime.DestroyAllStores ();   // teardown
-runtime.Shutdown ();
+runtime.Store_Close (pStore);  // teardown
 ```
 
 ## WASM_STORE
@@ -47,13 +40,13 @@ organization and container share one store.
 
 ### Fabric Reference Counting
 
-Every fabric that maps to a store calls `AddFabricRef()`. When a fabric is
-detached, it calls `ReleaseFabricRef()`. When the refcount reaches zero,
+Every fabric that maps to a store calls `Fabric_AddRef()`. When a fabric is
+detached, it calls `Fabric_ReleaseRef()`. When the refcount reaches zero,
 the store is eligible for destruction.
 
 ```cpp
-pStore->AddFabricRef ();      // fabric loaded
-pStore->ReleaseFabricRef ();  // fabric unloaded
+pStore->Fabric_AddRef ();      // fabric loaded
+pStore->Fabric_ReleaseRef ();  // fabric unloaded
 ```
 
 ## WASM_INSTANCE
@@ -67,27 +60,26 @@ identical bytecode from different URLs are treated as separate instances.
    Compile (pEngine, pBytes, nSize)     compile the .wasm bytecode
         │
         ▼
-   AddRef()  ──► refcount 0→1 ──► CallInit()     first fabric references it
+   Open (twFabricId, pParams, n)        refcount 0→1 fires Initialize, then Open
         │
         ▼
-   CallOpen (twFabricId, pParams, n)              per-fabric attachment
-        │
-        ▼
-   CallClose (twFabricId)                         per-fabric detachment
-        │
-        ▼
-   ReleaseRef()  ──► refcount 1→0 ──► CallShutdown()   instance goes dormant
+   Close (twFabricId)                  Close, then refcount 1→0 fires Finalize
 ```
+
+Refcounting is internal to `Open`/`Close`. The first `Open` fires
+`Initialize` before the guest Open export; the last `Close` fires
+`Finalize` after the guest Close export. Callers never touch the
+refcount directly.
 
 Instances cannot be unloaded from a live store. When dormant they simply
 stop receiving calls.
 
-### Compilation
+### Usage
 
 ```cpp
-auto* pInstance = new DEP::WASM_INSTANCE (pStore, sUrl, sSha256);
-pInstance->Compile (runtime.GetEngine (), pBytes, nBytes);
-pStore->AddInstance (pInstance);
+auto* pInstance = pStore->Instance_Open (sUrl, sSha256, pBytes, nBytes, twFabricId, nullptr, 0);
+// ...
+pInstance->Close (twFabricId);
 ```
 
 ## Host Functions
@@ -119,25 +111,6 @@ Naming convention: `Concept_Action`.
 
 All host functions receive the store pointer as `pEnv`, providing access to
 the calling store's identity for access control and storage scoping.
-
-## Thread Pool
-
-`THREAD_POOL` provides a fixed-size pool of worker threads for executing
-WASM work items.
-
-```cpp
-#include "wasm/ThreadPool.h"
-
-DEP::THREAD_POOL pool;
-pool.Initialize ();        // defaults to hardware_concurrency - 2
-
-pool.Submit ([] {
-   // execute WASM function call
-});
-
-pool.GetPendingCount ();   // queued but not yet started
-pool.Shutdown ();          // drains queue, joins all workers
-```
 
 ## Dependencies
 

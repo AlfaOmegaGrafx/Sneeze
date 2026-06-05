@@ -104,6 +104,11 @@ namespace SNEEZE
       const std::string& Url () const;
       void               Url (const std::string& sUrl);
 
+      void OnMsfReady    (NETWORK::FILE* pFile);
+      void OnMsfFailed   (NETWORK::FILE* pFile);
+      void OnWasmReady   (NETWORK::FILE* pFile, const std::string& sUrl, const std::string& sSha256);
+      void OnWasmFailed  (NETWORK::FILE* pFile, const std::string& sUrl);
+
    protected:
       class Impl;
       Impl* m_pImpl;

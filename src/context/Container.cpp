@@ -14,8 +14,7 @@
 
 #include <Sneeze.h>
 
-#include "wasm/WasmRuntime.h"
-#include "wasm/WasmStore.h"
+#include "wasm/Wasm.h"
 
 using namespace SNEEZE;
 
@@ -53,9 +52,11 @@ public:
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxContainer);
 
-      bool bResult = true;
+      bool bResult = false;
 
-      if (m_nCount_Open == 0)
+      m_apFabric.push_back (pFabric);
+
+      if (m_nCount_Open++ == 0)
       {
          if ((m_pStream = m_pContext->Console ()->Stream_Open (&m_CID)))
          {
@@ -65,25 +66,18 @@ public:
 
                if ((m_pWasm_Store = m_pContext->WasmRuntime ()->Store_Open ()))
                {
-                  m_pWasm_Store->SetHostData (static_cast<void*> (m_pContext));
-                  m_pWasm_Store->InitializeLinker ();
+                  m_pWasm_Store->HostData (static_cast<void*> (m_pContext));
+                  m_pWasm_Store->Linker_Initialize ();
+
+                  bResult = true;
                }
             }
-            else
-            {
-               m_pContext->Console ()->Stream_Close (m_pStream);
-               m_pStream = nullptr;
-               bResult = false;
-            }
          }
-         else bResult = false;
       }
+      else bResult = true;
 
-      if (bResult)
-      {
-         m_apFabric.push_back (pFabric);
-         m_nCount_Open++;
-      }
+      if (!bResult)
+        Close (pFabric);
 
       return bResult;
    }
@@ -92,16 +86,7 @@ public:
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxContainer);
 
-      m_nCount_Open--;
-
-      if (pFabric)
-      {
-         auto it = std::find (m_apFabric.begin (), m_apFabric.end (), pFabric);
-         if (it != m_apFabric.end ())
-            m_apFabric.erase (it);
-      }
-
-      if (m_nCount_Open == 0)
+      if (--m_nCount_Open == 0)
       {
          if (m_pWasm_Store)
          {
@@ -112,6 +97,7 @@ public:
          if (m_pSilo)
          {
             m_pSilo->Detach ();
+
             m_pContext->Storage ()->Silo_Close (m_pSilo);
             m_pSilo = nullptr;
          }
@@ -123,7 +109,25 @@ public:
          }
       }
 
+      auto it = std::find (m_apFabric.begin (), m_apFabric.end (), pFabric);
+      if (it != m_apFabric.end ())
+         m_apFabric.erase (it);
+
       return m_nCount_Open;
+   }
+
+   // -----------------------------------------------------------------------
+   // WASM Instance Lifecycle
+   // -----------------------------------------------------------------------
+
+   bool Instance_Open (const std::string& sUrl, const std::string& sSha256, const std::vector<uint8_t>& aWasmBytes)
+   {
+      return m_pWasm_Store->Instance_Open (sUrl, sSha256, aWasmBytes.data (), aWasmBytes.size (), 0, nullptr, 0);
+   }
+
+   void Instance_Close (const std::string& sUrl, const std::string& sSha256)
+   {
+      m_pWasm_Store->Instance_Close (sUrl, sSha256, 0);
    }
 
    // -----------------------------------------------------------------------
@@ -158,8 +162,11 @@ CONTAINER::~CONTAINER ()
    delete m_pImpl;
 }
 
-bool                  CONTAINER::Open     (FABRIC* pFabric) { return m_pImpl->Open  (pFabric); }
-size_t                CONTAINER::Close    (FABRIC* pFabric) { return m_pImpl->Close (pFabric); }
+bool                  CONTAINER::Open           (FABRIC* pFabric)                                                                    { return m_pImpl->Open (pFabric); }
+size_t                CONTAINER::Close          (FABRIC* pFabric)                                                                    { return m_pImpl->Close (pFabric); }
 
-const CONTAINER::CID* CONTAINER::Identity () const        { return &m_pImpl->m_CID; }
-const std::string&    CONTAINER::Key      () const        { return  m_pImpl->m_sKey; }
+bool                  CONTAINER::Instance_Open  (const std::string& sUrl, const std::string& sSha256, const std::vector<uint8_t>& a) { return m_pImpl->Instance_Open (sUrl, sSha256, a); }
+void                  CONTAINER::Instance_Close (const std::string& sUrl, const std::string& sSha256)                                { m_pImpl->Instance_Close (sUrl, sSha256); }
+
+const CONTAINER::CID* CONTAINER::Identity       () const        { return &m_pImpl->m_CID; }
+const std::string&    CONTAINER::Key            () const        { return  m_pImpl->m_sKey; }

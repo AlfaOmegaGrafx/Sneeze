@@ -167,27 +167,11 @@ public:
 // Texture management
 // -----------------------------------------------------------------------
 
-void Texture_Request ()
+   void Texture_Request ()
    {
       if (m_pMap_Object  &&  !m_pMap_Object->m_sUrl_Texture.empty ())
       {
-         ENGINE* pEngine = m_pFabric->Scene ()->Engine ();
-
-         std::string sPersonaHash = (pEngine->Persona ()  &&  pEngine->Persona ()->IsLoggedIn ())
-            ? pEngine->Persona ()->Hash ()
-            : "012PERSONABC";
-
-         CONTAINER::CID CID;
-         CID.sFingerprint       = "0123456789FINGERPRINT0123456789FINGERPRINT0123456789FINGERPRINT0";
-         CID.sOrganization      = "Metaversal Corporation";
-         CID.sOrganizationHash  = "012345abcdef";
-         CID.sContainer         = "Solar System";
-         CID.sPersonaHash       = sPersonaHash;
-         CID.eTrust             = kTRUST_VERIFIED;
-
-         NETWORK* pNetwork = m_pFabric->Scene ()->Network ();
-         if (pNetwork)
-            m_pFile = pNetwork->File_Open (&CID, m_pMap_Object->m_sUrl_Texture, this);
+         m_pFile = m_pFabric->Scene ()->Network ()->File_Open (m_pFabric->Container ()->Identity (), m_pMap_Object->m_sUrl_Texture, this);
       }
    }
 

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "HostFunctions.h"
-#include "WasmStore.h"
+#include "Wasm.h"
 
 #include <Container.h>
 #include <Console.h>

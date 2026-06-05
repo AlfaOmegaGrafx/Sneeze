@@ -99,3 +99,15 @@
 - Fixed outdated Storage test assertions: `containerName` -> `container` (field rename), `m_nCreatedCount == 1` -> `>= 1` (root container now creates its own silo during Context_Open)
 - All tests pass: 44/44 storage, 40/40 WASM, full suite green
 - Artemis verified working
+
+## June 5, 2026 — ~11:30 AM – ~11:55 AM PDT
+
+**WASM pipeline test data + Node.cpp CID blocker fix**
+
+- Created `tests/data/hello-world.json` — MSF payload referencing `hello_wasm.wasm` at `https://cdn.rp1.com/test/hello_wasm.wasm` with SHA-256 hash `c816eb074d864b9a9637213b613536b5447f982573513f6cf7d0f76485bba77a`
+- Signed payload with `SignMsf.exe` → `tests/data/hello-world.msf` (3,909 bytes, RS256, test provider cert chain)
+- Verified round-trip: signature verified, fingerprint matches (`482cda4c...`), payload round-trips cleanly — first MSF with a hashed WASM module
+- Fixed blocker in `Node.cpp`: `Texture_Request()` was fabricating a fake CID with hardcoded fingerprint/org/container; replaced with `m_pFabric->Container()->Identity()` — the real CID from the fabric's container
+- Added `m_pFabric->Container()` null guard (no texture fetch when fabric has no container yet — protects solar system kludge path)
+- Removed all fake CID code, persona hash lookup, and ENGINE/Persona references from Node.cpp
+- Committed for Dave at session end

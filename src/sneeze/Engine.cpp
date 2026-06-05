@@ -14,7 +14,7 @@
 
 #include "Types.h"
 #include "control/Control.h"
-#include "wasm/WasmRuntime.h"
+#include "wasm/Wasm.h"
 #include "spirv/SpvPipeline.h"
 #include "xr/XrRuntime.h"
 #include "ui/UiContext.h"
