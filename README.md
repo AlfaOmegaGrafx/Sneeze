@@ -19,7 +19,7 @@ Dependency builds are **stamp-cached** — once a dep builds successfully, the s
 
 ## Prerequisites
 
-You need seven tools installed before building. Open a terminal and check each one:
+You need the following installed before building. Open a terminal and check each one:
 
 | Tool | Purpose | Check command | Minimum version |
 |------|---------|---------------|-----------------|
@@ -30,6 +30,7 @@ You need seven tools installed before building. Open a terminal and check each o
 | **Python 3** | Used by glslang's build to generate source tables | `python --version` (Win) or `python3 --version` | 3.x |
 | **Go** | Used by BoringSSL's build for code generation | `go version` | any |
 | **NASM** | Assembler for BoringSSL's optimized crypto routines (x86/x64 only) | `nasm --version` | any |
+| **System dev packages** (Linux only) | Vulkan/X11/GL headers needed by Filament + OpenXR builds | `dpkg -l libvulkan-dev` (Debian/Ubuntu) | any |
 
 ^1 On Windows, run `cl` from a **"Developer PowerShell for VS 2022"** window (search for it in the Start Menu), not a regular terminal. That window pre-sets every environment variable MSVC needs. The build script in this repo is PowerShell-native and expects that environment.
 
@@ -102,6 +103,32 @@ NASM (Netwide Assembler) is used by BoringSSL to compile optimized assembly rout
 - **Linux:** `sudo apt install nasm` (Debian/Ubuntu) or `sudo dnf install nasm` (Fedora)
 - **macOS (Intel):** `brew install nasm`
 - **macOS (Apple Silicon):** Not required.
+
+---
+
+### Linux system development packages
+
+The Linux dep build needs Vulkan headers, OpenGL/X11 development libraries, and the clang+libc++ toolchain that the default `cmake/toolchain-linux-clang.cmake` selects. Required on Debian/Ubuntu/WSL:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y clang lld libc++-dev libc++abi-dev libvulkan-dev libgl-dev libx11-dev ninja-build
+```
+
+This is the same package set that CI installs (`.github/workflows/build.yml`, the `linux` job's `system-deps`). On Fedora or other distributions, translate the package names — the names above (`libvulkan-dev`, `libgl-dev`, etc.) are Debian-flavor.
+
+Optional — silences a few "Could NOT find" status messages during configure. The deps fall back to bundled or unused paths, so the build still succeeds without these:
+
+```bash
+sudo apt-get install -y libegl1-mesa-dev libjsoncpp-dev libwayland-dev libxcb1-dev libxkbcommon-dev
+```
+
+| Skipped optional | What's affected | Why it's still fine |
+|---|---|---|
+| `libegl1-mesa-dev` | Filament probes EGL for OpenGL/GLES platform integration | Vulkan is the active backend per `deps/filament.cmake` — EGL path is unused |
+| `libjsoncpp-dev` | OpenXR loader uses jsoncpp to parse runtime manifests | OpenXR-SDK ships a vendored copy in `src/external/jsoncpp/` and uses it as a fallback |
+
+If you skip an optional package you'll see a one-line "Could NOT find &lt;name&gt;" message during configure — that's expected, not an error.
 
 ---
 
