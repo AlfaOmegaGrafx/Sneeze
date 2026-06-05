@@ -68,6 +68,11 @@ namespace SNEEZE
          bool Compile (wasm_engine_t* pEngine, const uint8_t* pBytes, size_t nSize);
          bool IsCompiled () const { return m_pModule != nullptr; }
 
+         // --- Instantiation ---
+
+         bool Instantiate ();
+         bool IsInstantiated () const { return m_bInstantiated; }
+
          // --- Lifecycle ---
 
          int  AddRef ();
@@ -80,6 +85,8 @@ namespace SNEEZE
          bool CallShutdown ();
 
       private:
+         bool LookupExport (const char* sName, wasmtime_func_t* pFunc, bool* pFound);
+
          ENGINE*      m_pEngine;
          WASM_STORE*        m_pStore;
          std::string        m_sUrl;
@@ -89,6 +96,19 @@ namespace SNEEZE
 
          wasmtime_module_t* m_pModule;
          bool               m_bInstantiated;
+         wasmtime_instance_t m_wasmInstance;
+
+         wasmtime_func_t    m_fnInit;
+         wasmtime_func_t    m_fnShutdown;
+         wasmtime_func_t    m_fnOpen;
+         wasmtime_func_t    m_fnClose;
+         wasmtime_func_t    m_fnOnTimer;
+
+         bool               m_bHas_Init;
+         bool               m_bHas_Shutdown;
+         bool               m_bHas_Open;
+         bool               m_bHas_Close;
+         bool               m_bHas_OnTimer;
       };
    } // namespace DEP
 }

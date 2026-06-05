@@ -407,19 +407,17 @@ m_pPersona = new persona::PERSONA (m_pEngine);
    }
 
 public:
-   // Subsystems
-   IENGINE*                   m_pHost;
-   persona::PERSONA*          m_pPersona;
+   ENGINE*                    m_pEngine;
+   bool                       m_bInitialized;
 
-   // Paths
+// Paths
    std::string                m_sPath_Persistent;
    std::string                m_sPath_Transitory;
    std::string                m_sPath_Transitory_Session;
 
-private:
-   ENGINE*                    m_pEngine;
-   bool                       m_bInitialized;
-
+   // Subsystems
+   IENGINE*                   m_pHost;
+   persona::PERSONA*          m_pPersona;
    SNEEZE::DEP::WASM_RUNTIME* m_pWasmRuntime;
    SNEEZE::DEP::SPV_PIPELINE* m_pSpvPipeline;
    SNEEZE::DEP::XR_RUNTIME*   m_pXrRuntime;
@@ -472,11 +470,12 @@ bool SNEEZE::ENGINE::Context_Close (CONTEXT* pContext)
    return bResult;
 }
 
-SNEEZE::IENGINE* SNEEZE::ENGINE::Host () const                { return m_pImpl->m_pHost;      }
-const std::string& SNEEZE::ENGINE::Path_Persistent () const  { return m_pImpl->m_sPath_Persistent; }
-const std::string& SNEEZE::ENGINE::Path_Session    () const  { return m_pImpl->m_sPath_Transitory_Session; }
+SNEEZE::IENGINE*           SNEEZE::ENGINE::Host            () const { return m_pImpl->m_pHost; }
+const std::string&         SNEEZE::ENGINE::Path_Persistent () const { return m_pImpl->m_sPath_Persistent; }
+const std::string&         SNEEZE::ENGINE::Path_Session    () const { return m_pImpl->m_sPath_Transitory_Session; }
 
-SNEEZE::persona::PERSONA*  SNEEZE::ENGINE::Persona () const   { return m_pImpl->m_pPersona;   }
+SNEEZE::persona::PERSONA*  SNEEZE::ENGINE::Persona         () const { return m_pImpl->m_pPersona; }
+SNEEZE::DEP::WASM_RUNTIME* SNEEZE::ENGINE::WasmRuntime     () const { return m_pImpl->m_pWasmRuntime; }
 
 void SNEEZE::ENGINE::Queue_Post_Fetch (JOB_FETCH* pJob_Fetch)
 {

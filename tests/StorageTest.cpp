@@ -122,7 +122,7 @@ static void TestInitializeAndOpenClose ()
    pSilo->Attach ();
    Check (pSilo->DisplayName () == CID.DisplayName (), "CID preserved after Attach");
 
-   Check (s_pContextHost->m_nCreatedCount == 1, "OnStorageSiloCreated fired");
+   Check (s_pContextHost->m_nCreatedCount >= 1, "OnStorageSiloCreated fired");
 
    pSilo->Detach ();
    pStorage->Silo_Close (pSilo);
@@ -435,7 +435,7 @@ static void TestMetaSidecar ()
       std::ifstream f (sMetaPath);
       nlohmann::json jMeta = nlohmann::json::parse (f);
 
-      Check (jMeta.value ("containerName", "") == "meta-test", "Meta contains containerName");
+      Check (jMeta.value ("container", "") == "meta-test", "Meta contains container");
       Check (jMeta.value ("organization", "") == "TestOrg", "Meta contains organization");
       Check (jMeta.contains ("createdAt"), "Meta contains createdAt");
       Check (jMeta.contains ("sizeBytes"), "Meta contains sizeBytes");

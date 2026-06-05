@@ -225,15 +225,16 @@ SNEEZE::CONTEXT::~CONTEXT ()
 // Accessors
 // ---------------------------------------------------------------------------
 
-SNEEZE::ENGINE*    SNEEZE::CONTEXT::Engine         () const { return m_pImpl->m_pEngine;         }
-SNEEZE::ICONTEXT*  SNEEZE::CONTEXT::Host           () const { return m_pImpl->m_pHost;           }
-SNEEZE::CONSOLE*   SNEEZE::CONTEXT::Console        () const { return m_pImpl->m_pConsole;        }
-SNEEZE::NETWORK*   SNEEZE::CONTEXT::Network        () const { return m_pImpl->m_pNetwork;        }
-SNEEZE::STORAGE*   SNEEZE::CONTEXT::Storage        () const { return m_pImpl->m_pStorage;        }
-SNEEZE::SCENE*     SNEEZE::CONTEXT::Scene          () const { return m_pImpl->m_pScene;          }
-SNEEZE::VIEWPORT*  SNEEZE::CONTEXT::Viewport       () const { return m_pImpl->m_pViewport;       }
-const std::string& SNEEZE::CONTEXT::Path_Permanent () const { return m_pImpl->m_sPath_Permanent; }
-const std::string& SNEEZE::CONTEXT::Path_Temporary () const { return m_pImpl->m_sPath_Temporary; }
+SNEEZE::ENGINE*             SNEEZE::CONTEXT::Engine         () const { return m_pImpl->m_pEngine; }
+SNEEZE::ICONTEXT*           SNEEZE::CONTEXT::Host           () const { return m_pImpl->m_pHost; }
+SNEEZE::CONSOLE*            SNEEZE::CONTEXT::Console        () const { return m_pImpl->m_pConsole; }
+SNEEZE::NETWORK*            SNEEZE::CONTEXT::Network        () const { return m_pImpl->m_pNetwork; }
+SNEEZE::STORAGE*            SNEEZE::CONTEXT::Storage        () const { return m_pImpl->m_pStorage; }
+SNEEZE::SCENE*              SNEEZE::CONTEXT::Scene          () const { return m_pImpl->m_pScene; }
+SNEEZE::VIEWPORT*           SNEEZE::CONTEXT::Viewport       () const { return m_pImpl->m_pViewport; }
+SNEEZE::DEP::WASM_RUNTIME*  SNEEZE::CONTEXT::WasmRuntime    () const { return m_pImpl->m_pEngine->WasmRuntime (); }
+const std::string&          SNEEZE::CONTEXT::Path_Permanent () const { return m_pImpl->m_sPath_Permanent; }
+const std::string&          SNEEZE::CONTEXT::Path_Temporary () const { return m_pImpl->m_sPath_Temporary; }
 
 // ---------------------------------------------------------------------------
 // Methods

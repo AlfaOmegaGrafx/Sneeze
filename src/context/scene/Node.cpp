@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <Scene.h>
-#include <Network.h>
+#include <Sneeze.h>
+
 #include "MapObject.h"
-#include <Container.h>
 #include "stb/stb_image.h"
 #include <algorithm>
 

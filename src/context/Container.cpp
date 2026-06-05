@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <Container.h>
-#include <Context.h>
-#include <Console.h>
-#include <Storage.h>
+#include <Sneeze.h>
+
+#include "wasm/WasmRuntime.h"
+#include "wasm/WasmStore.h"
 
 using namespace SNEEZE;
 
@@ -34,7 +34,8 @@ public:
       m_sKey        (m_CID.Key ()),
       m_nCount_Open (0),
       m_pStream     (nullptr),
-      m_pSilo       (nullptr)
+      m_pSilo       (nullptr),
+      m_pWasm_Store (nullptr)
    {
    }
 
@@ -62,7 +63,11 @@ public:
             {
                m_pSilo->Attach ();
 
-               // TODO: WASM store (FindOrCreateStore) once ENGINE exposes WASM_RUNTIME
+               if ((m_pWasm_Store = m_pContext->WasmRuntime ()->Store_Open ()))
+               {
+                  m_pWasm_Store->SetHostData (static_cast<void*> (m_pContext));
+                  m_pWasm_Store->InitializeLinker ();
+               }
             }
             else
             {
@@ -98,7 +103,11 @@ public:
 
       if (m_nCount_Open == 0)
       {
-         // TODO: WASM store (DestroyStore) once ENGINE exposes WASM_RUNTIME
+         if (m_pWasm_Store)
+         {
+            m_pContext->WasmRuntime ()->Store_Close (m_pWasm_Store);
+            m_pWasm_Store = nullptr;
+         }
 
          if (m_pSilo)
          {
@@ -131,6 +140,7 @@ public:
 
    CONSOLE::STREAM*           m_pStream;
    STORAGE::SILO*             m_pSilo;
+   DEP::WASM_STORE*           m_pWasm_Store;
 };
 
 

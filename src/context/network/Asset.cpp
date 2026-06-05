@@ -480,6 +480,7 @@ public:
             std::unordered_map<std::string, std::string> mapReqHeaders;
 
             mapReqHeaders.insert ({ "User-Agent", "Artemis/1.0 Sneeze/1.0 (Windows NT 10.0; Win64; x64)" });
+         // mapReqHeaders.insert ({ "Accept-Encoding", "gzip, deflate, br, zstd" });
 
             auto* pJob = new ASSET_FETCH (m_pAsset, m_sUrl, Path (NETWORK::DISKFILE_TEMP), Path (NETWORK::DISKFILE_DATA), m_sHash, mapReqHeaders);
 

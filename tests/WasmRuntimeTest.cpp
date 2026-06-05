@@ -16,6 +16,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
+#include <vector>
 
 static int nPassed = 0;
 static int nFailed = 0;
@@ -383,6 +385,190 @@ static void TestHostFunction ()
 }
 
 // ---------------------------------------------------------------------------
+// Test 6: Hello WASM module — compiled Rust module with host function imports
+// ---------------------------------------------------------------------------
+
+static std::vector<std::string> g_aLogMessages;
+
+static wasm_trap_t* TestConsoleLog (
+   void* /*env*/, wasmtime_caller_t* pCaller,
+   const wasmtime_val_t* pArgs, size_t nArgs,
+   wasmtime_val_t* /*results*/, size_t /*nresults*/)
+{
+   if (nArgs >= 2)
+   {
+      int32_t nPtr = pArgs[0].of.i32;
+      int32_t nLen = pArgs[1].of.i32;
+
+      if (nPtr >= 0  &&  nLen > 0)
+      {
+         wasmtime_extern_t ext;
+         bool bFound = wasmtime_caller_export_get (pCaller, "memory", 6, &ext);
+
+         if (bFound  &&  ext.kind == WASMTIME_EXTERN_MEMORY)
+         {
+            wasmtime_context_t* pCtx = wasmtime_caller_context (pCaller);
+            uint8_t* pData = wasmtime_memory_data (pCtx, &ext.of.memory);
+            size_t nMemSize = wasmtime_memory_data_size (pCtx, &ext.of.memory);
+
+            if (static_cast<size_t> (nPtr + nLen) <= nMemSize)
+            {
+               std::string sMsg (reinterpret_cast<const char*> (pData + nPtr), static_cast<size_t> (nLen));
+               g_aLogMessages.push_back (sMsg);
+               std::printf ("    [Console.Log] %s\n", sMsg.c_str ());
+            }
+         }
+      }
+   }
+
+   return nullptr;
+}
+
+static void TestHelloWasm ()
+{
+   std::printf ("\n[Test 6] Hello WASM module (Rust, linker, lifecycle)\n");
+
+   g_aLogMessages.clear ();
+
+   const char* sPath = "tools/HelloWasm/target/wasm32-unknown-unknown/release/hello_wasm.wasm";
+   FILE* pFile = std::fopen (sPath, "rb");
+   Check (pFile != nullptr, "hello_wasm.wasm found on disk");
+
+   if (!pFile)
+   {
+      std::printf ("    (looked for: %s)\n", sPath);
+      return;
+   }
+
+   std::fseek (pFile, 0, SEEK_END);
+   long nSize = std::ftell (pFile);
+   std::fseek (pFile, 0, SEEK_SET);
+
+   std::vector<uint8_t> aBytes (static_cast<size_t> (nSize));
+   std::fread (aBytes.data (), 1, static_cast<size_t> (nSize), pFile);
+   std::fclose (pFile);
+
+   Check (nSize > 4  &&  aBytes[0] == 0x00  &&  aBytes[1] == 0x61  &&  aBytes[2] == 0x73  &&  aBytes[3] == 0x6D,
+      "Valid WASM magic number");
+
+   wasm_engine_t* pEngine = wasm_engine_new ();
+   wasmtime_store_t* pStore = wasmtime_store_new (pEngine, nullptr, nullptr);
+   wasmtime_context_t* pContext = wasmtime_store_context (pStore);
+
+   wasmtime_linker_t* pLinker = wasmtime_linker_new (pEngine);
+   Check (pLinker != nullptr, "Linker created");
+
+   wasm_valtype_t* aConsoleLogParams[] = { wasm_valtype_new (WASM_I32), wasm_valtype_new (WASM_I32) };
+   wasm_valtype_vec_t vParams;
+   wasm_valtype_vec_new (&vParams, 2, aConsoleLogParams);
+   wasm_valtype_vec_t vNoResults;
+   wasm_valtype_vec_new_empty (&vNoResults);
+   wasm_functype_t* pLogType = wasm_functype_new (&vParams, &vNoResults);
+
+   wasmtime_error_t* pErr = wasmtime_linker_define_func (pLinker,
+      "Console", 7, "Log", 3,
+      pLogType, TestConsoleLog, nullptr, nullptr);
+   wasm_functype_delete (pLogType);
+   Check (pErr == nullptr, "Console.Log registered in linker");
+   if (pErr) PrintError (pErr);
+
+   wasmtime_module_t* pModule = nullptr;
+   pErr = wasmtime_module_new (pEngine, aBytes.data (), aBytes.size (), &pModule);
+   Check (pErr == nullptr  &&  pModule != nullptr, "Module compiled from .wasm bytes");
+   if (pErr) { PrintError (pErr); }
+
+   if (pModule)
+   {
+      wasmtime_instance_t instance;
+      wasm_trap_t* pTrap = nullptr;
+      pErr = wasmtime_linker_instantiate (pLinker, pContext, pModule, &instance, &pTrap);
+      Check (pErr == nullptr  &&  pTrap == nullptr, "Module instantiated via linker");
+      if (pErr) { PrintError (pErr); }
+      if (pTrap)
+      {
+         wasm_message_t msg;
+         wasm_trap_message (pTrap, &msg);
+         std::fprintf (stderr, "    trap: %.*s\n", static_cast<int> (msg.size), msg.data);
+         wasm_byte_vec_delete (&msg);
+         wasm_trap_delete (pTrap);
+         pTrap = nullptr;
+      }
+
+      if (!pErr  &&  !pTrap)
+      {
+         wasmtime_extern_t ext;
+
+         bool bInit = wasmtime_instance_export_get (pContext, &instance, "Init", 4, &ext);
+         Check (bInit  &&  ext.kind == WASMTIME_EXTERN_FUNC, "Export 'Init' found");
+
+         if (bInit)
+         {
+            pErr = wasmtime_func_call (pContext, &ext.of.func, nullptr, 0, nullptr, 0, &pTrap);
+            Check (pErr == nullptr  &&  pTrap == nullptr, "Init() called successfully");
+            if (pErr) PrintError (pErr);
+            if (pTrap) { wasm_trap_delete (pTrap); pTrap = nullptr; }
+         }
+
+         bool bOpen = wasmtime_instance_export_get (pContext, &instance, "Open", 4, &ext);
+         Check (bOpen  &&  ext.kind == WASMTIME_EXTERN_FUNC, "Export 'Open' found");
+
+         if (bOpen)
+         {
+            wasmtime_val_t aArgs[4];
+            aArgs[0].kind = WASMTIME_I32;  aArgs[0].of.i32 = 42;
+            aArgs[1].kind = WASMTIME_I32;  aArgs[1].of.i32 = 0;
+            aArgs[2].kind = WASMTIME_I32;  aArgs[2].of.i32 = 0;
+            aArgs[3].kind = WASMTIME_I32;  aArgs[3].of.i32 = 0;
+            pErr = wasmtime_func_call (pContext, &ext.of.func, aArgs, 4, nullptr, 0, &pTrap);
+            Check (pErr == nullptr  &&  pTrap == nullptr, "Open(42) called successfully");
+            if (pErr) PrintError (pErr);
+            if (pTrap) { wasm_trap_delete (pTrap); pTrap = nullptr; }
+         }
+
+         bool bClose = wasmtime_instance_export_get (pContext, &instance, "Close", 5, &ext);
+         Check (bClose  &&  ext.kind == WASMTIME_EXTERN_FUNC, "Export 'Close' found");
+
+         if (bClose)
+         {
+            wasmtime_val_t aArgs[1];
+            aArgs[0].kind = WASMTIME_I32;  aArgs[0].of.i32 = 42;
+            pErr = wasmtime_func_call (pContext, &ext.of.func, aArgs, 1, nullptr, 0, &pTrap);
+            Check (pErr == nullptr  &&  pTrap == nullptr, "Close(42) called successfully");
+            if (pErr) PrintError (pErr);
+            if (pTrap) { wasm_trap_delete (pTrap); pTrap = nullptr; }
+         }
+
+         bool bShutdown = wasmtime_instance_export_get (pContext, &instance, "Shutdown", 8, &ext);
+         Check (bShutdown  &&  ext.kind == WASMTIME_EXTERN_FUNC, "Export 'Shutdown' found");
+
+         if (bShutdown)
+         {
+            pErr = wasmtime_func_call (pContext, &ext.of.func, nullptr, 0, nullptr, 0, &pTrap);
+            Check (pErr == nullptr  &&  pTrap == nullptr, "Shutdown() called successfully");
+            if (pErr) PrintError (pErr);
+            if (pTrap) { wasm_trap_delete (pTrap); pTrap = nullptr; }
+         }
+
+         Check (g_aLogMessages.size () == 4, "Console.Log called 4 times");
+
+         if (g_aLogMessages.size () >= 4)
+         {
+            Check (g_aLogMessages[0] == "Hello from WASM!",          "Init message correct");
+            Check (g_aLogMessages[1] == "WASM Open called",          "Open message correct");
+            Check (g_aLogMessages[2] == "WASM Close called",         "Close message correct");
+            Check (g_aLogMessages[3] == "WASM module shutting down",  "Shutdown message correct");
+         }
+      }
+
+      wasmtime_module_delete (pModule);
+   }
+
+   wasmtime_linker_delete (pLinker);
+   wasmtime_store_delete (pStore);
+   wasm_engine_delete (pEngine);
+}
+
+// ---------------------------------------------------------------------------
 
 int RunWasmTests (int /*nArgc*/, char** /*aArgv*/)
 {
@@ -394,6 +580,7 @@ int RunWasmTests (int /*nArgc*/, char** /*aArgv*/)
    TestFuelMetering ();
    TestInvalidWat ();
    TestHostFunction ();
+   TestHelloWasm ();
 
    std::printf ("\n=== Results: %d passed, %d failed ===\n", nPassed, nFailed);
 
