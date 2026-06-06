@@ -111,3 +111,24 @@
 - Added `m_pFabric->Container()` null guard (no texture fetch when fabric has no container yet — protects solar system kludge path)
 - Removed all fake CID code, persona hash lookup, and ENGINE/Persona references from Node.cpp
 - Committed for Dave at session end
+
+## June 5-6, 2026 — ~evening – ~12:22 AM PDT
+
+**WASM scene bootstrap — end-to-end milestone achieved**
+
+- Replaced `m_apNode` (`std::vector<NODE*>`) with `m_umpNode` (`std::unordered_map<uint64_t, NODE*>`) in Container.cpp — vector was catastrophic for sparse 48-bit object indices
+- Added `m_umpFabric` (`unordered_map<uint64_t, FABRIC*>`) for fabric handle management with `m_twFabricIx_Next` monotonic counter
+- Implemented `Node_Root`, `Node_Open`, `Node_Close`, `Node_Find` on CONTAINER — full handle table with RMCOBJECT wire-format deserialization
+- Moved mutex guard from internal `Node_Create` to public entry points (`Node_Root`, `Node_Open`)
+- Introduced `using WASM_HOST_FN` alias in HostFunctions.h — reduced 32 host function declarations to one-liners
+- Host function count grew from 29 to 32 (Scene module: Node_Root, Node_Open, Node_Close, Node_Position, Node_Scale, Node_Bound, Node_Color, Node_Name, Node_Radius, Node_Texture)
+- Implemented `Scene_Node_Root` and `Scene_Node_Open` host functions — read RMCOBJECT from WASM linear memory, create MAP_OBJECT_CELESTIAL + NODE, return twObjectIx handle
+- Consolidated test files: `scene-test.*` and `hello-world.*` merged into `solar-system.*` (single MSF + single WASM module)
+- Created Rust WASM module `tests/wasm/solar_system/` — calls Scene host functions to create Root/Sun/Earth/Moon nodes
+- Fixed Rust compilation issues: removed semicolons after return expressions (Rust expression-oriented semantics), added `#![allow(dead_code)]`
+- Fixed `WASM_INSTANCE::CallOpen` — was passing 4 args (leftover from hello_wasm), corrected to 3 (i64 twFabricIx, i32 dwOffset, i32 dwLength)
+- Built and signed solar-system.msf with solar_system.wasm module reference + SHA-256 hash
+- Commented out `astro::InjectSolarSystem()` to let WASM module populate the scene
+- **End-to-end success**: MSF fetched -> parsed -> WASM compiled -> instantiated -> Init called -> Open called -> 4 scene nodes created via host functions -> rendered as spheres in viewport
+- Vertically aligned Scene.h class declarations, grouped by accessors/mutators/methods
+- Updated project.mdc with all architectural changes

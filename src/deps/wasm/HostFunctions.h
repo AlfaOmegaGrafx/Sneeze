@@ -24,48 +24,53 @@ namespace SNEEZE
    namespace DEP
    {
 
+   using WASM_HOST_FN = wasm_trap_t* (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+
    std::string ReadWasmString (wasmtime_caller_t* pCaller, int32_t nPtr, int32_t nLen);
 
    // --- Console host functions (module: "Console") ---
 
-   wasm_trap_t* Console_Log            (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
-   wasm_trap_t* Console_Debug          (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
-   wasm_trap_t* Console_Info           (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
-   wasm_trap_t* Console_Warn           (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
-   wasm_trap_t* Console_Error          (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
-   wasm_trap_t* Console_Assert         (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
-   wasm_trap_t* Console_Group          (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
-   wasm_trap_t* Console_GroupCollapsed (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
-   wasm_trap_t* Console_GroupEnd       (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
-   wasm_trap_t* Console_Count          (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
-   wasm_trap_t* Console_CountReset     (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
-   wasm_trap_t* Console_Time           (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
-   wasm_trap_t* Console_TimeEnd        (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
-   wasm_trap_t* Console_TimeLog        (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+   WASM_HOST_FN Console_Log;
+   WASM_HOST_FN Console_Debug;
+   WASM_HOST_FN Console_Info;
+   WASM_HOST_FN Console_Warn;
+   WASM_HOST_FN Console_Error;
+   WASM_HOST_FN Console_Assert;
+   WASM_HOST_FN Console_Group;
+   WASM_HOST_FN Console_GroupCollapsed;
+   WASM_HOST_FN Console_GroupEnd;
+   WASM_HOST_FN Console_Count;
+   WASM_HOST_FN Console_CountReset;
+   WASM_HOST_FN Console_Time;
+   WASM_HOST_FN Console_TimeEnd;
+   WASM_HOST_FN Console_TimeLog;
 
    // --- Storage host functions (module: "Storage") ---
 
-   wasm_trap_t* Storage_Get            (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
-   wasm_trap_t* Storage_Set            (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
-   wasm_trap_t* Storage_Remove         (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
-   wasm_trap_t* Storage_Has            (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
-   wasm_trap_t* Storage_GetJson        (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
-   wasm_trap_t* Storage_SetJson        (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+   WASM_HOST_FN Storage_Get;
+   WASM_HOST_FN Storage_Set;
+   WASM_HOST_FN Storage_Remove;
+   WASM_HOST_FN Storage_Has;
+   WASM_HOST_FN Storage_GetJson;
+   WASM_HOST_FN Storage_SetJson;
 
    // --- Scene host functions (module: "Scene") ---
 
-   wasm_trap_t* Scene_Node_Create      (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
-   wasm_trap_t* Scene_Node_Remove      (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
-   wasm_trap_t* Scene_Node_SetPosition (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
-   wasm_trap_t* Scene_Node_SetScale    (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
-   wasm_trap_t* Scene_Node_SetBound    (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
-   wasm_trap_t* Scene_Node_SetColor    (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
-   wasm_trap_t* Scene_Node_SetName     (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+   WASM_HOST_FN Scene_Node_Root;
+   WASM_HOST_FN Scene_Node_Open;
+   WASM_HOST_FN Scene_Node_Close;
+   WASM_HOST_FN Scene_Node_Position;
+   WASM_HOST_FN Scene_Node_Scale;
+   WASM_HOST_FN Scene_Node_Bound;
+   WASM_HOST_FN Scene_Node_Color;
+   WASM_HOST_FN Scene_Node_Name;
+   WASM_HOST_FN Scene_Node_Radius;
+   WASM_HOST_FN Scene_Node_Texture;
 
    // --- Timer host functions (module: "Timer") ---
 
-   wasm_trap_t* Timer_Set              (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
-   wasm_trap_t* Timer_Clear            (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults);
+   WASM_HOST_FN Timer_Set;
+   WASM_HOST_FN Timer_Clear;
 
    } // namespace DEP
 } // namespace SNEEZE

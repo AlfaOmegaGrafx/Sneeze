@@ -60,10 +60,10 @@ identical bytecode from different URLs are treated as separate instances.
    Compile (pEngine, pBytes, nSize)     compile the .wasm bytecode
         │
         ▼
-   Open (twFabricId, pParams, n)        refcount 0→1 fires Initialize, then Open
+   Open (twFabricIx, pParams, n)        refcount 0→1 fires Initialize, then Open
         │
         ▼
-   Close (twFabricId)                  Close, then refcount 1→0 fires Finalize
+   Close (twFabricIx)                  Close, then refcount 1→0 fires Finalize
 ```
 
 Refcounting is internal to `Open`/`Close`. The first `Open` fires
@@ -77,9 +77,9 @@ stop receiving calls.
 ### Usage
 
 ```cpp
-auto* pInstance = pStore->Instance_Open (sUrl, sSha256, pBytes, nBytes, twFabricId, nullptr, 0);
+auto* pInstance = pStore->Instance_Open (twFabricIx, sUrl, sSha256, pBytes, nBytes, nullptr, 0);
 // ...
-pInstance->Close (twFabricId);
+pInstance->Close (twFabricIx);
 ```
 
 ## Host Functions

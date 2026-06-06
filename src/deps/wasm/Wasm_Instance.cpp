@@ -224,7 +224,7 @@ bool WASM_INSTANCE::Initialize ()
    return bResult;
 }
 
-bool WASM_INSTANCE::Open (uint32_t twFabricId, const uint8_t* pParams, size_t nParamsSize)
+bool WASM_INSTANCE::Open (uint64_t twFabricIx, const uint8_t* pParams, size_t nParamsSize)
 {
    bool bResult = false;
 
@@ -239,16 +239,13 @@ bool WASM_INSTANCE::Open (uint32_t twFabricId, const uint8_t* pParams, size_t nP
    {
       wasmtime_context_t* pCtx = m_pStore->Context ();
 
-      wasmtime_val_t aArgs[4];
-      aArgs[0].kind = WASMTIME_I32;  aArgs[0].of.i32 = static_cast<int32_t> (twFabricId);
-      aArgs[1].kind = WASMTIME_I32;  aArgs[1].of.i32 = 0;
-      aArgs[2].kind = WASMTIME_I32;  aArgs[2].of.i32 = 0;
-      aArgs[3].kind = WASMTIME_I32;  aArgs[3].of.i32 = 0;
-
-      (void) pParams; (void) nParamsSize;
+      wasmtime_val_t aArgs[3];
+      aArgs[0].kind = WASMTIME_I64;  aArgs[0].of.i64 = static_cast<int64_t> (twFabricIx);
+      aArgs[1].kind = WASMTIME_I32;  aArgs[1].of.i32 = static_cast<int32_t> (reinterpret_cast<uintptr_t> (pParams));
+      aArgs[2].kind = WASMTIME_I32;  aArgs[2].of.i32 = static_cast<int32_t> (nParamsSize);
 
       wasm_trap_t* pTrap = nullptr;
-      wasmtime_error_t* pError = wasmtime_func_call (pCtx, &m_fnOpen, aArgs, 4, nullptr, 0, &pTrap);
+      wasmtime_error_t* pError = wasmtime_func_call (pCtx, &m_fnOpen, aArgs, 3, nullptr, 0, &pTrap);
 
       if (pError)
       {
@@ -268,7 +265,7 @@ bool WASM_INSTANCE::Open (uint32_t twFabricId, const uint8_t* pParams, size_t nP
       }
       else
       {
-         m_pEngine->Log (IENGINE::kLOGLEVEL_Trace, "WASM_INSTANCE", "Open [" + m_sUrl + "] fabric=" + std::to_string (twFabricId));
+         m_pEngine->Log (IENGINE::kLOGLEVEL_Trace, "WASM_INSTANCE", "Open [" + m_sUrl + "] fabric=" + std::to_string (twFabricIx));
          bResult = true;
       }
    }
@@ -276,7 +273,7 @@ bool WASM_INSTANCE::Open (uint32_t twFabricId, const uint8_t* pParams, size_t nP
    return bResult;
 }
 
-bool WASM_INSTANCE::Close (uint32_t twFabricId)
+bool WASM_INSTANCE::Close (uint64_t twFabricIx)
 {
    bool bResult = true;
 
@@ -285,7 +282,7 @@ bool WASM_INSTANCE::Close (uint32_t twFabricId)
       wasmtime_context_t* pCtx = m_pStore->Context ();
 
       wasmtime_val_t aArgs[1];
-      aArgs[0].kind = WASMTIME_I32;  aArgs[0].of.i32 = static_cast<int32_t> (twFabricId);
+      aArgs[0].kind = WASMTIME_I64;  aArgs[0].of.i64 = static_cast<int64_t> (twFabricIx);
 
       wasm_trap_t* pTrap = nullptr;
       wasmtime_error_t* pError = wasmtime_func_call (pCtx, &m_fnClose, aArgs, 1, nullptr, 0, &pTrap);
@@ -309,7 +306,7 @@ bool WASM_INSTANCE::Close (uint32_t twFabricId)
          bResult = false;
       }
       else
-         m_pEngine->Log (IENGINE::kLOGLEVEL_Trace, "WASM_INSTANCE", "Close [" + m_sUrl + "] fabric=" + std::to_string (twFabricId));
+         m_pEngine->Log (IENGINE::kLOGLEVEL_Trace, "WASM_INSTANCE", "Close [" + m_sUrl + "] fabric=" + std::to_string (twFabricIx));
    }
 
    if (m_nRefCount > 0)

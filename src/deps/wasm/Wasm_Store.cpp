@@ -78,7 +78,7 @@ int WASM_STORE::Fabric_ReleaseRef ()
    return m_nFabricRefCount;
 }
 
-bool WASM_STORE::Instance_Open (const std::string& sUrl, const std::string& sHash, const uint8_t* pBytes, size_t nSize, uint32_t twFabricId, const uint8_t* pParams, size_t nParamsSize)
+bool WASM_STORE::Instance_Open (uint64_t twFabricIx, const std::string& sUrl, const std::string& sHash, const uint8_t* pBytes, size_t nSize, const uint8_t* pParams, size_t nParamsSize)
 {
    std::lock_guard<std::mutex> guard (m_mutex);
 
@@ -106,19 +106,19 @@ bool WASM_STORE::Instance_Open (const std::string& sUrl, const std::string& sHas
    }
 
    if (pInstance)
-      bResult = pInstance->Open (twFabricId, pParams, nParamsSize);
+      bResult = pInstance->Open (twFabricIx, pParams, nParamsSize);
 
    return bResult;
 }
 
-void WASM_STORE::Instance_Close (const std::string& sUrl, const std::string& sHash, uint32_t twFabricId)
+void WASM_STORE::Instance_Close (uint64_t twFabricIx, const std::string& sUrl, const std::string& sHash)
 {
    std::lock_guard<std::mutex> guard (m_mutex);
 
    for (auto* pInstance : m_apInstances)
    {
       if (pInstance->Url () == sUrl  &&  pInstance->Hash () == sHash)
-         pInstance->Close (twFabricId);
+         pInstance->Close (twFabricIx);
    }
 }
 
@@ -246,22 +246,29 @@ bool WASM_STORE::Linker_Initialize ()
 
          // --- Scene host functions (module: "Scene") ---
 
-         { wasm_valkind_t p[] = { WASM_I32 };
+         { wasm_valkind_t p[] = { WASM_I64, WASM_I32, WASM_I32 };
+           wasm_valkind_t r[] = { WASM_I64 };
+           if (Func_Register ("Scene", "Node_Root",        SNEEZE::DEP::Scene_Node_Root,        p, 3, r, 1)) nCount++; }
+         { wasm_valkind_t p[] = { WASM_I64, WASM_I32, WASM_I32 };
+           wasm_valkind_t r[] = { WASM_I64 };
+           if (Func_Register ("Scene", "Node_Open",        SNEEZE::DEP::Scene_Node_Open,        p, 3, r, 1)) nCount++; }
+         { wasm_valkind_t p[] = { WASM_I64 };
            wasm_valkind_t r[] = { WASM_I32 };
-           if (Func_Register ("Scene", "Node_Create",      SNEEZE::DEP::Scene_Node_Create,      p, 1, r, 1)) nCount++; }
-         { wasm_valkind_t p[] = { WASM_I32 };
-           wasm_valkind_t r[] = { WASM_I32 };
-           if (Func_Register ("Scene", "Node_Remove",      SNEEZE::DEP::Scene_Node_Remove,      p, 1, r, 1)) nCount++; }
-         { wasm_valkind_t p[] = { WASM_I32, WASM_F64, WASM_F64, WASM_F64 };
-           if (Func_Register ("Scene", "Node_SetPosition", SNEEZE::DEP::Scene_Node_SetPosition, p, 4, nullptr, 0)) nCount++; }
-         { wasm_valkind_t p[] = { WASM_I32, WASM_F64 };
-           if (Func_Register ("Scene", "Node_SetScale",    SNEEZE::DEP::Scene_Node_SetScale,    p, 2, nullptr, 0)) nCount++; }
-         { wasm_valkind_t p[] = { WASM_I32, WASM_F64 };
-           if (Func_Register ("Scene", "Node_SetBound",    SNEEZE::DEP::Scene_Node_SetBound,    p, 2, nullptr, 0)) nCount++; }
-         { wasm_valkind_t p[] = { WASM_I32, WASM_I32 };
-           if (Func_Register ("Scene", "Node_SetColor",    SNEEZE::DEP::Scene_Node_SetColor,    p, 2, nullptr, 0)) nCount++; }
-         { wasm_valkind_t p[] = { WASM_I32, WASM_I32, WASM_I32 };
-           if (Func_Register ("Scene", "Node_SetName",     SNEEZE::DEP::Scene_Node_SetName,     p, 3, nullptr, 0)) nCount++; }
+           if (Func_Register ("Scene", "Node_Close",       SNEEZE::DEP::Scene_Node_Close,       p, 1, r, 1)) nCount++; }
+         { wasm_valkind_t p[] = { WASM_I64, WASM_F64, WASM_F64, WASM_F64 };
+           if (Func_Register ("Scene", "Node_Position",    SNEEZE::DEP::Scene_Node_Position,    p, 4, nullptr, 0)) nCount++; }
+         { wasm_valkind_t p[] = { WASM_I64, WASM_F64 };
+           if (Func_Register ("Scene", "Node_Scale",       SNEEZE::DEP::Scene_Node_Scale,       p, 2, nullptr, 0)) nCount++; }
+         { wasm_valkind_t p[] = { WASM_I64, WASM_F64 };
+           if (Func_Register ("Scene", "Node_Bound",       SNEEZE::DEP::Scene_Node_Bound,       p, 2, nullptr, 0)) nCount++; }
+         { wasm_valkind_t p[] = { WASM_I64, WASM_I32 };
+           if (Func_Register ("Scene", "Node_Color",       SNEEZE::DEP::Scene_Node_Color,       p, 2, nullptr, 0)) nCount++; }
+         { wasm_valkind_t p[] = { WASM_I64, WASM_I32, WASM_I32 };
+           if (Func_Register ("Scene", "Node_Name",        SNEEZE::DEP::Scene_Node_Name,        p, 3, nullptr, 0)) nCount++; }
+         { wasm_valkind_t p[] = { WASM_I64, WASM_F64 };
+           if (Func_Register ("Scene", "Node_Radius",      SNEEZE::DEP::Scene_Node_Radius,      p, 2, nullptr, 0)) nCount++; }
+         { wasm_valkind_t p[] = { WASM_I64, WASM_I32, WASM_I32 };
+           if (Func_Register ("Scene", "Node_Texture",     SNEEZE::DEP::Scene_Node_Texture,     p, 3, nullptr, 0)) nCount++; }
 
          // --- Timer host functions (module: "Timer") ---
 

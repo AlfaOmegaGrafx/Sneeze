@@ -9,6 +9,12 @@ deps/repos/
 deps/builds/
 builds/
 
+# Rust/Cargo build output (WASM test modules)
+tests/wasm/*/target/
+
+# Compiled WASM binaries (rebuilt from source)
+*.wasm
+
 # IDE and editor files
 .vs/
 .vscode/

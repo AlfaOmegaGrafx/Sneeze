@@ -117,6 +117,7 @@ public:
       m_pFabric_Parent (pNode_Attach ? pNode_Attach->Fabric () : nullptr),
       m_pNode_Root     (nullptr),
       m_pContainer     (nullptr),
+      m_twFabricIx     (0),
       m_pMsf           (nullptr),
       m_pMsf_Fetch     (nullptr)
    {
@@ -166,7 +167,7 @@ public:
       if (m_pContainer)
       {
          for (auto& pair : m_aModule)
-            m_pContainer->Instance_Close (pair.first, pair.second);
+            m_pContainer->Instance_Close (m_twFabricIx, pair.first, pair.second);
          m_aModule.clear ();
 
          m_pScene->Context ()->Container_Close (m_pFabric, m_pContainer);
@@ -258,7 +259,7 @@ public:
 
       if (!aData.empty ()  &&  m_pContainer)
       {
-         if (m_pContainer->Instance_Open (sUrl, sHash, aData))
+         if (m_pContainer->Instance_Open (m_twFabricIx, sUrl, sHash, aData))
          {
             m_aModule.push_back (std::make_pair (sUrl, sHash));
 
@@ -297,6 +298,7 @@ public:
       if (m_pContainer  &&  !m_aModule.empty ())
          m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "FABRIC", std::to_string (m_aModule.size ()) + " WASM instance(s) active");
 
+/*
 // temporary kludge to inject the solar system into the primary fabric
 if (m_pMsf  &&  m_pMsf->Payload ()["container"] == "solar-system"
 || true
@@ -309,6 +311,7 @@ if (m_pMsf  &&  m_pMsf->Payload ()["container"] == "solar-system"
       astro::InjectSolarSystem (m_pFabric);
    }
 }
+*/
    }
 
 // -----------------------------------------------------------------------
@@ -355,6 +358,7 @@ public:
    NODE*                                               m_pNode_Root;
    NODE*                                               m_pNode_Attach;
    CONTAINER*                                          m_pContainer;
+   uint64_t                                            m_twFabricIx;
    MSF*                                                m_pMsf;
    MSF_FETCH*                                          m_pMsf_Fetch;
    std::vector<WASM_FETCH*>                            m_apWasm_Fetch;
@@ -390,6 +394,7 @@ FABRIC::~FABRIC ()
 SCENE*             FABRIC::Scene          ()                         const { return m_pImpl->m_pScene; }
 CONTAINER*         FABRIC::Container      ()                         const { return m_pImpl->m_pContainer; }
 MSF*               FABRIC::Msf            ()                         const { return m_pImpl->m_pMsf; }
+uint64_t           FABRIC::FabricIx       ()                         const { return m_pImpl->m_twFabricIx; }
 FABRIC*            FABRIC::Fabric_Parent  ()                         const { return m_pImpl->m_pFabric_Parent; }
 NODE*              FABRIC::Node_Root      ()                         const { return m_pImpl->m_pNode_Root; }
 NODE*              FABRIC::Node_Attach    ()                         const { return m_pImpl->m_pNode_Attach; }
@@ -399,16 +404,17 @@ const std::string& FABRIC::Url            ()                         const { ret
 // Mutators
 // -----------------------------------------------------------------------
 
-void               FABRIC::Container      (CONTAINER* pContainer)         { m_pImpl->m_pContainer = pContainer; }
-void               FABRIC::Node_Root      (NODE* pNode_Root)              { m_pImpl->m_pNode_Root = pNode_Root; }
-void               FABRIC::Url            (const std::string& sUrl)       { m_pImpl->Url (sUrl); }
+void               FABRIC::Container      (CONTAINER* pContainer)         {         m_pImpl->m_pContainer = pContainer; }
+void               FABRIC::FabricIx       (uint64_t twFabricIx)           {         m_pImpl->m_twFabricIx = twFabricIx; }
+void               FABRIC::Node_Root      (NODE* pNode_Root)              {         m_pImpl->m_pNode_Root = pNode_Root; }
+void               FABRIC::Url            (const std::string& sUrl)       {         m_pImpl->Url (sUrl); }
 
 // -----------------------------------------------------------------------
 // Called internally from child fabrics
 // -----------------------------------------------------------------------
 
-void               FABRIC::Fabric_Add     (FABRIC* pFabric_Child)         { m_pImpl->Fabric_Add (pFabric_Child); }
-void               FABRIC::Fabric_Remove  (FABRIC* pFabric_Child)         { m_pImpl->Fabric_Remove (pFabric_Child); }
+void               FABRIC::Fabric_Add     (FABRIC* pFabric_Child)         {         m_pImpl->Fabric_Add    (pFabric_Child); }
+void               FABRIC::Fabric_Remove  (FABRIC* pFabric_Child)         {         m_pImpl->Fabric_Remove (pFabric_Child); }
 
 // -----------------------------------------------------------------------
 // Fetch callbacks (delegated from MSF_FETCH / WASM_FETCH helpers)

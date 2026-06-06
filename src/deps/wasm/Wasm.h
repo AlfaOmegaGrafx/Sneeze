@@ -83,8 +83,8 @@ namespace SNEEZE
 
          int  RefCount () const { return m_nRefCount; }
 
-         bool Open  (uint32_t twFabricId, const uint8_t* pParams, size_t nParamsSize);
-         bool Close (uint32_t twFabricId);
+         bool Open  (uint64_t twFabricIx, const uint8_t* pParams, size_t nParamsSize);
+         bool Close (uint64_t twFabricIx);
 
       private:
          bool Initialize ();
@@ -146,9 +146,9 @@ namespace SNEEZE
 
          // --- Instance management ---
 
-         bool           Instance_Open  (const std::string& sUrl, const std::string& sHash, const uint8_t* pBytes, size_t nSize, uint32_t twFabricId, const uint8_t* pParams, size_t nParamsSize);
-         void           Instance_Close (const std::string& sUrl, const std::string& sHash, uint32_t twFabricId);
-         WASM_INSTANCE* Instance_Find  (const std::string& sUrl, const std::string& sHash) const;
+         bool           Instance_Open  (uint64_t twFabricIx, const std::string& sUrl, const std::string& sHash, const uint8_t* pBytes, size_t nSize, const uint8_t* pParams, size_t nParamsSize);
+         void           Instance_Close (uint64_t twFabricIx, const std::string& sUrl, const std::string& sHash);
+         WASM_INSTANCE* Instance_Find  (                     const std::string& sUrl, const std::string& sHash) const;
          const std::vector<WASM_INSTANCE*>& Instances () const { return m_apInstances; }
 
          // --- Linker and host data ---

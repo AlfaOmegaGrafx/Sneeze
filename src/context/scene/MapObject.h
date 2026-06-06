@@ -20,6 +20,105 @@
 namespace SNEEZE
 {
    // ---------------------------------------------------------------------------
+   // RMAP wire-format structures (RMCOBJECT, 432 bytes)
+   //
+   // These structs mirror the RMAP binary layout byte-for-byte. They are the
+   // contract between WASM modules (which write them into linear memory) and
+   // the Scene host functions (which read them out). Both sides must agree on
+   // layout — C++ uses #pragma pack(push, 1), Rust uses #[repr(C, packed)].
+   // ---------------------------------------------------------------------------
+
+#pragma pack(push, 1)
+
+   struct OBJECTIX
+   {
+      uint64_t qwComposed;
+
+      uint64_t ObjectIx () const   { return qwComposed & 0x0000FFFFFFFFFFFFull; }
+      uint16_t Class    () const   { return static_cast<uint16_t> (qwComposed >> 48); }
+   };
+
+   struct OBJECT_HEAD
+   {
+      OBJECTIX     Parent;
+      OBJECTIX     Self;
+      uint64_t     qwEvent;
+   };
+
+   struct RMCOBJECT_NAME
+   {
+      uint16_t wsName[48];
+   };
+
+   struct RMCOBJECT_TYPE
+   {
+      uint8_t  bType;
+      uint8_t  bSubtype;
+      uint8_t  bFiction;
+      uint8_t  abReserved[5];
+   };
+
+   struct RMCOBJECT_OWNER
+   {
+      uint64_t twOwner;
+   };
+
+   struct RMCOBJECT_RESOURCE
+   {
+      uint64_t qwResource;
+      char     sName[32];
+      char     sReference[64];
+   };
+
+   struct RMCOBJECT_TRANSFORM
+   {
+      double d3Position[3];
+      double d4Rotation[4];
+      double d3Scale[3];
+   };
+
+   struct RMCOBJECT_ORBIT
+   {
+      int64_t  tmPeriod;
+      int64_t  tmOrigin;
+      double   dA;
+      double   dB;
+   };
+
+   struct RMCOBJECT_BOUND
+   {
+      uint8_t  abReserved[24];
+      double   d3Max[3];
+   };
+
+   struct RMCOBJECT_PROPERTIES
+   {
+      float    fMass;
+      float    fGravity;
+      float    fColor;
+      float    fBrightness;
+      float    fReflectivity;
+      uint8_t  abReserved[12];
+   };
+
+   struct RMCOBJECT
+   {
+      OBJECT_HEAD              Head;
+      RMCOBJECT_NAME           Name;
+      RMCOBJECT_TYPE           Type;
+      RMCOBJECT_OWNER          Owner;
+      RMCOBJECT_RESOURCE       Resource;
+      RMCOBJECT_TRANSFORM      Transform;
+      RMCOBJECT_ORBIT          Orbit;
+      RMCOBJECT_BOUND          Bound;
+      RMCOBJECT_PROPERTIES     Properties;
+   };
+
+#pragma pack(pop)
+
+   static_assert (sizeof (RMCOBJECT) == 432, "RMCOBJECT must be exactly 432 bytes");
+
+   // ---------------------------------------------------------------------------
    // Map object type identifiers
    // ---------------------------------------------------------------------------
 

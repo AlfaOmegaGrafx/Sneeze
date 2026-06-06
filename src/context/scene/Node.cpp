@@ -287,7 +287,7 @@ public:
    NETWORK::FILE*                      m_pFile;
    SEQLOCK                             m_Seqlock;
 
-   uint32_t                            m_twObjectIx;
+   uint64_t                            m_twObjectIx;
    bool                                m_bPrivate;
 
    std::vector<NODE*>                  m_apNode;
@@ -318,7 +318,7 @@ NODE::~NODE ()
 // Accessors
 // -----------------------------------------------------------------------
 
-uint32_t    NODE::ObjectIx          ()                    const { return m_pImpl->m_twObjectIx; }
+uint64_t    NODE::ObjectIx          ()                    const { return m_pImpl->m_twObjectIx; }
 FABRIC*     NODE::Fabric            ()                    const { return m_pImpl->m_pFabric; }
 FABRIC*     NODE::Fabric_Attachment ()                    const { return m_pImpl->m_pFabric_Attachment; }
 
@@ -333,11 +333,12 @@ int         NODE::Node_Count        ()                    const { return m_pImpl
 // Mutators
 // -----------------------------------------------------------------------
 
-void        NODE::Private           (bool bPrivate)             { m_pImpl->m_bPrivate = bPrivate; }
+void        NODE::Private           (bool bPrivate)             {        m_pImpl->m_bPrivate   = bPrivate; }
+void        NODE::ObjectIx          (uint64_t twObjectIx)       {        m_pImpl->m_twObjectIx = twObjectIx; }
 
 // -----------------------------------------------------------------------
 // Called internally from child nodes
 // -----------------------------------------------------------------------
 
-void  NODE::Node_Add        (NODE* pNode_Child)         { m_pImpl->Node_Add (pNode_Child); }
-void  NODE::Node_Remove     (NODE* pNode_Child)         { m_pImpl->Node_Remove (pNode_Child); }
+void        NODE::Node_Add          (NODE* pNode_Child)         {        m_pImpl->Node_Add    (pNode_Child); }
+void        NODE::Node_Remove       (NODE* pNode_Child)         {        m_pImpl->Node_Remove (pNode_Child); }

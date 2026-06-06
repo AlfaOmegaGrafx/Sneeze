@@ -27,6 +27,22 @@ namespace SNEEZE
    class FABRIC;
 
    // ---------------------------------------------------------------------------
+   // RMAP Object Index constants
+   //
+   // Object indices are 48-bit values (TWORD) stored in a uint64_t. The upper
+   // 16 bits of the containing QWORD may carry a packed class discriminator
+   // (OBJECTIX union), but the object index itself is always in the low 48.
+   // ---------------------------------------------------------------------------
+
+   static constexpr uint64_t TWORD_MAX        = 0x0000FFFFFFFFFFFFull;
+   static constexpr uint64_t OBJECTIX_MAX     = 0x0000FFFFFFFFFFFCull;
+   static constexpr uint64_t OBJECTIX_LAST    = 0x0000FFFFFFFFFFFDull;
+   static constexpr uint64_t OBJECTIX_ERROR   = 0x0000FFFFFFFFFFFeull;
+   static constexpr uint64_t OBJECTIX_INVALID = 0x0000FFFFFFFFFFFFull;
+   static constexpr uint64_t OBJECTIX_IDENTITY= 0x0000FFFFFFFFFFFFull;
+   static constexpr uint64_t OBJECTIX_NULL    = 0x0000000000000000ull;
+
+   // ---------------------------------------------------------------------------
    // NODE -- structural element in the scene.
    //
    // Each node participates in a tree owned by a single FABRIC. When a
@@ -37,35 +53,32 @@ namespace SNEEZE
    class NODE
    {
    public:
-      NODE (FABRIC* pFabric, NODE* pNode_Parent);
+      NODE  (FABRIC* pFabric, NODE* pNode_Parent);
       ~NODE ();
 
-      bool Initialize (MAP_OBJECT* pMapObject);
+      bool               Initialize        (MAP_OBJECT* pMapObject);
 
-      // --- Identity ---
+      // Accessors
+      uint64_t           ObjectIx          () const;
+      MAP_OBJECT*        MapObject         () const;
+      FABRIC*            Fabric            () const;
+      FABRIC*            Fabric_Attachment () const;
+      NODE*              Parent            () const;
+      NODE*              Child             (int nPosition) const;
+      int                Node_Count        () const;
+      bool               IsPrivate         () const;
 
-      uint32_t    ObjectIx          () const;
-      MAP_OBJECT* MapObject         () const;
-      FABRIC*     Fabric            () const;
-      FABRIC*     Fabric_Attachment () const;
+      // Mutators
+      void               ObjectIx          (uint64_t twObjectIx);
+      void               Private           (bool bPrivate);
 
-      // --- Tree structure ---
-
-      NODE* Parent      () const;
-      NODE* Child       (int nPosition) const;
-      int   Node_Count  () const;
-
-      void  Node_Add    (NODE* pNode_Child);
-      void  Node_Remove (NODE* pNode_Child);
-
-      // --- Flags ---
-
-      bool IsPrivate () const;
-      void Private   (bool bPrivate);
+      // Methods
+      void               Node_Add          (NODE* pNode_Child);
+      void               Node_Remove       (NODE* pNode_Child);
 
    private:
       class Impl;
-      Impl* m_pImpl;
+      Impl*              m_pImpl;
    };
 
    // ---------------------------------------------------------------------------
@@ -80,38 +93,38 @@ namespace SNEEZE
    class FABRIC
    {
    public:
-      FABRIC (SCENE* pScene, NODE* pNode_Attach);
+      FABRIC  (SCENE* pScene, NODE* pNode_Attach);
       virtual ~FABRIC ();
 
-      bool Initialize (const std::string& sUrl);
+      bool               Initialize     (const std::string& sUrl);
 
-      SCENE*  Scene () const;
+      // Accessors
+      SCENE*             Scene          () const;
+      FABRIC*            Fabric_Parent  () const;
+      NODE*              Node_Root      () const;
+      NODE*              Node_Attach    () const;
+      CONTAINER*         Container      () const;
+      uint64_t           FabricIx       () const;
+      MSF*               Msf            () const;
+      const std::string& Url            () const;
 
-      FABRIC* Fabric_Parent () const;
-      void    Fabric_Add (FABRIC* pFabric_Child);
-      void    Fabric_Remove (FABRIC* pFabric_Child);
+      // Mutators
+      void               Node_Root      (NODE* pNode_Root);
+      void               Container      (CONTAINER* pContainer);
+      void               FabricIx       (uint64_t twFabricIx);
+      void               Url            (const std::string& sUrl);
 
-      NODE*   Node_Root () const;
-      void    Node_Root (NODE* pNode_Root);
-
-      NODE*   Node_Attach () const;
-
-      CONTAINER* Container () const;
-      void       Container (CONTAINER* pContainer);
-
-      MSF*       Msf () const;
-
-      const std::string& Url () const;
-      void               Url (const std::string& sUrl);
-
-      void OnMsfReady    (NETWORK::FILE* pFile);
-      void OnMsfFailed   (NETWORK::FILE* pFile);
-      void OnWasmReady   (NETWORK::FILE* pFile, const std::string& sUrl, const std::string& sHash);
-      void OnWasmFailed  (NETWORK::FILE* pFile, const std::string& sUrl);
+      // Methods
+      void               Fabric_Add     (FABRIC* pFabric_Child);
+      void               Fabric_Remove  (FABRIC* pFabric_Child);
+      void               OnMsfReady     (NETWORK::FILE* pFile);
+      void               OnMsfFailed    (NETWORK::FILE* pFile);
+      void               OnWasmReady    (NETWORK::FILE* pFile, const std::string& sUrl, const std::string& sHash);
+      void               OnWasmFailed   (NETWORK::FILE* pFile, const std::string& sUrl);
 
    protected:
       class Impl;
-      Impl* m_pImpl;
+      Impl*              m_pImpl;
    };
 
    // ---------------------------------------------------------------------------
@@ -127,12 +140,13 @@ namespace SNEEZE
    public:
       FABRIC_ROOT (SCENE* pScene);
 
-      bool  Initialize (const std::string& sUrl);
+      bool               Initialize    (const std::string& sUrl);
 
-      NODE* Node_Primary () const;
+      // Accessors
+      NODE*              Node_Primary  () const;
 
    private:
-      NODE* m_pNode_Primary;
+      NODE*              m_pNode_Primary;
    };
 
    // ---------------------------------------------------------------------------
@@ -149,19 +163,21 @@ namespace SNEEZE
       explicit SCENE (CONTEXT* pContext);
       ~SCENE ();
 
-      bool Initialize (const std::string& sUrl);
-      void Url (const std::string& sUrl);
+      bool               Initialize      (const std::string& sUrl);
 
-      ENGINE*       Engine         () const;
-      CONTEXT*      Context        () const;
-      NETWORK*      Network        () const;
+      // Accessors
+      ENGINE*            Engine          () const;
+      CONTEXT*           Context         () const;
+      NETWORK*           Network         () const;
+      FABRIC_ROOT*       Fabric_Root     () const;
+      FABRIC*            Fabric_Primary  () const;
 
-      FABRIC_ROOT*  Fabric_Root    () const;
-      FABRIC*       Fabric_Primary () const;
-      
+      // Mutators
+      void               Url             (const std::string& sUrl);
+
    private:
-      CONTEXT*     m_pContext;
-      FABRIC_ROOT* m_pFabric_Root;
+      CONTEXT*           m_pContext;
+      FABRIC_ROOT*       m_pFabric_Root;
    };
 }
 #endif // SNEEZE_SCENE_H
