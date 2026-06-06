@@ -1,5 +1,16 @@
 #![allow(non_snake_case, non_camel_case_types, dead_code)]
 
+mod star;
+mod planets;
+mod moons_earth;
+mod moons_mars;
+mod moons_jupiter;
+mod moons_saturn;
+mod moons_uranus;
+mod moons_neptune;
+mod moons_pluto;
+mod debris;
+
 #[link(wasm_import_module = "Console")]
 extern "C"
 {
@@ -28,16 +39,15 @@ fn LogMsg (sMsg: &str)
    }
 }
 
-// RMAP constants
-const OBJECTIX_IDENTITY: u64 = 0x0000_FFFF_FFFF_FFFF;
-const OBJECTIX_NULL:     u64 = 0x0000_0000_0000_0000;
+const TYPE_ROOT:      u8 = 0;
+const TYPE_CELESTIAL: u8 = 1;
 
-fn MakeObjectIx (wClass: u16, twObjectIx: u64) -> u64
-{
-   ((wClass as u64) << 48) | (twObjectIx & 0x0000_FFFF_FFFF_FFFF)
-}
+const TEX_BASE: &str = "https://cdn.rp1.com/res/texture/celestial/";
 
+// ---------------------------------------------------------------------------
 // RMCOBJECT layout (432 bytes, packed)
+// ---------------------------------------------------------------------------
+
 #[repr(C, packed)]
 struct RMCOBJECT
 {
@@ -119,51 +129,84 @@ impl RMCOBJECT
    }
 }
 
-fn RMCObject_Create (sName: &str, bType: u8, bSubtype: u8, dRadius: f64, dX: f64, dY: f64, dZ: f64, fColor: f32, fMass: f32, sTexture: &str) -> RMCOBJECT
+// ---------------------------------------------------------------------------
+// Submit helpers — build and submit one RMCOBJECT per call
+//
+// Three variants match the three levels of the scene hierarchy:
+//   System  — orbital frame (STARSYSTEM, PLANETSYSTEM, MOONSYSTEM, DEBRISSYSTEM)
+//   Body    — physical body (STAR, PLANET, MOON, DEBRIS)
+//   Surface — texture attachment (SURFACE)
+// ---------------------------------------------------------------------------
+
+fn Submit_Node (obj: &RMCOBJECT)
 {
-   let mut RMCObject = RMCOBJECT::New ();
-   RMCObject.qwObjectIx_Self = MakeObjectIx (0, OBJECTIX_IDENTITY);
-   RMCObject.bType           = bType;
-   RMCObject.bSubtype        = bSubtype;
-   RMCObject.d3Position      = [dX, dY, dZ];
-   RMCObject.d3Scale         = [1.0, 1.0, 1.0];
-   RMCObject.d3Max           = [dRadius, dRadius, dRadius];
-   RMCObject.fColor          = fColor;
-   RMCObject.fMass           = fMass;
-   RMCObject.Name_Set (sName);
+   let dwOffset = obj as *const RMCOBJECT as u32;
+   let dwLength = core::mem::size_of::<RMCOBJECT> () as u32;
+   unsafe { Node_Open (obj.qwObjectIx_Parent, dwOffset, dwLength) };
+}
+
+#[allow(clippy::too_many_arguments)]
+fn Submit_System (nParent: u64, nSelf: u64, sName: &str, bSubtype: u8, dA: f64, dB: f64, tmPeriod: i64, tmOrigin: i64, qx: f64, qy: f64, qz: f64, qw: f64, precX: f64, precY: f64, precZ: f64, dBound: f64, fMass: f32, nColor: u32)
+{
+   let mut obj = RMCOBJECT::New ();
+   obj.qwObjectIx_Parent = nParent;
+   obj.qwObjectIx_Self   = nSelf;
+   obj.bType             = TYPE_CELESTIAL;
+   obj.bSubtype          = bSubtype;
+   obj.d3Scale           = [1.0, 1.0, 1.0];
+   obj.d3Max             = [dBound, dBound, dBound];
+   obj.fMass             = fMass;
+   obj.fColor            = f32::from_bits (nColor);
+   obj.dA                = dA;
+   obj.dB                = dB;
+   obj.tmPeriod          = tmPeriod;
+   obj.tmOrigin          = tmOrigin;
+   obj.d4Rotation        = [qx, qy, qz, qw];
+   obj.d3Position        = [precX, precY, precZ];
+   obj.Name_Set (sName);
+   Submit_Node (&obj);
+}
+
+#[allow(clippy::too_many_arguments)]
+fn Submit_Body (nParent: u64, nSelf: u64, sName: &str, bSubtype: u8, dRadius: f64, fMass: f32, nColor: u32, qx: f64, qy: f64, qz: f64, qw: f64, precX: f64, precY: f64, precZ: f64)
+{
+   let mut obj = RMCOBJECT::New ();
+   obj.qwObjectIx_Parent = nParent;
+   obj.qwObjectIx_Self   = nSelf;
+   obj.bType             = TYPE_CELESTIAL;
+   obj.bSubtype          = bSubtype;
+   obj.d3Scale           = [1.0, 1.0, 1.0];
+   obj.d3Max             = [dRadius, dRadius, dRadius];
+   obj.fMass             = fMass;
+   obj.fColor            = f32::from_bits (nColor);
+   obj.d4Rotation        = [qx, qy, qz, qw];
+   obj.d3Position        = [precX, precY, precZ];
+   obj.Name_Set (sName);
+   Submit_Node (&obj);
+}
+
+fn Submit_Surface (nParent: u64, nSelf: u64, sName: &str, sTexture: &str, dW0Rad: f64, tmSpinPeriod: i64)
+{
+   let mut obj = RMCOBJECT::New ();
+   obj.qwObjectIx_Parent = nParent;
+   obj.qwObjectIx_Self   = nSelf;
+   obj.bType             = TYPE_CELESTIAL;
+   obj.bSubtype          = 17;
+   obj.d3Scale           = [1.0, 1.0, 1.0];
+   obj.dA                = dW0Rad;
+   obj.tmPeriod          = tmSpinPeriod;
+   obj.Name_Set (sName);
    if !sTexture.is_empty ()
    {
-      RMCObject.Reference_Set (sTexture);
+      let sUrl = [TEX_BASE, sTexture].concat ();
+      obj.Reference_Set (&sUrl);
    }
-   RMCObject
+   Submit_Node (&obj);
 }
 
-fn Node_Create_Root (twFabricIx: u64, sName: &str, bType: u8, bSubtype: u8, dRadius: f64, dX: f64, dY: f64, dZ: f64, fColor: f32, fMass: f32) -> u64
-{
-   let RMCObject = RMCObject_Create (sName, bType, bSubtype, dRadius, dX, dY, dZ, fColor, fMass, "");
-   let dwOffset  = &RMCObject as *const RMCOBJECT as u32;
-   let dwLength  = core::mem::size_of::<RMCOBJECT> () as u32;
-
-   unsafe { Node_Root (twFabricIx, dwOffset, dwLength) }
-}
-
-fn Node_Create_Child (twParentIx: u64, sName: &str, bType: u8, bSubtype: u8, dRadius: f64, dX: f64, dY: f64, dZ: f64, fColor: f32, fMass: f32, sTexture: &str) -> u64
-{
-   let RMCObject = RMCObject_Create (sName, bType, bSubtype, dRadius, dX, dY, dZ, fColor, fMass, sTexture);
-   let dwOffset  = &RMCObject as *const RMCOBJECT as u32;
-   let dwLength  = core::mem::size_of::<RMCOBJECT> () as u32;
-
-   unsafe { Node_Open (twParentIx, dwOffset, dwLength) }
-}
-
-const TYPE_ROOT:      u8 = 0;
-const TYPE_CELESTIAL: u8 = 1;
-
-const SUBTYPE_NONE:   u8 = 0;
-const SUBTYPE_STAR:   u8 = 10;
-const SUBTYPE_PLANET: u8 = 12;
-
-const AU: f64 = 149_597_870_700.0;
+// ---------------------------------------------------------------------------
+// WASM lifecycle exports
+// ---------------------------------------------------------------------------
 
 #[no_mangle]
 pub extern "C" fn Init ()
@@ -176,34 +219,44 @@ pub extern "C" fn Open (twFabricIx: u64, _dwOffset: u32, _dwLength: u32)
 {
    LogMsg (&format! ("Solar System WASM: Open (twFabricIx={})", twFabricIx));
 
-   let sTexBase = "https://cdn.rp1.com/res/texture/celestial/";
+   // Create root node (index 1 — OBJECTIX_NULL is 0, so index must be > 0)
+   let mut objRoot = RMCOBJECT::New ();
+   objRoot.qwObjectIx_Self = 1;
+   objRoot.bType           = TYPE_ROOT;
+   objRoot.d3Scale         = [1.0, 1.0, 1.0];
+   objRoot.Name_Set ("Solar System");
+   let dwOffset = &objRoot as *const RMCOBJECT as u32;
+   let dwLength = core::mem::size_of::<RMCOBJECT> () as u32;
+   let twRoot = unsafe { Node_Root (twFabricIx, dwOffset, dwLength) };
+   if twRoot == 0
+   {
+      LogMsg ("  ERROR: Failed to create root node");
+      return;
+   }
 
-   //                                                                              radius (m)       x position             y    z    color (f32 bits)                        mass (f32)   texture
-   let twRoot = Node_Create_Root (twFabricIx, "Solar System", TYPE_ROOT, SUBTYPE_NONE, 0.0, 0.0,                 0.0, 0.0, 0.0,                                    0.0);
-   if twRoot == 0 { LogMsg ("  ERROR: Failed to create root node"); return; }
+   let mut nTotal: u32 = 0;
+   nTotal += star::Submit ();
+   nTotal += planets::Submit ();
+   nTotal += moons_earth::Submit ();
+   // nTotal += moons_mars::Submit ();
+   // nTotal += moons_jupiter::Submit ();
+   // nTotal += moons_saturn::Submit ();
+   // nTotal += moons_uranus::Submit ();
+   // nTotal += moons_neptune::Submit ();
+   // nTotal += moons_pluto::Submit ();
+   nTotal += debris::Submit ();
 
-   Node_Create_Child (twRoot, "Sun",      TYPE_CELESTIAL, SUBTYPE_STAR,   695_700_000.0,       0.0,                                0.0, 0.0, f32::from_bits (0x00FFDD66),            1.989e30,    &format! ("{}sun.jpg",     sTexBase));
-   Node_Create_Child (twRoot, "Mercury",  TYPE_CELESTIAL, SUBTYPE_PLANET,   2_439_400.0,       0.387 * AU,                         0.0, 0.0, f32::from_bits (0x00AAAAAA),            3.302e23,    &format! ("{}mercury.jpg", sTexBase));
-   Node_Create_Child (twRoot, "Venus",    TYPE_CELESTIAL, SUBTYPE_PLANET,   6_051_840.0,       0.723 * AU,                         0.0, 0.0, f32::from_bits (0x00EECC88),            4.869e24,    &format! ("{}venus.jpg",   sTexBase));
-   Node_Create_Child (twRoot, "Earth",    TYPE_CELESTIAL, SUBTYPE_PLANET,   6_371_010.0,       1.000 * AU,                         0.0, 0.0, f32::from_bits (0x004488FF),            5.972e24,    &format! ("{}earth.jpg",   sTexBase));
-   Node_Create_Child (twRoot, "Mars",     TYPE_CELESTIAL, SUBTYPE_PLANET,   3_389_920.0,       1.524 * AU,                         0.0, 0.0, f32::from_bits (0x00FF6644),            6.417e23,    &format! ("{}mars.jpg",    sTexBase));
-   Node_Create_Child (twRoot, "Jupiter",  TYPE_CELESTIAL, SUBTYPE_PLANET,  69_911_000.0,       5.204 * AU,                         0.0, 0.0, f32::from_bits (0x00DDAA66),            1.898e27,    &format! ("{}jupiter.jpg", sTexBase));
-   Node_Create_Child (twRoot, "Saturn",   TYPE_CELESTIAL, SUBTYPE_PLANET,  58_232_000.0,       9.581 * AU,                         0.0, 0.0, f32::from_bits (0x00CCBB77),            5.684e26,    &format! ("{}saturn.jpg",  sTexBase));
-   Node_Create_Child (twRoot, "Uranus",   TYPE_CELESTIAL, SUBTYPE_PLANET,  25_362_000.0,      19.202 * AU,                         0.0, 0.0, f32::from_bits (0x0066CCDD),            8.682e25,    &format! ("{}uranus.jpg",  sTexBase));
-   Node_Create_Child (twRoot, "Neptune",  TYPE_CELESTIAL, SUBTYPE_PLANET,  24_624_000.0,      30.145 * AU,                         0.0, 0.0, f32::from_bits (0x004466FF),            1.024e26,    &format! ("{}neptune.jpg", sTexBase));
-   Node_Create_Child (twRoot, "Pluto",    TYPE_CELESTIAL, SUBTYPE_PLANET,   1_188_300.0,      39.281 * AU,                         0.0, 0.0, f32::from_bits (0x00CCAA88),            1.307e22,    &format! ("{}pluto.jpg",   sTexBase));
-
-   LogMsg ("  Solar system complete: Sun + 9 planets (11 nodes)");
+   LogMsg (&format! ("  Solar system complete: {} objects", nTotal));
 }
 
 #[no_mangle]
 pub extern "C" fn Close (_twFabricIx: u64)
 {
-   LogMsg ("Scene test WASM: Close");
+   LogMsg ("Solar System WASM: Close");
 }
 
 #[no_mangle]
 pub extern "C" fn Shutdown ()
 {
-   LogMsg ("Scene test WASM: Shutdown");
+   LogMsg ("Solar System WASM: Shutdown");
 }

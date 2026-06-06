@@ -132,3 +132,19 @@
 - **End-to-end success**: MSF fetched -> parsed -> WASM compiled -> instantiated -> Init called -> Open called -> 4 scene nodes created via host functions -> rendered as spheres in viewport
 - Vertically aligned Scene.h class declarations, grouped by accessors/mutators/methods
 - Updated project.mdc with all architectural changes
+
+## June 6, 2026 — ~afternoon PDT
+
+**WASM full solar system — 1,245 objects, hierarchical rendering, textures**
+
+- Created `gen_solar_system.py` — Python generator that parses the JavaScript Solar System project data (`E:\Dev\SolarSystem\`), computes MSF orbital parameters (quaternions, semi-axes, periods, precession vectors, tilt, spin), and generates 10 Rust source files for the WASM module
+- Generated Rust data files: `star.rs`, `planets.rs`, `moons_{earth,mars,jupiter,saturn,uranus,neptune,pluto}.rs`, `debris.rs` — 1,245 total objects in 3-level hierarchy (System→Body→Surface)
+- RMCOBJECT wire format fields fully utilized: `m_Orbit` (dA/dB/tmPeriod/tmOrigin for orbital parameters and surface spin), `m_Transform.d4Rotation` (tilt quaternion on bodies, orbital quaternion on systems), `m_Transform.d3Position` (precession axis-angle rate vector), `m_Resource.sReference` (texture URLs)
+- Implemented `MAP_OBJECT_CELESTIAL::Rotation()` override with three code paths: BODY subtypes (tilt quaternion + precession composition), SURFACE subtypes (spin around Y-axis using dA=W0Rad and tmPeriod=spin period), SYSTEM subtypes (identity)
+- Refactored `Compositor.cpp::TraverseNode` to use `WORLD_FRAME` struct for hierarchical world-space accumulation — SYSTEM nodes compute orbital position and propagate to children, BODY nodes capture radius/color/star-flag, only SURFACE nodes render as spheres (using inherited parent attributes)
+- Fixed texture CDN URL: changed `TEX_BASE` from `cdn2-david.rp1.dev/img/` to `cdn.rp1.com/res/texture/celestial/` — resolved HTTP 404 errors
+- Fixed Python generator to output single-line Rust function calls (no line splitting)
+- Performance discovery: all 1,245 objects cause 1-2 FPS; selectively disabling Jupiter (79 moons) and Saturn (83 moons) restores 60 FPS — bottleneck is in the renderer
+- Current configuration: star + planets + Earth/Mars/Uranus/Neptune/Pluto moons + debris = 60 FPS with textures and orbit trails
+- `astro::InjectSolarSystem()` fully superseded by WASM module — pending removal after validation
+- Updated project.mdc with all architectural changes

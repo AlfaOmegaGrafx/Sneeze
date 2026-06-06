@@ -212,45 +212,13 @@ public:
       {
          auto* pMapObj = new MAP_OBJECT_CELESTIAL ();
 
-         int nNameLen = 0;
-         while (nNameLen < 48  &&  pRMCObject->Name.wsName[nNameLen] != 0)
-            nNameLen++;
-
-         pMapObj->m_sName.reserve (nNameLen);
-         for (int i = 0; i < nNameLen; i++)
-            pMapObj->m_sName.push_back (static_cast<char> (pRMCObject->Name.wsName[i] & 0xFF));
-
+         memcpy (&pMapObj->m_Name, &pRMCObject->Name, sizeof (MAP_OBJECT_NAME));
          memcpy (&pMapObj->m_Type, &pRMCObject->Type, sizeof (MAP_OBJECT_TYPE));
          memcpy (&pMapObj->m_Resource, &pRMCObject->Resource, sizeof (MAP_OBJECT_RESOURCE));
-
          memcpy (&pMapObj->m_Transform, &pRMCObject->Transform, sizeof (MAP_OBJECT_TRANSFORM));
          memcpy (&pMapObj->m_Orbit, &pRMCObject->Orbit, sizeof (MAP_OBJECT_ORBIT));
          memcpy (&pMapObj->m_Bound, &pRMCObject->Bound, sizeof (MAP_OBJECT_BOUND));
          memcpy (&pMapObj->m_Properties, &pRMCObject->Properties, sizeof (MAP_OBJECT_PROPERTIES));
-
-         pMapObj->m_dRadius = pRMCObject->Bound.d3Max[0];
-
-         uint32_t nColorBits;
-         memcpy (&nColorBits, &pRMCObject->Properties.fColor, 4);
-         if (nColorBits != 0)
-         {
-            int r = (nColorBits >> 16) & 0xFF;
-            int g = (nColorBits >>  8) & 0xFF;
-            int b =  nColorBits        & 0xFF;
-            pMapObj->m_nColorDim    = static_cast<uint32_t> (((r/2) << 16) | ((g/2) << 8) | (b/2));
-            pMapObj->m_nColorBright = static_cast<uint32_t> (((r + 64 > 255 ? 255 : r + 64) << 16) | ((g + 64 > 255 ? 255 : g + 64) << 8) | (b + 64 > 255 ? 255 : b + 64));
-         }
-
-         if (pRMCObject->Properties.fMass > 0.0f)
-            pMapObj->m_dMass = static_cast<double> (pRMCObject->Properties.fMass);
-
-         if (pRMCObject->Orbit.tmPeriod != 0)
-         {
-            pMapObj->m_orbit.tmPeriod = pRMCObject->Orbit.tmPeriod;
-            pMapObj->m_orbit.tmStart  = pRMCObject->Orbit.tmOrigin;
-            pMapObj->m_orbit.dA       = pRMCObject->Orbit.dA;
-            pMapObj->m_orbit.dB       = pRMCObject->Orbit.dB;
-         }
 
          auto* pNode = new NODE (pFabric, pParent);
          pNode->Initialize (pMapObj);

@@ -344,7 +344,7 @@ wasm_trap_t* Scene_Node_Root (void* pEnv, wasmtime_caller_t* pCaller, const wasm
             if (pContainer)
             {
                const auto* pObject = reinterpret_cast<const RMCOBJECT*> (pBytes);
-               twResult = pContainer->Node_Root (twFabricIx, pObject);
+                twResult = pContainer->Node_Root (twFabricIx, pObject);
             }
          }
       }
@@ -478,8 +478,11 @@ wasm_trap_t* Scene_Node_Bound (void* pEnv, wasmtime_caller_t* pCaller, const was
          MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
 
          if (pObj)
-            if (pObj->GetType () == MAP_OBJECT_TYPE_TYPE_CELESTIAL)
-               static_cast<MAP_OBJECT_CELESTIAL*> (pObj)->m_dRadius = pArgs[1].of.f64;
+         {
+            pObj->m_Bound.d3Max[0] = pArgs[1].of.f64;
+            pObj->m_Bound.d3Max[1] = pArgs[1].of.f64;
+            pObj->m_Bound.d3Max[2] = pArgs[1].of.f64;
+         }
       }
    }
 
@@ -525,10 +528,14 @@ wasm_trap_t* Scene_Node_Name (void* pEnv, wasmtime_caller_t* pCaller, const wasm
          NODE* pNode = pContainer->Node_Find (twObjectIx);
          MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
 
-         if (pObj  &&  pObj->GetType () == MAP_OBJECT_TYPE_TYPE_CELESTIAL)
+         if (pObj)
          {
             std::string sName = ReadWasmString (pCaller, pArgs[1].of.i32, pArgs[2].of.i32);
-            static_cast<MAP_OBJECT_CELESTIAL*> (pObj)->m_sName = sName;
+            memset (&pObj->m_Name, 0, sizeof (MAP_OBJECT_NAME));
+            int nLen = static_cast<int> (sName.size ());
+            if (nLen > 47) nLen = 47;
+            for (int i = 0; i < nLen; i++)
+               pObj->m_Name.wsName[i] = static_cast<uint16_t> (static_cast<uint8_t> (sName[i]));
          }
       }
    }
@@ -550,8 +557,12 @@ wasm_trap_t* Scene_Node_Radius (void* pEnv, wasmtime_caller_t* pCaller, const wa
          NODE* pNode = pContainer->Node_Find (twObjectIx);
          MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
 
-         if (pObj  &&  pObj->GetType () == MAP_OBJECT_TYPE_TYPE_CELESTIAL)
-            static_cast<MAP_OBJECT_CELESTIAL*> (pObj)->m_dRadius = pArgs[1].of.f64;
+         if (pObj)
+         {
+            pObj->m_Bound.d3Max[0] = pArgs[1].of.f64;
+            pObj->m_Bound.d3Max[1] = pArgs[1].of.f64;
+            pObj->m_Bound.d3Max[2] = pArgs[1].of.f64;
+         }
       }
    }
 

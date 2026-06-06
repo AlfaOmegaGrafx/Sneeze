@@ -39,7 +39,6 @@
 #include "Control.h"
 #include "Types.h"
 #include "renderer/Renderer.h"
-#include "scene/Epoch.h"
 #include "scene/MapObject.h"
 #include <cmath>
 #include <functional>
@@ -261,23 +260,123 @@ void AGENT::COMPOSITOR::Execute_Destroy (JOB_COMPOSITOR* pJob_Compositor)
    else pJob_Compositor->Return (JOB_COMPOSITOR::kSTATE_DESTROY);
 }
 
-static void TraverseNode (NODE* pNode, std::function<void (NODE*)> fnVisit)
+struct WORLD_FRAME
 {
-   if (!pNode)
-      return;
+   double dPosX   = 0.0;
+   double dPosY   = 0.0;
+   double dPosZ   = 0.0;
+   double dRadius = 0.0;
+   float  fColor  = 0.0f;
+   bool   bStar   = false;
+};
 
-   fnVisit (pNode);
+static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, std::vector<SPHERE_DATA>& aSpheres, std::vector<CURVE_DATA>&  aCurves)
+{
+   MAP_OBJECT* pObj = pNode->MapObject ();
+   WORLD_FRAME childFrame = frame;
+
+   if (pObj  &&  pObj->GetType () == MAP_OBJECT_TYPE_TYPE_CELESTIAL)
+   {
+      auto* pCelestial = static_cast<MAP_OBJECT_CELESTIAL*> (pObj);
+      uint8_t bSub = pCelestial->m_Type.bSubtype;
+
+      if (bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_STARSYSTEM    ||
+          bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_PLANETSYSTEM   ||
+          bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_MOONSYSTEM     ||
+          bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_DEBRISSYSTEM)
+      {
+         double dPosX, dPosY, dPosZ;
+         pCelestial->Position (tmNow, dPosX, dPosY, dPosZ);
+
+         childFrame.dPosX = frame.dPosX + dPosX * METERS_TO_AU;
+         childFrame.dPosY = frame.dPosY + dPosY * METERS_TO_AU;
+         childFrame.dPosZ = frame.dPosZ + dPosZ * METERS_TO_AU;
+
+         if (pCelestial->HasOrbit ())
+         {
+            CURVE_DATA curve;
+            ColorFromPropertyFloat (pCelestial->m_Properties.fColor, curve.r, curve.g, curve.b);
+            curve.r *= 0.4f;
+            curve.g *= 0.4f;
+            curve.b *= 0.4f;
+
+            int nTrailPoints = static_cast<int> (TRAIL_SEGMENTS * TRAIL_FRACTION);
+
+            CURVE_POINT cpHead;
+            cpHead.x       = static_cast<float> (childFrame.dPosX);
+            cpHead.y       = static_cast<float> (childFrame.dPosY);
+            cpHead.z       = static_cast<float> (childFrame.dPosZ);
+            cpHead.dRadius = 0.002f;
+            curve.aPoints.push_back (cpHead);
+
+            ORBIT_POSITION pos;
+            ORBIT_POSITION* pPos = pCelestial->PositionAtTick (tmNow, pos);
+            if (pPos)
+            {
+               double dE_planet = pPos->dE;
+               for (int i = 1; i <= nTrailPoints; i++)
+               {
+                  double dE = dE_planet - (static_cast<double> (i) / TRAIL_SEGMENTS) * TWO_PI;
+                  VEC3 vPt = pCelestial->OrbitTrailPoint (dE, tmNow);
+
+                  CURVE_POINT cp;
+                  cp.x       = static_cast<float> (frame.dPosX + vPt.x * METERS_TO_AU);
+                  cp.y       = static_cast<float> (frame.dPosY + vPt.y * METERS_TO_AU);
+                  cp.z       = static_cast<float> (frame.dPosZ + vPt.z * METERS_TO_AU);
+                  cp.dRadius = 0.002f;
+                  curve.aPoints.push_back (cp);
+               }
+            }
+
+            aCurves.push_back (std::move (curve));
+         }
+      }
+      else if (bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_STAR
+           ||  bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_PLANET
+           ||  bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_MOON
+           ||  bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_DEBRIS)
+      {
+         childFrame.dRadius = pCelestial->Radius ();
+         childFrame.fColor  = pCelestial->m_Properties.fColor;
+         childFrame.bStar   = (bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_STAR);
+      }
+      else if (bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_SURFACE)
+      {
+         float dRadius = static_cast<float> (childFrame.dRadius * METERS_TO_AU);
+         if (dRadius < MIN_SPHERE_RADIUS) dRadius = MIN_SPHERE_RADIUS;
+         if (childFrame.bStar)            dRadius *= SUN_RADIUS_SCALE;
+
+         SPHERE_DATA sphere;
+         sphere.x         = static_cast<float> (childFrame.dPosX);
+         sphere.y         = static_cast<float> (childFrame.dPosY);
+         sphere.z         = static_cast<float> (childFrame.dPosZ);
+         sphere.dRadius   = dRadius;
+         sphere.bEmissive = childFrame.bStar;
+         ColorFromPropertyFloat (childFrame.fColor, sphere.r, sphere.g, sphere.b);
+
+         if (pCelestial->m_bTextureReady.load ())
+         {
+            pCelestial->LockTexture ();
+            sphere.pTexturePixels  = pCelestial->m_aTexturePixels.data ();
+            sphere.nTextureWidth   = pCelestial->m_nTextureWidth;
+            sphere.nTextureHeight  = pCelestial->m_nTextureHeight;
+            pCelestial->UnlockTexture ();
+         }
+
+         aSpheres.push_back (sphere);
+      }
+   }
 
    for (int i = 0; i < pNode->Node_Count (); i++)
    {
       NODE* pChild = pNode->Child (i);
       if (pChild)
       {
-         TraverseNode (pChild, fnVisit);
+         TraverseNode (pChild, childFrame, tmNow, aSpheres, aCurves);
 
          FABRIC* pAttached = pChild->Fabric_Attachment ();
          if (pAttached  &&  pAttached->Node_Root ())
-            TraverseNode (pAttached->Node_Root (), fnVisit);
+            TraverseNode (pAttached->Node_Root (), childFrame, tmNow, aSpheres, aCurves);
       }
    }
 }
@@ -351,93 +450,8 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
 
       if (pSomRoot)
       {
-         ORBIT_POSITION pos;
-
-         TraverseNode (pSomRoot, [&] (NODE* pNode)
-         {
-            MAP_OBJECT* pObj = pNode->MapObject ();
-            if (!pObj  ||  pObj->GetType () != MAP_OBJECT_TYPE_TYPE_CELESTIAL)
-               return;
-
-            auto* pCelestial = static_cast<MAP_OBJECT_CELESTIAL*> (pObj);
-
-            float dBodyX, dBodyY, dBodyZ;
-            if (pCelestial->HasOrbit ())
-            {
-               ORBIT_POSITION* pPos = pCelestial->m_orbit.PositionAtTick (tmNow, pos);
-               if (!pPos) return;
-               dBodyX = static_cast<float> (pPos->x * METERS_TO_AU);
-               dBodyY = static_cast<float> (pPos->y * METERS_TO_AU);
-               dBodyZ = static_cast<float> (pPos->z * METERS_TO_AU);
-            }
-            else
-            {
-               dBodyX = static_cast<float> (pCelestial->m_Transform.d3Position[0] * METERS_TO_AU);
-               dBodyY = static_cast<float> (pCelestial->m_Transform.d3Position[1] * METERS_TO_AU);
-               dBodyZ = static_cast<float> (pCelestial->m_Transform.d3Position[2] * METERS_TO_AU);
-            }
-
-            float dRadius = static_cast<float> (pCelestial->m_dRadius * METERS_TO_AU);
-            if (dRadius < MIN_SPHERE_RADIUS) dRadius = MIN_SPHERE_RADIUS;
-            if (!pCelestial->HasOrbit ()) dRadius *= SUN_RADIUS_SCALE;
-
-            SPHERE_DATA sphere;
-            sphere.x         = dBodyX;
-            sphere.y         = dBodyY;
-            sphere.z         = dBodyZ;
-            sphere.dRadius   = dRadius;
-            sphere.bEmissive = !pCelestial->HasOrbit ();
-            ColorFromPropertyFloat (pCelestial->m_Properties.fColor, sphere.r, sphere.g, sphere.b);
-
-            if (pCelestial->m_bTextureReady.load ())
-            {
-               pCelestial->LockTexture ();
-               sphere.pTexturePixels  = pCelestial->m_aTexturePixels.data ();
-               sphere.nTextureWidth   = pCelestial->m_nTextureWidth;
-               sphere.nTextureHeight  = pCelestial->m_nTextureHeight;
-               pCelestial->UnlockTexture ();
-            }
-
-            aSpheres.push_back (sphere);
-
-            if (pCelestial->HasOrbit ())
-            {
-               CURVE_DATA curve;
-               ColorFromPropertyFloat (pCelestial->m_Properties.fColor, curve.r, curve.g, curve.b);
-               curve.r *= 0.4f;
-               curve.g *= 0.4f;
-               curve.b *= 0.4f;
-
-               int nTrailPoints = static_cast<int> (TRAIL_SEGMENTS * TRAIL_FRACTION);
-
-               CURVE_POINT cpHead;
-               cpHead.x       = dBodyX;
-               cpHead.y       = dBodyY;
-               cpHead.z       = dBodyZ;
-               cpHead.dRadius = 0.002f;
-               curve.aPoints.push_back (cpHead);
-
-               ORBIT_POSITION* pPos = pCelestial->m_orbit.PositionAtTick (tmNow, pos);
-               if (pPos)
-               {
-                  double dE_planet = pPos->dE;
-                  for (int i = 1; i <= nTrailPoints; i++)
-                  {
-                     double dE = dE_planet - (static_cast<double> (i) / TRAIL_SEGMENTS) * TWO_PI;
-                     VEC3 vPt = pCelestial->m_orbit.PointOnOrbit (dE, tmNow);
-
-                     CURVE_POINT cp;
-                     cp.x       = static_cast<float> (vPt.x * METERS_TO_AU);
-                     cp.y       = static_cast<float> (vPt.y * METERS_TO_AU);
-                     cp.z       = static_cast<float> (vPt.z * METERS_TO_AU);
-                     cp.dRadius = 0.002f;
-                     curve.aPoints.push_back (cp);
-                  }
-               }
-
-               aCurves.push_back (std::move (curve));
-            }
-         });
+         WORLD_FRAME rootFrame;
+         TraverseNode (pSomRoot, rootFrame, tmNow, aSpheres, aCurves);
       }
 
       pViewport->Accumulate (VIEWPORT::kACCUMULATE_SCENE, tpSceneStart);

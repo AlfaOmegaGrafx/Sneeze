@@ -189,6 +189,14 @@ namespace SNEEZE
 
       MAP_OBJECT_TYPE_TYPE GetType       () const { return m_Type.bType; }
 
+      virtual void Position (int64_t tmNow, double& dX, double& dY, double& dZ) const;
+      virtual void Rotation (int64_t tmNow, double& dQx, double& dQy, double& dQz, double& dQw) const;
+      void         Scale    (double& dX, double& dY, double& dZ) const;
+      double       Radius   () const;
+      uint32_t     ColorToU32      () const;
+      uint32_t     ColorDimToU32   () const;
+      uint32_t     ColorBrightToU32 () const;
+
       void                 LockTexture   () const {        m_textureMutex.lock   (); }
       void                 UnlockTexture () const {        m_textureMutex.unlock (); }
 
@@ -211,24 +219,11 @@ namespace SNEEZE
 
       bool HasOrbit () const;
 
-      // Identity
-      std::string    m_sName;
+      void Position (int64_t tmNow, double& dX, double& dY, double& dZ) const override;
+      void Rotation (int64_t tmNow, double& dQx, double& dQy, double& dQz, double& dQw) const override;
 
-      // Physical
-      double                m_dRadius        = 0.0;
-      std::optional<double> m_dMass;
-      std::optional<double> m_dGM;
-      std::optional<double> m_dSystemRadiusKm;
-      std::optional<double> m_dPoleRA;
-      std::optional<double> m_dPoleDec;
-      std::optional<double> m_dObliquity;
-
-      // Color variants (computed from m_Properties.fColor)
-      uint32_t m_nColorDim    = 0x666666;
-      uint32_t m_nColorBright = 0xffffff;
-
-      // Orbital mechanics
-      ORBIT m_orbit;
+      ORBIT_POSITION* PositionAtTick (int64_t tmNow, ORBIT_POSITION& out) const;
+      VEC3            OrbitTrailPoint (double dE, int64_t tmElapsed) const;
    };
 
    class MAP_OBJECT_TERRESTRIAL : public MAP_OBJECT

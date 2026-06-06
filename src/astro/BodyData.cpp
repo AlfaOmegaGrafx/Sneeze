@@ -466,16 +466,15 @@ namespace SNEEZE
          auto itSun = registry.find ("sun");
          {
             auto* pMapObj = new MAP_OBJECT_CELESTIAL ();
-            pMapObj->m_sName           = "Sun";
             pMapObj->m_Type.bSubtype   = MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_STAR;
             pMapObj->m_Transform.d3Position[0] = 0.0;
             pMapObj->m_Transform.d3Position[1] = 0.0;
             pMapObj->m_Transform.d3Position[2] = 0.0;
-            pMapObj->m_dRadius         = 695700.0 * 1000.0;
+            pMapObj->m_Bound.d3Max[0]  = 695700.0 * 1000.0;
+            pMapObj->m_Bound.d3Max[1]  = 695700.0 * 1000.0;
+            pMapObj->m_Bound.d3Max[2]  = 695700.0 * 1000.0;
             { uint32_t nC = 0xFFE666; memcpy (&pMapObj->m_Properties.fColor, &nC, 4); }
-            pMapObj->m_nColorDim       = 0x7F7333;
-            pMapObj->m_nColorBright    = 0xFFFF9A;
-            pMapObj->m_dMass           = 1.98841e30;
+            pMapObj->m_Properties.fMass = static_cast<float> (1.98841e30);
             std::string sTextureSun    = (itSun != registry.end ()) ? itSun->second->sTexture : "";
             if (!sTextureSun.empty ())
                strncpy (pMapObj->m_Resource.sReference, sTextureSun.c_str (), sizeof (pMapObj->m_Resource.sReference) - 1);
@@ -504,14 +503,10 @@ namespace SNEEZE
 
             double dRadius = 100.0 * 1000.0;
             uint32_t nColor = pBody->GetColor ();
-            uint32_t nColorDim = pBody->pColor.nDim;
-            uint32_t nColorBright = pBody->pColor.nBright;
             if (pChildBody)
             {
                dRadius = pChildBody->dRadius.value_or (100.0) * 1000.0;
                nColor = pChildBody->GetColor ();
-               nColorDim = pChildBody->pColor.nDim;
-               nColorBright = pChildBody->pColor.nBright;
             }
 
             std::string sTexture;
@@ -519,18 +514,30 @@ namespace SNEEZE
                sTexture = pChildBody->sTexture;
 
             auto* pMapObj = new MAP_OBJECT_CELESTIAL ();
-            pMapObj->m_sName           = pChildBody ? pChildBody->sName : pBody->sName;
             pMapObj->m_Type.bSubtype   = static_cast<uint8_t> (MapCelestialType (pChildBody ? pChildBody->bType : pBody->bType));
-            pMapObj->m_dRadius         = dRadius;
+            pMapObj->m_Bound.d3Max[0]  = dRadius;
+            pMapObj->m_Bound.d3Max[1]  = dRadius;
+            pMapObj->m_Bound.d3Max[2]  = dRadius;
             memcpy (&pMapObj->m_Properties.fColor, &nColor, 4);
-            pMapObj->m_nColorDim       = nColorDim;
-            pMapObj->m_nColorBright    = nColorBright;
-            pMapObj->m_dMass           = pBody->dMass;
-            pMapObj->m_dGM             = pBody->dGM;
-            pMapObj->m_dSystemRadiusKm = pBody->dSystemRadiusKm;
+            if (pBody->dMass.has_value ())
+               pMapObj->m_Properties.fMass = static_cast<float> (pBody->dMass.value ());
             if (!sTexture.empty ())
                strncpy (pMapObj->m_Resource.sReference, sTexture.c_str (), sizeof (pMapObj->m_Resource.sReference) - 1);
-            pMapObj->m_orbit           = *pBody->pOrbit;
+
+            if (pBody->pOrbit)
+            {
+               pMapObj->m_Orbit.tmPeriod  = pBody->pOrbit->tmPeriod;
+               pMapObj->m_Orbit.tmOrigin  = pBody->pOrbit->tmStart;
+               pMapObj->m_Orbit.dA        = pBody->pOrbit->dA;
+               pMapObj->m_Orbit.dB        = pBody->pOrbit->dB;
+               pMapObj->m_Transform.d4Rotation[0] = pBody->pOrbit->dQx;
+               pMapObj->m_Transform.d4Rotation[1] = pBody->pOrbit->dQy;
+               pMapObj->m_Transform.d4Rotation[2] = pBody->pOrbit->dQz;
+               pMapObj->m_Transform.d4Rotation[3] = pBody->pOrbit->dQw;
+               pMapObj->m_Transform.d3Position[0] = pBody->pOrbit->dPrecX;
+               pMapObj->m_Transform.d3Position[1] = pBody->pOrbit->dPrecY;
+               pMapObj->m_Transform.d3Position[2] = pBody->pOrbit->dPrecZ;
+            }
 
             auto* pNode = new NODE (pFabric, pRoot);
             pNode->Initialize (pMapObj);
