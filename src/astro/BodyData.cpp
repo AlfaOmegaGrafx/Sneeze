@@ -33,22 +33,22 @@ namespace SNEEZE
          return { nNormal, nDim, nBright };
       }
 
-      static CELESTIAL_TYPE MapCelestialType (RMCOBJECT_TYPE bType)
+      static MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL MapCelestialType (RMCOBJECT_TYPE bType)
       {
          switch (bType)
          {
-            case RMCOBJECT_TYPE_UNIVERSE:       return CELESTIAL_TYPE_UNIVERSE;
-            case RMCOBJECT_TYPE_STARSYSTEM:     return CELESTIAL_TYPE_STARSYSTEM;
-            case RMCOBJECT_TYPE_STAR:           return CELESTIAL_TYPE_STAR;
-            case RMCOBJECT_TYPE_PLANETSYSTEM:   return CELESTIAL_TYPE_PLANETSYSTEM;
-            case RMCOBJECT_TYPE_PLANET:         return CELESTIAL_TYPE_PLANET;
-            case RMCOBJECT_TYPE_MOONSYSTEM:     return CELESTIAL_TYPE_MOONSYSTEM;
-            case RMCOBJECT_TYPE_MOON:           return CELESTIAL_TYPE_MOON;
-            case RMCOBJECT_TYPE_DEBRISSYSTEM:   return CELESTIAL_TYPE_DEBRISSYSTEM;
-            case RMCOBJECT_TYPE_DEBRIS:         return CELESTIAL_TYPE_DEBRIS;
-            case RMCOBJECT_TYPE_SATELLITE:      return CELESTIAL_TYPE_SATELLITE;
-            case RMCOBJECT_TYPE_SURFACE:        return CELESTIAL_TYPE_SURFACE;
-            default:                            return CELESTIAL_TYPE_NONE;
+            case RMCOBJECT_TYPE_UNIVERSE:       return MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_UNIVERSE;
+            case RMCOBJECT_TYPE_STARSYSTEM:     return MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_STARSYSTEM;
+            case RMCOBJECT_TYPE_STAR:           return MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_STAR;
+            case RMCOBJECT_TYPE_PLANETSYSTEM:   return MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_PLANETSYSTEM;
+            case RMCOBJECT_TYPE_PLANET:         return MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_PLANET;
+            case RMCOBJECT_TYPE_MOONSYSTEM:     return MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_MOONSYSTEM;
+            case RMCOBJECT_TYPE_MOON:           return MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_MOON;
+            case RMCOBJECT_TYPE_DEBRISSYSTEM:   return MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_DEBRISSYSTEM;
+            case RMCOBJECT_TYPE_DEBRIS:         return MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_DEBRIS;
+            case RMCOBJECT_TYPE_SATELLITE:      return MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_SATELLITE;
+            case RMCOBJECT_TYPE_SURFACE:        return MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_SURFACE;
+            default:                            return MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_NONE;
          }
       }
 
@@ -467,16 +467,18 @@ namespace SNEEZE
          {
             auto* pMapObj = new MAP_OBJECT_CELESTIAL ();
             pMapObj->m_sName           = "Sun";
-            pMapObj->m_bCelestialType  = CELESTIAL_TYPE_STAR;
-            pMapObj->m_dPosX           = 0.0;
-            pMapObj->m_dPosY           = 0.0;
-            pMapObj->m_dPosZ           = 0.0;
+            pMapObj->m_Type.bSubtype   = MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_STAR;
+            pMapObj->m_Transform.d3Position[0] = 0.0;
+            pMapObj->m_Transform.d3Position[1] = 0.0;
+            pMapObj->m_Transform.d3Position[2] = 0.0;
             pMapObj->m_dRadius         = 695700.0 * 1000.0;
-            pMapObj->m_nColor          = 0xFFE666;
+            { uint32_t nC = 0xFFE666; memcpy (&pMapObj->m_Properties.fColor, &nC, 4); }
             pMapObj->m_nColorDim       = 0x7F7333;
             pMapObj->m_nColorBright    = 0xFFFF9A;
             pMapObj->m_dMass           = 1.98841e30;
-            pMapObj->m_sUrl_Texture    = (itSun != registry.end ()) ? itSun->second->sTexture : "";
+            std::string sTextureSun    = (itSun != registry.end ()) ? itSun->second->sTexture : "";
+            if (!sTextureSun.empty ())
+               strncpy (pMapObj->m_Resource.sReference, sTextureSun.c_str (), sizeof (pMapObj->m_Resource.sReference) - 1);
 
             auto* pNode = new NODE (pFabric, pRoot);
             pNode->Initialize (pMapObj);
@@ -518,15 +520,16 @@ namespace SNEEZE
 
             auto* pMapObj = new MAP_OBJECT_CELESTIAL ();
             pMapObj->m_sName           = pChildBody ? pChildBody->sName : pBody->sName;
-            pMapObj->m_bCelestialType  = MapCelestialType (pChildBody ? pChildBody->bType : pBody->bType);
+            pMapObj->m_Type.bSubtype   = static_cast<uint8_t> (MapCelestialType (pChildBody ? pChildBody->bType : pBody->bType));
             pMapObj->m_dRadius         = dRadius;
-            pMapObj->m_nColor          = nColor;
+            memcpy (&pMapObj->m_Properties.fColor, &nColor, 4);
             pMapObj->m_nColorDim       = nColorDim;
             pMapObj->m_nColorBright    = nColorBright;
             pMapObj->m_dMass           = pBody->dMass;
             pMapObj->m_dGM             = pBody->dGM;
             pMapObj->m_dSystemRadiusKm = pBody->dSystemRadiusKm;
-            pMapObj->m_sUrl_Texture    = sTexture;
+            if (!sTexture.empty ())
+               strncpy (pMapObj->m_Resource.sReference, sTexture.c_str (), sizeof (pMapObj->m_Resource.sReference) - 1);
             pMapObj->m_orbit           = *pBody->pOrbit;
 
             auto* pNode = new NODE (pFabric, pRoot);

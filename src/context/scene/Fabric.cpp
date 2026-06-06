@@ -449,7 +449,9 @@ bool FABRIC_ROOT::Initialize (const std::string& sUrl)
       if (pNode_Root->Initialize (nullptr))
       {
          auto* pMap_Object  = new MAP_OBJECT_ROOT ();
-         pMap_Object->m_sUrl_Fabric = sUrl;
+         
+         pMap_Object->m_Type.bSubtype = 255;
+         strncpy (pMap_Object->m_Resource.sReference, sUrl.c_str (), sizeof (pMap_Object->m_Resource.sReference) - 1);
 
          m_pNode_Primary = new NODE (this, pNode_Root);
 

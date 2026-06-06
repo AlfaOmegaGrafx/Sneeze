@@ -20,6 +20,46 @@
 namespace SNEEZE
 {
    // ---------------------------------------------------------------------------
+   // Map object type identifiers
+   // ---------------------------------------------------------------------------
+
+   enum MAP_OBJECT_TYPE_TYPE : uint8_t
+   {
+      MAP_OBJECT_TYPE_TYPE_ROOT        = 0,
+      MAP_OBJECT_TYPE_TYPE_CELESTIAL   = 1,
+      MAP_OBJECT_TYPE_TYPE_TERRESTRIAL = 2,
+      MAP_OBJECT_TYPE_TYPE_PHYSICAL    = 3,
+   };
+
+   // ---------------------------------------------------------------------------
+   // Celestial body type identifiers
+   // ---------------------------------------------------------------------------
+
+   enum MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL
+   {
+      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_NONE           = 0,
+      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_UNIVERSE       = 1,
+      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_SUPERCLUSTER   = 2,
+      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_GALAXYCLUSTER  = 3,
+      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_GALAXY         = 4,
+      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_SECTOR         = 5,
+      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_NEBULA         = 6,
+      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_STARCLUSTER    = 7,
+      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_BLACKHOLE      = 8,
+      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_STARSYSTEM     = 9,
+      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_STAR           = 10,
+      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_PLANETSYSTEM   = 11,
+      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_PLANET         = 12,
+      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_MOONSYSTEM     = 125,
+      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_MOON           = 13,
+      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_DEBRISSYSTEM   = 135,
+      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_DEBRIS         = 14,
+      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_SATELLITE      = 15,
+      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_TRANSPORT      = 16,
+      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_SURFACE        = 17,
+   };
+
+   // ---------------------------------------------------------------------------
    // RMAP wire-format structures (RMCOBJECT, 432 bytes)
    //
    // These structs mirror the RMAP binary layout byte-for-byte. They are the
@@ -32,123 +72,91 @@ namespace SNEEZE
 
    struct OBJECTIX
    {
-      uint64_t qwComposed;
+      uint64_t              qwComposed;
 
-      uint64_t ObjectIx () const   { return qwComposed & 0x0000FFFFFFFFFFFFull; }
-      uint16_t Class    () const   { return static_cast<uint16_t> (qwComposed >> 48); }
+      uint64_t              ObjectIx () const   { return qwComposed & 0x0000FFFFFFFFFFFFull; }
+      uint16_t              Class    () const   { return static_cast<uint16_t> (qwComposed >> 48); }
    };
 
    struct OBJECT_HEAD
    {
-      OBJECTIX     Parent;
-      OBJECTIX     Self;
-      uint64_t     qwEvent;
+      OBJECTIX              Parent;
+      OBJECTIX              Self;
+      uint64_t              qwEvent;
    };
 
-   struct RMCOBJECT_NAME
+   struct MAP_OBJECT_NAME
    {
-      uint16_t wsName[48];
+      uint16_t              wsName[48];
    };
 
-   struct RMCOBJECT_TYPE
+   struct MAP_OBJECT_TYPE
    {
-      uint8_t  bType;
-      uint8_t  bSubtype;
-      uint8_t  bFiction;
-      uint8_t  abReserved[5];
+      MAP_OBJECT_TYPE_TYPE  bType;
+      uint8_t               bSubtype;
+      uint8_t               bFiction;
+      uint8_t               abReserved[5];
    };
 
-   struct RMCOBJECT_OWNER
+   struct MAP_OBJECT_OWNER
    {
-      uint64_t twOwner;
+      uint64_t              twOwner;
    };
 
-   struct RMCOBJECT_RESOURCE
+   struct MAP_OBJECT_RESOURCE
    {
-      uint64_t qwResource;
-      char     sName[32];
-      char     sReference[64];
+      uint64_t              qwResource;
+      char                  sName[32];
+      char                  sReference[64];
    };
 
-   struct RMCOBJECT_TRANSFORM
+   struct MAP_OBJECT_TRANSFORM
    {
-      double d3Position[3];
-      double d4Rotation[4];
-      double d3Scale[3];
+      double                d3Position[3];
+      double                d4Rotation[4];
+      double                d3Scale[3];
    };
 
-   struct RMCOBJECT_ORBIT
+   struct MAP_OBJECT_ORBIT
    {
-      int64_t  tmPeriod;
-      int64_t  tmOrigin;
-      double   dA;
-      double   dB;
+      int64_t               tmPeriod;
+      int64_t               tmOrigin;
+      double                dA;
+      double                dB;
    };
 
-   struct RMCOBJECT_BOUND
+   struct MAP_OBJECT_BOUND
    {
-      uint8_t  abReserved[24];
-      double   d3Max[3];
+      uint8_t               abReserved[24];
+      double                d3Max[3];
    };
 
-   struct RMCOBJECT_PROPERTIES
+   struct MAP_OBJECT_PROPERTIES
    {
-      float    fMass;
-      float    fGravity;
-      float    fColor;
-      float    fBrightness;
-      float    fReflectivity;
-      uint8_t  abReserved[12];
+      float                 fMass;
+      float                 fGravity;
+      float                 fColor;
+      float                 fBrightness;
+      float                 fReflectivity;
+      uint8_t               abReserved[12];
    };
 
    struct RMCOBJECT
    {
-      OBJECT_HEAD              Head;
-      RMCOBJECT_NAME           Name;
-      RMCOBJECT_TYPE           Type;
-      RMCOBJECT_OWNER          Owner;
-      RMCOBJECT_RESOURCE       Resource;
-      RMCOBJECT_TRANSFORM      Transform;
-      RMCOBJECT_ORBIT          Orbit;
-      RMCOBJECT_BOUND          Bound;
-      RMCOBJECT_PROPERTIES     Properties;
+      OBJECT_HEAD           Head;
+      MAP_OBJECT_NAME       Name;
+      MAP_OBJECT_TYPE       Type;
+      MAP_OBJECT_OWNER      Owner;
+      MAP_OBJECT_RESOURCE   Resource;
+      MAP_OBJECT_TRANSFORM  Transform;
+      MAP_OBJECT_ORBIT      Orbit;
+      MAP_OBJECT_BOUND      Bound;
+      MAP_OBJECT_PROPERTIES Properties;
    };
 
 #pragma pack(pop)
 
    static_assert (sizeof (RMCOBJECT) == 432, "RMCOBJECT must be exactly 432 bytes");
-
-   // ---------------------------------------------------------------------------
-   // Map object type identifiers
-   // ---------------------------------------------------------------------------
-
-   enum MAP_OBJECT_TYPE
-   {
-      MAP_OBJECT_TYPE_ROOT        = 0,
-      MAP_OBJECT_TYPE_CELESTIAL   = 1,
-      MAP_OBJECT_TYPE_TERRESTRIAL = 2,
-      MAP_OBJECT_TYPE_PHYSICAL    = 3,
-   };
-
-   // ---------------------------------------------------------------------------
-   // Celestial body type identifiers
-   // ---------------------------------------------------------------------------
-
-   enum CELESTIAL_TYPE
-   {
-      CELESTIAL_TYPE_NONE           = 0,
-      CELESTIAL_TYPE_UNIVERSE       = 1,
-      CELESTIAL_TYPE_STARSYSTEM     = 9,
-      CELESTIAL_TYPE_STAR           = 10,
-      CELESTIAL_TYPE_PLANETSYSTEM   = 11,
-      CELESTIAL_TYPE_PLANET         = 12,
-      CELESTIAL_TYPE_MOONSYSTEM     = 125,
-      CELESTIAL_TYPE_MOON           = 13,
-      CELESTIAL_TYPE_DEBRISSYSTEM   = 135,
-      CELESTIAL_TYPE_DEBRIS         = 14,
-      CELESTIAL_TYPE_SATELLITE      = 15,
-      CELESTIAL_TYPE_SURFACE        = 17,
-   };
 
    // ---------------------------------------------------------------------------
    // MAP_OBJECT — base class for all 3D objects referenced by SOM::NODEs.
@@ -159,42 +167,31 @@ namespace SNEEZE
    class MAP_OBJECT
    {
    public:
-      explicit MAP_OBJECT (MAP_OBJECT_TYPE bType);
+      explicit MAP_OBJECT (MAP_OBJECT_TYPE_TYPE bType);
       virtual ~MAP_OBJECT () = default;
 
-      MAP_OBJECT_TYPE GetType () const { return m_bType; }
-
-      // Position in parent-relative coordinates (meters)
-      double m_dPosX   = 0.0;
-      double m_dPosY   = 0.0;
-      double m_dPosZ   = 0.0;
-
-      // Scale (uniform for now)
-      double m_dScale  = 1.0;
-
-      // Bounding sphere radius (meters)
-      double m_dBound  = 0.0;
-
-      // Visual color (0xRRGGBB)
-      uint32_t m_nColor = 0xcccccc;
-
-      // Fabric
-      std::string              m_sUrl_Fabric;
+      MAP_OBJECT_NAME               m_Name             = {};
+      MAP_OBJECT_TYPE               m_Type             = {};
+      MAP_OBJECT_OWNER              m_Owner            = {};
+      MAP_OBJECT_RESOURCE           m_Resource         = {};
+      MAP_OBJECT_TRANSFORM          m_Transform        = {};
+      MAP_OBJECT_ORBIT              m_Orbit            = {};
+      MAP_OBJECT_BOUND              m_Bound            = {};
+      MAP_OBJECT_PROPERTIES         m_Properties       = {};
 
       // Texture
-      std::string              m_sUrl_Texture;
-      std::vector<uint8_t>     m_aTexturePixels;
-      int                      m_nTextureWidth  = 0;
-      int                      m_nTextureHeight = 0;
-      int                      m_nTextureChannels = 0;
-      std::atomic<bool>        m_bTextureReady {false};
-      mutable std::mutex       m_textureMutex;
+      std::vector<uint8_t>          m_aTexturePixels;
+      int                           m_nTextureWidth    = 0;
+      int                           m_nTextureHeight   = 0;
+      int                           m_nTextureChannels = 0;
+      std::atomic<bool>             m_bTextureReady      {false};
+      mutable std::mutex            m_textureMutex;
 
-      void LockTexture () const   { m_textureMutex.lock (); }
-      void UnlockTexture () const { m_textureMutex.unlock (); }
+      MAP_OBJECT_TYPE_TYPE GetType       () const { return m_Type.bType; }
 
-   private:
-      MAP_OBJECT_TYPE m_bType;
+      void                 LockTexture   () const {        m_textureMutex.lock   (); }
+      void                 UnlockTexture () const {        m_textureMutex.unlock (); }
+
    };
 
    // ---------------------------------------------------------------------------
@@ -204,19 +201,18 @@ namespace SNEEZE
    class MAP_OBJECT_ROOT : public MAP_OBJECT
    {
    public:
-      MAP_OBJECT_ROOT () : MAP_OBJECT (MAP_OBJECT_TYPE_ROOT) {}
+      MAP_OBJECT_ROOT ();
    };
 
    class MAP_OBJECT_CELESTIAL : public MAP_OBJECT
    {
    public:
-      MAP_OBJECT_CELESTIAL () : MAP_OBJECT (MAP_OBJECT_TYPE_CELESTIAL) {}
+      MAP_OBJECT_CELESTIAL ();
 
-      bool HasOrbit () const { return m_orbit.dA != 0.0  &&  m_orbit.tmPeriod != 0  &&  m_orbit.bHasQuat; }
+      bool HasOrbit () const;
 
       // Identity
       std::string    m_sName;
-      CELESTIAL_TYPE m_bCelestialType = CELESTIAL_TYPE_NONE;
 
       // Physical
       double                m_dRadius        = 0.0;
@@ -227,7 +223,7 @@ namespace SNEEZE
       std::optional<double> m_dPoleDec;
       std::optional<double> m_dObliquity;
 
-      // Color variants (base m_nColor on MAP_OBJECT serves as normal)
+      // Color variants (computed from m_Properties.fColor)
       uint32_t m_nColorDim    = 0x666666;
       uint32_t m_nColorBright = 0xffffff;
 
@@ -238,13 +234,13 @@ namespace SNEEZE
    class MAP_OBJECT_TERRESTRIAL : public MAP_OBJECT
    {
    public:
-      MAP_OBJECT_TERRESTRIAL () : MAP_OBJECT (MAP_OBJECT_TYPE_TERRESTRIAL) {}
+      MAP_OBJECT_TERRESTRIAL ();
    };
 
    class MAP_OBJECT_PHYSICAL : public MAP_OBJECT
    {
    public:
-      MAP_OBJECT_PHYSICAL () : MAP_OBJECT (MAP_OBJECT_TYPE_PHYSICAL) {}
+      MAP_OBJECT_PHYSICAL ();
    };
 }
 #endif // SNEEZE_SOM_MAPOBJECT_H

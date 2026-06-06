@@ -129,13 +129,13 @@ void SPATIAL_INDEX::Build (const std::vector<NODE*>& apNodes)
       if (pObj)
       {
          AABB pBounds;
-         double dR = pObj->m_dBound > 0 ? pObj->m_dBound : pObj->m_dScale;
-         pBounds.dMinX = pObj->m_dPosX - dR;
-         pBounds.dMinY = pObj->m_dPosY - dR;
-         pBounds.dMinZ = pObj->m_dPosZ - dR;
-         pBounds.dMaxX = pObj->m_dPosX + dR;
-         pBounds.dMaxY = pObj->m_dPosY + dR;
-         pBounds.dMaxZ = pObj->m_dPosZ + dR;
+         double dR = pObj->m_Transform.d3Scale[0];
+         pBounds.dMinX = pObj->m_Transform.d3Position[0] - dR;
+         pBounds.dMinY = pObj->m_Transform.d3Position[1] - dR;
+         pBounds.dMinZ = pObj->m_Transform.d3Position[2] - dR;
+         pBounds.dMaxX = pObj->m_Transform.d3Position[0] + dR;
+         pBounds.dMaxY = pObj->m_Transform.d3Position[1] + dR;
+         pBounds.dMaxZ = pObj->m_Transform.d3Position[2] + dR;
 
          m_apLeaves.push_back (pNode);
          m_aLeafBounds.push_back (pBounds);

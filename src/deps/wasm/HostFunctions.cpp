@@ -431,9 +431,9 @@ wasm_trap_t* Scene_Node_Position (void* pEnv, wasmtime_caller_t* pCaller, const 
 
          if (pObj)
          {
-            pObj->m_dPosX = pArgs[1].of.f64;
-            pObj->m_dPosY = pArgs[2].of.f64;
-            pObj->m_dPosZ = pArgs[3].of.f64;
+            pObj->m_Transform.d3Position[0] = pArgs[1].of.f64;
+            pObj->m_Transform.d3Position[1] = pArgs[2].of.f64;
+            pObj->m_Transform.d3Position[2] = pArgs[3].of.f64;
          }
       }
    }
@@ -456,7 +456,7 @@ wasm_trap_t* Scene_Node_Scale (void* pEnv, wasmtime_caller_t* pCaller, const was
          MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
 
          if (pObj)
-            pObj->m_dScale = pArgs[1].of.f64;
+            pObj->m_Transform.d3Scale[0] = pArgs[1].of.f64;
       }
    }
 
@@ -478,7 +478,8 @@ wasm_trap_t* Scene_Node_Bound (void* pEnv, wasmtime_caller_t* pCaller, const was
          MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
 
          if (pObj)
-            pObj->m_dBound = pArgs[1].of.f64;
+            if (pObj->GetType () == MAP_OBJECT_TYPE_TYPE_CELESTIAL)
+               static_cast<MAP_OBJECT_CELESTIAL*> (pObj)->m_dRadius = pArgs[1].of.f64;
       }
    }
 
@@ -500,7 +501,10 @@ wasm_trap_t* Scene_Node_Color (void* pEnv, wasmtime_caller_t* pCaller, const was
          MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
 
          if (pObj)
-            pObj->m_nColor = static_cast<uint32_t> (pArgs[1].of.i32);
+         {
+            uint32_t nColor = static_cast<uint32_t> (pArgs[1].of.i32);
+            memcpy (&pObj->m_Properties.fColor, &nColor, 4);
+         }
       }
    }
 
@@ -521,7 +525,7 @@ wasm_trap_t* Scene_Node_Name (void* pEnv, wasmtime_caller_t* pCaller, const wasm
          NODE* pNode = pContainer->Node_Find (twObjectIx);
          MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
 
-         if (pObj  &&  pObj->GetType () == MAP_OBJECT_TYPE_CELESTIAL)
+         if (pObj  &&  pObj->GetType () == MAP_OBJECT_TYPE_TYPE_CELESTIAL)
          {
             std::string sName = ReadWasmString (pCaller, pArgs[1].of.i32, pArgs[2].of.i32);
             static_cast<MAP_OBJECT_CELESTIAL*> (pObj)->m_sName = sName;
@@ -546,7 +550,7 @@ wasm_trap_t* Scene_Node_Radius (void* pEnv, wasmtime_caller_t* pCaller, const wa
          NODE* pNode = pContainer->Node_Find (twObjectIx);
          MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
 
-         if (pObj  &&  pObj->GetType () == MAP_OBJECT_TYPE_CELESTIAL)
+         if (pObj  &&  pObj->GetType () == MAP_OBJECT_TYPE_TYPE_CELESTIAL)
             static_cast<MAP_OBJECT_CELESTIAL*> (pObj)->m_dRadius = pArgs[1].of.f64;
       }
    }
@@ -571,7 +575,8 @@ wasm_trap_t* Scene_Node_Texture (void* pEnv, wasmtime_caller_t* pCaller, const w
          if (pObj)
          {
             std::string sUrl = ReadWasmString (pCaller, pArgs[1].of.i32, pArgs[2].of.i32);
-            pObj->m_sUrl_Texture = sUrl;
+            strncpy (pObj->m_Resource.sReference, sUrl.c_str (), sizeof (pObj->m_Resource.sReference) - 1);
+            pObj->m_Resource.sReference[sizeof (pObj->m_Resource.sReference) - 1] = '\0';
          }
       }
    }

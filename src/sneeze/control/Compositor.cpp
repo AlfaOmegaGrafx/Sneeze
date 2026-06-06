@@ -164,6 +164,13 @@ static void ColorFromU32 (uint32_t nColor, float& r, float& g, float& b)
    b = static_cast<float> (nColor & 0xFF) / 255.0f;
 }
 
+static void ColorFromPropertyFloat (float fColor, float& r, float& g, float& b)
+{
+   uint32_t nColor;
+   memcpy (&nColor, &fColor, 4);
+   ColorFromU32 (nColor & 0x00FFFFFF, r, g, b);
+}
+
 static int64_t s_nGlobalFrameSeq = 0;
 
 // ---------------------------------------------------------------------------
@@ -349,7 +356,7 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
          TraverseNode (pSomRoot, [&] (NODE* pNode)
          {
             MAP_OBJECT* pObj = pNode->MapObject ();
-            if (!pObj  ||  pObj->GetType () != MAP_OBJECT_TYPE_CELESTIAL)
+            if (!pObj  ||  pObj->GetType () != MAP_OBJECT_TYPE_TYPE_CELESTIAL)
                return;
 
             auto* pCelestial = static_cast<MAP_OBJECT_CELESTIAL*> (pObj);
@@ -365,9 +372,9 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
             }
             else
             {
-               dBodyX = static_cast<float> (pCelestial->m_dPosX * METERS_TO_AU);
-               dBodyY = static_cast<float> (pCelestial->m_dPosY * METERS_TO_AU);
-               dBodyZ = static_cast<float> (pCelestial->m_dPosZ * METERS_TO_AU);
+               dBodyX = static_cast<float> (pCelestial->m_Transform.d3Position[0] * METERS_TO_AU);
+               dBodyY = static_cast<float> (pCelestial->m_Transform.d3Position[1] * METERS_TO_AU);
+               dBodyZ = static_cast<float> (pCelestial->m_Transform.d3Position[2] * METERS_TO_AU);
             }
 
             float dRadius = static_cast<float> (pCelestial->m_dRadius * METERS_TO_AU);
@@ -380,7 +387,7 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
             sphere.z         = dBodyZ;
             sphere.dRadius   = dRadius;
             sphere.bEmissive = !pCelestial->HasOrbit ();
-            ColorFromU32 (pCelestial->m_nColor, sphere.r, sphere.g, sphere.b);
+            ColorFromPropertyFloat (pCelestial->m_Properties.fColor, sphere.r, sphere.g, sphere.b);
 
             if (pCelestial->m_bTextureReady.load ())
             {
@@ -396,7 +403,7 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
             if (pCelestial->HasOrbit ())
             {
                CURVE_DATA curve;
-               ColorFromU32 (pCelestial->m_nColor, curve.r, curve.g, curve.b);
+               ColorFromPropertyFloat (pCelestial->m_Properties.fColor, curve.r, curve.g, curve.b);
                curve.r *= 0.4f;
                curve.g *= 0.4f;
                curve.b *= 0.4f;

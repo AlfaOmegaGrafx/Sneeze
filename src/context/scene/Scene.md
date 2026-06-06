@@ -96,10 +96,10 @@ Derived types:
 
 | Type                   | Added Fields    | Map Object Type            |
 |------------------------|-----------------|----------------------------|
-| `MAP_OBJECT_ROOT`      | —               | `MAP_OBJECT_TYPE_ROOT`      |
-| `MAP_OBJECT_CELESTIAL` | `m_dRadius`     | `MAP_OBJECT_TYPE_CELESTIAL` |
-| `MAP_OBJECT_TERRESTRIAL`| —              | `MAP_OBJECT_TYPE_TERRESTRIAL`|
-| `MAP_OBJECT_PHYSICAL`  | —               | `MAP_OBJECT_TYPE_PHYSICAL`  |
+| `MAP_OBJECT_ROOT`      | —               | `MAP_OBJECT_TYPE_TYPE_ROOT`      |
+| `MAP_OBJECT_CELESTIAL` | `m_dRadius`     | `MAP_OBJECT_TYPE_TYPE_CELESTIAL` |
+| `MAP_OBJECT_TERRESTRIAL`| —              | `MAP_OBJECT_TYPE_TYPE_TERRESTRIAL`|
+| `MAP_OBJECT_PHYSICAL`  | —               | `MAP_OBJECT_TYPE_TYPE_PHYSICAL`  |
 
 ## Access Control
 

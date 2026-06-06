@@ -106,11 +106,11 @@ public:
 
       m_pMap_Object = pMap_Object;
 
-      if (m_pMap_Object)
+      if (m_pMap_Object  &&  m_pMap_Object->m_Resource.sReference[0] != '\0')
       {
-         if (!m_pMap_Object->m_sUrl_Fabric.empty ())
-            bResult = Fabric_Open (m_pMap_Object->m_sUrl_Fabric);
-         else if (!m_pMap_Object->m_sUrl_Texture.empty ())
+         if (m_pMap_Object->m_Type.bSubtype == 255)
+            bResult = Fabric_Open (m_pMap_Object->m_Resource.sReference);
+         else
             Texture_Request ();
       }
 
@@ -169,9 +169,9 @@ public:
 
    void Texture_Request ()
    {
-      if (m_pMap_Object  &&  !m_pMap_Object->m_sUrl_Texture.empty ())
+      if (m_pMap_Object  &&  m_pMap_Object->m_Resource.sReference[0] != '\0')
       {
-         m_pFile = m_pFabric->Scene ()->Network ()->File_Open (m_pFabric->Container ()->Identity (), m_pMap_Object->m_sUrl_Texture, this);
+         m_pFile = m_pFabric->Scene ()->Network ()->File_Open (m_pFabric->Container ()->Identity (), m_pMap_Object->m_Resource.sReference, this);
       }
    }
 

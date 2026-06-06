@@ -21,7 +21,44 @@ using namespace SNEEZE;
 // MAP_OBJECT
 // ---------------------------------------------------------------------------
 
-MAP_OBJECT::MAP_OBJECT (MAP_OBJECT_TYPE bType)
-   : m_bType (bType)
+MAP_OBJECT::MAP_OBJECT (MAP_OBJECT_TYPE_TYPE bType)
+{
+   m_Type.bType = bType;
+}
+
+// ---------------------------------------------------------------------------
+// MAP_OBJECT_ROOT
+// ---------------------------------------------------------------------------
+
+MAP_OBJECT_ROOT::MAP_OBJECT_ROOT () : MAP_OBJECT (MAP_OBJECT_TYPE_TYPE_ROOT)
+{
+}
+
+// ---------------------------------------------------------------------------
+// MAP_OBJECT_CELESTIAL
+// ---------------------------------------------------------------------------
+
+MAP_OBJECT_CELESTIAL::MAP_OBJECT_CELESTIAL () : MAP_OBJECT (MAP_OBJECT_TYPE_TYPE_CELESTIAL)
+{
+}
+
+bool MAP_OBJECT_CELESTIAL::HasOrbit () const
+{
+   return m_orbit.dA != 0.0  &&  m_orbit.tmPeriod != 0  &&  m_orbit.bHasQuat;
+}
+
+// ---------------------------------------------------------------------------
+// MAP_OBJECT_TERRESTRIAL
+// ---------------------------------------------------------------------------
+
+MAP_OBJECT_TERRESTRIAL::MAP_OBJECT_TERRESTRIAL () : MAP_OBJECT (MAP_OBJECT_TYPE_TYPE_TERRESTRIAL)
+{
+}
+
+// ---------------------------------------------------------------------------
+// MAP_OBJECT_PHYSICAL
+// ---------------------------------------------------------------------------
+
+MAP_OBJECT_PHYSICAL::MAP_OBJECT_PHYSICAL () : MAP_OBJECT (MAP_OBJECT_TYPE_TYPE_PHYSICAL)
 {
 }
