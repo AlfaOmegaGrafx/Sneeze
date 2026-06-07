@@ -21,7 +21,7 @@ using namespace SNEEZE;
 // Impl
 // ---------------------------------------------------------------------------
 
-class NETWORK::FILE::Impl
+class SNEEZE::FILE::Impl
 {
 public:
    Impl (FILE* pFile, INETWORK_IMPL* pINetwork_Impl, const CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
@@ -37,7 +37,7 @@ public:
       m_pListener        (nullptr),
       m_nCount_Attach    (0),
       m_nAssetIx         (0),
-      m_bState           (STATE_IDLE),
+      m_bState           (kASSET_STATE_IDLE),
       m_nSizeBytes       (0),
       m_nHttpStatus      (0),
       m_dFetchQueuedTime (0.0),
@@ -253,7 +253,7 @@ public:
    }
 
 public:
-   FILE*                          m_pFile;
+   FILE*                       m_pFile;
    INETWORK_IMPL*                 m_pINetwork_Impl;
    const CONTAINER::CID* m_pCID;
    ASSET*                         m_pAsset;
@@ -268,7 +268,7 @@ public:
    uint32_t                       m_nAssetIx;
    bool                           m_bCacheEnabled;
 
-   STATE                          m_bState;
+   eASSET_STATE                   m_bState;
    double                         m_dFetchQueuedTime;
    double                         m_dFetchStartTime;
 
@@ -287,17 +287,17 @@ public:
 // Constructor / Destructor
 // ---------------------------------------------------------------------------
 
-NETWORK::FILE::FILE (INETWORK_IMPL* pINetwork_Impl, const CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
+SNEEZE::FILE::FILE (INETWORK_IMPL* pINetwork_Impl, const CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
    m_pImpl (new Impl (this, pINetwork_Impl, pCID, nFileIx, sUrl, sHash, bCacheEnabled))
 {
 }
 
-bool NETWORK::FILE::Initialize (IFILE* pListener)
+bool SNEEZE::FILE::Initialize (IFILE* pListener)
 {
    return m_pImpl->Initialize (pListener);
 }
 
-NETWORK::FILE::~FILE ()
+SNEEZE::FILE::~FILE ()
 {
    delete m_pImpl;
 }
@@ -306,70 +306,70 @@ NETWORK::FILE::~FILE ()
 // Attach / Detach / Close
 // ---------------------------------------------------------------------------
 
-bool NETWORK::FILE::Attach        ()                              { return m_pImpl->Attach           (false); }
-void NETWORK::FILE::Detach        ()                              {        m_pImpl->Detach           (); }
+bool SNEEZE::FILE::Attach        ()                              { return m_pImpl->Attach           (false); }
+void SNEEZE::FILE::Detach        ()                              {        m_pImpl->Detach           (); }
 
-void NETWORK::FILE::Clear         ()                              {        m_pImpl->Clear            (); }
-void NETWORK::FILE::Close         ()                              {        m_pImpl->Close            (); }
-void NETWORK::FILE::Reset         ()                              {        m_pImpl->Reset            (); }
+void SNEEZE::FILE::Clear         ()                              {        m_pImpl->Clear            (); }
+void SNEEZE::FILE::Close         ()                              {        m_pImpl->Close            (); }
+void SNEEZE::FILE::Reset         ()                              {        m_pImpl->Reset            (); }
 
-bool NETWORK::FILE::Pending_Clear ()                              { return m_pImpl->Pending_Clear    (); }
-bool NETWORK::FILE::Pending_Close ()                              { return m_pImpl->Pending_Close    (); }
-void NETWORK::FILE::Pending_Reset ()                              {        m_pImpl->m_pAsset->Reset  (); }
+bool SNEEZE::FILE::Pending_Clear ()                              { return m_pImpl->Pending_Clear    (); }
+bool SNEEZE::FILE::Pending_Close ()                              { return m_pImpl->Pending_Close    (); }
+void SNEEZE::FILE::Pending_Reset ()                              {        m_pImpl->m_pAsset->Reset  (); }
 
 // ---------------------------------------------------------------------------
 // Notify — host callbacks
 // ---------------------------------------------------------------------------
 
-void NETWORK::FILE::Notify_Changed   ()                    {        m_pImpl->Notify_Changed (); }
+void SNEEZE::FILE::Notify_Changed   ()                    {        m_pImpl->Notify_Changed (); }
 
 // ---------------------------------------------------------------------------
 // Snapshot — copies display fields from the attached ASSET
 // ---------------------------------------------------------------------------
 
-void NETWORK::FILE::SnapshotInitial  () { m_pImpl->SnapshotInitial (); }
-void NETWORK::FILE::SnapshotProgress () { m_pImpl->SnapshotProgress (); }
-void NETWORK::FILE::SnapshotFinal    () { m_pImpl->SnapshotFinal (); }
+void SNEEZE::FILE::SnapshotInitial  () { m_pImpl->SnapshotInitial (); }
+void SNEEZE::FILE::SnapshotProgress () { m_pImpl->SnapshotProgress (); }
+void SNEEZE::FILE::SnapshotFinal    () { m_pImpl->SnapshotFinal (); }
 
 // ---------------------------------------------------------------------------
 // ASSET-dependent accessors (require attached ASSET)
 // ---------------------------------------------------------------------------
 
-//std::string                                        NETWORK::FILE::Header            (const std::string& sName) const { return m_pImpl->m_pAsset->Header (sName); }
-void                                               NETWORK::FILE::ReadData          (std::vector<uint8_t>& aData) const { return m_pImpl->m_pAsset->ReadData (aData); }
+//std::string                                        SNEEZE::FILE::Header            (const std::string& sName) const { return m_pImpl->m_pAsset->Header (sName); }
+void                                               SNEEZE::FILE::ReadData          (std::vector<uint8_t>& aData) const { return m_pImpl->m_pAsset->ReadData (aData); }
 
-std::string                                        NETWORK::FILE::DiskPath          () const { return m_pImpl->m_pAsset->DiskPath (); }
-std::string                                        NETWORK::FILE::CreatedTime       () const { return m_pImpl->m_pAsset->CreatedTime (); }
-std::string                                        NETWORK::FILE::LastAccessTime    () const { return m_pImpl->m_pAsset->LastAccessTime (); }
-uint32_t                                           NETWORK::FILE::AccessCount       () const { return m_pImpl->m_pAsset->AccessCount (); }
-const std::unordered_map<std::string, std::string>& NETWORK::FILE::RspHeaders        () const { return m_pImpl->m_pAsset->RspHeaders (); }
-const std::unordered_map<std::string, std::string>& NETWORK::FILE::ReqHeaders        () const { return m_pImpl->m_pAsset->ReqHeaders (); }
-std::string                                        NETWORK::FILE::ContainerName     () const { return m_pImpl->m_pCID->DisplayName (); }
-NETWORK::STATE                                     NETWORK::FILE::State             () const { return m_pImpl->m_bState; }
-bool                                               NETWORK::FILE::IsReady           () const { return m_pImpl->m_bState == STATE_READY; }
-std::string                                        NETWORK::FILE::Url               () const { return m_pImpl->m_sUrl; }
-std::string                                        NETWORK::FILE::Hash              () const { return m_pImpl->m_sHash; }
-bool                                               NETWORK::FILE::IsHashed          () const { return !m_pImpl->m_sHash.empty (); }
-uint32_t                                           NETWORK::FILE::FileIx            () const { return m_pImpl->m_nFileIx; }
-uint32_t                                           NETWORK::FILE::AssetIx           () const { return m_pImpl->m_nAssetIx; }
-long                                               NETWORK::FILE::HttpStatus        () const { return m_pImpl->m_nHttpStatus; }
-double                                             NETWORK::FILE::FetchQueuedTime   () const { return m_pImpl->m_dFetchQueuedTime; }
-double                                             NETWORK::FILE::FetchStartTime    () const { return m_pImpl->m_dFetchStartTime; }
-double                                             NETWORK::FILE::FetchEndTime      () const { return m_pImpl->m_dFetchEndTime; }
-double                                             NETWORK::FILE::FetchDuration     () const { return m_pImpl->m_dFetchEndTime - m_pImpl->m_dFetchStartTime; }
-bool                                               NETWORK::FILE::IsServedFromCache () const { return m_pImpl->m_bServedFromCache; }
-std::string                                        NETWORK::FILE::ContentType       () const { return m_pImpl->m_sContentType; }
-uint64_t                                           NETWORK::FILE::SizeBytes         () const { return m_pImpl->m_nSizeBytes; }
+std::string                                        SNEEZE::FILE::DiskPath          () const { return m_pImpl->m_pAsset->DiskPath (); }
+std::string                                        SNEEZE::FILE::CreatedTime       () const { return m_pImpl->m_pAsset->CreatedTime (); }
+std::string                                        SNEEZE::FILE::LastAccessTime    () const { return m_pImpl->m_pAsset->LastAccessTime (); }
+uint32_t                                           SNEEZE::FILE::AccessCount       () const { return m_pImpl->m_pAsset->AccessCount (); }
+const std::unordered_map<std::string, std::string>& SNEEZE::FILE::RspHeaders        () const { return m_pImpl->m_pAsset->RspHeaders (); }
+const std::unordered_map<std::string, std::string>& SNEEZE::FILE::ReqHeaders        () const { return m_pImpl->m_pAsset->ReqHeaders (); }
+std::string                                        SNEEZE::FILE::ContainerName     () const { return m_pImpl->m_pCID->DisplayName (); }
+eASSET_STATE                                     SNEEZE::FILE::State             () const { return m_pImpl->m_bState; }
+bool                                               SNEEZE::FILE::IsReady           () const { return m_pImpl->m_bState == kASSET_STATE_READY; }
+std::string                                        SNEEZE::FILE::Url               () const { return m_pImpl->m_sUrl; }
+std::string                                        SNEEZE::FILE::Hash              () const { return m_pImpl->m_sHash; }
+bool                                               SNEEZE::FILE::IsHashed          () const { return !m_pImpl->m_sHash.empty (); }
+uint32_t                                           SNEEZE::FILE::FileIx            () const { return m_pImpl->m_nFileIx; }
+uint32_t                                           SNEEZE::FILE::AssetIx           () const { return m_pImpl->m_nAssetIx; }
+long                                               SNEEZE::FILE::HttpStatus        () const { return m_pImpl->m_nHttpStatus; }
+double                                             SNEEZE::FILE::FetchQueuedTime   () const { return m_pImpl->m_dFetchQueuedTime; }
+double                                             SNEEZE::FILE::FetchStartTime    () const { return m_pImpl->m_dFetchStartTime; }
+double                                             SNEEZE::FILE::FetchEndTime      () const { return m_pImpl->m_dFetchEndTime; }
+double                                             SNEEZE::FILE::FetchDuration     () const { return m_pImpl->m_dFetchEndTime - m_pImpl->m_dFetchStartTime; }
+bool                                               SNEEZE::FILE::IsServedFromCache () const { return m_pImpl->m_bServedFromCache; }
+std::string                                        SNEEZE::FILE::ContentType       () const { return m_pImpl->m_sContentType; }
+uint64_t                                           SNEEZE::FILE::SizeBytes         () const { return m_pImpl->m_nSizeBytes; }
 
-bool                                               NETWORK::FILE::IsPending_Clear   () const { return m_pImpl->m_bPending_Clear; }
-bool                                               NETWORK::FILE::IsPending_Close   () const { return m_pImpl->m_bPending_Close; }
-std::string                                        NETWORK::FILE::Path              () const { return m_pImpl->Path (); }
-std::string                                        NETWORK::FILE::Filename          (const std::string& sExt) const { return m_pImpl->Filename (sExt); }
-std::string                                        NETWORK::FILE::Pathname          (const std::string& sExt) const { return m_pImpl->Pathname (sExt); }
+bool                                               SNEEZE::FILE::IsPending_Clear   () const { return m_pImpl->m_bPending_Clear; }
+bool                                               SNEEZE::FILE::IsPending_Close   () const { return m_pImpl->m_bPending_Close; }
+std::string                                        SNEEZE::FILE::Path              () const { return m_pImpl->Path (); }
+std::string                                        SNEEZE::FILE::Filename          (const std::string& sExt) const { return m_pImpl->Filename (sExt); }
+std::string                                        SNEEZE::FILE::Pathname          (const std::string& sExt) const { return m_pImpl->Pathname (sExt); }
 
-NETWORK::IFILE*                                    NETWORK::FILE::Listener          () const { return m_pImpl->m_pListener; }
+IFILE*                                    SNEEZE::FILE::Listener          () const { return m_pImpl->m_pListener; }
 
-const std::string&                                 NETWORK::FILE::OpenHash          () const { return m_pImpl->m_sOpenHash; }
-bool                                               NETWORK::FILE::CacheEnabled      () const { return m_pImpl->m_bCacheEnabled; }
+const std::string&                                 SNEEZE::FILE::OpenHash          () const { return m_pImpl->m_sOpenHash; }
+bool                                               SNEEZE::FILE::CacheEnabled      () const { return m_pImpl->m_bCacheEnabled; }
 
-const std::string&                                 NETWORK::FILE::RemoteAddress     () const { return m_pImpl->m_pAsset->RemoteAddress (); }
+const std::string&                                 SNEEZE::FILE::RemoteAddress     () const { return m_pImpl->m_pAsset->RemoteAddress (); }

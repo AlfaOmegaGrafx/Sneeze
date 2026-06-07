@@ -18,10 +18,10 @@
 using namespace SNEEZE;
 
 // ---------------------------------------------------------------------------
-// CONSOLE::STREAM::Impl
+// STREAM::Impl
 // ---------------------------------------------------------------------------
 
-class CONSOLE::STREAM::Impl
+class STREAM::Impl
 {
 public:
    Impl (ICONSOLE_IMPL* pIConsole_Impl, const CONTAINER::CID* pCID) :
@@ -220,14 +220,14 @@ public:
    // (timestamp, sequence, ring buffer), then writes to the active block.
    // ---------------------------------------------------------------------------
 
-   void Entry (CONSOLE::eLEVEL eLevel, const std::string& sMessage, bool bCollapsed = false)
+   void Entry (eENTRY_LEVEL eLevel, const std::string& sMessage, bool bCollapsed = false, bool bSystem = false)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxStream);
 
       if (m_nBlock < 0  ||  m_nBlockEntryCount >= m_nEntries_Block)
          Rotate ();
 
-      auto pEntry = m_pIConsole_Impl->Entry_Create (m_pCID, eLevel, sMessage, m_nGroupDepth, bCollapsed);
+      auto pEntry = m_pIConsole_Impl->Entry_Create (m_pCID, eLevel, sMessage, m_nGroupDepth, bCollapsed, bSystem);
 
       m_apBlock.back ()->Write (pEntry);
       m_nBlockEntryCount++;
@@ -241,7 +241,7 @@ public:
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxStream);
 
-      Entry (CONSOLE::kLEVEL_LOG, sLabel, bCollapsed);
+      Entry (kENTRY_LEVEL_LOG, sLabel, bCollapsed);
       m_nGroupDepth++;
    }
 
@@ -262,7 +262,7 @@ public:
       std::lock_guard<std::recursive_mutex> guard (m_mxStream);
 
       uint32_t nCount = ++m_umpCount[sLabel];
-      Entry (CONSOLE::kLEVEL_INFO, sLabel + ": " + std::to_string (nCount));
+      Entry (kENTRY_LEVEL_INFO, sLabel + ": " + std::to_string (nCount));
    }
 
    void CountReset (const std::string& sLabel)
@@ -296,7 +296,7 @@ public:
 
          std::ostringstream oss;
          oss << sLabel << ": " << std::fixed << std::setprecision (3) << dElapsed << "ms";
-         Entry (CONSOLE::kLEVEL_INFO, oss.str ());
+         Entry (kENTRY_LEVEL_INFO, oss.str ());
       }
    }
 
@@ -312,7 +312,7 @@ public:
 
          std::ostringstream oss;
          oss << sLabel << ": " << std::fixed << std::setprecision (3) << dElapsed << "ms";
-         Entry (CONSOLE::kLEVEL_INFO, oss.str ());
+         Entry (kENTRY_LEVEL_INFO, oss.str ());
       }
    }
 
@@ -335,20 +335,20 @@ public:
 };
 
 // ===========================================================================
-// CONSOLE::STREAM
+// STREAM
 // ===========================================================================
 
-CONSOLE::STREAM::STREAM (ICONSOLE_IMPL* pIConsole_Impl, const CONTAINER::CID* pCID) :
+STREAM::STREAM (ICONSOLE_IMPL* pIConsole_Impl, const CONTAINER::CID* pCID) :
    m_pImpl (new Impl (pIConsole_Impl, pCID))
 {
 }
 
-void CONSOLE::STREAM::Initialize (int nBlocks, int nEntries_Block)
+void STREAM::Initialize (int nBlocks, int nEntries_Block)
 {
    m_pImpl->Initialize (nBlocks, nEntries_Block);
 }
 
-CONSOLE::STREAM::~STREAM ()
+STREAM::~STREAM ()
 {
    delete m_pImpl;
 }
@@ -357,11 +357,11 @@ CONSOLE::STREAM::~STREAM ()
 // Accessors
 // ---------------------------------------------------------------------------
 
-std::string CONSOLE::STREAM::DisplayName    ()                                         const { return m_pImpl->m_pCID->DisplayName (); }
+std::string STREAM::DisplayName    ()                                         const { return m_pImpl->m_pCID->DisplayName (); }
 
-std::string CONSOLE::STREAM::Path          (uint32_t nBlock)                          const { return m_pImpl->Path     (nBlock); }
-std::string CONSOLE::STREAM::Filename      (uint32_t nBlock, const std::string& sExt) const { return m_pImpl->Filename (nBlock, sExt); }
-std::string CONSOLE::STREAM::Pathname      (uint32_t nBlock, const std::string& sExt) const { return m_pImpl->Pathname (nBlock, sExt); }
+std::string STREAM::Path          (uint32_t nBlock)                          const { return m_pImpl->Path     (nBlock); }
+std::string STREAM::Filename      (uint32_t nBlock, const std::string& sExt) const { return m_pImpl->Filename (nBlock, sExt); }
+std::string STREAM::Pathname      (uint32_t nBlock, const std::string& sExt) const { return m_pImpl->Pathname (nBlock, sExt); }
 
 // ---------------------------------------------------------------------------
 // Modifiers
@@ -371,27 +371,27 @@ std::string CONSOLE::STREAM::Pathname      (uint32_t nBlock, const std::string& 
 // STREAM Caching
 // ---------------------------------------------------------------------------
 
-void CONSOLE::STREAM::Attach              ()                                                 {                  m_pImpl->Attach (); }
-void CONSOLE::STREAM::Detach              ()                                                 {                  m_pImpl->Detach (); }
+void STREAM::Attach              ()                                                 {                  m_pImpl->Attach (); }
+void STREAM::Detach              ()                                                 {                  m_pImpl->Detach (); }
 
 // ---------------------------------------------------------------------------
 // STREAM Pass-through
 // ---------------------------------------------------------------------------
 
-void     CONSOLE::STREAM::Log             (                 const std::string& sMessage)     {                  m_pImpl->Entry      (CONSOLE::kLEVEL_LOG,                          sMessage); }
-void     CONSOLE::STREAM::Debug           (                 const std::string& sMessage)     {                  m_pImpl->Entry      (CONSOLE::kLEVEL_DEBUG,                        sMessage); }
-void     CONSOLE::STREAM::Info            (                 const std::string& sMessage)     {                  m_pImpl->Entry      (CONSOLE::kLEVEL_INFO,                         sMessage); }
-void     CONSOLE::STREAM::Warn            (                 const std::string& sMessage)     {                  m_pImpl->Entry      (CONSOLE::kLEVEL_WARN,                         sMessage); }
-void     CONSOLE::STREAM::Error           (                 const std::string& sMessage)     {                  m_pImpl->Entry      (CONSOLE::kLEVEL_ERROR,                        sMessage); }
-void     CONSOLE::STREAM::Assert          (bool bCondition, const std::string& sMessage)     { if (!bCondition) m_pImpl->Entry      (CONSOLE::kLEVEL_ERROR, "Assertion failed: " + sMessage); }
+void     STREAM::Log             (                 const std::string& sMessage, bool bSystem) {                  m_pImpl->Entry      (kENTRY_LEVEL_LOG,                          sMessage, false, bSystem); }
+void     STREAM::Debug           (                 const std::string& sMessage, bool bSystem) {                  m_pImpl->Entry      (kENTRY_LEVEL_DEBUG,                        sMessage, false, bSystem); }
+void     STREAM::Info            (                 const std::string& sMessage, bool bSystem) {                  m_pImpl->Entry      (kENTRY_LEVEL_INFO,                         sMessage, false, bSystem); }
+void     STREAM::Warn            (                 const std::string& sMessage, bool bSystem) {                  m_pImpl->Entry      (kENTRY_LEVEL_WARN,                         sMessage, false, bSystem); }
+void     STREAM::Error           (                 const std::string& sMessage, bool bSystem) {                  m_pImpl->Entry      (kENTRY_LEVEL_ERROR,                        sMessage, false, bSystem); }
+void     STREAM::Assert          (bool bCondition, const std::string& sMessage, bool bSystem) { if (!bCondition) m_pImpl->Entry      (kENTRY_LEVEL_ERROR, "Assertion failed: " + sMessage, false, bSystem); }
 
-void     CONSOLE::STREAM::Group           (                 const std::string& sLabel)       {                  m_pImpl->Group      (sLabel, false); }
-void     CONSOLE::STREAM::GroupCollapsed  (                 const std::string& sLabel)       {                  m_pImpl->Group      (sLabel, true);  }
-void     CONSOLE::STREAM::GroupEnd        ()                                                 {                  m_pImpl->GroupEnd   ();              }
+void     STREAM::Group           (                 const std::string& sLabel)                 {                  m_pImpl->Group      (sLabel, false); }
+void     STREAM::GroupCollapsed  (                 const std::string& sLabel)                 {                  m_pImpl->Group      (sLabel, true);  }
+void     STREAM::GroupEnd        ()                                                           {                  m_pImpl->GroupEnd   ();              }
 
-void     CONSOLE::STREAM::Count           (                 const std::string& sLabel)       {                  m_pImpl->Count      (sLabel); }
-void     CONSOLE::STREAM::CountReset      (                 const std::string& sLabel)       {                  m_pImpl->CountReset (sLabel); }
+void     STREAM::Count           (                 const std::string& sLabel)                 {                  m_pImpl->Count      (sLabel); }
+void     STREAM::CountReset      (                 const std::string& sLabel)                 {                  m_pImpl->CountReset (sLabel); }
 
-void     CONSOLE::STREAM::Time            (                 const std::string& sLabel)       {                  m_pImpl->Time       (sLabel); }
-void     CONSOLE::STREAM::TimeEnd         (                 const std::string& sLabel)       {                  m_pImpl->TimeEnd    (sLabel); }
-void     CONSOLE::STREAM::TimeLog         (                 const std::string& sLabel)       {                  m_pImpl->TimeLog    (sLabel); }
+void     STREAM::Time            (                 const std::string& sLabel)                 {                  m_pImpl->Time       (sLabel); }
+void     STREAM::TimeEnd         (                 const std::string& sLabel)                 {                  m_pImpl->TimeEnd    (sLabel); }
+void     STREAM::TimeLog         (                 const std::string& sLabel)                 {                  m_pImpl->TimeLog    (sLabel); }

@@ -63,20 +63,20 @@ public:
    int m_nEntryCount = 0;
    int m_nClearCount = 0;
 
-   void OnConsoleEntryCreated (std::shared_ptr<const CONSOLE::ENTRY>) override { m_nEntryCount++; }
-   void OnConsoleEntryDeleted (std::shared_ptr<const CONSOLE::ENTRY>) override { m_nClearCount++; }
+   void OnConsoleEntryCreated (std::shared_ptr<const ENTRY>) override { m_nEntryCount++; }
+   void OnConsoleEntryDeleted (std::shared_ptr<const ENTRY>) override { m_nClearCount++; }
 };
 
 // ---------------------------------------------------------------------------
 // IENUM collector
 // ---------------------------------------------------------------------------
 
-class ENTRY_COLLECTOR : public CONSOLE::IENUM_ENTRY
+class ENTRY_COLLECTOR : public IENUM_ENTRY
 {
 public:
-   std::vector<std::shared_ptr<const CONSOLE::ENTRY>> m_aEntry;
+   std::vector<std::shared_ptr<const ENTRY>> m_aEntry;
 
-   void OnEntry (std::shared_ptr<const CONSOLE::ENTRY> pEntry) override
+   void OnEntry (std::shared_ptr<const ENTRY> pEntry) override
    {
       m_aEntry.push_back (pEntry);
    }
@@ -146,7 +146,7 @@ int RunConsoleTests (int nArgc, char** aArgv)
    CONSOLE* pConsole = pContext->Console ();
 
    // Open a stream for the CID — all logging goes through streams
-   CONSOLE::STREAM* pStream = pConsole->Stream_Open (&cid);
+   STREAM* pStream = pConsole->Stream_Open (&cid);
    ASSERT (pStream != nullptr, "Stream_Open returned non-null");
 
    // -----------------------------------------------------------------------
@@ -164,8 +164,8 @@ int RunConsoleTests (int nArgc, char** aArgv)
    ENTRY_COLLECTOR collector;
    pConsole->Entry_Enum (&collector);
    ASSERT (collector.m_aEntry.size () == 5, "Five entries in ring buffer");
-   ASSERT (collector.m_aEntry[0]->Level () == CONSOLE::kLEVEL_LOG,   "First entry is LOG");
-   ASSERT (collector.m_aEntry[4]->Level () == CONSOLE::kLEVEL_ERROR, "Last entry is ERROR");
+   ASSERT (collector.m_aEntry[0]->Level () == kENTRY_LEVEL_LOG,   "First entry is LOG");
+   ASSERT (collector.m_aEntry[4]->Level () == kENTRY_LEVEL_ERROR, "Last entry is ERROR");
    ASSERT (collector.m_aEntry[0]->Message () == "Hello from log", "Log message correct");
    ASSERT (contextHost.m_nEntryCount == 5, "Five OnConsoleEntry notifications");
 
@@ -175,7 +175,7 @@ int RunConsoleTests (int nArgc, char** aArgv)
 
    std::printf ("\n[Test 3] Engine-internal logging (null CID)\n");
 
-   CONSOLE::STREAM* pEngineStream = pConsole->Stream_Open (nullptr);
+   STREAM* pEngineStream = pConsole->Stream_Open (nullptr);
 
    if (pEngineStream)
    {
@@ -205,7 +205,7 @@ int RunConsoleTests (int nArgc, char** aArgv)
    ENTRY_COLLECTOR collector3;
    pConsole->Entry_Enum (&collector3);
    auto pAssertEntry = collector3.m_aEntry.back ();
-   ASSERT (pAssertEntry->Level () == CONSOLE::kLEVEL_ERROR, "Failed assert is ERROR");
+   ASSERT (pAssertEntry->Level () == kENTRY_LEVEL_ERROR, "Failed assert is ERROR");
    ASSERT (pAssertEntry->Message ().find ("Assertion failed") != std::string::npos, "Assert message contains prefix");
 
    // -----------------------------------------------------------------------
@@ -322,7 +322,7 @@ int RunConsoleTests (int nArgc, char** aArgv)
    {
       auto pOriginal = collector8.m_aEntry.front ();
       nlohmann::json jEntry = pOriginal->ToJson ();
-      auto pDeserialized = CONSOLE::ENTRY::FromJson (jEntry, &cid);
+      auto pDeserialized = ENTRY::FromJson (jEntry, &cid);
 
       ASSERT (pDeserialized != nullptr, "Deserialized entry is non-null");
       ASSERT (pDeserialized->Level ()   == pOriginal->Level (),   "Level round-trips");
@@ -391,15 +391,15 @@ int RunConsoleTests (int nArgc, char** aArgv)
 
    std::string sLevel;
 
-   CONSOLE::ENTRY::LevelString (CONSOLE::kLEVEL_LOG, sLevel);
+   ENTRY::LevelString (kENTRY_LEVEL_LOG, sLevel);
    ASSERT (sLevel == "log",   "LOG -> log");
-   CONSOLE::ENTRY::LevelString (CONSOLE::kLEVEL_DEBUG, sLevel);
+   ENTRY::LevelString (kENTRY_LEVEL_DEBUG, sLevel);
    ASSERT (sLevel == "debug", "DEBUG -> debug");
-   CONSOLE::ENTRY::LevelString (CONSOLE::kLEVEL_INFO, sLevel);
+   ENTRY::LevelString (kENTRY_LEVEL_INFO, sLevel);
    ASSERT (sLevel == "info",  "INFO -> info");
-   CONSOLE::ENTRY::LevelString (CONSOLE::kLEVEL_WARN, sLevel);
+   ENTRY::LevelString (kENTRY_LEVEL_WARN, sLevel);
    ASSERT (sLevel == "warn",  "WARN -> warn");
-   CONSOLE::ENTRY::LevelString (CONSOLE::kLEVEL_ERROR, sLevel);
+   ENTRY::LevelString (kENTRY_LEVEL_ERROR, sLevel);
    ASSERT (sLevel == "error", "ERROR -> error");
 
    // -----------------------------------------------------------------------

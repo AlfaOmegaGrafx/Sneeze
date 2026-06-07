@@ -54,7 +54,7 @@ public:
    // Silo management
    // ---------------------------------------------------------------------------
 
-   STORAGE::SILO* Silo_Open (const CONTAINER::CID* pCID)
+   SILO* Silo_Open (const CONTAINER::CID* pCID)
    {
       SILO* pSilo = nullptr;
 
@@ -105,7 +105,7 @@ public:
    // ISTORAGE_IMPL
    // ---------------------------------------------------------------------------
 
-   UNIT* Unit_Open (eSCOPE eScope, const std::string& sPathname)
+   UNIT* Unit_Open (eSILO_SCOPE eScope, const std::string& sPathname)
    {
       UNIT* pUnit = nullptr;
 
@@ -182,6 +182,6 @@ STORAGE::~STORAGE ()
 // Container lifecycle
 // ---------------------------------------------------------------------------
 
-STORAGE::SILO*     STORAGE::Silo_Open       (const CONTAINER::CID* pCID)         { return m_pImpl->Silo_Open       (pCID); }
+SILO*              STORAGE::Silo_Open       (const CONTAINER::CID* pCID)         { return m_pImpl->Silo_Open       (pCID); }
 void               STORAGE::Silo_Close      (SILO* pSilo)                                 {        m_pImpl->Silo_Close      (pSilo); }
 void               STORAGE::Silo_Enum       (IENUM_SILO* pEnum)                           {        m_pImpl->Silo_Enum       (pEnum); }

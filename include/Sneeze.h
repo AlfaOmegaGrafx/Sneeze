@@ -83,19 +83,19 @@ namespace SNEEZE
    public:
       virtual ~ICONTEXT () = default;
 
-      virtual bool OnNetworkFileCreated   (NETWORK::FILE*) { return true; }
-      virtual void OnNetworkFileChanged   (NETWORK::FILE*) {}
-      virtual void OnNetworkFileDeleted   (NETWORK::FILE*) {}
+      virtual bool OnNetworkFileCreated   (FILE*) { return true; }
+      virtual void OnNetworkFileChanged   (FILE*) {}
+      virtual void OnNetworkFileDeleted   (FILE*) {}
 
-      virtual void OnStorageSiloCreated   (STORAGE::SILO*) {}
-      virtual void OnStorageSiloChanged   (STORAGE::SILO*, STORAGE::eSCOPE eScope, const std::string&) {}
-      virtual void OnStorageSiloDeleted   (STORAGE::SILO*) {}
+      virtual void OnStorageSiloCreated   (SILO*) {}
+      virtual void OnStorageSiloChanged   (SILO*, eSILO_SCOPE eScope, const std::string&) {}
+      virtual void OnStorageSiloDeleted   (SILO*) {}
 
-      virtual void OnConsoleStreamCreated (CONSOLE::STREAM*) {}
-      virtual void OnConsoleStreamDeleted (CONSOLE::STREAM*) {}
+      virtual void OnConsoleStreamCreated (STREAM*) {}
+      virtual void OnConsoleStreamDeleted (STREAM*) {}
 
-      virtual void OnConsoleEntryCreated  (std::shared_ptr<const CONSOLE::ENTRY>) {}
-      virtual void OnConsoleEntryDeleted  (std::shared_ptr<const CONSOLE::ENTRY>) {}
+      virtual void OnConsoleEntryCreated  (std::shared_ptr<const ENTRY>) {}
+      virtual void OnConsoleEntryDeleted  (std::shared_ptr<const ENTRY>) {}
    };
 
    // ------------------------------------------------------------------------

@@ -25,7 +25,7 @@ using namespace SNEEZE;
 // Delegates to FABRIC's public callback methods (no Impl access).
 // ---------------------------------------------------------------------------
 
-class MSF_FETCH : public NETWORK::IFILE
+class MSF_FETCH : public IFILE
 {
 public:
    MSF_FETCH (FABRIC* pFabric, SCENE* pScene) :
@@ -51,12 +51,12 @@ public:
       }
    }
 
-   void OnFileReady  (NETWORK::FILE* pFile) override { m_pFabric->OnMsfReady  (pFile); delete this; }
-   void OnFileFailed (NETWORK::FILE* pFile) override { m_pFabric->OnMsfFailed (pFile); delete this; }
+   void OnFileReady  (SNEEZE::FILE* pFile) override { m_pFabric->OnMsfReady  (pFile); delete this; }
+   void OnFileFailed (SNEEZE::FILE* pFile) override { m_pFabric->OnMsfFailed (pFile); delete this; }
 
    FABRIC*        m_pFabric;
    SCENE*         m_pScene;
-   NETWORK::FILE* m_pFile;
+   SNEEZE::FILE*  m_pFile;
 };
 
 // ---------------------------------------------------------------------------
@@ -64,7 +64,7 @@ public:
 // One instance per module declared in the MSF payload.
 // ---------------------------------------------------------------------------
 
-class WASM_FETCH : public NETWORK::IFILE
+class WASM_FETCH : public IFILE
 {
 public:
    WASM_FETCH (FABRIC* pFabric, SCENE* pScene, const std::string& sUrl, const std::string& sHash) :
@@ -92,14 +92,14 @@ public:
       }
    }
 
-   void OnFileReady  (NETWORK::FILE* pFile) override { m_pFabric->OnWasmReady  (pFile, m_sUrl, m_sHash); delete this; }
-   void OnFileFailed (NETWORK::FILE* pFile) override { m_pFabric->OnWasmFailed (pFile, m_sUrl         ); delete this; }
+   void OnFileReady  (SNEEZE::FILE* pFile) override { m_pFabric->OnWasmReady  (pFile, m_sUrl, m_sHash); delete this; }
+   void OnFileFailed (SNEEZE::FILE* pFile) override { m_pFabric->OnWasmFailed (pFile, m_sUrl         ); delete this; }
 
    FABRIC*        m_pFabric;
    SCENE*         m_pScene;
    std::string    m_sUrl;
    std::string    m_sHash;
-   NETWORK::FILE* m_pFile;
+   SNEEZE::FILE*  m_pFile;
 };
 
 
@@ -185,7 +185,7 @@ public:
 // MSF loaded — open container, enumerate modules, begin WASM fetches
 // -----------------------------------------------------------------------
 
-   void OnMsfReady (NETWORK::FILE* pFile)
+   void OnMsfReady (FILE* pFile)
    {
       std::vector<uint8_t> aData;
 
@@ -204,7 +204,9 @@ public:
 
             if ((m_pContainer = m_pScene->Context ()->Container_Open (m_pFabric)))
             {
-               m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "FABRIC", "Loaded MSF: " + m_pContainer->Identity ()->DisplayName () + " (trust: " + std::to_string (m_pContainer->Identity ()->eTrust) + ")");
+               std::string sMsg = "Loaded MSF: " + m_pContainer->Identity ()->DisplayName () + " (trust: " + std::to_string (m_pContainer->Identity ()->eTrust) + ")";
+               m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "FABRIC", sMsg);
+               m_pContainer->Stream ()->Info (sMsg, true);
 
                auto aModule = m_pMsf->Modules ();
 
@@ -219,30 +221,46 @@ public:
                      pWasm_Fetch->Initialize (m_pContainer->Identity ());
                   }
 
-                  m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "FABRIC", "Fetching " + std::to_string (aModule.size ()) + " WASM module(s)");
+                  std::string sModMsg = "Fetching " + std::to_string (aModule.size ()) + " WASM module(s)";
+                  m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "FABRIC", sModMsg);
+                  m_pContainer->Stream ()->Info (sModMsg, true);
                }
 
                if (m_apWasm_Fetch.empty ())
                   WasmFetch_Complete ();
             }
-            else m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "FABRIC", "Container_Open failed for " + m_sUrl);
+            else
+            {
+               std::string sErr = "Container_Open failed for " + m_sUrl;
+               m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "FABRIC", sErr);
+               m_pFabric_Parent->Container ()->Stream ()->Error (sErr, true);
+            }
          }
          else
          {
-            m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "FABRIC", "Failed to parse MSF from " + m_sUrl);
+            std::string sErr = "Failed to parse MSF from " + m_sUrl;
+            m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "FABRIC", sErr);
+            m_pFabric_Parent->Container ()->Stream ()->Error (sErr, true);
 
             delete m_pMsf;
             m_pMsf = nullptr;
          }
       }
-      else m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "FABRIC", "MSF was empty for " + m_sUrl);
+      else
+      {
+         std::string sErr = "MSF was empty for " + m_sUrl;
+         m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "FABRIC", sErr);
+         m_pFabric_Parent->Container ()->Stream ()->Error (sErr, true);
+      }   
 
       m_pMsf_Fetch = nullptr;
    }
 
-   void OnMsfFailed (NETWORK::FILE* pFile)
+   void OnMsfFailed (FILE* pFile)
    {
-      m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "FABRIC", "Failed to fetch MSF from " + m_sUrl);
+      std::string sErr = "Failed to fetch MSF from " + m_sUrl;
+      m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "FABRIC", sErr);
+      m_pFabric_Parent->Container ()->Stream ()->Error (sErr, true);
 
       m_pMsf_Fetch = nullptr;
    }
@@ -251,7 +269,7 @@ public:
 // WASM module fetched — compile and insert into container
 // -----------------------------------------------------------------------
 
-   void OnWasmReady (NETWORK::FILE* pFile, const std::string& sUrl, const std::string& sHash)
+   void OnWasmReady (FILE* pFile, const std::string& sUrl, const std::string& sHash)
    {
       std::vector<uint8_t> aData;
 
@@ -263,17 +281,26 @@ public:
          {
             m_aModule.push_back (std::make_pair (sUrl, sHash));
 
-            m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "FABRIC", "Loaded WASM: " + sUrl);
+            std::string sWasmMsg = "Loaded WASM: " + sUrl;
+            m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "FABRIC", sWasmMsg);
+            m_pContainer->Stream ()->Info (sWasmMsg, true);
          }
-         else m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "FABRIC", "Failed to load WASM: " + sUrl);
+         else
+         {
+            std::string sWasmErr = "Failed to load WASM: " + sUrl;
+            m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "FABRIC", sWasmErr);
+            m_pContainer->Stream ()->Error (sWasmErr, true);
+         }
       }
 
       WasmFetch_Remove (sUrl);
    }
 
-   void OnWasmFailed (NETWORK::FILE* pFile, const std::string& sUrl)
+   void OnWasmFailed (FILE* pFile, const std::string& sUrl)
    {
-      m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "FABRIC", "Failed to fetch WASM: " + sUrl);
+      std::string sFetchErr = "Failed to fetch WASM: " + sUrl;
+      m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "FABRIC", sFetchErr);
+      m_pContainer->Stream ()->Error (sFetchErr, true);
 
       WasmFetch_Remove (sUrl);
    }
@@ -295,8 +322,12 @@ public:
 
    void WasmFetch_Complete ()
    {
-      if (m_pContainer  &&  !m_aModule.empty ())
-         m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "FABRIC", std::to_string (m_aModule.size ()) + " WASM instance(s) active");
+      if (!m_aModule.empty ())
+      {
+         std::string sActiveMsg = std::to_string (m_aModule.size ()) + " WASM instance(s) active";
+         m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "FABRIC", sActiveMsg);
+         m_pContainer->Stream ()->Info (sActiveMsg, true);
+      }
 
 /*
 // temporary kludge to inject the solar system into the primary fabric
@@ -420,10 +451,10 @@ void               FABRIC::Fabric_Remove  (FABRIC* pFabric_Child)         {     
 // Fetch callbacks (delegated from MSF_FETCH / WASM_FETCH helpers)
 // -----------------------------------------------------------------------
 
-void               FABRIC::OnMsfReady    (NETWORK::FILE* pFile)                                                      { m_pImpl->OnMsfReady   (pFile); }
-void               FABRIC::OnMsfFailed   (NETWORK::FILE* pFile)                                                      { m_pImpl->OnMsfFailed  (pFile); }
-void               FABRIC::OnWasmReady   (NETWORK::FILE* pFile, const std::string& sUrl, const std::string& sHash)   { m_pImpl->OnWasmReady  (pFile, sUrl, sHash); }
-void               FABRIC::OnWasmFailed  (NETWORK::FILE* pFile, const std::string& sUrl)                             { m_pImpl->OnWasmFailed (pFile, sUrl); } 
+void               FABRIC::OnMsfReady    (FILE* pFile)                                                      { m_pImpl->OnMsfReady   (pFile); }
+void               FABRIC::OnMsfFailed   (FILE* pFile)                                                      { m_pImpl->OnMsfFailed  (pFile); }
+void               FABRIC::OnWasmReady   (FILE* pFile, const std::string& sUrl, const std::string& sHash)   { m_pImpl->OnWasmReady  (pFile, sUrl, sHash); }
+void               FABRIC::OnWasmFailed  (FILE* pFile, const std::string& sUrl)                             { m_pImpl->OnWasmFailed (pFile, sUrl); } 
 
 // ===========================================================================
 // FABRIC_ROOT
@@ -449,7 +480,7 @@ bool FABRIC_ROOT::Initialize (const std::string& sUrl)
       if (pNode_Root->Initialize (nullptr))
       {
          auto* pMap_Object  = new MAP_OBJECT_ROOT ();
-         
+
          pMap_Object->m_Type.bSubtype = 255;
          strncpy (pMap_Object->m_Resource.sReference, sUrl.c_str (), sizeof (pMap_Object->m_Resource.sReference) - 1);
 

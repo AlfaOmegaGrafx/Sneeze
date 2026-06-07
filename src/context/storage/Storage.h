@@ -23,7 +23,7 @@ namespace SNEEZE
       ISTORAGE_IMPL ();
       virtual ~ISTORAGE_IMPL ();
 
-      virtual UNIT*              Unit_Open  (STORAGE::eSCOPE eScope, const std::string& sPathname)                        = 0;
+      virtual UNIT*              Unit_Open  (eSILO_SCOPE eScope, const std::string& sPathname)                                 = 0;
       virtual void               Unit_Close (UNIT* pUnit)                                                                 = 0;
 
       virtual void               Log (IENGINE::eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage)  = 0;
@@ -47,14 +47,14 @@ namespace SNEEZE
    class UNIT
    {
    public:
-      UNIT (ISTORAGE_IMPL* pIStorage_Impl, STORAGE::eSCOPE eScope, const std::string& sPathname);
+      UNIT (ISTORAGE_IMPL* pIStorage_Impl, eSILO_SCOPE eScope, const std::string& sPathname);
       virtual ~UNIT ();
 
       // --- State ---
 
       bool                IsLoaded () const;
       bool                IsDirty () const;
-      STORAGE::eSCOPE     GetScope () const;
+      eSILO_SCOPE              GetScope () const;
 
       // --- JSON access ---
 

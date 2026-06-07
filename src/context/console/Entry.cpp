@@ -15,16 +15,17 @@
 using namespace SNEEZE;
 
 // ===========================================================================
-// CONSOLE::ENTRY
+// ENTRY
 // ===========================================================================
 
-CONSOLE::ENTRY::ENTRY (const CONTAINER::CID* pCID, eLEVEL eLevel, const std::string& sMessage, uint32_t nIndex, uint32_t nGroupDepth, bool bCollapsed, const std::string& sStackTrace, const std::string& sSource) :
+ENTRY::ENTRY (const CONTAINER::CID* pCID, eENTRY_LEVEL eLevel, const std::string& sMessage, uint32_t nIndex, uint32_t nGroupDepth, bool bCollapsed, bool bSystem, const std::string& sStackTrace, const std::string& sSource) :
    m_pCID        (pCID),
    m_eLevel      (eLevel),
    m_sMessage    (sMessage),
    m_nIndex      (nIndex),
    m_nGroupDepth (nGroupDepth),
    m_bCollapsed  (bCollapsed),
+   m_bSystem     (bSystem),
    m_sStackTrace (sStackTrace),
    m_sSource     (sSource),
    m_tpStamp     (std::chrono::system_clock::now ())
@@ -35,31 +36,32 @@ CONSOLE::ENTRY::ENTRY (const CONTAINER::CID* pCID, eLEVEL eLevel, const std::str
 // Const accessors
 // ---------------------------------------------------------------------------
 
-const SNEEZE::CONTAINER::CID*       CONSOLE::ENTRY::CID         () const { return m_pCID; }
-CONSOLE::eLEVEL                              CONSOLE::ENTRY::Level       () const { return m_eLevel; }
-const std::string&                           CONSOLE::ENTRY::Message     () const { return m_sMessage; }
-uint32_t                                     CONSOLE::ENTRY::Index       () const { return m_nIndex; }
-uint32_t                                     CONSOLE::ENTRY::GroupDepth  () const { return m_nGroupDepth; }
-bool                                         CONSOLE::ENTRY::IsCollapsed () const { return m_bCollapsed; }
-const std::string&                           CONSOLE::ENTRY::StackTrace  () const { return m_sStackTrace; }
-const std::string&                           CONSOLE::ENTRY::Source      () const { return m_sSource; }
-std::chrono::system_clock::time_point        CONSOLE::ENTRY::tpStamp     () const { return m_tpStamp; }
+const SNEEZE::CONTAINER::CID*       ENTRY::CID         () const { return m_pCID; }
+eENTRY_LEVEL                              ENTRY::Level       () const { return m_eLevel; }
+const std::string&                  ENTRY::Message     () const { return m_sMessage; }
+uint32_t                            ENTRY::Index       () const { return m_nIndex; }
+uint32_t                            ENTRY::GroupDepth  () const { return m_nGroupDepth; }
+bool                                ENTRY::IsCollapsed () const { return m_bCollapsed; }
+bool                                ENTRY::IsSystem    () const { return m_bSystem; }
+const std::string&                  ENTRY::StackTrace  () const { return m_sStackTrace; }
+const std::string&                  ENTRY::Source      () const { return m_sSource; }
+std::chrono::system_clock::time_point ENTRY::tpStamp   () const { return m_tpStamp; }
 
 // ---------------------------------------------------------------------------
 // LevelString
 // ---------------------------------------------------------------------------
 
-void CONSOLE::ENTRY::LevelString (eLEVEL eLevel, std::string& sLevel)
+void ENTRY::LevelString (eENTRY_LEVEL eLevel, std::string& sLevel)
 {
    sLevel = "log";
 
    switch (eLevel)
    {
-      case kLEVEL_DEBUG: sLevel = "debug"; break;
-      case kLEVEL_LOG:   sLevel = "log";   break;
-      case kLEVEL_INFO:  sLevel = "info";  break;
-      case kLEVEL_WARN:  sLevel = "warn";  break;
-      case kLEVEL_ERROR: sLevel = "error"; break;
+      case kENTRY_LEVEL_DEBUG: sLevel = "debug"; break;
+      case kENTRY_LEVEL_LOG:   sLevel = "log";   break;
+      case kENTRY_LEVEL_INFO:  sLevel = "info";  break;
+      case kENTRY_LEVEL_WARN:  sLevel = "warn";  break;
+      case kENTRY_LEVEL_ERROR: sLevel = "error"; break;
    }
 }
 
@@ -67,7 +69,7 @@ void CONSOLE::ENTRY::LevelString (eLEVEL eLevel, std::string& sLevel)
 // FormatStamp
 // ---------------------------------------------------------------------------
 
-std::string CONSOLE::ENTRY::FormatStamp () const
+std::string ENTRY::FormatStamp () const
 {
    auto tStamp        = std::chrono::system_clock::to_time_t (m_tpStamp);
    auto nMilliseconds = std::chrono::duration_cast<std::chrono::milliseconds> (m_tpStamp.time_since_epoch ()).count () % 1000;
@@ -95,7 +97,7 @@ std::string CONSOLE::ENTRY::FormatStamp () const
 // single element. JSON parsing errors return the raw message.
 // ---------------------------------------------------------------------------
 
-void CONSOLE::ENTRY::MessageParts (std::vector<std::string> &aParts) const
+void ENTRY::MessageParts (std::vector<std::string> &aParts) const
 {
    if (!m_sMessage.empty ()  &&  m_sMessage.front () == '[')
    {
@@ -126,7 +128,7 @@ void CONSOLE::ENTRY::MessageParts (std::vector<std::string> &aParts) const
 // ToJson — serialize to a JSON object for JSONL disk storage.
 // ---------------------------------------------------------------------------
 
-nlohmann::json CONSOLE::ENTRY::ToJson () const
+nlohmann::json ENTRY::ToJson () const
 {
    nlohmann::json jEntry;
    std::string sLevel;
@@ -140,6 +142,7 @@ nlohmann::json CONSOLE::ENTRY::ToJson () const
    jEntry["index"]      = m_nIndex;
    jEntry["groupDepth"] = m_nGroupDepth;
    jEntry["collapsed"]  = m_bCollapsed;
+   jEntry["system"]     = m_bSystem;
 
    if (!m_sStackTrace.empty ())
       jEntry["stackTrace"] = m_sStackTrace;
@@ -155,14 +158,14 @@ nlohmann::json CONSOLE::ENTRY::ToJson () const
 // the STREAM that owns the block file (ENTRY does not resolve CIDs itself).
 // ---------------------------------------------------------------------------
 
-std::shared_ptr<const CONSOLE::ENTRY> CONSOLE::ENTRY::FromJson (const nlohmann::json& jEntry, const CONTAINER::CID* pCID)
+std::shared_ptr<const ENTRY> ENTRY::FromJson (const nlohmann::json& jEntry, const CONTAINER::CID* pCID)
 {
-   eLEVEL eLevel = kLEVEL_LOG;
+   eENTRY_LEVEL eLevel = kENTRY_LEVEL_LOG;
    std::string sLevelStr = jEntry.value ("level", "log");
-   if      (sLevelStr == "debug") eLevel = kLEVEL_DEBUG;
-   else if (sLevelStr == "info")  eLevel = kLEVEL_INFO;
-   else if (sLevelStr == "warn")  eLevel = kLEVEL_WARN;
-   else if (sLevelStr == "error") eLevel = kLEVEL_ERROR;
+   if      (sLevelStr == "debug") eLevel = kENTRY_LEVEL_DEBUG;
+   else if (sLevelStr == "info")  eLevel = kENTRY_LEVEL_INFO;
+   else if (sLevelStr == "warn")  eLevel = kENTRY_LEVEL_WARN;
+   else if (sLevelStr == "error") eLevel = kENTRY_LEVEL_ERROR;
 
    auto pEntry = std::make_shared<ENTRY>
    (
@@ -172,6 +175,7 @@ std::shared_ptr<const CONSOLE::ENTRY> CONSOLE::ENTRY::FromJson (const nlohmann::
       jEntry.value ("index",      static_cast<uint32_t> (0)),
       jEntry.value ("groupDepth", static_cast<uint32_t> (0)),
       jEntry.value ("collapsed",  false),
+      jEntry.value ("system",     false),
       jEntry.value ("stackTrace", std::string ()),
       jEntry.value ("source",     std::string ())
    );

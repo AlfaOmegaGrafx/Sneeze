@@ -58,7 +58,7 @@ public:
    // Stream management
    // ---------------------------------------------------------------------------
 
-   CONSOLE::STREAM* Stream_Open (const CONTAINER::CID* pCID)
+   STREAM* Stream_Open (const CONTAINER::CID* pCID)
    {
       STREAM* pStream = nullptr;
 
@@ -102,7 +102,7 @@ public:
       }
    }
 
-   void Stream_Enum (CONSOLE::IENUM_STREAM* pEnum)
+   void Stream_Enum (IENUM_STREAM* pEnum)
    {
       if (pEnum)
       {
@@ -131,7 +131,7 @@ public:
    // Enumeration
    // ---------------------------------------------------------------------------
 
-   void Entry_Enum (CONSOLE::IENUM_ENTRY* pEnum)
+   void Entry_Enum (IENUM_ENTRY* pEnum)
    {
       if (pEnum)
       {
@@ -156,11 +156,11 @@ public:
    // and ring-buffer an entry. Returns the immutable shared_ptr.
    // ---------------------------------------------------------------------------
 
-   std::shared_ptr<const CONSOLE::ENTRY> Entry_Find (uint32_t nIndex) override
+   std::shared_ptr<const ENTRY> Entry_Find (uint32_t nIndex) override
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
 
-      std::shared_ptr<const CONSOLE::ENTRY> pEntry;
+      std::shared_ptr<const ENTRY> pEntry;
 
       if (!m_apEntry.empty ())
       {
@@ -174,11 +174,11 @@ public:
       return pEntry;
    }
 
-   std::shared_ptr<const CONSOLE::ENTRY> Entry_Create (const CONTAINER::CID* pCID, CONSOLE::eLEVEL eLevel, const std::string& sMessage, uint32_t nGroupDepth, bool bCollapsed) override
+   std::shared_ptr<const ENTRY> Entry_Create (const CONTAINER::CID* pCID, eENTRY_LEVEL eLevel, const std::string& sMessage, uint32_t nGroupDepth, bool bCollapsed, bool bSystem) override
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
 
-      auto pEntry = std::make_shared<const CONSOLE::ENTRY> (pCID, eLevel, sMessage, m_nIndex_Entry++, nGroupDepth, bCollapsed);
+      auto pEntry = std::make_shared<const ENTRY> (pCID, eLevel, sMessage, m_nIndex_Entry++, nGroupDepth, bCollapsed, bSystem);
       
       m_apEntry.push_back (pEntry);
 
@@ -201,10 +201,10 @@ public:
    uint32_t                                                         m_nBlocks;
 
    std::recursive_mutex                                             m_mxConsole;
-   std::deque<std::shared_ptr<const CONSOLE::ENTRY>>                m_apEntry;
+   std::deque<std::shared_ptr<const ENTRY>>                m_apEntry;
    uint32_t                                                         m_nIndex_Entry;
 
-   std::unordered_map<const CONTAINER::CID*, CONSOLE::STREAM*>      m_umpStream;
+   std::unordered_map<const CONTAINER::CID*, STREAM*>      m_umpStream;
 };
 
 /***********************************************************************************************************************************
@@ -243,7 +243,7 @@ void               CONSOLE::Blocks          (uint32_t n) {        m_pImpl->m_nBl
 // Methods
 // ---------------------------------------------------------------------------
 
-CONSOLE::STREAM*   CONSOLE::Stream_Open       (const CONTAINER::CID* pCID)           { return m_pImpl->Stream_Open       (pCID); }
+STREAM*   CONSOLE::Stream_Open       (const CONTAINER::CID* pCID)           { return m_pImpl->Stream_Open       (pCID); }
 void               CONSOLE::Stream_Close      (STREAM* pStream)                               {        m_pImpl->Stream_Close      (pStream); }
 void               CONSOLE::Stream_Enum       (IENUM_STREAM* pEnum)                           {        m_pImpl->Stream_Enum       (pEnum); }
 

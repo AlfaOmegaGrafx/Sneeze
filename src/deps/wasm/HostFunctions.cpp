@@ -94,11 +94,11 @@ static CONTAINER* GetContainer (void* pEnv)
 }
 
 // ---------------------------------------------------------------------------
-// Helper — recovers the CONSOLE::STREAM from the env pointer chain.
+// Helper — recovers the STREAM from the env pointer chain.
 // pEnv is a WASM_STORE* whose HostData() points to the owning CONTAINER*.
 // ---------------------------------------------------------------------------
 
-static CONSOLE::STREAM* GetStream (void* pEnv)
+static STREAM* GetStream (void* pEnv)
 {
    auto* pStore = static_cast<WASM_STORE*> (pEnv);
    if (!pStore  ||  !pStore->HostData ())
@@ -111,7 +111,7 @@ static CONSOLE::STREAM* GetStream (void* pEnv)
 }
 
 // ---------------------------------------------------------------------------
-// Console host functions — forward calls to the CONSOLE::STREAM.
+// Console host functions — forward calls to the STREAM.
 // For now, log via ENGINE as the CONTAINER/STREAM wiring is indirect.
 // ---------------------------------------------------------------------------
 

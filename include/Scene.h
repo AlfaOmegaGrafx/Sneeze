@@ -117,10 +117,10 @@ namespace SNEEZE
       // Methods
       void               Fabric_Add     (FABRIC* pFabric_Child);
       void               Fabric_Remove  (FABRIC* pFabric_Child);
-      void               OnMsfReady     (NETWORK::FILE* pFile);
-      void               OnMsfFailed    (NETWORK::FILE* pFile);
-      void               OnWasmReady    (NETWORK::FILE* pFile, const std::string& sUrl, const std::string& sHash);
-      void               OnWasmFailed   (NETWORK::FILE* pFile, const std::string& sUrl);
+      void               OnMsfReady     (FILE* pFile);
+      void               OnMsfFailed    (FILE* pFile);
+      void               OnWasmReady    (FILE* pFile, const std::string& sUrl, const std::string& sHash);
+      void               OnWasmFailed   (FILE* pFile, const std::string& sUrl);
 
    protected:
       class Impl;

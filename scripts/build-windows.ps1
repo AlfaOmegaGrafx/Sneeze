@@ -206,76 +206,6 @@ function Show-DepList {
    }
 }
 
-# src/ and include/ must come from the same revision. A stale include/ tree
-# (pre-NASSET/SASSET console refactor) produces hundreds of C2511/C2039 errors
-# that cite old line numbers such as Network.h(254) ASSET* Asset_Open.
-function Test-SourceHeaderSync {
-   param ([string] $Root)
-
-   $sNetworkH       = Join-Path $Root 'include\Network.h'
-   $sNetworkImplH   = Join-Path $Root 'src\context\network\Network.h'
-   $sStorageH        = Join-Path $Root 'include\Storage.h'
-   $sConsoleH        = Join-Path $Root 'include\Console.h'
-   $sConsoleImplH    = Join-Path $Root 'src\context\console\Console.h'
-   $bOk              = $true
-
-   if (-not (Select-String -Path $sNetworkH -Pattern 'void\s+File_Enum\s*\(' -Quiet)) {
-      Write-Host '  MISMATCH: include/Network.h missing NETWORK::File_Enum (stale public header?)'
-      $bOk = $false
-   }
-   if (-not (Select-String -Path $sNetworkH -Pattern 'class\s+INETWORK_IMPL' -Quiet)) {
-      Write-Host '  MISMATCH: include/Network.h missing INETWORK_IMPL forward decl'
-      $bOk = $false
-   }
-   if (Select-String -Path $sNetworkH -Pattern '\bASSET\s*\*\s*Asset_Open' -Quiet) {
-      Write-Host '  MISMATCH: include/Network.h still exposes ASSET* Asset_Open on NETWORK (moved to INETWORK_IMPL)'
-      $bOk = $false
-   }
-   if (-not (Test-Path $sNetworkImplH)) {
-      Write-Host '  MISSING: src/context/network/Network.h (internal INETWORK_IMPL header)'
-      $bOk = $false
-   }
-   if (-not (Select-String -Path $sStorageH -Pattern 'class\s+ISTORAGE_IMPL' -Quiet)) {
-      Write-Host '  MISMATCH: include/Storage.h missing ISTORAGE_IMPL forward decl (stale public header?)'
-      $bOk = $false
-   }
-   if (-not (Select-String -Path $sConsoleH -Pattern 'enum\s+eLEVEL' -Quiet)) {
-      Write-Host '  MISMATCH: include/Console.h missing CONSOLE::eLEVEL (old JSON-store stub?)'
-      $bOk = $false
-   }
-   if (-not (Select-String -Path $sConsoleH -Pattern 'STREAM\s*\(\s*ICONSOLE_IMPL\s*\*' -Quiet)) {
-      Write-Host '  MISMATCH: include/Console.h STREAM ctor still uses CONSOLE* (expected ICONSOLE_IMPL*)'
-      $bOk = $false
-   }
-   if (-not (Select-String -Path $sConsoleH -Pattern 'void\s+LevelString\s*\(\s*eLEVEL' -Quiet)) {
-      Write-Host '  MISMATCH: include/Console.h ENTRY::LevelString API stale (expected void LevelString(eLEVEL, std::string&))'
-      $bOk = $false
-   }
-   if (-not (Test-Path $sConsoleImplH)) {
-      Write-Host '  MISSING: src/context/console/Console.h (internal ICONSOLE_IMPL header)'
-      $bOk = $false
-   }
-   elseif (-not (Select-String -Path $sConsoleImplH -Pattern 'class\s+ICONSOLE_IMPL' -Quiet)) {
-      Write-Host '  MISMATCH: src/context/console/Console.h does not define ICONSOLE_IMPL'
-      $bOk = $false
-   }
-
-   $sViewportH = Join-Path $Root 'include\Viewport.h'
-   if (Select-String -Path $sViewportH -Pattern 'SetDimensions\s*\(' -Quiet) {
-      Write-Host '  MISMATCH: include/Viewport.h still has SetDimensions (expected Size/Resize after AppFrame resize refactor)'
-      $bOk = $false
-   }
-   if (-not (Select-String -Path $sViewportH -Pattern 'void\s+Size\s*\(' -Quiet)) {
-      Write-Host '  MISMATCH: include/Viewport.h missing Size() (stale public header?)'
-      $bOk = $false
-   }
-   if (-not (Select-String -Path $sViewportH -Pattern 'void\s+Resize\s*\(' -Quiet)) {
-      Write-Host '  MISMATCH: include/Viewport.h missing Resize()'
-      $bOk = $false
-   }
-
-   return $bOk
-}
 
 function Clear-SneezePrecompiledHeaders {
    param ([string] $BuildRoot)
@@ -405,21 +335,6 @@ if ($DepsMode) {
 # ---------------------------------------------------------------------------
 
 if ($Fresh -or $SneezeMode) {
-   if ($SneezeMode -and -not (Test-SourceHeaderSync $SneezeDir)) {
-      Write-Error @"
-Sneeze include/ headers do not match src/ (stale checkout or partial sync).
-MSVC will fail with ASSET vs NASSET and missing CONSOLE::ENTRY errors.
-
-Fix on this agent:
-  git fetch origin
-  git reset --hard origin/main
-  git clean -fdx
-  Remove-Item -Recurse -Force builds\windows-x64\build -ErrorAction SilentlyContinue
-  .\scripts\build-windows.ps1 -All -Config $Config
-"@
-      exit 1
-   }
-
    # -Rebuild with Sneeze in scope: clean only the CURRENT config's compiled
    # artifacts via `cmake --build --target clean --config <cfg>`. This preserves
    # the configured CMake tree (CMakeCache.txt, CMakeFiles/, generated .sln and

@@ -148,3 +148,24 @@
 - Current configuration: star + planets + Earth/Mars/Uranus/Neptune/Pluto moons + debris = 60 FPS with textures and orbit trails
 - `astro::InjectSolarSystem()` fully superseded by WASM module — pending removal after validation
 - Updated project.mdc with all architectural changes
+
+## June 7, 2026 — ~late evening PDT (June 6 session continued)
+
+**Console bSystem flag, dual logging, un-nesting Console/Storage/Network types**
+
+- Added `m_bSystem` (bool) to `ENTRY` — distinguishes browser-injected system entries from container-generated entries; always serialized to JSONL as `"system"` key
+- Added `bSystem = false` default parameter to `STREAM` logging methods (Log/Debug/Info/Warn/Error)
+- Console tests pass without modification (44/44)
+- Un-nested `eLEVEL`, `ENTRY`, `STREAM`, `IENUM_ENTRY`, `IENUM_STREAM` from `CONSOLE` into `SNEEZE` namespace — resolved circular header dependency preventing `Container.h` from forward-declaring `STREAM`
+- Renamed `eLEVEL` to `eENTRY_LEVEL` with constants `kENTRY_LEVEL_DEBUG`, etc.
+- Un-nested `eSCOPE`, `SILO`, `IENUM_SILO` from `STORAGE` into `SNEEZE` namespace
+- Renamed `eSCOPE` to `eSILO_SCOPE` with constants `kSILO_SCOPE_PERMANENT_ORG`, etc.
+- Un-nested `STATE`, `DISKFILE`, `FILE`, `IFILE`, `IENUM_FILE` from `NETWORK` into `SNEEZE` namespace
+- Renamed `STATE` to `eASSET_STATE` with constants `kASSET_STATE_IDLE`, etc.
+- Renamed `DISKFILE` to `eASSET_EXT` with constants `kASSET_EXT_DATA`, `kASSET_EXT_TEMP`, `kASSET_EXT_META`
+- Kept `FILE` as `FILE` (not `NETFILE`) — qualify as `SNEEZE::FILE` where ambiguity with C's `::FILE` arises
+- Added `STREAM* Stream()` accessor to `CONTAINER` (forward-declared in `Container.h`)
+- Implemented dual logging in `Fabric.cpp` — MSF/WASM lifecycle events logged to both `Engine()->Log()` and `Container->Stream()->Info/Error(msg, true)` with `bSystem = true`; pre-container errors log to parent fabric's container stream
+- Removed obsolete `Test-SourceHeaderSync` function from `build-windows.ps1`
+- All console (44/44) and storage (44/44) tests pass; network tests pass for non-external cases
+- Updated project.mdc with all type un-nesting and enum rename changes

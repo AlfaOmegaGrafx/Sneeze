@@ -286,8 +286,8 @@ public:
    uint32_t                               m_nCount_Open;
    std::recursive_mutex                   m_mxContainer;
 
-   CONSOLE::STREAM*                       m_pStream;
-   STORAGE::SILO*                         m_pSilo;
+   STREAM*                                m_pStream;
+   SILO*                                  m_pSilo;
    DEP::WASM_STORE*                       m_pWasm_Store;
 
    uint64_t                               m_twObjectIx_Next;
@@ -324,6 +324,7 @@ NODE*                 CONTAINER::Node_Find  (uint64_t twObjectIx) const         
 SNEEZE::CONTEXT*      CONTAINER::Context    () const                                           { return  m_pImpl->m_pContext; }
 const CONTAINER::CID* CONTAINER::Identity   () const                                           { return &m_pImpl->m_CID; }
 const std::string&    CONTAINER::Key        () const                                           { return  m_pImpl->m_sKey; }
+STREAM*               CONTAINER::Stream     () const                                           { return  m_pImpl->m_pStream; }
 
 bool CONTAINER::Instance_Open (uint64_t twFabricIx, const std::string& sUrl, const std::string& sHash, const std::vector<uint8_t>& aWasmBytes)
 {

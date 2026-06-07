@@ -23,7 +23,7 @@ using namespace SNEEZE;
 class UNIT::Impl
 {
 public:
-   Impl (ISTORAGE_IMPL* pIStorage_Impl, STORAGE::eSCOPE eScope, const std::string& sPathname) :
+   Impl (ISTORAGE_IMPL* pIStorage_Impl, eSILO_SCOPE eScope, const std::string& sPathname) :
       m_pIStorage_Impl (pIStorage_Impl),
       m_eScope (eScope),
       m_sPathname (sPathname),
@@ -506,7 +506,7 @@ public:
    }
 
    ISTORAGE_IMPL*       m_pIStorage_Impl;
-   STORAGE::eSCOPE      m_eScope;
+   eSILO_SCOPE      m_eScope;
    std::string          m_sPathname;
 
    nlohmann::json       m_jData;
@@ -528,7 +528,7 @@ public:
 // UNIT
 // ===========================================================================
 
-UNIT::UNIT (ISTORAGE_IMPL* pIStorage_Impl, STORAGE::eSCOPE eScope, const std::string& sPathname) :
+UNIT::UNIT (ISTORAGE_IMPL* pIStorage_Impl, eSILO_SCOPE eScope, const std::string& sPathname) :
    m_pImpl (new Impl (pIStorage_Impl, eScope, sPathname))
 {
 }
@@ -544,7 +544,7 @@ UNIT::~UNIT ()
 
 bool                    UNIT::IsLoaded       () const { return m_pImpl->m_bLoaded; }
 bool                    UNIT::IsDirty        () const { return m_pImpl->m_bDirty; }
-SNEEZE::STORAGE::eSCOPE UNIT::GetScope       () const { return m_pImpl->m_eScope; }
+SNEEZE::eSILO_SCOPE UNIT::GetScope       () const { return m_pImpl->m_eScope; }
 const std::string&      UNIT::Pathname       () const { return m_pImpl->m_sPathname; }
 uint64_t                UNIT::SizeBytes      () const { return m_pImpl->m_nSizeBytes; }
 const std::string&      UNIT::CreatedTime    () const { return m_pImpl->m_sCreatedAt; }

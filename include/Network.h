@@ -22,6 +22,139 @@ namespace SNEEZE
    class INETWORK_IMPL;
 
    // ---------------------------------------------------------------------------
+   // Network enums and interfaces
+   // ---------------------------------------------------------------------------
+
+   enum eASSET_STATE
+   {
+      kASSET_STATE_IDLE       = 0,
+      kASSET_STATE_FETCHING   = 1,
+      kASSET_STATE_VALIDATING = 2,
+      kASSET_STATE_READY      = 3,
+      kASSET_STATE_FAILED     = 4,
+   };
+
+   enum eASSET_EXT
+   {
+      kASSET_EXT_DATA = 0,
+      kASSET_EXT_TEMP = 1,
+      kASSET_EXT_META = 2,
+   };
+
+   class FILE;
+
+   class IFILE
+   {
+   public:
+      virtual ~IFILE () {}
+      virtual void OnFileReady  (FILE* pFile) = 0;
+      virtual void OnFileFailed (FILE* pFile) = 0;
+   };
+
+   class IENUM_FILE
+   {
+   public:
+      virtual ~IENUM_FILE () {}
+      virtual void OnAsset (FILE* pFile) = 0;
+   };
+
+   // ---------------------------------------------------------------------------
+   // FILE — per-caller handle to a cached resource.
+   //
+   // Created by NETWORK::File_Open(), returned to the caller as a raw pointer.
+   // Owns a snapshot of the asset's display-level fields so the inspector can
+   // read them after Close.
+   // ---------------------------------------------------------------------------
+
+   class FILE
+   {
+   public:
+      FILE (INETWORK_IMPL* pINetwork_Impl, const CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled);
+      ~FILE ();
+
+      // --- Snapshot fields (always available, even after Close) ---
+
+      eASSET_STATE     State             () const;
+      bool             IsReady           () const;
+
+      std::string      Url               () const;
+      std::string      Hash              () const;
+      bool             IsHashed          () const;
+
+      uint32_t         FileIx            () const;
+      uint32_t         AssetIx           () const;
+      long             HttpStatus        () const;
+      double           FetchQueuedTime   () const;
+      double           FetchStartTime    () const;
+      double           FetchEndTime      () const;
+      double           FetchDuration     () const;
+      bool             IsServedFromCache () const;
+
+      std::string      ContentType       () const;
+      uint64_t         SizeBytes         () const;
+
+      // --- ASSET-dependent (require attached ASSET, empty/default after Close) ---
+
+      void             ReadData          (std::vector<uint8_t>& aData) const;
+//    std::string      Header (const std::string& sName) const;
+      std::string      DiskPath          () const;
+      std::string      CreatedTime       () const;
+      std::string      LastAccessTime    () const;
+      uint32_t         AccessCount       () const;
+      const std::unordered_map<std::string, std::string>& ReqHeaders () const;
+      const std::unordered_map<std::string, std::string>& RspHeaders () const;
+
+      const std::string&   RemoteAddress     () const;
+
+      // --- Container ---
+
+      std::string ContainerName () const;
+
+      // --- Paths ---
+
+      std::string        Path () const;
+      std::string        Filename (const std::string& sExt = "") const;
+      std::string        Pathname (const std::string& sExt = "") const;
+
+      // --- Listener ---
+
+      IFILE* Listener () const;
+
+      // --- Open-time state (locked in at construction) ---
+
+      const std::string& OpenHash  () const;
+      bool               CacheEnabled () const;
+
+      // --- Lifecycle ---
+
+      bool   Initialize (IFILE* pListener = nullptr);
+      bool   Attach     ();
+      void   Detach     ();
+      void   Clear      ();
+      void   Close      ();
+      void   Reset      ();
+
+      // --- Internal (NETWORK use only) ---
+
+      bool   IsPending_Clear () const;
+      bool   IsPending_Close () const;
+
+      bool   Pending_Clear ();
+      bool   Pending_Close ();
+      void   Pending_Reset ();
+
+      void   Notify_Changed ();
+
+      void   SnapshotInitial ();
+      void   SnapshotProgress ();
+      void   SnapshotFinal ();
+
+   private:
+      class Impl;
+      Impl* m_pImpl;
+   };
+
+   // ---------------------------------------------------------------------------
    // NETWORK — the network resource system.
    //
    // Fetches remote resources, caches them on disk, and serves them to callers
@@ -41,139 +174,6 @@ namespace SNEEZE
    class NETWORK
    {
    public:
-
-      // -----------------------------------------------------------------------
-      // Nested types
-      // -----------------------------------------------------------------------
-
-      enum STATE
-      {
-         STATE_IDLE       = 0,
-         STATE_FETCHING   = 1,
-         STATE_VALIDATING = 2,
-         STATE_READY      = 3,
-         STATE_FAILED     = 4,
-      };
-
-      enum DISKFILE
-      {
-         DISKFILE_DATA = 0,
-         DISKFILE_TEMP = 1,
-         DISKFILE_META = 2,
-      };
-
-      class FILE;
-
-      class IFILE
-      {
-      public:
-         virtual ~IFILE () {}
-         virtual void OnFileReady  (FILE* pFile) = 0;
-         virtual void OnFileFailed (FILE* pFile) = 0;
-      };
-
-      class IENUM_FILE
-      {
-      public:
-         virtual ~IENUM_FILE () {}
-         virtual void OnAsset (FILE* pFile) = 0;
-      };
-
-      // -----------------------------------------------------------------------
-      // FILE — per-caller handle to a cached resource.
-      //
-      // Created by NETWORK::File_Open(), returned to the caller as a raw pointer.
-      // Owns a snapshot of the asset's display-level fields so the inspector can
-      // read them after Close.
-      // -----------------------------------------------------------------------
-
-      class FILE
-      {
-      public:
-         FILE (INETWORK_IMPL* pINetwork_Impl, const CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled);
-         ~FILE ();
-
-         // --- Snapshot fields (always available, even after Close) ---
-
-         STATE                State             () const;
-         bool                 IsReady           () const;
-
-         std::string          Url               () const;
-         std::string          Hash              () const;
-         bool                 IsHashed          () const;
-
-         uint32_t             FileIx            () const;
-         uint32_t             AssetIx           () const;
-         long                 HttpStatus        () const;
-         double               FetchQueuedTime   () const;
-         double               FetchStartTime    () const;
-         double               FetchEndTime      () const;
-         double               FetchDuration     () const;
-         bool                 IsServedFromCache () const;
-
-         std::string          ContentType       () const;
-         uint64_t             SizeBytes         () const;
-
-         // --- ASSET-dependent (require attached ASSET, empty/default after Close) ---
-
-         void                 ReadData          (std::vector<uint8_t>& aData) const;
-//         std::string          Header (const std::string& sName) const;
-         std::string          DiskPath          () const;
-         std::string          CreatedTime       () const;
-         std::string          LastAccessTime    () const;
-         uint32_t             AccessCount       () const;
-         const std::unordered_map<std::string, std::string>& ReqHeaders () const;
-         const std::unordered_map<std::string, std::string>& RspHeaders () const;
-
-         const std::string&   RemoteAddress     () const;
-
-         // --- Container ---
-
-         std::string ContainerName () const;
-
-         // --- Paths ---
-
-         std::string        Path () const;
-         std::string        Filename (const std::string& sExt = "") const;
-         std::string        Pathname (const std::string& sExt = "") const;
-
-         // --- Listener ---
-
-         IFILE* Listener () const;
-
-         // --- Open-time state (locked in at construction) ---
-
-         const std::string& OpenHash  () const;
-         bool               CacheEnabled () const;
-
-         // --- Lifecycle ---
-
-         bool   Initialize (IFILE* pListener = nullptr);
-         bool   Attach     ();
-         void   Detach     ();
-         void   Clear      ();
-         void   Close      ();
-         void   Reset      ();
-
-         // --- Internal (NETWORK use only) ---
-
-         bool   IsPending_Clear () const;
-         bool   IsPending_Close () const;
-
-         bool   Pending_Clear ();
-         bool   Pending_Close ();
-         void   Pending_Reset ();
-
-         void   Notify_Changed ();
-
-         void   SnapshotInitial ();
-         void   SnapshotProgress ();
-         void   SnapshotFinal ();
-
-      private:
-         class Impl;
-         Impl* m_pImpl;
-      };
 
       // -----------------------------------------------------------------------
       // NETWORK public API

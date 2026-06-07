@@ -49,7 +49,7 @@ public:
          Evict ();
    }
 
-   void Entry_Enum (CONSOLE::IENUM_ENTRY* pEnum) const
+   void Entry_Enum (IENUM_ENTRY* pEnum) const
    {
       if (pEnum)
       {
@@ -91,7 +91,7 @@ public:
                      auto pEntry = (nIndex != UINT32_MAX) ? m_pIConsole_Impl->Entry_Find (nIndex) : nullptr;
 
                      if (!pEntry)
-                        pEntry = CONSOLE::ENTRY::FromJson (jEntry, pCID);
+                        pEntry = ENTRY::FromJson (jEntry, pCID);
 
                      if (pEntry)
                      {
@@ -114,7 +114,7 @@ public:
    // Write — append one JSONL line to the block file.
    // ---------------------------------------------------------------------------
 
-   void Write (std::shared_ptr<const CONSOLE::ENTRY> pEntry)
+   void Write (std::shared_ptr<const ENTRY> pEntry)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -160,7 +160,7 @@ public:
    uint32_t                                                   m_nEntryCount;
 
    mutable std::recursive_mutex                               m_mutex;
-   std::vector<std::shared_ptr<const CONSOLE::ENTRY>>         m_aEntry;
+   std::vector<std::shared_ptr<const ENTRY>>         m_aEntry;
 };
 
 // ===========================================================================
@@ -192,9 +192,9 @@ uint32_t             BLOCK::EntryCount  () const { return m_pImpl->m_nEntryCount
 
 void     BLOCK::Attach     ()                                             { m_pImpl->Attach     (); }
 void     BLOCK::Detach     (const CONTAINER::CID* pCID)                   { m_pImpl->Detach     (pCID); }
-void     BLOCK::Entry_Enum (CONSOLE::IENUM_ENTRY* pEnum)            const { m_pImpl->Entry_Enum (pEnum); }
+void     BLOCK::Entry_Enum (IENUM_ENTRY* pEnum)            const { m_pImpl->Entry_Enum (pEnum); }
 
 void     BLOCK::Load       (const CONTAINER::CID* pCID)                   { m_pImpl->Load       (pCID); }
 void     BLOCK::Evict      ()                                             { m_pImpl->Evict      (); }
 
-void     BLOCK::Write      (std::shared_ptr<const CONSOLE::ENTRY> pEntry) { m_pImpl->Write      (pEntry); }
+void     BLOCK::Write      (std::shared_ptr<const ENTRY> pEntry) { m_pImpl->Write      (pEntry); }

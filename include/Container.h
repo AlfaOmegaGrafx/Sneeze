@@ -20,6 +20,7 @@ namespace SNEEZE
    class CONTEXT;
    class FABRIC;
    class NODE;
+   class STREAM;
    struct RMCOBJECT;
 
    enum eTRUST
@@ -74,6 +75,7 @@ namespace SNEEZE
       CONTEXT*           Context  () const;
       const CID*         Identity () const;
       const std::string& Key      () const;
+      STREAM*            Stream   () const;
 
    private:
       class Impl;

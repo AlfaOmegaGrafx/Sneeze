@@ -260,14 +260,14 @@ public:
    // File operations
    // ---------------------------------------------------------------------------
 
-   NETWORK::FILE* File_Open (const CONTAINER::CID* pCID, const std::string& sUrl, const std::string& sHash, uint32_t nAssetIx, IFILE* pListener)
+   FILE* File_Open (const CONTAINER::CID* pCID, const std::string& sUrl, const std::string& sHash, uint32_t nAssetIx, IFILE* pListener)
    {
       FILE* pFile = nullptr;
 
       {
          std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-         pFile = new NETWORK::FILE (this, pCID, m_nNextFileIx++, sUrl, sHash, m_bCacheEnabled);
+         pFile = new FILE (this, pCID, m_nNextFileIx++, sUrl, sHash, m_bCacheEnabled);
 
          m_apFile.push_back (pFile);
 
@@ -322,7 +322,7 @@ public:
    // Notification helpers (called under m_mutex -- recursive lock allows re-entry)
    // ---------------------------------------------------------------------------
 
-   void NotifyFiles (const std::vector<NETWORK::FILE*>& apFiles, NETWORK::STATE bState)
+   void NotifyFiles (const std::vector<FILE*>& apFiles, eASSET_STATE bState)
    {
       for (auto* pFile : apFiles)
       {
@@ -331,7 +331,7 @@ public:
          IFILE* pListener = pFile->Listener ();
          if (pListener)
          {
-            if (bState == STATE_READY)
+            if (bState == kASSET_STATE_READY)
                pListener->OnFileReady (pFile);
             else
                pListener->OnFileFailed (pFile);
@@ -356,7 +356,7 @@ public:
    // INETWORK_IMPL
    // ---------------------------------------------------------------------------
 
-   ASSET* Asset_Open (NETWORK::FILE* pFile) override
+   ASSET* Asset_Open (FILE* pFile) override
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -379,7 +379,7 @@ public:
       return pAsset;
    }
 
-   void Asset_Close (NETWORK::FILE* pFile, ASSET* pAsset) override
+   void Asset_Close (FILE* pFile, ASSET* pAsset) override
    {
       std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
@@ -411,7 +411,7 @@ public:
       return m_pContext->Host ();
    }
 
-   void File_Close (NETWORK::FILE* pFile) override
+   void File_Close (FILE* pFile) override
    {
       if (pFile)
       {
@@ -433,7 +433,7 @@ public:
       }
    }
 
-   void File_Clear (NETWORK::FILE* pFile) override
+   void File_Clear (FILE* pFile) override
    {
       if (pFile)
       {
@@ -455,7 +455,7 @@ public:
       }
    }
 
-   void File_Reset (NETWORK::FILE* pFile) override
+   void File_Reset (FILE* pFile) override
    {
       if (pFile)
       {
@@ -483,7 +483,7 @@ public:
    uint32_t                                m_nNextAssetIx;
 
    // Network inspector
-   std::vector<FILE*>                      m_apFile;
+   std::vector<FILE*>                   m_apFile;
    uint32_t                                m_nNextFileIx;
    std::chrono::steady_clock::time_point   m_tpEpoch;
 };
@@ -517,12 +517,12 @@ bool               NETWORK::IsCacheEnabled    ()                                
 // Methods
 // ---------------------------------------------------------------------------
 
-NETWORK::FILE* NETWORK::File_Open (const CONTAINER::CID* pCID, const std::string& sUrl, IFILE* pListener)
+SNEEZE::FILE* NETWORK::File_Open (const CONTAINER::CID* pCID, const std::string& sUrl, IFILE* pListener)
 {
    return File_Open (pCID, sUrl, std::string (), 0, pListener);
 }
 
-NETWORK::FILE* NETWORK::File_Open (const CONTAINER::CID* pCID, const std::string& sUrl, const std::string& sHash, uint32_t nAssetIx, IFILE* pListener)
+SNEEZE::FILE* NETWORK::File_Open (const CONTAINER::CID* pCID, const std::string& sUrl, const std::string& sHash, uint32_t nAssetIx, IFILE* pListener)
 {
    return m_pImpl->File_Open (pCID, sUrl, sHash, nAssetIx, pListener);
 }

@@ -82,7 +82,7 @@ void SEQLOCK::EndWrite ()
 // NODE::Impl
 // ---------------------------------------------------------------------------
 
-class NODE::Impl : public NETWORK::IFILE
+class NODE::Impl : public IFILE
 {
 public:
    Impl (NODE* pNode, FABRIC* pFabric, NODE* pNode_Parent) :
@@ -184,7 +184,7 @@ public:
       }
    }
 
-   void OnFileReady (NETWORK::FILE* pFile) override
+   void OnFileReady (FILE* pFile) override
    {
       std::vector<uint8_t> aData;
 
@@ -214,7 +214,7 @@ public:
       }
    }
 
-   void OnFileFailed (NETWORK::FILE* pFile) override
+   void OnFileFailed (FILE* pFile) override
    {
       pFile->Close ();
       m_pFile = nullptr;
@@ -284,7 +284,7 @@ public:
    NODE*                               m_pNode_Parent;
    MAP_OBJECT*                         m_pMap_Object;
    FABRIC*                             m_pFabric_Attachment;
-   NETWORK::FILE*                      m_pFile;
+   FILE*                      m_pFile;
    SEQLOCK                             m_Seqlock;
 
    uint64_t                            m_twObjectIx;
