@@ -42,7 +42,7 @@ MSF::~MSF ()
 // Parse
 // ---------------------------------------------------------------------------
 
-bool MSF::Parse (const std::string& sJws)
+bool MSF::Parse (const std::string& sJws, const std::string& sUrl)
 {
    bool bResult = false;
 
@@ -121,6 +121,10 @@ bool MSF::Parse (const std::string& sJws)
          try
          {
             m_pJson_Payload = nlohmann::json::parse (sJws);
+
+            m_sFingerprint      = CHAIN::HashString (sUrl + sJws);
+            m_sOrganizationHash = CHAIN::HashString (sUrl);
+
             m_bParsed = true;
             bResult   = true;
          }

@@ -127,7 +127,7 @@ int RunJwsTests (int nArgc, char** aArgv)
 
    MSF verifier;
    verifier.AddTrustedCert (sCaCert);
-   verifier.Parse (sJws);
+   verifier.Parse (sJws, "test://sign-verify");
    verifier.VerifySignature ();
    verifier.VerifyChain ();
    ASSERT (verifier.IsSignatureValid ()  &&  verifier.IsChainTrusted (), "Verification succeeded (no error)");
@@ -166,7 +166,7 @@ int RunJwsTests (int nArgc, char** aArgv)
 
    MSF svc;
    svc.AddTrustedCert (sCaCert);
-   svc.Parse (sMssJws);
+   svc.Parse (sMssJws, "test://payload-parsing");
    svc.VerifySignature ();
    svc.VerifyChain ();
    ASSERT (svc.IsSignatureValid ()  &&  svc.IsChainTrusted (), "MSS verification succeeded");
@@ -210,7 +210,7 @@ int RunJwsTests (int nArgc, char** aArgv)
 
    MSF tamperedVerifier;
    tamperedVerifier.AddTrustedCert (sCaCert);
-   tamperedVerifier.Parse (sTampered);
+   tamperedVerifier.Parse (sTampered, "test://tampered");
    tamperedVerifier.VerifySignature ();
    ASSERT (!tamperedVerifier.IsSignatureValid (), "Tampered payload rejected");
    printf ("  Error: %s\n", tamperedVerifier.SignatureError ().c_str ());
@@ -230,7 +230,7 @@ int RunJwsTests (int nArgc, char** aArgv)
 
    MSF expiredVerifier;
    expiredVerifier.AddTrustedCert (sCaCert);
-   expiredVerifier.Parse (sExpiredJws);
+   expiredVerifier.Parse (sExpiredJws, "test://expired");
    expiredVerifier.VerifyChain ();
    ASSERT (!expiredVerifier.IsChainTrusted (), "Expired certificate rejected");
    printf ("  Error: %s\n", expiredVerifier.ChainError ().c_str ());
@@ -242,7 +242,7 @@ int RunJwsTests (int nArgc, char** aArgv)
    BeginGroup ("Untrusted Chain Rejected");
 
    MSF untrustedVerifier;
-   untrustedVerifier.Parse (sJws);
+   untrustedVerifier.Parse (sJws, "test://untrusted");
    untrustedVerifier.VerifyChain ();
    ASSERT (!untrustedVerifier.IsChainTrusted (), "Untrusted chain rejected");
    printf ("  Error: %s\n", untrustedVerifier.ChainError ().c_str ());
@@ -255,7 +255,7 @@ int RunJwsTests (int nArgc, char** aArgv)
 
    MSF verifier2;
    verifier2.AddTrustedCert (sCaCert);
-   verifier2.Parse (sJws);
+   verifier2.Parse (sJws, "test://sign-verify");
    verifier2.VerifySignature ();
    verifier2.VerifyChain ();
    ASSERT (verifier2.IsSignatureValid ()  &&  verifier2.IsChainTrusted (), "Second verification succeeded");
@@ -269,13 +269,13 @@ int RunJwsTests (int nArgc, char** aArgv)
 
    MSF malformedVerifier;
 
-   bool bEmpty = malformedVerifier.Parse ("");
+   bool bEmpty = malformedVerifier.Parse ("", "test://malformed");
    ASSERT (!bEmpty, "Empty string rejected");
 
-   bool bGarbage = malformedVerifier.Parse ("not.a.jws");
+   bool bGarbage = malformedVerifier.Parse ("not.a.jws", "test://malformed");
    ASSERT (!bGarbage, "Garbage string rejected");
 
-   bool bPartial = malformedVerifier.Parse ("eyJhbGciOiJSUzI1NiJ9");
+   bool bPartial = malformedVerifier.Parse ("eyJhbGciOiJSUzI1NiJ9", "test://malformed");
    ASSERT (!bPartial, "Partial JWS (one segment) rejected");
 
    // -----------------------------------------------------------------------
@@ -285,7 +285,7 @@ int RunJwsTests (int nArgc, char** aArgv)
    BeginGroup ("Parse Populates Data Without Verification");
 
    MSF parseOnly;
-   bool bParsed = parseOnly.Parse (sMssJws);
+   bool bParsed = parseOnly.Parse (sMssJws, "test://parse-only");
    ASSERT (bParsed, "Parse succeeded without verification");
    ASSERT (parseOnly.Container () == "poker-table", "Container available without verify");
    ASSERT (!parseOnly.Fingerprint ().empty (), "Fingerprint available without verify");
@@ -309,7 +309,7 @@ int RunJwsTests (int nArgc, char** aArgv)
 
    MSF reader;
    reader.AddTrustedCert (sCaCert);
-   reader.Parse (sComposedJws);
+   reader.Parse (sComposedJws, "test://composition");
    reader.VerifySignature ();
    reader.VerifyChain ();
    ASSERT (reader.IsSignatureValid ()  &&  reader.IsChainTrusted (), "Composed MSF verifies");

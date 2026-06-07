@@ -543,33 +543,16 @@ set (CORE_HEADERS
    sneeze/Engine.h
    sneeze/control/Control.h)
 
-set (ASTRO_SOURCES
-   astro/BodyData.cpp
-   astro/RMCObject.cpp)
-set (ASTRO_HEADERS
-   astro/BodyData.h
-   astro/RMCObject.h)
-
 set (SOM_SOURCES
    viewport/Viewport.cpp
-   context/scene/Celestial.cpp
-   context/scene/Orbit.cpp
-   context/scene/Epoch.cpp
    context/scene/Node.cpp
    context/scene/Fabric.cpp
    context/scene/Scene.cpp
    context/scene/MapObject.cpp
-   context/scene/AccessControl.cpp
-   context/scene/Events.cpp
-   context/scene/SpatialIndex.cpp)
+   context/scene/AccessControl.cpp)
 set (SOM_HEADERS
-   context/scene/Celestial.h
-   context/scene/Orbit.h
-   context/scene/Epoch.h
    context/scene/MapObject.h
-   context/scene/AccessControl.h
-   context/scene/Events.h
-   context/scene/SpatialIndex.h)
+   context/scene/AccessControl.h)
 
 # Embed Mozilla's CA bundle (cacert.pem) as a string blob so libcurl can
 # verify HTTPS certificates on platforms whose system has no libcurl-
@@ -697,7 +680,6 @@ set (INCLUDE_HEADERS
 
 add_library (Sneeze STATIC
    ${CORE_SOURCES}      ${CORE_HEADERS}
-   ${ASTRO_SOURCES}     ${ASTRO_HEADERS}
    ${SOM_SOURCES}       ${SOM_HEADERS}
    ${NETWORK_SOURCES}   ${NETWORK_HEADERS}
    ${CONTAINER_HEADERS}
@@ -817,7 +799,6 @@ endif ()
 
 source_group (TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
    ${CORE_SOURCES}      ${CORE_HEADERS}
-   ${ASTRO_SOURCES}     ${ASTRO_HEADERS}
    ${SOM_SOURCES}       ${SOM_HEADERS}
    ${NETWORK_SOURCES}   ${NETWORK_HEADERS}
    ${CONTAINER_HEADERS}

@@ -15,10 +15,18 @@
 #ifndef SNEEZE_SOM_MAPOBJECT_H
 #define SNEEZE_SOM_MAPOBJECT_H
 
-#include "Orbit.h"
+#include "sneeze/Types.h"
 
 namespace SNEEZE
 {
+   struct ORBIT_POSITION
+   {
+      double x;
+      double y;
+      double z;
+      double dE;
+   };
+
    // ---------------------------------------------------------------------------
    // Map object type identifiers
    // ---------------------------------------------------------------------------

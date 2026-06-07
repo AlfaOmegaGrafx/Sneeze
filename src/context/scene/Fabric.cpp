@@ -15,7 +15,6 @@
 #include <Sneeze.h>
 
 #include "MapObject.h"
-#include "astro/BodyData.h"
 #include <algorithm>
 
 using namespace SNEEZE;
@@ -197,7 +196,7 @@ public:
 
          m_pMsf = new MSF (m_pScene->Engine ());
 
-         if (m_pMsf->Parse (sMsf))
+         if (m_pMsf->Parse (sMsf, m_sUrl))
          {
             m_pMsf->VerifySignature ();
             m_pMsf->VerifyChain ();
@@ -328,21 +327,6 @@ public:
          m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "FABRIC", sActiveMsg);
          m_pContainer->Stream ()->Info (sActiveMsg, true);
       }
-
-/*
-// temporary kludge to inject the solar system into the primary fabric
-if (m_pMsf  &&  m_pMsf->Payload ()["container"] == "solar-system"
-|| true
-)
-{
-   auto* pNode_Root = new NODE (m_pFabric, nullptr);
-
-   if (pNode_Root->Initialize (nullptr))
-   {
-      astro::InjectSolarSystem (m_pFabric);
-   }
-}
-*/
    }
 
 // -----------------------------------------------------------------------

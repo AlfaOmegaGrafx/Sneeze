@@ -169,3 +169,22 @@
 - Removed obsolete `Test-SourceHeaderSync` function from `build-windows.ps1`
 - All console (44/44) and storage (44/44) tests pass; network tests pass for non-external cases
 - Updated project.mdc with all type un-nesting and enum rename changes
+
+## June 7, 2026 — ~morning PDT
+
+**Deleted astro module and unused scene files, fixed build errors, orbit trail analysis**
+
+- Fixed `CID::Key()` crash on empty/short strings — moved `DisplayName()` and `Key()` from `Container.h` to `Container.cpp`, added `substr` guards
+- Implemented synthetic fingerprint for plain JSON MSF files — `SHA-256(url + content)` for `sFingerprint`, `SHA-256(url)` for `sOrganizationHash`
+- Made `MSF::Parse` URL parameter required (removed default)
+- Deleted entire `src/astro/` folder (BodyData.h/cpp, RMCObject.h/cpp) — WASM module is sole scene population path
+- Deleted `Orbit.h`/`Orbit.cpp` — moved `ORBIT_POSITION` struct to `MapObject.h`, `SolveKepler` to `MapObject.cpp` (file-local static)
+- Deleted `Celestial.h`/`Celestial.cpp` — moved `QuatMultiply` and `RotateByQuat` to `MapObject.cpp` (file-local statics)
+- Deleted `Epoch.h`/`Epoch.cpp` — unused after WASM pipeline replaced astro injection
+- Deleted `Events.h`/`Events.cpp` from build (dead code — never instantiated)
+- Deleted `SpatialIndex.h`/`SpatialIndex.cpp` from build (dead code — never queried)
+- Fixed build errors: added `#include "sneeze/Types.h"` to `MapObject.h`, replaced `CELESTIAL::` qualifications with local calls in `MapObject.cpp`
+- Cleaned up `CMakeLists.txt`, `Sneeze.vcxproj`, `Sneeze.vcxproj.filters` — removed all 10 deleted files
+- Analyzed compositor orbit trail rendering: identified ANARI `"curve"` geometry as source of visual quality issues (thick PBR-lit tubes vs. desired thin screen-space lines) and major performance bottleneck (~80-90% of 1 FPS drop with all moons)
+- Decided to prioritize visual quality improvements (unlit/emissive material, camera-distance radius scaling) before performance optimizations
+- Updated project.mdc with all deletions, architectural changes, and orbit trail analysis

@@ -137,21 +137,13 @@
     <ClCompile Include="..\src\sneeze\control\Pool_Queue.cpp" />
     <ClCompile Include="..\src\sneeze\control\Pool_Cycle.cpp" />
     <ClCompile Include="..\src\sneeze\control\Fetch.cpp" />
-    <!-- astro -->
-    <ClCompile Include="..\src\astro\BodyData.cpp" />
-    <ClCompile Include="..\src\astro\RMCObject.cpp" />
     <!-- viewport -->
     <ClCompile Include="..\src\viewport\Viewport.cpp" />
-    <ClCompile Include="..\src\context\scene\Celestial.cpp" />
-    <ClCompile Include="..\src\context\scene\Orbit.cpp" />
-    <ClCompile Include="..\src\context\scene\Epoch.cpp" />
     <ClCompile Include="..\src\context\scene\Node.cpp" />
     <ClCompile Include="..\src\context\scene\Fabric.cpp" />
     <ClCompile Include="..\src\context\scene\Scene.cpp" />
     <ClCompile Include="..\src\context\scene\MapObject.cpp" />
     <ClCompile Include="..\src\context\scene\AccessControl.cpp" />
-    <ClCompile Include="..\src\context\scene\Events.cpp" />
-    <ClCompile Include="..\src\context\scene\SpatialIndex.cpp" />
     <!-- console -->
     <ClCompile Include="..\src\context\console\Console.cpp" />
     <ClCompile Include="..\src\context\console\Entry.cpp" />
@@ -203,15 +195,8 @@
     <ClInclude Include="..\src\sneeze\Types.h" />
     <ClInclude Include="..\src\sneeze\Engine.h" />
     <ClInclude Include="..\src\sneeze\control\Control.h" />
-    <ClInclude Include="..\src\astro\BodyData.h" />
-    <ClInclude Include="..\src\astro\RMCObject.h" />
-    <ClInclude Include="..\src\context\scene\Celestial.h" />
-    <ClInclude Include="..\src\context\scene\Orbit.h" />
-    <ClInclude Include="..\src\context\scene\Epoch.h" />
     <ClInclude Include="..\src\context\scene\MapObject.h" />
     <ClInclude Include="..\src\context\scene\AccessControl.h" />
-    <ClInclude Include="..\src\context\scene\Events.h" />
-    <ClInclude Include="..\src\context\scene\SpatialIndex.h" />
     <ClInclude Include="..\src\viewport\renderer\Renderer.h" />
     <ClInclude Include="..\src\viewport\renderer\AnariRenderer.h" />
     <ClInclude Include="..\src\viewport\renderer\UVSphere.h" />

@@ -22,6 +22,25 @@ using namespace SNEEZE;
 
 
 // ============================================================================
+// CONTAINER::CID
+// ============================================================================
+
+std::string CONTAINER::CID::DisplayName () const
+{
+   return ((eTrust >= kTRUST_EXPIRED) ? sOrganization : sOrganizationHash) + "/" + sContainer;
+}
+
+std::string CONTAINER::CID::Key () const
+{
+   std::string sPersona = (sPersonaHash.size () >= 12) ? sPersonaHash.substr (0, 12) : sPersonaHash;
+   std::string sFp2     = (sFingerprint.size () >= 2)  ? sFingerprint.substr (0, 2)  : sFingerprint;
+   std::string sFp22    = (sFingerprint.size () >= 24) ? sFingerprint.substr (2, 22) : std::string ();
+
+   return sPersona + "/" + sFp2 + "/" + sFp22 + "/" + sContainer;
+}
+
+
+// ============================================================================
 // CONTAINER::Impl
 // ============================================================================
 

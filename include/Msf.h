@@ -95,7 +95,7 @@ namespace SNEEZE
 
       // --- Parse & Export ---
 
-      bool        Parse (const std::string& sJws);
+      bool        Parse (const std::string& sJws, const std::string& sUrl);
       std::string Sign  (const std::string& sPrivateKeyPem,
                          const std::string& sAlgorithm = "RS256");
 

@@ -49,8 +49,8 @@ namespace SNEEZE
 
          CID () : eTrust (kTRUST_NONE) {}
 
-         std::string DisplayName () const { return ((eTrust >= kTRUST_EXPIRED) ? sOrganization : sOrganizationHash) + "/" + sContainer; }
-         std::string Key         () const { return sPersonaHash.substr (0, 12) + "/" + sFingerprint.substr (0, 2) + "/" + sFingerprint.substr (2, 22) + "/" + sContainer; }
+         std::string DisplayName () const;
+         std::string Key         () const;
       };
 
       CONTAINER (CONTEXT* pContext, const CID* pCID);

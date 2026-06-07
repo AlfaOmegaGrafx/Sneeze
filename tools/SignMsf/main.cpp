@@ -92,8 +92,7 @@ static void PrintCertChain (const MSF& msf)
    }
 }
 
-static int DoVerify (const char* sMsfPath,
-                     const std::vector<const char*>& aTrustPaths)
+static int DoVerify (const char* sMsfPath, const std::vector<const char*>& aTrustPaths)
 {
    int nResult = 1;
 
@@ -115,7 +114,7 @@ static int DoVerify (const char* sMsfPath,
             std::cerr << "Warning: cannot read trust cert: " << sTrustPath << "\n";
       }
 
-      if (!msf.Parse (sJws))
+      if (!msf.Parse (sJws, sMsfPath))
       {
          std::cerr << "Error: failed to parse JWS from " << sMsfPath << "\n";
       }

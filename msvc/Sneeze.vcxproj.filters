@@ -22,9 +22,6 @@
     <Filter Include="src\context">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000013}</UniqueIdentifier>
     </Filter>
-    <Filter Include="src\astro">
-      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000005}</UniqueIdentifier>
-    </Filter>
     <Filter Include="src\viewport">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000006}</UniqueIdentifier>
     </Filter>
@@ -160,23 +157,8 @@
     <ClCompile Include="..\src\context\console\Block.cpp">
       <Filter>src\context\console</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\astro\BodyData.cpp">
-      <Filter>src\astro</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\astro\RMCObject.cpp">
-      <Filter>src\astro</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\viewport\Viewport.cpp">
       <Filter>src\viewport</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\context\scene\Celestial.cpp">
-      <Filter>src\context\scene</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\context\scene\Orbit.cpp">
-      <Filter>src\context\scene</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\context\scene\Epoch.cpp">
-      <Filter>src\context\scene</Filter>
     </ClCompile>
     <ClCompile Include="..\src\context\scene\Node.cpp">
       <Filter>src\context\scene</Filter>
@@ -191,12 +173,6 @@
       <Filter>src\context\scene</Filter>
     </ClCompile>
     <ClCompile Include="..\src\context\scene\AccessControl.cpp">
-      <Filter>src\context\scene</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\context\scene\Events.cpp">
-      <Filter>src\context\scene</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\context\scene\SpatialIndex.cpp">
       <Filter>src\context\scene</Filter>
     </ClCompile>
     <ClCompile Include="..\src\viewport\renderer\AnariRenderer.cpp">
@@ -265,21 +241,6 @@
     <ClInclude Include="..\src\sneeze\control\Control.h">
       <Filter>src\sneeze\control</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\astro\BodyData.h">
-      <Filter>src\astro</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\astro\RMCObject.h">
-      <Filter>src\astro</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\context\scene\Celestial.h">
-      <Filter>src\context\scene</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\context\scene\Orbit.h">
-      <Filter>src\context\scene</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\context\scene\Epoch.h">
-      <Filter>src\context\scene</Filter>
-    </ClInclude>
     <ClInclude Include="..\src\context\scene\Node.h">
       <Filter>src\context\scene</Filter>
     </ClInclude>
@@ -290,12 +251,6 @@
       <Filter>src\context\scene</Filter>
     </ClInclude>
     <ClInclude Include="..\src\context\scene\AccessControl.h">
-      <Filter>src\context\scene</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\context\scene\Events.h">
-      <Filter>src\context\scene</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\context\scene\SpatialIndex.h">
       <Filter>src\context\scene</Filter>
     </ClInclude>
     <ClInclude Include="..\src\viewport\renderer\Renderer.h">

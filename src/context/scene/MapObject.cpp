@@ -18,6 +18,48 @@
 
 using namespace SNEEZE;
 
+static QUAT QuatMultiply (const QUAT& q1, const QUAT& q2)
+{
+   QUAT r;
+
+   r.dX = q1.dW*q2.dX + q1.dX*q2.dW + q1.dY*q2.dZ - q1.dZ*q2.dY;
+   r.dY = q1.dW*q2.dY - q1.dX*q2.dZ + q1.dY*q2.dW + q1.dZ*q2.dX;
+   r.dZ = q1.dW*q2.dZ + q1.dX*q2.dY - q1.dY*q2.dX + q1.dZ*q2.dW;
+   r.dW = q1.dW*q2.dW - q1.dX*q2.dX - q1.dY*q2.dY - q1.dZ*q2.dZ;
+
+   return r;
+}
+
+static VEC3 RotateByQuat (double qx, double qy, double qz, double qw, double vx, double vy, double vz)
+{
+   double cx1 = qy * vz - qz * vy;
+   double cy1 = qz * vx - qx * vz;
+   double cz1 = qx * vy - qy * vx;
+   double cx2 = qy * cz1 - qz * cy1;
+   double cy2 = qz * cx1 - qx * cz1;
+   double cz2 = qx * cy1 - qy * cx1;
+
+   return {
+      vx + 2.0 * (qw * cx1 + cx2),
+      vy + 2.0 * (qw * cy1 + cy2),
+      vz + 2.0 * (qw * cz1 + cz2),
+   };
+}
+
+static double SolveKepler (double dM_rad, double dEcc)
+{
+   double dE = dEcc > 0.8 ? PI : dM_rad;
+
+   for (int i = 0; i < 50; i++)
+   {
+      double dDelta = dE - dEcc * std::sin (dE) - dM_rad;
+      if (std::abs (dDelta) < 1e-15) break;
+      dE -= dDelta / (1.0 - dEcc * std::cos (dE));
+   }
+
+   return dE;
+}
+
 // ---------------------------------------------------------------------------
 // MAP_OBJECT
 // ---------------------------------------------------------------------------
@@ -153,7 +195,7 @@ void MAP_OBJECT_CELESTIAL::Rotation (int64_t tmNow, double& dQx, double& dQy, do
             double dSinHalf = std::sin (dHalf) / dRate;
 
             QUAT qPrec     = { dPrecX * dSinHalf, dPrecY * dSinHalf, dPrecZ * dSinHalf, std::cos (dHalf) };
-            QUAT qComposed = CELESTIAL::QuatMultiply (qPrec, { eX, eY, eZ, eW });
+            QUAT qComposed = QuatMultiply (qPrec, { eX, eY, eZ, eW });
 
             dQx = qComposed.dX;
             dQy = qComposed.dY;
@@ -204,7 +246,7 @@ ORBIT_POSITION* MAP_OBJECT_CELESTIAL::PositionAtTick (int64_t tmNow, ORBIT_POSIT
 
       int64_t tmInOrbit = ((m_Orbit.tmOrigin + tmNow) % m_Orbit.tmPeriod + m_Orbit.tmPeriod) % m_Orbit.tmPeriod;
       double  dM        = (static_cast<double> (tmInOrbit) / static_cast<double> (m_Orbit.tmPeriod)) * TWO_PI;
-      double  dE        = ORBIT::SolveKepler (dM, dEcc);
+      double  dE        = SolveKepler (dM, dEcc);
 
       double dRx = m_Transform.d4Rotation[0];
       double dRy = m_Transform.d4Rotation[1];
@@ -225,7 +267,7 @@ ORBIT_POSITION* MAP_OBJECT_CELESTIAL::PositionAtTick (int64_t tmNow, ORBIT_POSIT
             double dSinHalf = std::sin (dHalf) / dRate;
 
             QUAT pPrec = { dPrecX * dSinHalf, dPrecY * dSinHalf, dPrecZ * dSinHalf, std::cos (dHalf) };
-            QUAT pComposed = CELESTIAL::QuatMultiply (pPrec, { dRx, dRy, dRz, dRw });
+            QUAT pComposed = QuatMultiply (pPrec, { dRx, dRy, dRz, dRw });
             dRx = pComposed.dX;
             dRy = pComposed.dY;
             dRz = pComposed.dZ;
@@ -236,7 +278,7 @@ ORBIT_POSITION* MAP_OBJECT_CELESTIAL::PositionAtTick (int64_t tmNow, ORBIT_POSIT
       double dLX = dA * (std::cos (dE) - dEcc);
       double dLY = dB * std::sin (dE);
 
-      VEC3 pPos = CELESTIAL::RotateByQuat (dRx, dRy, dRz, dRw, dLX, 0.0, -dLY);
+      VEC3 pPos = RotateByQuat (dRx, dRy, dRz, dRw, dLX, 0.0, -dLY);
 
       out.x  = pPos.x;
       out.y  = pPos.y;
@@ -269,7 +311,7 @@ VEC3 MAP_OBJECT_CELESTIAL::OrbitTrailPoint (double dE, int64_t tmElapsed) const
          double dSinHalf = std::sin (dHalf) / dRate;
 
          QUAT pPrec = { dPrecX * dSinHalf, dPrecY * dSinHalf, dPrecZ * dSinHalf, std::cos (dHalf) };
-         QUAT pComposed = CELESTIAL::QuatMultiply (pPrec, { dRx, dRy, dRz, dRw });
+         QUAT pComposed = QuatMultiply (pPrec, { dRx, dRy, dRz, dRw });
          dRx = pComposed.dX;
          dRy = pComposed.dY;
          dRz = pComposed.dZ;
@@ -283,7 +325,7 @@ VEC3 MAP_OBJECT_CELESTIAL::OrbitTrailPoint (double dE, int64_t tmElapsed) const
    double dLX  = dA * (std::cos (dE) - dEcc);
    double dLY  = dB * std::sin (dE);
 
-   return CELESTIAL::RotateByQuat (dRx, dRy, dRz, dRw, dLX, 0.0, -dLY);
+   return RotateByQuat (dRx, dRy, dRz, dRw, dLX, 0.0, -dLY);
 }
 
 // ---------------------------------------------------------------------------
