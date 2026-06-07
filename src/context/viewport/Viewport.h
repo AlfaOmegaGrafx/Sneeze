@@ -12,10 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef SNEEZE_VIEWPORT_RENDERER_H
-#define SNEEZE_VIEWPORT_RENDERER_H
+#ifndef SNEEZE_VIEWPORT_PRIVATE_H
+#define SNEEZE_VIEWPORT_PRIVATE_H
 
 #include "Types.h"
+
+struct UV_SPHERE
+{
+   std::vector<float>    aPositions;
+   std::vector<float>    aNormals;
+   std::vector<float>    aTexCoords;
+   std::vector<uint32_t> aIndices;
+};
+
+void GenerateUVSphere (UV_SPHERE& sphere, float dRadius,
+                       int nStacks, int nSlices,
+                       float dCenterX, float dCenterY, float dCenterZ);
 
 namespace SNEEZE
 {
@@ -82,4 +94,4 @@ namespace SNEEZE
    };
 }
 
-#endif // SNEEZE_VIEWPORT_RENDERER_H
+#endif // SNEEZE_VIEWPORT_PRIVATE_H

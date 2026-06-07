@@ -22,14 +22,11 @@
     <Filter Include="src\context">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000013}</UniqueIdentifier>
     </Filter>
-    <Filter Include="src\viewport">
+    <Filter Include="src\context\viewport">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000006}</UniqueIdentifier>
     </Filter>
     <Filter Include="src\context\scene">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000007}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="src\viewport\renderer">
-      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000008}</UniqueIdentifier>
     </Filter>
     <Filter Include="src\context\msf">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000009}</UniqueIdentifier>
@@ -157,8 +154,8 @@
     <ClCompile Include="..\src\context\console\Block.cpp">
       <Filter>src\context\console</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\viewport\Viewport.cpp">
-      <Filter>src\viewport</Filter>
+    <ClCompile Include="..\src\context\viewport\Viewport.cpp">
+      <Filter>src\context\viewport</Filter>
     </ClCompile>
     <ClCompile Include="..\src\context\scene\Node.cpp">
       <Filter>src\context\scene</Filter>
@@ -175,11 +172,11 @@
     <ClCompile Include="..\src\context\scene\AccessControl.cpp">
       <Filter>src\context\scene</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\viewport\renderer\AnariRenderer.cpp">
-      <Filter>src\viewport\renderer</Filter>
+    <ClCompile Include="..\src\context\viewport\AnariRenderer.cpp">
+      <Filter>src\context\viewport</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\viewport\renderer\UVSphere.cpp">
-      <Filter>src\viewport\renderer</Filter>
+    <ClCompile Include="..\src\context\viewport\UVSphere.cpp">
+      <Filter>src\context\viewport</Filter>
     </ClCompile>
     <ClCompile Include="..\src\context\msf\MsfFile.cpp">
       <Filter>src\context\msf</Filter>
@@ -253,14 +250,11 @@
     <ClInclude Include="..\src\context\scene\AccessControl.h">
       <Filter>src\context\scene</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\viewport\renderer\Renderer.h">
-      <Filter>src\viewport\renderer</Filter>
+    <ClInclude Include="..\src\context\viewport\Viewport.h">
+      <Filter>src\context\viewport</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\viewport\renderer\AnariRenderer.h">
-      <Filter>src\viewport\renderer</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\viewport\renderer\UVSphere.h">
-      <Filter>src\viewport\renderer</Filter>
+    <ClInclude Include="..\src\context\viewport\AnariRenderer.h">
+      <Filter>src\context\viewport</Filter>
     </ClInclude>
     <ClInclude Include="..\src\context\msf\Msf.h">
       <Filter>src\context\msf</Filter>

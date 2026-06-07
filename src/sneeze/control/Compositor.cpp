@@ -38,7 +38,7 @@
 
 #include "Control.h"
 #include "Types.h"
-#include "renderer/Renderer.h"
+#include "context/viewport/Viewport.h"
 #include "scene/MapObject.h"
 #include <cmath>
 #include <functional>

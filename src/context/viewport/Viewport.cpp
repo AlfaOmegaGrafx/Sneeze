@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include <Sneeze.h>
-#include "renderer/AnariRenderer.h"
+#include "AnariRenderer.h"
 #include "sneeze/control/Control.h"
 
 using namespace SNEEZE;

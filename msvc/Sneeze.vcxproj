@@ -63,7 +63,7 @@
   <!-- ===================================================================== -->
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(SneezeRoot)\src;$(SneezeRoot)\include;$(SneezeRoot)\src\sneeze;$(SneezeRoot)\src\context;$(SneezeRoot)\src\viewport;$(SneezeRoot)\src\deps;$(SneezeDepsRoot)\debug\libs\SPIRV-Tools\install\include;$(SneezeDepsRoot)\debug\libs\curl\install\include;$(SneezeDepsRoot)\debug\libs\FreeType\install\include\freetype2;$(SneezeDepsRoot)\debug\libs\RmlUi\install\include;$(SneezeDepsRoot)\debug\libs\nlohmann-json\install\include;$(SneezeDepsRoot)\debug\libs\boringssl\install\include;$(SneezeDepsRoot)\debug\libs\jwt-cpp\install\include;$(SneezeDepsRoot)\debug\libs\Wasmtime\install\include;$(SneezeDepsRoot)\debug\libs\OpenXR-SDK\install\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SneezeRoot)\src;$(SneezeRoot)\include;$(SneezeRoot)\src\sneeze;$(SneezeRoot)\src\context;$(SneezeRoot)\src\context\viewport;$(SneezeRoot)\src\deps;$(SneezeDepsRoot)\debug\libs\SPIRV-Tools\install\include;$(SneezeDepsRoot)\debug\libs\curl\install\include;$(SneezeDepsRoot)\debug\libs\FreeType\install\include\freetype2;$(SneezeDepsRoot)\debug\libs\RmlUi\install\include;$(SneezeDepsRoot)\debug\libs\nlohmann-json\install\include;$(SneezeDepsRoot)\debug\libs\boringssl\install\include;$(SneezeDepsRoot)\debug\libs\jwt-cpp\install\include;$(SneezeDepsRoot)\debug\libs\Wasmtime\install\include;$(SneezeDepsRoot)\debug\libs\OpenXR-SDK\install\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>%(AdditionalOptions) /external:I "$(SneezeDepsRoot)\debug\libs\ANARI-SDK\install\include" /external:I "$(SneezeDepsRoot)\debug\libs\Vox\install\include"</AdditionalOptions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
@@ -89,7 +89,7 @@
   <!-- ===================================================================== -->
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(SneezeRoot)\src;$(SneezeRoot)\include;$(SneezeRoot)\src\sneeze;$(SneezeRoot)\src\context;$(SneezeRoot)\src\viewport;$(SneezeRoot)\src\deps;$(SneezeDepsRoot)\release\libs\SPIRV-Tools\install\include;$(SneezeDepsRoot)\release\libs\curl\install\include;$(SneezeDepsRoot)\release\libs\FreeType\install\include\freetype2;$(SneezeDepsRoot)\release\libs\RmlUi\install\include;$(SneezeDepsRoot)\release\libs\nlohmann-json\install\include;$(SneezeDepsRoot)\release\libs\boringssl\install\include;$(SneezeDepsRoot)\release\libs\jwt-cpp\install\include;$(SneezeDepsRoot)\release\libs\Wasmtime\install\include;$(SneezeDepsRoot)\release\libs\OpenXR-SDK\install\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SneezeRoot)\src;$(SneezeRoot)\include;$(SneezeRoot)\src\sneeze;$(SneezeRoot)\src\context;$(SneezeRoot)\src\context\viewport;$(SneezeRoot)\src\deps;$(SneezeDepsRoot)\release\libs\SPIRV-Tools\install\include;$(SneezeDepsRoot)\release\libs\curl\install\include;$(SneezeDepsRoot)\release\libs\FreeType\install\include\freetype2;$(SneezeDepsRoot)\release\libs\RmlUi\install\include;$(SneezeDepsRoot)\release\libs\nlohmann-json\install\include;$(SneezeDepsRoot)\release\libs\boringssl\install\include;$(SneezeDepsRoot)\release\libs\jwt-cpp\install\include;$(SneezeDepsRoot)\release\libs\Wasmtime\install\include;$(SneezeDepsRoot)\release\libs\OpenXR-SDK\install\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>%(AdditionalOptions) /external:I "$(SneezeDepsRoot)\release\libs\ANARI-SDK\install\include" /external:I "$(SneezeDepsRoot)\release\libs\Vox\install\include"</AdditionalOptions>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
@@ -138,7 +138,7 @@
     <ClCompile Include="..\src\sneeze\control\Pool_Cycle.cpp" />
     <ClCompile Include="..\src\sneeze\control\Fetch.cpp" />
     <!-- viewport -->
-    <ClCompile Include="..\src\viewport\Viewport.cpp" />
+    <ClCompile Include="..\src\context\viewport\Viewport.cpp" />
     <ClCompile Include="..\src\context\scene\Node.cpp" />
     <ClCompile Include="..\src\context\scene\Fabric.cpp" />
     <ClCompile Include="..\src\context\scene\Scene.cpp" />
@@ -160,8 +160,8 @@
     <!-- persona -->
     <ClCompile Include="..\src\persona\Persona.cpp" />
     <!-- renderer -->
-    <ClCompile Include="..\src\viewport\renderer\AnariRenderer.cpp" />
-    <ClCompile Include="..\src\viewport\renderer\UVSphere.cpp" />
+    <ClCompile Include="..\src\context\viewport\AnariRenderer.cpp" />
+    <ClCompile Include="..\src\context\viewport\UVSphere.cpp" />
     <!-- deps: wasm -->
     <ClCompile Include="..\src\deps\wasm\Wasm_Runtime.cpp" />
     <ClCompile Include="..\src\deps\wasm\Wasm_Store.cpp" />
@@ -197,9 +197,8 @@
     <ClInclude Include="..\src\sneeze\control\Control.h" />
     <ClInclude Include="..\src\context\scene\MapObject.h" />
     <ClInclude Include="..\src\context\scene\AccessControl.h" />
-    <ClInclude Include="..\src\viewport\renderer\Renderer.h" />
-    <ClInclude Include="..\src\viewport\renderer\AnariRenderer.h" />
-    <ClInclude Include="..\src\viewport\renderer\UVSphere.h" />
+    <ClInclude Include="..\src\context\viewport\Viewport.h" />
+    <ClInclude Include="..\src\context\viewport\AnariRenderer.h" />
     <ClInclude Include="..\src\deps\wasm\Wasm.h" />
     <ClInclude Include="..\src\deps\wasm\HostFunctions.h" />
     <ClInclude Include="..\src\deps\wasm\ThreadPool.h" />

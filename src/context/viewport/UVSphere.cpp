@@ -12,10 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "UVSphere.h"
+#include "Viewport.h"
 #include <cmath>
-
-static constexpr float PI = 3.14159265358979323846f;
 
 void GenerateUVSphere (UV_SPHERE& sphere, float dRadius,
                        int nStacks, int nSlices,

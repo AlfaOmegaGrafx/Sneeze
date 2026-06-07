@@ -544,7 +544,7 @@ set (CORE_HEADERS
    sneeze/control/Control.h)
 
 set (SOM_SOURCES
-   viewport/Viewport.cpp
+   context/viewport/Viewport.cpp
    context/scene/Node.cpp
    context/scene/Fabric.cpp
    context/scene/Scene.cpp
@@ -619,8 +619,8 @@ set (STORAGE_HEADERS)
 set (PERSONA_SOURCES  persona/Persona.cpp)
 set (PERSONA_HEADERS)
 
-set (RENDERER_SOURCES  viewport/renderer/AnariRenderer.cpp  viewport/renderer/UVSphere.cpp)
-set (RENDERER_HEADERS  viewport/renderer/Renderer.h  viewport/renderer/AnariRenderer.h  viewport/renderer/UVSphere.h)
+set (RENDERER_SOURCES  context/viewport/AnariRenderer.cpp  context/viewport/UVSphere.cpp)
+set (RENDERER_HEADERS  context/viewport/Viewport.h  context/viewport/AnariRenderer.h)
 
 if (SNEEZE_ENABLE_WASM)
    set (WASM_SOURCES
@@ -721,7 +721,7 @@ target_include_directories (Sneeze PUBLIC
    ${CMAKE_CURRENT_SOURCE_DIR}/../include
    ${CMAKE_CURRENT_SOURCE_DIR}/sneeze
    ${CMAKE_CURRENT_SOURCE_DIR}/context
-   ${CMAKE_CURRENT_SOURCE_DIR}/viewport
+   ${CMAKE_CURRENT_SOURCE_DIR}/context/viewport
    ${CMAKE_CURRENT_SOURCE_DIR}/deps
    ${SPIRV_TOOLS_INCLUDE}
    ${CURL_INCLUDE}

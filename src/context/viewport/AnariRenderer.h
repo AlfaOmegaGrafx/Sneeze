@@ -15,8 +15,7 @@
 #ifndef SNEEZE_RENDERER_ANARIRENDERER_H
 #define SNEEZE_RENDERER_ANARIRENDERER_H
 
-#include "Renderer.h"
-#include "UVSphere.h"
+#include "Viewport.h"
 #include <unordered_map>
 
 // Forward declarations for ANARI types used in RENDERER::ANARI class body

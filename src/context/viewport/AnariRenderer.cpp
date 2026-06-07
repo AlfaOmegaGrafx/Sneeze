@@ -45,7 +45,6 @@
 
 #include <Sneeze.h>
 #include "AnariRenderer.h"
-#include "UVSphere.h"
 #include <anari/anari.h>
 
 #define ANARI_RENDERER_TYPE ANARI_DATA_TYPE_DEFINE(514)
