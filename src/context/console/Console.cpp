@@ -58,19 +58,19 @@ public:
    // Stream management
    // ---------------------------------------------------------------------------
 
-   STREAM* Stream_Open (const CONTAINER::CID* pCID)
+   STREAM* Stream_Open (CONTAINER* pContainer)
    {
       STREAM* pStream = nullptr;
 
-      if (pCID)
+      if (pContainer)
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
 
-         if (m_umpStream.find (pCID) == m_umpStream.end ())
+         if (m_umpStream.find (pContainer) == m_umpStream.end ())
          {
-            pStream = new STREAM (this, pCID);
+            pStream = new STREAM (this, pContainer);
 
-            m_umpStream[pCID] = pStream;
+            m_umpStream[pContainer] = pStream;
 
             pStream->Initialize (m_nBlocks, m_nEntries_Block);
 
@@ -174,11 +174,11 @@ public:
       return pEntry;
    }
 
-   std::shared_ptr<const ENTRY> Entry_Create (const CONTAINER::CID* pCID, eENTRY_LEVEL eLevel, const std::string& sMessage, uint32_t nGroupDepth, bool bCollapsed, bool bSystem) override
+   std::shared_ptr<const ENTRY> Entry_Create (CONTAINER* pContainer, eENTRY_LEVEL eLevel, const std::string& sMessage, uint32_t nGroupDepth, bool bCollapsed, bool bSystem) override
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
 
-      auto pEntry = std::make_shared<const ENTRY> (pCID, eLevel, sMessage, m_nIndex_Entry++, nGroupDepth, bCollapsed, bSystem);
+      auto pEntry = std::make_shared<const ENTRY> (pContainer, eLevel, sMessage, m_nIndex_Entry++, nGroupDepth, bCollapsed, bSystem);
       
       m_apEntry.push_back (pEntry);
 
@@ -193,18 +193,18 @@ public:
       return pEntry;
    }
 
-   CONTEXT*                                                         m_pContext;
-   std::string                                                      m_sPath_Temporary;
+   CONTEXT*                                 m_pContext;
+   std::string                              m_sPath_Temporary;
 
-   uint32_t                                                         m_nEntries_Cache;
-   uint32_t                                                         m_nEntries_Block;
-   uint32_t                                                         m_nBlocks;
+   uint32_t                                 m_nEntries_Cache;
+   uint32_t                                 m_nEntries_Block;
+   uint32_t                                 m_nBlocks;
 
-   std::recursive_mutex                                             m_mxConsole;
-   std::deque<std::shared_ptr<const ENTRY>>                m_apEntry;
-   uint32_t                                                         m_nIndex_Entry;
+   std::recursive_mutex                     m_mxConsole;
+   std::deque<std::shared_ptr<const ENTRY>> m_apEntry;
+   uint32_t                                 m_nIndex_Entry;
 
-   std::unordered_map<const CONTAINER::CID*, STREAM*>      m_umpStream;
+   std::unordered_map<CONTAINER*, STREAM*>  m_umpStream;
 };
 
 /***********************************************************************************************************************************
@@ -230,23 +230,28 @@ CONSOLE::~CONSOLE ()
 // Accessors
 // ---------------------------------------------------------------------------
 
-SNEEZE::CONTEXT*   CONSOLE::Context         () const     { return m_pImpl->m_pContext; }
+SNEEZE::CONTEXT* CONSOLE::Context       () const                { return m_pImpl->m_pContext; }
 
-uint32_t           CONSOLE::Entries_Cache   () const     { return m_pImpl->m_nEntries_Cache; }
-void               CONSOLE::Entries_Cache   (uint32_t n) {        m_pImpl->m_nEntries_Cache = n; }
-uint32_t           CONSOLE::Entries_Block   () const     { return m_pImpl->m_nEntries_Block; }
-void               CONSOLE::Entries_Block   (uint32_t n) {        m_pImpl->m_nEntries_Block = n; }
-uint32_t           CONSOLE::Blocks          () const     { return m_pImpl->m_nBlocks; }
-void               CONSOLE::Blocks          (uint32_t n) {        m_pImpl->m_nBlocks = n; }
+uint32_t         CONSOLE::Entries_Cache () const                { return m_pImpl->m_nEntries_Cache; }
+uint32_t         CONSOLE::Entries_Block () const                { return m_pImpl->m_nEntries_Block; }
+uint32_t         CONSOLE::Blocks        () const                { return m_pImpl->m_nBlocks; }
+
+// ---------------------------------------------------------------------------
+//Mutators
+// ---------------------------------------------------------------------------
+
+void             CONSOLE::Entries_Cache (uint32_t n)            {        m_pImpl->m_nEntries_Cache = n; }
+void             CONSOLE::Entries_Block (uint32_t n)            {        m_pImpl->m_nEntries_Block = n; }
+void             CONSOLE::Blocks        (uint32_t n)            {        m_pImpl->m_nBlocks        = n; }
 
 // ---------------------------------------------------------------------------
 // Methods
 // ---------------------------------------------------------------------------
 
-STREAM*   CONSOLE::Stream_Open       (const CONTAINER::CID* pCID)           { return m_pImpl->Stream_Open       (pCID); }
-void               CONSOLE::Stream_Close      (STREAM* pStream)                               {        m_pImpl->Stream_Close      (pStream); }
-void               CONSOLE::Stream_Enum       (IENUM_STREAM* pEnum)                           {        m_pImpl->Stream_Enum       (pEnum); }
+STREAM*          CONSOLE::Stream_Open   (CONTAINER* pContainer) { return m_pImpl->Stream_Open       (pContainer); }
+void             CONSOLE::Stream_Close  (STREAM* pStream)       {        m_pImpl->Stream_Close      (pStream); }
+void             CONSOLE::Stream_Enum   (IENUM_STREAM* pEnum)   {        m_pImpl->Stream_Enum       (pEnum); }
 
-void               CONSOLE::Clear             ()                                              {        m_pImpl->Clear             (); }
+void             CONSOLE::Clear         ()                      {        m_pImpl->Clear             (); }
 
-void               CONSOLE::Entry_Enum        (IENUM_ENTRY* pEnum)                            {        m_pImpl->Entry_Enum        (pEnum); }
+void             CONSOLE::Entry_Enum    (IENUM_ENTRY* pEnum)    {        m_pImpl->Entry_Enum        (pEnum); }

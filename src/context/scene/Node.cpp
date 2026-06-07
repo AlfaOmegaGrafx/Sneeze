@@ -171,7 +171,7 @@ public:
    {
       if (m_pMap_Object  &&  m_pMap_Object->m_Resource.sReference[0] != '\0')
       {
-         m_pFile = m_pFabric->Scene ()->Network ()->File_Open (m_pFabric->Container ()->Identity (), m_pMap_Object->m_Resource.sReference, this);
+         m_pFile = m_pFabric->Scene ()->Network ()->File_Open (m_pFabric->Container (), m_pMap_Object->m_Resource.sReference, this);
       }
    }
 

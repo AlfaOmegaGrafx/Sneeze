@@ -751,9 +751,15 @@ void RENDERER::ANARI::BuildScene (const std::vector<SPHERE_DATA>& aSpheres,
       anariRelease (m_pDevice, pPosArr);
       anariRelease (m_pDevice, pRadArr);
 
-      entry.pMat = anariNewMaterial (m_pDevice, "matte");
-      float color[3] = { c.r, c.g, c.b };
-      anariSetParameter (m_pDevice, entry.pMat, "color", ANARI_FLOAT32_VEC3, color);
+      entry.pMat = anariNewMaterial (m_pDevice, "physicallyBased");
+      float black[4]    = { 0.0f, 0.0f, 0.0f, 1.0f };
+      float emissive[3] = { c.r, c.g, c.b };
+      float dMetallic   = 0.0f;
+      float dRoughness  = 1.0f;
+      anariSetParameter (m_pDevice, entry.pMat, "baseColor", ANARI_FLOAT32_VEC4, black);
+      anariSetParameter (m_pDevice, entry.pMat, "metallic",  ANARI_FLOAT32,      &dMetallic);
+      anariSetParameter (m_pDevice, entry.pMat, "roughness", ANARI_FLOAT32,      &dRoughness);
+      anariSetParameter (m_pDevice, entry.pMat, "emissive",  ANARI_FLOAT32_VEC3, emissive);
       anariCommitParameters (m_pDevice, entry.pMat);
 
       entry.pSurf = anariNewSurface (m_pDevice);

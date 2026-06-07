@@ -22,7 +22,7 @@ ASSET (internal, pImpl, one per URL)
  └── Meta sidecar (.meta) per asset
 
 FILE (per-caller handle, pImpl)
- ├── CID by value, IFILE* listener
+ ├── CONTAINER* m_pContainer, IFILE* listener
  ├── Snapshot fields (three phases: Initial, Progress, Final)
  ├── m_bPending_Close / m_bPending_Clear (dual-flag deletion)
  └── Path computation (persona/fp/container/diskkey fan-out)
@@ -43,7 +43,7 @@ class MY_LISTENER : public SNEEZE::IFILE
 };
 
 MY_LISTENER listener;
-SNEEZE::FILE* pFile = pNetwork->File_Open (&cid, sUrl, &listener);
+SNEEZE::FILE* pFile = pNetwork->File_Open (pContainer, sUrl, &listener);
 // ... later:
 pNetwork->File_Close (pFile);
 ```
@@ -51,13 +51,13 @@ pNetwork->File_Close (pFile);
 ### Hash-Verified Fetch
 
 ```cpp
-SNEEZE::FILE* pFile = pNetwork->File_Open (&cid, sUrl, sSriHash, &listener);
+SNEEZE::FILE* pFile = pNetwork->File_Open (pContainer, sUrl, sSriHash, &listener);
 ```
 
 ### Passive Open (no fetch)
 
 ```cpp
-SNEEZE::FILE* pFile = pNetwork->File_Open (&cid, sUrl);   // null listener
+SNEEZE::FILE* pFile = pNetwork->File_Open (pContainer, sUrl);   // null listener
 // Returns valid handle in IDLE state; no fetch triggered
 ```
 

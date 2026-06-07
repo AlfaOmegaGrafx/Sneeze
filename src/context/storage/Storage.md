@@ -20,7 +20,7 @@ UNIT (one per JSON file on disk)
  └── m_mutex (recursive_mutex)
 
 SILO (groups four UNITs for a container)
- ├── CID by value
+ ├── CONTAINER* m_pContainer
  ├── UNIT* indexed by eSILO_SCOPE [4]
  ├── m_bAttached
  └── Path-based API: Get/Set/Remove/Has/Json
@@ -32,7 +32,7 @@ in the `SNEEZE` namespace.
 ## Usage
 
 ```cpp
-SILO* pSilo = pContext->Storage ()->Silo_Open (&cid);
+SILO* pSilo = pContext->Storage ()->Silo_Open (pContainer);
 pSilo->Attach ();
 
 pSilo->Set (kSILO_SCOPE_PERMANENT_COMPANY, "player.name", "Dean");

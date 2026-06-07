@@ -84,7 +84,7 @@ static ENGINE*                     s_pSneeze      = nullptr;
 static STORAGE*                    s_pStorage     = nullptr;
 static CONTEXT*                    s_pContext     = nullptr;
 
-static CONTAINER::CID MakeTestCID (const std::string& sContainer = "poker")
+static CONTAINER* MakeTestContainer (const std::string& sContainer = "poker")
 {
    CONTAINER::CID CID;
    CID.sFingerprint       = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
@@ -93,7 +93,7 @@ static CONTAINER::CID MakeTestCID (const std::string& sContainer = "poker")
    CID.sContainer         = sContainer;
    CID.sPersonaHash       = "persona_hash_test";
    CID.eTrust             = kTRUST_VERIFIED;
-   return CID;
+   return new CONTAINER (s_pContext, &CID);
 }
 
 static void CleanTestDir ()
@@ -113,19 +113,20 @@ static void TestInitializeAndOpenClose ()
    STORAGE* pStorage = s_pStorage;
    Check (pStorage != nullptr, "Storage exists");
 
-   auto CID = MakeTestCID ();
-   SILO* pSilo = pStorage->Silo_Open (&CID);
+   auto* pContainer = MakeTestContainer ();
+   SILO* pSilo = pStorage->Silo_Open (pContainer);
    Check (pSilo != nullptr, "Open returns SILO");
-   Check (pSilo->DisplayName () == CID.DisplayName (), "SILO holds correct CID");
+   Check (pSilo->DisplayName () == pContainer->Identity ()->DisplayName (), "SILO holds correct CID");
    Check (pSilo != nullptr, "Silo opened successfully");
 
    pSilo->Attach ();
-   Check (pSilo->DisplayName () == CID.DisplayName (), "CID preserved after Attach");
+   Check (pSilo->DisplayName () == pContainer->Identity ()->DisplayName (), "CID preserved after Attach");
 
    Check (s_pContextHost->m_nCreatedCount >= 1, "OnStorageSiloCreated fired");
 
    pSilo->Detach ();
    pStorage->Silo_Close (pSilo);
+   delete pContainer;
 }
 
 // ---------------------------------------------------------------------------
@@ -137,8 +138,8 @@ static void TestBasicOperations ()
    std::printf ("\n[Test 2] Basic Set/Get/Has/Remove\n");
 
    STORAGE* pStorage = s_pStorage;
-   auto CID = MakeTestCID ();
-   SILO* pSilo = pStorage->Silo_Open (&CID);
+   auto* pContainer = MakeTestContainer ();
+   SILO* pSilo = pStorage->Silo_Open (pContainer);
    pSilo->Attach ();
 
    s_pContextHost->m_nChangedCount = 0;
@@ -158,6 +159,7 @@ static void TestBasicOperations ()
 
    pSilo->Detach ();
    pStorage->Silo_Close (pSilo);
+   delete pContainer;
 }
 
 // ---------------------------------------------------------------------------
@@ -169,8 +171,8 @@ static void TestPathNavigation ()
    std::printf ("\n[Test 3] Nested path navigation\n");
 
    STORAGE* pStorage = s_pStorage;
-   auto CID = MakeTestCID ();
-   SILO* pSilo = pStorage->Silo_Open (&CID);
+   auto* pContainer = MakeTestContainer ();
+   SILO* pSilo = pStorage->Silo_Open (pContainer);
    pSilo->Attach ();
 
    pSilo->Set (kSILO_SCOPE_PERMANENT_COMPANY, "game.poker.table.color", "green");
@@ -187,6 +189,7 @@ static void TestPathNavigation ()
 
    pSilo->Detach ();
    pStorage->Silo_Close (pSilo);
+   delete pContainer;
 }
 
 // ---------------------------------------------------------------------------
@@ -198,8 +201,8 @@ static void TestArrayAccess ()
    std::printf ("\n[Test 4] Array index access\n");
 
    STORAGE* pStorage = s_pStorage;
-   auto CID = MakeTestCID ();
-   SILO* pSilo = pStorage->Silo_Open (&CID);
+   auto* pContainer = MakeTestContainer ();
+   SILO* pSilo = pStorage->Silo_Open (pContainer);
    pSilo->Attach ();
 
    pSilo->Set (kSILO_SCOPE_PERMANENT_COMPANY, "scores[0]", 100);
@@ -225,6 +228,7 @@ static void TestArrayAccess ()
 
    pSilo->Detach ();
    pStorage->Silo_Close (pSilo);
+   delete pContainer;
 }
 
 // ---------------------------------------------------------------------------
@@ -236,10 +240,10 @@ static void TestPersistence ()
    std::printf ("\n[Test 5] Persistence across Open/Close\n");
 
    STORAGE* pStorage = s_pStorage;
-   auto CID = MakeTestCID ("persist-test");
+   auto* pContainer = MakeTestContainer ("persist-test");
 
    {
-      SILO* pSilo = pStorage->Silo_Open (&CID);
+      SILO* pSilo = pStorage->Silo_Open (pContainer);
       pSilo->Attach ();
       pSilo->Set (kSILO_SCOPE_PERMANENT_COMPANY, "saved.value", 42);
       pSilo->Set (kSILO_SCOPE_PERMANENT_COMPANY, "saved.text", "hello");
@@ -248,7 +252,7 @@ static void TestPersistence ()
    }
 
    {
-      SILO* pSilo = pStorage->Silo_Open (&CID);
+      SILO* pSilo = pStorage->Silo_Open (pContainer);
       pSilo->Attach ();
       auto jValue = pSilo->Get (kSILO_SCOPE_PERMANENT_COMPANY, "saved.value");
       auto jText  = pSilo->Get (kSILO_SCOPE_PERMANENT_COMPANY, "saved.text");
@@ -259,6 +263,8 @@ static void TestPersistence ()
       pSilo->Detach ();
       pStorage->Silo_Close (pSilo);
    }
+
+   delete pContainer;
 }
 
 // ---------------------------------------------------------------------------
@@ -270,14 +276,14 @@ static void TestOrgSharing ()
    std::printf ("\n[Test 6] Organization storage shared across containers\n");
 
    STORAGE* pStorage = s_pStorage;
-   auto CID_A = MakeTestCID ("container-a");
-   auto CID_B = MakeTestCID ("container-b");
+   auto* pContainerA = MakeTestContainer ("container-a");
+   auto* pContainerB = MakeTestContainer ("container-b");
 
-   SILO* pSiloA = pStorage->Silo_Open (&CID_A);
+   SILO* pSiloA = pStorage->Silo_Open (pContainerA);
    pSiloA->Attach ();
    pSiloA->Set (kSILO_SCOPE_PERMANENT_ORG, "org.setting", "shared-value");
 
-   SILO* pSiloB = pStorage->Silo_Open (&CID_B);
+   SILO* pSiloB = pStorage->Silo_Open (pContainerB);
    pSiloB->Attach ();
    auto jOrgB = pSiloB->Get (kSILO_SCOPE_PERMANENT_ORG, "org.setting");
 
@@ -289,6 +295,8 @@ static void TestOrgSharing ()
    pStorage->Silo_Close (pSiloA);
    pSiloB->Detach ();
    pStorage->Silo_Close (pSiloB);
+   delete pContainerA;
+   delete pContainerB;
 }
 
 // ---------------------------------------------------------------------------
@@ -300,8 +308,8 @@ static void TestScopeIsolation ()
    std::printf ("\n[Test 7] Scope isolation\n");
 
    STORAGE* pStorage = s_pStorage;
-   auto CID = MakeTestCID ("scope-test");
-   SILO* pSilo = pStorage->Silo_Open (&CID);
+   auto* pContainer = MakeTestContainer ("scope-test");
+   SILO* pSilo = pStorage->Silo_Open (pContainer);
    pSilo->Attach ();
 
    pSilo->Set (kSILO_SCOPE_PERMANENT_COMPANY, "key", "permanent");
@@ -321,6 +329,7 @@ static void TestScopeIsolation ()
 
    pSilo->Detach ();
    pStorage->Silo_Close (pSilo);
+   delete pContainer;
 }
 
 // ---------------------------------------------------------------------------
@@ -332,12 +341,13 @@ static void TestCrashRecovery ()
    std::printf ("\n[Test 8] JSONL crash recovery\n");
 
    STORAGE* pStorage = s_pStorage;
-   auto CID = MakeTestCID ("crash-test");
+   auto* pContainer = MakeTestContainer ("crash-test");
+   const CONTAINER::CID* pCID = pContainer->Identity ();
 
    // Compute the actual path that STORAGE will use
-   std::string sFp2  = CID.sFingerprint.substr (0, 2);
-   std::string sFp22 = CID.sFingerprint.substr (2, 22);
-   std::filesystem::path sDir = std::filesystem::path (s_pContext->Path_Permanent ()) / "Storage" / CID.sPersonaHash / (sFp2 + "/" + sFp22);
+   std::string sFp2  = pCID->sFingerprint.substr (0, 2);
+   std::string sFp22 = pCID->sFingerprint.substr (2, 22);
+   std::filesystem::path sDir = std::filesystem::path (s_pContext->Path_Permanent ()) / "Storage" / pCID->sPersonaHash / (sFp2 + "/" + sFp22);
    std::filesystem::path sJsonPath = sDir / "container-crash-test.json";
    std::filesystem::path sLogPath  = sDir / "container-crash-test.log";
 
@@ -357,7 +367,7 @@ static void TestCrashRecovery ()
       f << "[\"Remove\",\"will-remove\"]\n";
    }
 
-   SILO* pSilo = pStorage->Silo_Open (&CID);
+   SILO* pSilo = pStorage->Silo_Open (pContainer);
    pSilo->Attach ();
 
    auto jRecovered = pSilo->Get (kSILO_SCOPE_PERMANENT_COMPANY, "recovered");
@@ -375,6 +385,7 @@ static void TestCrashRecovery ()
 
    pSilo->Detach ();
    pStorage->Silo_Close (pSilo);
+   delete pContainer;
 }
 
 // ---------------------------------------------------------------------------
@@ -386,8 +397,8 @@ static void TestBulkJson ()
    std::printf ("\n[Test 9] Bulk JSON get/set\n");
 
    STORAGE* pStorage = s_pStorage;
-   auto CID = MakeTestCID ("bulk-test");
-   SILO* pSilo = pStorage->Silo_Open (&CID);
+   auto* pContainer = MakeTestContainer ("bulk-test");
+   SILO* pSilo = pStorage->Silo_Open (pContainer);
    pSilo->Attach ();
 
    pSilo->Json (kSILO_SCOPE_PERMANENT_COMPANY,
@@ -406,6 +417,7 @@ static void TestBulkJson ()
 
    pSilo->Detach ();
    pStorage->Silo_Close (pSilo);
+   delete pContainer;
 }
 
 // ---------------------------------------------------------------------------
@@ -417,9 +429,9 @@ static void TestMetaSidecar ()
    std::printf ("\n[Test 10] Meta sidecar\n");
 
    STORAGE* pStorage = s_pStorage;
-   auto CID = MakeTestCID ("meta-test");
+   auto* pContainer = MakeTestContainer ("meta-test");
 
-   SILO* pSilo = pStorage->Silo_Open (&CID);
+   SILO* pSilo = pStorage->Silo_Open (pContainer);
    pSilo->Attach ();
    pSilo->Set (kSILO_SCOPE_PERMANENT_COMPANY, "data", "value");
 
@@ -440,6 +452,8 @@ static void TestMetaSidecar ()
       Check (jMeta.contains ("createdAt"), "Meta contains createdAt");
       Check (jMeta.contains ("sizeBytes"), "Meta contains sizeBytes");
    }
+
+   delete pContainer;
 }
 
 // ---------------------------------------------------------------------------

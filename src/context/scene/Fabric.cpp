@@ -34,9 +34,9 @@ public:
    {
    }
 
-   bool Initialize (const CONTAINER::CID* pCID, const std::string& sUrl)
+   bool Initialize (CONTAINER* pContainer, const std::string& sUrl)
    {
-      m_pFile = m_pScene->Network ()->File_Open (pCID, sUrl, this);
+      m_pFile = m_pScene->Network ()->File_Open (pContainer, sUrl, this);
 
       return (m_pFile != nullptr);
    }
@@ -75,9 +75,9 @@ public:
    {
    }
 
-   bool Initialize (const CONTAINER::CID* pCID)
+   bool Initialize (CONTAINER* pContainer)
    {
-      m_pFile = m_pScene->Network ()->File_Open (pCID, m_sUrl, m_sHash, 0, this);
+      m_pFile = m_pScene->Network ()->File_Open (pContainer, m_sUrl, m_sHash, 0, this);
 
       return (m_pFile != nullptr);
    }
@@ -134,7 +134,7 @@ public:
       {
          m_pMsf_Fetch = new MSF_FETCH (m_pFabric, m_pScene);
 
-         bResult = m_pMsf_Fetch->Initialize (m_pFabric_Parent->Container ()->Identity (), m_sUrl);
+         bResult = m_pMsf_Fetch->Initialize (m_pFabric_Parent->Container (), m_sUrl);
       }
 
       return bResult;
@@ -217,7 +217,7 @@ public:
 
                      m_apWasm_Fetch.push_back (pWasm_Fetch);
 
-                     pWasm_Fetch->Initialize (m_pContainer->Identity ());
+                     pWasm_Fetch->Initialize (m_pContainer);
                   }
 
                   std::string sModMsg = "Fetching " + std::to_string (aModule.size ()) + " WASM module(s)";

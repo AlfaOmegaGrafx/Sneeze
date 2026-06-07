@@ -88,9 +88,9 @@ public:
 
       if (m_nCount_Open++ == 0)
       {
-         if ((m_pStream = m_pContext->Console ()->Stream_Open (&m_CID)))
+         if ((m_pStream = m_pContext->Console ()->Stream_Open (m_pContainer)))
          {
-            if ((m_pSilo = m_pContext->Storage ()->Silo_Open (&m_CID)))
+            if ((m_pSilo = m_pContext->Storage ()->Silo_Open (m_pContainer)))
             {
                m_pSilo->Attach ();
 

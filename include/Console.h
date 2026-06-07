@@ -46,12 +46,12 @@ namespace SNEEZE
    class ENTRY
    {
    public:
-      ENTRY (const CONTAINER::CID* pCID, eENTRY_LEVEL eLevel, const std::string& sMessage, uint32_t nIndex, uint32_t nGroupDepth, bool bCollapsed, bool bSystem = false, const std::string& sStackTrace = "", const std::string& sSource = "");
+      ENTRY (CONTAINER* pContainer, eENTRY_LEVEL eLevel, const std::string& sMessage, uint32_t nIndex, uint32_t nGroupDepth, bool bCollapsed, bool bSystem = false, const std::string& sStackTrace = "", const std::string& sSource = "");
 
       eENTRY_LEVEL                                          Level       () const;
       const std::string&                              Message     () const;
       std::chrono::system_clock::time_point           tpStamp     () const;
-      const CONTAINER::CID*                           CID         () const;
+      CONTAINER*                                      Container   () const;
       uint32_t                                        Index       () const;
       uint32_t                                        GroupDepth  () const;
       bool                                            IsCollapsed () const;
@@ -64,13 +64,13 @@ namespace SNEEZE
       std::string                                     FormatStamp () const;
       void                                            MessageParts (std::vector<std::string>& aParts) const;
       nlohmann::json                                  ToJson      () const;
-      static std::shared_ptr<const ENTRY>             FromJson    (const nlohmann::json& jEntry, const CONTAINER::CID* pCID);
+      static std::shared_ptr<const ENTRY>             FromJson    (const nlohmann::json& jEntry, CONTAINER* pContainer);
 
    private:
       eENTRY_LEVEL                                          m_eLevel;
       std::string                                     m_sMessage;
       std::chrono::system_clock::time_point           m_tpStamp;
-      const CONTAINER::CID*                           m_pCID;
+      CONTAINER*                                      m_pContainer;
       uint32_t                                        m_nIndex;
       uint32_t                                        m_nGroupDepth;
       bool                                            m_bCollapsed;
@@ -91,7 +91,7 @@ namespace SNEEZE
    class STREAM
    {
    public:
-      STREAM (ICONSOLE_IMPL* pIConsole_Impl, const CONTAINER::CID* pCID);
+      STREAM (ICONSOLE_IMPL* pIConsole_Impl, CONTAINER* pContainer);
      ~STREAM ();
 
       void Initialize (int nBlocks, int nEntries_Block);
@@ -210,7 +210,7 @@ namespace SNEEZE
 
       // --- Stream management ---
 
-      STREAM*  Stream_Open  (const CONTAINER::CID* pCID);
+      STREAM*  Stream_Open  (CONTAINER* pContainer);
       void     Stream_Close (STREAM* pStream);
       void     Stream_Enum  (IENUM_STREAM* pEnum);
 

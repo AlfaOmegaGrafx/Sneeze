@@ -24,9 +24,9 @@ using namespace SNEEZE;
 class STREAM::Impl
 {
 public:
-   Impl (ICONSOLE_IMPL* pIConsole_Impl, const CONTAINER::CID* pCID) :
+   Impl (ICONSOLE_IMPL* pIConsole_Impl, CONTAINER* pContainer) :
       m_pIConsole_Impl   (pIConsole_Impl),
-      m_pCID             (pCID),
+      m_pContainer       (pContainer),
       m_bAttached        (false),
       m_nBlocks          (0),
       m_nEntries_Block   (0),
@@ -63,7 +63,8 @@ public:
    {
       const std::string& sBasePath = m_pIConsole_Impl->Path_Temporary ();
 
-      return (std::filesystem::path (sBasePath) / m_pCID->sPersonaHash / m_pCID->sFingerprint.substr (0, 2) / m_pCID->sFingerprint.substr (2, 22)).string ();
+      const CONTAINER::CID* pCID = m_pContainer->Identity ();
+      return (std::filesystem::path (sBasePath) / pCID->sPersonaHash / pCID->sFingerprint.substr (0, 2) / pCID->sFingerprint.substr (2, 22)).string ();
    }
 
    std::string Filename (uint32_t nBlock, const std::string& sExt = "") const
@@ -71,7 +72,7 @@ public:
       char szBlock[5];
       snprintf (szBlock, sizeof (szBlock), "%04u", nBlock);
 
-      std::string sName = m_pCID->sContainer + "-" + szBlock;
+      std::string sName = m_pContainer->Identity ()->sContainer + "-" + szBlock;
 
       if (!sExt.empty ())
          sName += "." + sExt;
@@ -86,7 +87,7 @@ public:
 
    std::string Pathname_Meta () const
    {
-      return (std::filesystem::path (Path (0)) / (m_pCID->sContainer + ".meta")).string ();
+      return (std::filesystem::path (Path (0)) / (m_pContainer->Identity ()->sContainer + ".meta")).string ();
    }
 
    // ---------------------------------------------------------------------------
@@ -135,11 +136,12 @@ public:
       jMeta["block"]           = m_nBlock;
       jMeta["blockEntryCount"] = m_nBlockEntryCount;
 
-      jMeta["fingerprint"]       = m_pCID->sFingerprint;
-      jMeta["organization"]      = m_pCID->sOrganization;
-      jMeta["organizationHash"]  = m_pCID->sOrganizationHash;
-      jMeta["container"]         = m_pCID->sContainer;
-      jMeta["personaHash"]       = m_pCID->sPersonaHash;
+      const CONTAINER::CID* pCID = m_pContainer->Identity ();
+      jMeta["fingerprint"]       = pCID->sFingerprint;
+      jMeta["organization"]      = pCID->sOrganization;
+      jMeta["organizationHash"]  = pCID->sOrganizationHash;
+      jMeta["container"]         = pCID->sContainer;
+      jMeta["personaHash"]       = pCID->sPersonaHash;
 
       std::string sTmpPath = sPathname_Meta + ".temp";
       std::ofstream ofs (sTmpPath, std::ios::trunc);
@@ -176,7 +178,7 @@ public:
       if (m_bAttached)
       {
          for (int nBlock = 0; nBlock < (int) m_apBlock.size (); nBlock++)
-            m_apBlock[nBlock]->Detach (m_pCID);
+            m_apBlock[nBlock]->Detach (m_pContainer);
 
          Meta_Save ();
 
@@ -204,7 +206,7 @@ public:
          BLOCK* pBlock = m_apBlock.front ();
 
          if (m_bAttached)
-            pBlock->Detach (m_pCID);
+            pBlock->Detach (m_pContainer);
 
          delete pBlock;
          m_apBlock.erase (m_apBlock.begin ());
@@ -227,7 +229,7 @@ public:
       if (m_nBlock < 0  ||  m_nBlockEntryCount >= m_nEntries_Block)
          Rotate ();
 
-      auto pEntry = m_pIConsole_Impl->Entry_Create (m_pCID, eLevel, sMessage, m_nGroupDepth, bCollapsed, bSystem);
+      auto pEntry = m_pIConsole_Impl->Entry_Create (m_pContainer, eLevel, sMessage, m_nGroupDepth, bCollapsed, bSystem);
 
       m_apBlock.back ()->Write (pEntry);
       m_nBlockEntryCount++;
@@ -318,7 +320,7 @@ public:
 
 public:
    ICONSOLE_IMPL*                                                         m_pIConsole_Impl;
-   const CONTAINER::CID*                                                  m_pCID;
+   CONTAINER*                                                             m_pContainer;
    std::vector<BLOCK*>                                                    m_apBlock;
    std::recursive_mutex                                                   m_mxStream;
    bool                                                                   m_bAttached;
@@ -338,8 +340,8 @@ public:
 // STREAM
 // ===========================================================================
 
-STREAM::STREAM (ICONSOLE_IMPL* pIConsole_Impl, const CONTAINER::CID* pCID) :
-   m_pImpl (new Impl (pIConsole_Impl, pCID))
+STREAM::STREAM (ICONSOLE_IMPL* pIConsole_Impl, CONTAINER* pContainer) :
+   m_pImpl (new Impl (pIConsole_Impl, pContainer))
 {
 }
 
@@ -357,7 +359,7 @@ STREAM::~STREAM ()
 // Accessors
 // ---------------------------------------------------------------------------
 
-std::string STREAM::DisplayName    ()                                         const { return m_pImpl->m_pCID->DisplayName (); }
+std::string STREAM::DisplayName    ()                                         const { return m_pImpl->m_pContainer->Identity ()->DisplayName (); }
 
 std::string STREAM::Path          (uint32_t nBlock)                          const { return m_pImpl->Path     (nBlock); }
 std::string STREAM::Filename      (uint32_t nBlock, const std::string& sExt) const { return m_pImpl->Filename (nBlock, sExt); }
@@ -371,8 +373,8 @@ std::string STREAM::Pathname      (uint32_t nBlock, const std::string& sExt) con
 // STREAM Caching
 // ---------------------------------------------------------------------------
 
-void STREAM::Attach              ()                                                 {                  m_pImpl->Attach (); }
-void STREAM::Detach              ()                                                 {                  m_pImpl->Detach (); }
+void STREAM::Attach              ()                                                           {                  m_pImpl->Attach (); }
+void STREAM::Detach              ()                                                           {                  m_pImpl->Detach (); }
 
 // ---------------------------------------------------------------------------
 // STREAM Pass-through

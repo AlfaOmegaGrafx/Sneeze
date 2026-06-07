@@ -18,8 +18,8 @@ using namespace SNEEZE;
 // ENTRY
 // ===========================================================================
 
-ENTRY::ENTRY (const CONTAINER::CID* pCID, eENTRY_LEVEL eLevel, const std::string& sMessage, uint32_t nIndex, uint32_t nGroupDepth, bool bCollapsed, bool bSystem, const std::string& sStackTrace, const std::string& sSource) :
-   m_pCID        (pCID),
+ENTRY::ENTRY (CONTAINER* pContainer, eENTRY_LEVEL eLevel, const std::string& sMessage, uint32_t nIndex, uint32_t nGroupDepth, bool bCollapsed, bool bSystem, const std::string& sStackTrace, const std::string& sSource) :
+   m_pContainer  (pContainer),
    m_eLevel      (eLevel),
    m_sMessage    (sMessage),
    m_nIndex      (nIndex),
@@ -36,16 +36,16 @@ ENTRY::ENTRY (const CONTAINER::CID* pCID, eENTRY_LEVEL eLevel, const std::string
 // Const accessors
 // ---------------------------------------------------------------------------
 
-const SNEEZE::CONTAINER::CID*       ENTRY::CID         () const { return m_pCID; }
-eENTRY_LEVEL                              ENTRY::Level       () const { return m_eLevel; }
-const std::string&                  ENTRY::Message     () const { return m_sMessage; }
-uint32_t                            ENTRY::Index       () const { return m_nIndex; }
-uint32_t                            ENTRY::GroupDepth  () const { return m_nGroupDepth; }
-bool                                ENTRY::IsCollapsed () const { return m_bCollapsed; }
-bool                                ENTRY::IsSystem    () const { return m_bSystem; }
-const std::string&                  ENTRY::StackTrace  () const { return m_sStackTrace; }
-const std::string&                  ENTRY::Source      () const { return m_sSource; }
-std::chrono::system_clock::time_point ENTRY::tpStamp   () const { return m_tpStamp; }
+SNEEZE::CONTAINER*                    ENTRY::Container   () const { return m_pContainer; }
+eENTRY_LEVEL                          ENTRY::Level       () const { return m_eLevel; }
+const std::string&                    ENTRY::Message     () const { return m_sMessage; }
+uint32_t                              ENTRY::Index       () const { return m_nIndex; }
+uint32_t                              ENTRY::GroupDepth  () const { return m_nGroupDepth; }
+bool                                  ENTRY::IsCollapsed () const { return m_bCollapsed; }
+bool                                  ENTRY::IsSystem    () const { return m_bSystem; }
+const std::string&                    ENTRY::StackTrace  () const { return m_sStackTrace; }
+const std::string&                    ENTRY::Source      () const { return m_sSource; }
+std::chrono::system_clock::time_point ENTRY::tpStamp     () const { return m_tpStamp; }
 
 // ---------------------------------------------------------------------------
 // LevelString
@@ -158,7 +158,7 @@ nlohmann::json ENTRY::ToJson () const
 // the STREAM that owns the block file (ENTRY does not resolve CIDs itself).
 // ---------------------------------------------------------------------------
 
-std::shared_ptr<const ENTRY> ENTRY::FromJson (const nlohmann::json& jEntry, const CONTAINER::CID* pCID)
+std::shared_ptr<const ENTRY> ENTRY::FromJson (const nlohmann::json& jEntry, CONTAINER* pContainer)
 {
    eENTRY_LEVEL eLevel = kENTRY_LEVEL_LOG;
    std::string sLevelStr = jEntry.value ("level", "log");
@@ -169,7 +169,7 @@ std::shared_ptr<const ENTRY> ENTRY::FromJson (const nlohmann::json& jEntry, cons
 
    auto pEntry = std::make_shared<ENTRY>
    (
-      pCID,
+      pContainer,
       eLevel,
       jEntry.value ("message",    std::string ()),
       jEntry.value ("index",      static_cast<uint32_t> (0)),

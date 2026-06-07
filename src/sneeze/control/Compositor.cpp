@@ -151,10 +151,12 @@ void JOB_COMPOSITOR::Complete_Deliver ()
 // ===========================================================================
 
 static constexpr float METERS_TO_AU     = 1.0f / 149597870700.0f;
-static constexpr float MIN_SPHERE_RADIUS = 0.005f;
-static constexpr float SUN_RADIUS_SCALE  = 5.0f;
-static constexpr int   TRAIL_SEGMENTS    = 256;
+static constexpr float MIN_SPHERE_RADIUS = 0.0005f;
+static constexpr float SPHERE_SCALE      = 0.3f;
+static constexpr int    TRAIL_SEGMENTS   = 128;
 static constexpr double TRAIL_FRACTION   = 0.75;
+static constexpr float  TRAIL_RADIUS_PLANET = 0.0005f;
+static constexpr float  TRAIL_RADIUS_MOON   = 0.000075f;
 
 static void ColorFromU32 (uint32_t nColor, float& r, float& g, float& b)
 {
@@ -270,7 +272,7 @@ struct WORLD_FRAME
    bool   bStar   = false;
 };
 
-static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, std::vector<SPHERE_DATA>& aSpheres, std::vector<CURVE_DATA>&  aCurves)
+static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, std::vector<SPHERE_DATA>& aSpheres, std::vector<CURVE_DATA>& aCurves)
 {
    MAP_OBJECT* pObj = pNode->MapObject ();
    WORLD_FRAME childFrame = frame;
@@ -294,6 +296,10 @@ static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, 
 
          if (pCelestial->HasOrbit ())
          {
+            float dTrailRadius = (bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_MOONSYSTEM
+                               || bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_DEBRISSYSTEM)
+                               ? TRAIL_RADIUS_MOON : TRAIL_RADIUS_PLANET;
+
             CURVE_DATA curve;
             ColorFromPropertyFloat (pCelestial->m_Properties.fColor, curve.r, curve.g, curve.b);
             curve.r *= 0.4f;
@@ -306,7 +312,7 @@ static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, 
             cpHead.x       = static_cast<float> (childFrame.dPosX);
             cpHead.y       = static_cast<float> (childFrame.dPosY);
             cpHead.z       = static_cast<float> (childFrame.dPosZ);
-            cpHead.dRadius = 0.002f;
+            cpHead.dRadius = dTrailRadius;
             curve.aPoints.push_back (cpHead);
 
             ORBIT_POSITION pos;
@@ -319,11 +325,13 @@ static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, 
                   double dE = dE_planet - (static_cast<double> (i) / TRAIL_SEGMENTS) * TWO_PI;
                   VEC3 vPt = pCelestial->OrbitTrailPoint (dE, tmNow);
 
+                  float dTaper = 1.0f - static_cast<float> (i) / static_cast<float> (nTrailPoints);
+
                   CURVE_POINT cp;
                   cp.x       = static_cast<float> (frame.dPosX + vPt.x * METERS_TO_AU);
                   cp.y       = static_cast<float> (frame.dPosY + vPt.y * METERS_TO_AU);
                   cp.z       = static_cast<float> (frame.dPosZ + vPt.z * METERS_TO_AU);
-                  cp.dRadius = 0.002f;
+                  cp.dRadius = dTrailRadius * dTaper;
                   curve.aPoints.push_back (cp);
                }
             }
@@ -342,9 +350,8 @@ static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, 
       }
       else if (bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_SURFACE)
       {
-         float dRadius = static_cast<float> (childFrame.dRadius * METERS_TO_AU);
+         float dRadius = SPHERE_SCALE * std::sqrt (static_cast<float> (childFrame.dRadius * METERS_TO_AU));
          if (dRadius < MIN_SPHERE_RADIUS) dRadius = MIN_SPHERE_RADIUS;
-         if (childFrame.bStar)            dRadius *= SUN_RADIUS_SCALE;
 
          SPHERE_DATA sphere;
          sphere.x         = static_cast<float> (childFrame.dPosX);

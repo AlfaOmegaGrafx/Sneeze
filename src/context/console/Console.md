@@ -2,19 +2,19 @@
 
 The `console` module provides a per-context developer console analogous to a
 web browser's `console` object. Structured logging, grouping, counting, and
-timing — all scoped per container via CID.
+timing — all scoped per container via CONTAINER.
 
 ## Architecture
 
 ```
 CONSOLE (per-context, constructor takes CONTEXT*)
  ├── m_apEntry: deque<shared_ptr<ENTRY>>     (global ring buffer, capped)
- ├── m_umpStream: CID* -> STREAM*            (one per container)
+ ├── m_umpStream: CONTAINER* -> STREAM*      (one per container)
  ├── m_nIndex_Entry: monotonic entry counter
  └── m_mxConsole (recursive_mutex)
 
 STREAM (per-container log channel)
- ├── const CID* m_pCID
+ ├── CONTAINER* m_pContainer
  ├── m_apBlock: vector<BLOCK*>               (rolling window)
  ├── Group depth, count map, timer map
  └── m_mxStream (recursive_mutex)
@@ -25,7 +25,7 @@ BLOCK (one per JSONL log file on disk)
  └── m_nCount_Load (cache ref count)
 
 ENTRY (immutable, shared via shared_ptr<const ENTRY>)
- ├── eENTRY_LEVEL, message, timestamp, CID*, index
+ ├── eENTRY_LEVEL, message, timestamp, CONTAINER*, index
  ├── group depth, collapsed flag, system flag
  └── stack trace, source
 ```
@@ -76,7 +76,7 @@ Immutable, self-stamps with `system_clock::now()` in constructor.
 
 | Method | Effect |
 |--------|--------|
-| `Stream_Open(pCID)` | Creates STREAM, fires OnConsoleStreamCreated |
+| `Stream_Open(pContainer)` | Creates STREAM, fires OnConsoleStreamCreated |
 | `Stream_Close(pStream)` | Fires OnConsoleStreamDeleted, deletes |
 | `Stream_Enum(pEnum)` | Walks active streams |
 | `Entry_Enum(pEnum)` | Walks global ring buffer |

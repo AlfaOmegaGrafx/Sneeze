@@ -123,7 +123,7 @@ int RunConsoleTests (int nArgc, char** aArgv)
 
    engine.Login ("Test", "User");
 
-   // Create a CID for testing
+   // Create a CONTAINER for testing
    CONTAINER::CID cid;
    cid.sFingerprint       = "abcdef0123456789abcdef01234567890123456789abcdef0123456789abcd";
    cid.sOrganization      = "TestOrg";
@@ -145,8 +145,10 @@ int RunConsoleTests (int nArgc, char** aArgv)
 
    CONSOLE* pConsole = pContext->Console ();
 
-   // Open a stream for the CID — all logging goes through streams
-   STREAM* pStream = pConsole->Stream_Open (&cid);
+   CONTAINER container (pContext, &cid);
+
+   // Open a stream for the container — all logging goes through streams
+   STREAM* pStream = pConsole->Stream_Open (&container);
    ASSERT (pStream != nullptr, "Stream_Open returned non-null");
 
    // -----------------------------------------------------------------------
@@ -170,10 +172,10 @@ int RunConsoleTests (int nArgc, char** aArgv)
    ASSERT (contextHost.m_nEntryCount == 5, "Five OnConsoleEntry notifications");
 
    // -----------------------------------------------------------------------
-   // Test 3: Engine-internal logging (null CID stream)
+   // Test 3: Engine-internal logging (null container stream)
    // -----------------------------------------------------------------------
 
-   std::printf ("\n[Test 3] Engine-internal logging (null CID)\n");
+   std::printf ("\n[Test 3] Engine-internal logging (null container)\n");
 
    STREAM* pEngineStream = pConsole->Stream_Open (nullptr);
 
@@ -184,13 +186,13 @@ int RunConsoleTests (int nArgc, char** aArgv)
       ENTRY_COLLECTOR collector2;
       pConsole->Entry_Enum (&collector2);
       ASSERT (collector2.m_aEntry.size () == 6, "Six entries total");
-      ASSERT (collector2.m_aEntry[5]->CID () == nullptr, "Engine entry has null CID");
+      ASSERT (collector2.m_aEntry[5]->Container () == nullptr, "Engine entry has null container");
 
       pConsole->Stream_Close (pEngineStream);
    }
    else
    {
-      ASSERT (true, "Null-CID stream not supported (skipped)");
+      ASSERT (true, "Null-container stream not supported (skipped)");
    }
 
    // -----------------------------------------------------------------------
@@ -322,7 +324,7 @@ int RunConsoleTests (int nArgc, char** aArgv)
    {
       auto pOriginal = collector8.m_aEntry.front ();
       nlohmann::json jEntry = pOriginal->ToJson ();
-      auto pDeserialized = ENTRY::FromJson (jEntry, &cid);
+      auto pDeserialized = ENTRY::FromJson (jEntry, &container);
 
       ASSERT (pDeserialized != nullptr, "Deserialized entry is non-null");
       ASSERT (pDeserialized->Level ()   == pOriginal->Level (),   "Level round-trips");

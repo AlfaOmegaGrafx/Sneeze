@@ -24,10 +24,10 @@ using namespace SNEEZE;
 class SNEEZE::FILE::Impl
 {
 public:
-   Impl (FILE* pFile, INETWORK_IMPL* pINetwork_Impl, const CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
+   Impl (FILE* pFile, INETWORK_IMPL* pINetwork_Impl, CONTAINER* pContainer, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
       m_pFile            (pFile),
       m_pINetwork_Impl   (pINetwork_Impl),
-      m_pCID             (pCID),
+      m_pContainer       (pContainer),
       m_nFileIx          (nFileIx),
       m_sUrl             (sUrl),
       m_sOpenHash        (sHash),
@@ -234,7 +234,8 @@ public:
 
    std::string Path () const
    {
-      return (std::filesystem::path (m_pINetwork_Impl->Path_Permanent ()) / m_pCID->sPersonaHash / m_pCID->sFingerprint.substr (0, 2) / m_pCID->sFingerprint.substr (2, 22) / m_pCID->sContainer / m_sDiskKey.substr (0, 2)).string ();
+      const CONTAINER::CID* pCID = m_pContainer->Identity ();
+      return (std::filesystem::path (m_pINetwork_Impl->Path_Permanent ()) / pCID->sPersonaHash / pCID->sFingerprint.substr (0, 2) / pCID->sFingerprint.substr (2, 22) / pCID->sContainer / m_sDiskKey.substr (0, 2)).string ();
    }
 
    std::string Filename (const std::string& sExt) const
@@ -253,9 +254,9 @@ public:
    }
 
 public:
-   FILE*                       m_pFile;
+   FILE*                          m_pFile;
    INETWORK_IMPL*                 m_pINetwork_Impl;
-   const CONTAINER::CID* m_pCID;
+   CONTAINER*                     m_pContainer;
    ASSET*                         m_pAsset;
    IFILE*                         m_pListener;
    uint32_t                       m_nCount_Attach;
@@ -287,8 +288,8 @@ public:
 // Constructor / Destructor
 // ---------------------------------------------------------------------------
 
-SNEEZE::FILE::FILE (INETWORK_IMPL* pINetwork_Impl, const CONTAINER::CID* pCID, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
-   m_pImpl (new Impl (this, pINetwork_Impl, pCID, nFileIx, sUrl, sHash, bCacheEnabled))
+SNEEZE::FILE::FILE (INETWORK_IMPL* pINetwork_Impl, CONTAINER* pContainer, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
+   m_pImpl (new Impl (this, pINetwork_Impl, pContainer, nFileIx, sUrl, sHash, bCacheEnabled))
 {
 }
 
@@ -321,7 +322,7 @@ void SNEEZE::FILE::Pending_Reset ()                              {        m_pImp
 // Notify — host callbacks
 // ---------------------------------------------------------------------------
 
-void SNEEZE::FILE::Notify_Changed   ()                    {        m_pImpl->Notify_Changed (); }
+void SNEEZE::FILE::Notify_Changed   ()                           {        m_pImpl->Notify_Changed (); }
 
 // ---------------------------------------------------------------------------
 // Snapshot — copies display fields from the attached ASSET
@@ -335,41 +336,41 @@ void SNEEZE::FILE::SnapshotFinal    () { m_pImpl->SnapshotFinal (); }
 // ASSET-dependent accessors (require attached ASSET)
 // ---------------------------------------------------------------------------
 
-//std::string                                        SNEEZE::FILE::Header            (const std::string& sName) const { return m_pImpl->m_pAsset->Header (sName); }
-void                                               SNEEZE::FILE::ReadData          (std::vector<uint8_t>& aData) const { return m_pImpl->m_pAsset->ReadData (aData); }
+//std::string                                       SNEEZE::FILE::Header            (const std::string& sName) const { return m_pImpl->m_pAsset->Header (sName); }
+void                                                SNEEZE::FILE::ReadData          (std::vector<uint8_t>& aData) const { return m_pImpl->m_pAsset->ReadData (aData); }
 
-std::string                                        SNEEZE::FILE::DiskPath          () const { return m_pImpl->m_pAsset->DiskPath (); }
-std::string                                        SNEEZE::FILE::CreatedTime       () const { return m_pImpl->m_pAsset->CreatedTime (); }
-std::string                                        SNEEZE::FILE::LastAccessTime    () const { return m_pImpl->m_pAsset->LastAccessTime (); }
-uint32_t                                           SNEEZE::FILE::AccessCount       () const { return m_pImpl->m_pAsset->AccessCount (); }
+std::string                                         SNEEZE::FILE::DiskPath          () const { return m_pImpl->m_pAsset->DiskPath (); }
+std::string                                         SNEEZE::FILE::CreatedTime       () const { return m_pImpl->m_pAsset->CreatedTime (); }
+std::string                                         SNEEZE::FILE::LastAccessTime    () const { return m_pImpl->m_pAsset->LastAccessTime (); }
+uint32_t                                            SNEEZE::FILE::AccessCount       () const { return m_pImpl->m_pAsset->AccessCount (); }
 const std::unordered_map<std::string, std::string>& SNEEZE::FILE::RspHeaders        () const { return m_pImpl->m_pAsset->RspHeaders (); }
 const std::unordered_map<std::string, std::string>& SNEEZE::FILE::ReqHeaders        () const { return m_pImpl->m_pAsset->ReqHeaders (); }
-std::string                                        SNEEZE::FILE::ContainerName     () const { return m_pImpl->m_pCID->DisplayName (); }
-eASSET_STATE                                     SNEEZE::FILE::State             () const { return m_pImpl->m_bState; }
-bool                                               SNEEZE::FILE::IsReady           () const { return m_pImpl->m_bState == kASSET_STATE_READY; }
-std::string                                        SNEEZE::FILE::Url               () const { return m_pImpl->m_sUrl; }
-std::string                                        SNEEZE::FILE::Hash              () const { return m_pImpl->m_sHash; }
-bool                                               SNEEZE::FILE::IsHashed          () const { return !m_pImpl->m_sHash.empty (); }
-uint32_t                                           SNEEZE::FILE::FileIx            () const { return m_pImpl->m_nFileIx; }
-uint32_t                                           SNEEZE::FILE::AssetIx           () const { return m_pImpl->m_nAssetIx; }
-long                                               SNEEZE::FILE::HttpStatus        () const { return m_pImpl->m_nHttpStatus; }
-double                                             SNEEZE::FILE::FetchQueuedTime   () const { return m_pImpl->m_dFetchQueuedTime; }
-double                                             SNEEZE::FILE::FetchStartTime    () const { return m_pImpl->m_dFetchStartTime; }
-double                                             SNEEZE::FILE::FetchEndTime      () const { return m_pImpl->m_dFetchEndTime; }
-double                                             SNEEZE::FILE::FetchDuration     () const { return m_pImpl->m_dFetchEndTime - m_pImpl->m_dFetchStartTime; }
-bool                                               SNEEZE::FILE::IsServedFromCache () const { return m_pImpl->m_bServedFromCache; }
-std::string                                        SNEEZE::FILE::ContentType       () const { return m_pImpl->m_sContentType; }
-uint64_t                                           SNEEZE::FILE::SizeBytes         () const { return m_pImpl->m_nSizeBytes; }
+std::string                                         SNEEZE::FILE::ContainerName     () const { return m_pImpl->m_pContainer->Identity ()->DisplayName (); }
+eASSET_STATE                                        SNEEZE::FILE::State             () const { return m_pImpl->m_bState; }
+bool                                                SNEEZE::FILE::IsReady           () const { return m_pImpl->m_bState == kASSET_STATE_READY; }
+std::string                                         SNEEZE::FILE::Url               () const { return m_pImpl->m_sUrl; }
+std::string                                         SNEEZE::FILE::Hash              () const { return m_pImpl->m_sHash; }
+bool                                                SNEEZE::FILE::IsHashed          () const { return !m_pImpl->m_sHash.empty (); }
+uint32_t                                            SNEEZE::FILE::FileIx            () const { return m_pImpl->m_nFileIx; }
+uint32_t                                            SNEEZE::FILE::AssetIx           () const { return m_pImpl->m_nAssetIx; }
+long                                                SNEEZE::FILE::HttpStatus        () const { return m_pImpl->m_nHttpStatus; }
+double                                              SNEEZE::FILE::FetchQueuedTime   () const { return m_pImpl->m_dFetchQueuedTime; }
+double                                              SNEEZE::FILE::FetchStartTime    () const { return m_pImpl->m_dFetchStartTime; }
+double                                              SNEEZE::FILE::FetchEndTime      () const { return m_pImpl->m_dFetchEndTime; }
+double                                              SNEEZE::FILE::FetchDuration     () const { return m_pImpl->m_dFetchEndTime - m_pImpl->m_dFetchStartTime; }
+bool                                                SNEEZE::FILE::IsServedFromCache () const { return m_pImpl->m_bServedFromCache; }
+std::string                                         SNEEZE::FILE::ContentType       () const { return m_pImpl->m_sContentType; }
+uint64_t                                            SNEEZE::FILE::SizeBytes         () const { return m_pImpl->m_nSizeBytes; }
 
-bool                                               SNEEZE::FILE::IsPending_Clear   () const { return m_pImpl->m_bPending_Clear; }
-bool                                               SNEEZE::FILE::IsPending_Close   () const { return m_pImpl->m_bPending_Close; }
-std::string                                        SNEEZE::FILE::Path              () const { return m_pImpl->Path (); }
-std::string                                        SNEEZE::FILE::Filename          (const std::string& sExt) const { return m_pImpl->Filename (sExt); }
-std::string                                        SNEEZE::FILE::Pathname          (const std::string& sExt) const { return m_pImpl->Pathname (sExt); }
+bool                                                SNEEZE::FILE::IsPending_Clear   () const { return m_pImpl->m_bPending_Clear; }
+bool                                                SNEEZE::FILE::IsPending_Close   () const { return m_pImpl->m_bPending_Close; }
+std::string                                         SNEEZE::FILE::Path              () const { return m_pImpl->Path (); }
+std::string                                         SNEEZE::FILE::Filename          (const std::string& sExt) const { return m_pImpl->Filename (sExt); }
+std::string                                         SNEEZE::FILE::Pathname          (const std::string& sExt) const { return m_pImpl->Pathname (sExt); }
 
-IFILE*                                    SNEEZE::FILE::Listener          () const { return m_pImpl->m_pListener; }
+IFILE*                                              SNEEZE::FILE::Listener          () const { return m_pImpl->m_pListener; }
 
-const std::string&                                 SNEEZE::FILE::OpenHash          () const { return m_pImpl->m_sOpenHash; }
-bool                                               SNEEZE::FILE::CacheEnabled      () const { return m_pImpl->m_bCacheEnabled; }
+const std::string&                                  SNEEZE::FILE::OpenHash          () const { return m_pImpl->m_sOpenHash; }
+bool                                                SNEEZE::FILE::CacheEnabled      () const { return m_pImpl->m_bCacheEnabled; }
 
-const std::string&                                 SNEEZE::FILE::RemoteAddress     () const { return m_pImpl->m_pAsset->RemoteAddress (); }
+const std::string&                                  SNEEZE::FILE::RemoteAddress     () const { return m_pImpl->m_pAsset->RemoteAddress (); }

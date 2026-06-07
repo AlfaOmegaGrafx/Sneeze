@@ -23,9 +23,9 @@ using namespace SNEEZE;
 class SILO::Impl
 {
 public:
-   Impl (ISTORAGE_IMPL* pIStorage_Impl, const CONTAINER::CID* pCID) :
+   Impl (ISTORAGE_IMPL* pIStorage_Impl, CONTAINER* pContainer) :
       m_pIStorage_Impl (pIStorage_Impl),
-      m_pCID           (pCID),
+      m_pContainer     (pContainer),
       m_bAttached      (false)
    {
       for (int nScope = 0; nScope < kSILO_SCOPE_COUNT; nScope++)
@@ -65,12 +65,13 @@ public:
    {
       const std::string& sBasePath = (eScope == kSILO_SCOPE_TEMPORARY_ORG || eScope == kSILO_SCOPE_TEMPORARY_COMPANY) ? m_pIStorage_Impl->Path_Temporary () : m_pIStorage_Impl->Path_Permanent ();
 
-      return (std::filesystem::path (sBasePath) / m_pCID->sPersonaHash / m_pCID->sFingerprint.substr (0, 2) / m_pCID->sFingerprint.substr (2, 22)).string ();
+      const CONTAINER::CID* pCID = m_pContainer->Identity ();
+      return (std::filesystem::path (sBasePath) / pCID->sPersonaHash / pCID->sFingerprint.substr (0, 2) / pCID->sFingerprint.substr (2, 22)).string ();
    }
 
    std::string Filename (eSILO_SCOPE eScope, const std::string& sExt = "") const
    {
-      std::string sName = (eScope == kSILO_SCOPE_PERMANENT_ORG || eScope == kSILO_SCOPE_TEMPORARY_ORG) ? "organization" : "container-" + m_pCID->sContainer;
+      std::string sName = (eScope == kSILO_SCOPE_PERMANENT_ORG || eScope == kSILO_SCOPE_TEMPORARY_ORG) ? "organization" : "container-" + m_pContainer->Identity ()->sContainer;
 
       if (!sExt.empty ())
          sName += "." + sExt;
@@ -107,7 +108,7 @@ public:
       if (m_bAttached)
       {
          for (int nScope = 0; nScope < kSILO_SCOPE_COUNT; nScope++)
-            m_apUnit[nScope]->Detach (m_pCID);
+            m_apUnit[nScope]->Detach (m_pContainer);
 
          m_bAttached = false;
       }
@@ -154,7 +155,7 @@ public:
 
 public:
    ISTORAGE_IMPL*                   m_pIStorage_Impl;
-   const CONTAINER::CID*            m_pCID;
+   CONTAINER*                       m_pContainer;
    UNIT*                            m_apUnit[kSILO_SCOPE_COUNT];
    std::mutex                       m_mxSilo;
    bool                             m_bAttached;
@@ -164,8 +165,8 @@ public:
 // STORAGE::SILO
 // ===========================================================================
 
-SILO::SILO (ISTORAGE_IMPL* pIStorage_Impl, const CONTAINER::CID* pCID) :
-   m_pImpl (new Impl (pIStorage_Impl, pCID))
+SILO::SILO (ISTORAGE_IMPL* pIStorage_Impl, CONTAINER* pContainer) :
+   m_pImpl (new Impl (pIStorage_Impl, pContainer))
 {
 }
 
@@ -183,7 +184,7 @@ SILO::~SILO ()
 // Accessors
 // ---------------------------------------------------------------------------
 
-std::string SILO::DisplayName ()                                                                      const { return m_pImpl->m_pCID->DisplayName (); }
+std::string SILO::DisplayName ()                                                                           const { return m_pImpl->m_pContainer->Identity ()->DisplayName (); }
 
 std::string SILO::Path        (eSILO_SCOPE eScope)                                                         const { return m_pImpl->Path     (eScope);       }
 std::string SILO::Filename    (eSILO_SCOPE eScope, const std::string& sExt)                                const { return m_pImpl->Filename (eScope, sExt); }
@@ -197,8 +198,8 @@ std::string SILO::Pathname    (eSILO_SCOPE eScope, const std::string& sExt)     
 // UNIT Caching
 // ---------------------------------------------------------------------------
 
-void        SILO::Attach      ()                                                                            {        m_pImpl->Attach    (); }
-void        SILO::Detach      ()                                                                            {        m_pImpl->Detach    (); }
+void        SILO::Attach      ()                                                                                 {        m_pImpl->Attach    (); }
+void        SILO::Detach      ()                                                                                 {        m_pImpl->Detach    (); }
 
 // ---------------------------------------------------------------------------
 // UNIT Pass-through

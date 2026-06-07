@@ -260,14 +260,14 @@ public:
    // File operations
    // ---------------------------------------------------------------------------
 
-   FILE* File_Open (const CONTAINER::CID* pCID, const std::string& sUrl, const std::string& sHash, uint32_t nAssetIx, IFILE* pListener)
+   FILE* File_Open (CONTAINER* pContainer, const std::string& sUrl, const std::string& sHash, uint32_t nAssetIx, IFILE* pListener)
    {
       FILE* pFile = nullptr;
 
       {
          std::lock_guard<std::recursive_mutex> guard (m_mutex);
 
-         pFile = new FILE (this, pCID, m_nNextFileIx++, sUrl, sHash, m_bCacheEnabled);
+         pFile = new FILE (this, pContainer, m_nNextFileIx++, sUrl, sHash, m_bCacheEnabled);
 
          m_apFile.push_back (pFile);
 
@@ -517,14 +517,14 @@ bool               NETWORK::IsCacheEnabled    ()                                
 // Methods
 // ---------------------------------------------------------------------------
 
-SNEEZE::FILE* NETWORK::File_Open (const CONTAINER::CID* pCID, const std::string& sUrl, IFILE* pListener)
+SNEEZE::FILE* NETWORK::File_Open (CONTAINER* pContainer, const std::string& sUrl, IFILE* pListener)
 {
-   return File_Open (pCID, sUrl, std::string (), 0, pListener);
+   return File_Open (pContainer, sUrl, std::string (), 0, pListener);
 }
 
-SNEEZE::FILE* NETWORK::File_Open (const CONTAINER::CID* pCID, const std::string& sUrl, const std::string& sHash, uint32_t nAssetIx, IFILE* pListener)
+SNEEZE::FILE* NETWORK::File_Open (CONTAINER* pContainer, const std::string& sUrl, const std::string& sHash, uint32_t nAssetIx, IFILE* pListener)
 {
-   return m_pImpl->File_Open (pCID, sUrl, sHash, nAssetIx, pListener);
+   return m_pImpl->File_Open (pContainer, sUrl, sHash, nAssetIx, pListener);
 }
 
 void NETWORK::File_Enum  (IENUM_FILE* pEnum) { m_pImpl->File_Enum (pEnum); }

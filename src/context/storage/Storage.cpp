@@ -54,15 +54,15 @@ public:
    // Silo management
    // ---------------------------------------------------------------------------
 
-   SILO* Silo_Open (const CONTAINER::CID* pCID)
+   SILO* Silo_Open (CONTAINER* pContainer)
    {
       SILO* pSilo = nullptr;
 
-      if (pCID)
+      if (pContainer)
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
 
-         pSilo = new SILO (this, pCID);
+         pSilo = new SILO (this, pContainer);
 
          m_apSilo.push_back (pSilo);
 
@@ -182,6 +182,6 @@ STORAGE::~STORAGE ()
 // Container lifecycle
 // ---------------------------------------------------------------------------
 
-SILO*              STORAGE::Silo_Open       (const CONTAINER::CID* pCID)         { return m_pImpl->Silo_Open       (pCID); }
-void               STORAGE::Silo_Close      (SILO* pSilo)                                 {        m_pImpl->Silo_Close      (pSilo); }
-void               STORAGE::Silo_Enum       (IENUM_SILO* pEnum)                           {        m_pImpl->Silo_Enum       (pEnum); }
+SILO* STORAGE::Silo_Open  (CONTAINER* pContainer) { return m_pImpl->Silo_Open       (pContainer); }
+void  STORAGE::Silo_Close (SILO* pSilo)           {        m_pImpl->Silo_Close      (pSilo); }
+void  STORAGE::Silo_Enum  (IENUM_SILO* pEnum)     {        m_pImpl->Silo_Enum       (pEnum); }
