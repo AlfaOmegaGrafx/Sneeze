@@ -1,14 +1,13 @@
 # Viewport — Rendering and Camera
 
 The viewport module owns the rendering pipeline and camera controls for each
-browser context. Each CONTEXT owns one VIEWPORT; the VIEWPORT only renders
-when an IVIEWPORT host is attached (enabling headless contexts for inactive
-tabs).
+context. Each CONTEXT owns one VIEWPORT; the VIEWPORT only renders when an
+IVIEWPORT host is attached (enabling headless contexts for inactive tabs).
 
 ## Architecture
 
 ```
-VIEWPORT (src/viewport/Viewport.cpp)
+VIEWPORT (Viewport.cpp, pImpl)
 ├── RENDERER (abstract, declared in Viewport.h)
 │   └── RENDERER::ANARI (AnariRenderer.h/cpp — Halogen/Filament backend)
 ├── VIEW (camera orbit state, declared in include/Viewport.h)
@@ -17,71 +16,68 @@ VIEWPORT (src/viewport/Viewport.cpp)
 └── JOB_COMPOSITOR (pool-cycle job, managed by CONTROL)
 ```
 
-All private headers and source live directly in `src/viewport/` — there are
-no subdirectories.
+All source lives in `src/context/viewport/` — no subdirectories.
 
 ## VIEWPORT
 
-Owned by CONTEXT. pImpl pattern. Key lifecycle:
+Owned by CONTEXT. pImpl pattern.
 
 - `Renderer_Initialize()` — deferred, called from compositor agent 0 thread
   (Filament thread affinity). Creates `RENDERER::ANARI`.
+- `Renderer_Shutdown()` — called from compositor agent 0 via Execute_Destroy.
 - `Activate(IVIEWPORT*)` — creates JOB_COMPOSITOR, posts to POOL_CYCLE.
 - `Deactivate()` — cancels compositor job, blocks until renderer shutdown.
-- Input via `Input_Mouse()` / `Input_Key()` (accumulated under mutex).
-- Framebuffer via `FrameBuffer_Write()` / `FrameBuffer_Capture()` /
+- Input: `Input_Mouse()` / `Input_Key()` (accumulated under `m_mxInput`).
+- Framebuffer: `FrameBuffer_Write()` / `FrameBuffer_Capture()` /
   `FrameBuffer_Release()` (producer-consumer with mutex).
+- Timing: `Accumulate()` tracks per-section durations; `Diagnostics()` logs
+  FPS and averages once per second.
 
-## RENDERER (base class)
+## RENDERER (abstract)
 
-Abstract rendering interface in `Viewport.h`. All backends implement this.
+Declared in `Viewport.h` (private header). Virtual interface for all backends.
 
 ### Frame Lifecycle
 
 ```
-SetCamera (...)        // position, direction, up, fov, aspect
-BeginFrame ()          // clear / prepare
-SubmitSpheres (...)    // batch of positioned, colored, optionally textured spheres
-SubmitCurves (...)     // batch of polyline curves (orbit trails)
-EndFrame ()            // render and produce framebuffer
+SetCamera (CAMERA_DATA)
+BeginFrame ()
+SubmitSpheres (vector<SPHERE_DATA>)
+SubmitCurves (vector<CURVE_DATA>)
+EndFrame ()
 ```
 
-After `EndFrame()`, the framebuffer is available via `GetFrameBuffer()`.
+After `EndFrame()`, framebuffer is available via `GetFrameBuffer()`.
 
 ### Native Surface Rendering
 
-If `SetNativeWindow()` is called before `Initialize()` and the backend
-supports it, the renderer presents directly to the platform surface (HWND,
-CAMetalLayer, etc.). `IsRenderingToNativeSurface()` returns true and
-`GetFrameBuffer()` returns nullptr — the application skips CPU blitting.
+If `SetNativeWindow(hwnd)` is called before `Initialize()`, Filament creates a
+Vulkan swapchain on the platform window (zero CPU copies, 60 FPS). The
+framebuffer publish path is skipped entirely.
 
 ### Data Types
 
 | Type | Purpose |
 |------|---------|
-| `SPHERE_DATA` | Positioned sphere: x/y/z, radius, r/g/b color, optional texture pixels, emissive flag |
+| `SPHERE_DATA` | Position, radius, color, optional texture pixels, emissive flag |
 | `CURVE_POINT` | Vertex with position and radius |
-| `CURVE_DATA` | Polyline (vector of CURVE_POINTs) with r/g/b color |
-| `CAMERA_DATA` | Eye position, look direction, up vector, FOV, aspect, near/far |
+| `CURVE_DATA` | Polyline (vector of CURVE_POINTs) with color |
+| `CAMERA_DATA` | Eye, look direction, up, FOV, aspect, near/far |
 | `UV_SPHERE` | Generated mesh: positions, normals, texcoords, indices |
 
 ## RENDERER::ANARI
 
-Concrete ANARI backend (`AnariRenderer.h`/`AnariRenderer.cpp`). Loads an ANARI
-library by name (e.g. `"halogen"`), creates a device, manages the
-frame/world/camera lifecycle. Scene retention: ANARI objects are created once
-via `BuildScene()` and retained; `UpdateScene()` updates transforms only.
-`SceneNeedsRebuild()` detects structural changes. Submit/render timing exposed
-via `GetLastSubmitSeconds()` / `GetLastRenderSeconds()`.
+Concrete ANARI backend. Constructor takes library name (e.g. `"halogen"`).
+Scene retention: ANARI objects created once via `BuildScene()`, updated via
+`UpdateScene()`. `SceneNeedsRebuild()` detects structural changes. Timing
+exposed via `GetLastSubmitSeconds()` / `GetLastRenderSeconds()`.
 
 ## VIEW (Camera Orbit)
 
-A struct declared in `include/Viewport.h`. Each VIEWPORT owns one VIEW,
-updated by the compositor from that viewport's input.
+Struct declared in `include/Viewport.h`. Each VIEWPORT owns one VIEW.
 
 ```cpp
-SNEEZE::VIEWPORT::VIEW& view = pViewport->View ();
-view.Update (nDX, nDY, dScrollY, bMouseLeft, bMouseRight);
+VIEWPORT::VIEW& view = pViewport->View ();
 ```
 
 | Input | Action |
@@ -91,21 +87,27 @@ view.Update (nDX, nDY, dScrollY, bMouseLeft, bMouseRight);
 | Scroll wheel | Zoom (adjust distance) |
 
 Spherical-to-Cartesian conversion from `dTheta`, `dPhi`, `dDistance` looking
-at `(dTargetX, dTargetY, dTargetZ)`. The compositor converts this into
-`CAMERA_DATA` for the renderer.
+at `(dTargetX, dTargetY, dTargetZ)`.
 
-## Known Issues
+## INPUT
 
-- **Orbit trails render as thick PBR-lit tubes.** ANARI's `"curve"` geometry
-  produces volumetric cylinders with the `"matte"` material, resulting in
-  over-luminated, thick, visually noisy trails. The original Three.js
-  implementation used screen-space lines. Planned: unlit/emissive material,
-  camera-distance radius scaling, reduced segment count.
+POD struct accumulating raw input state per viewport: mouse deltas, scroll,
+button state, key state. Written by Artemis via `Input_Mouse()` / `Input_Key()`.
+Consumed by `Input_Consume()` (resets accumulated deltas). Protected by
+`m_mxInput` (std::mutex).
 
-## Future Work
+## UV_SPHERE
 
-- **First-person camera** — walk/fly mode for terrestrial navigation
-- **Camera transitions** — smooth animated transitions between targets
-- **Camera constraints** — phi clamping, zoom limits, collision
-- **Mesh geometry** — triangle meshes (glTF/GLB) not yet submittable
-- **Screen-space lines** — via Filament custom material or post-process
+`GenerateUVSphere(nStacks, nSlices)` produces a UV_SPHERE struct with
+positions, normals, texcoords, and indices for a unit sphere. Used by the
+ANARI renderer for textured planet rendering.
+
+## Files
+
+| File | Contents |
+|------|----------|
+| `Viewport.cpp` | VIEWPORT::Impl (activate/deactivate, input, framebuffer, timing) |
+| `Viewport.h` | Private header — RENDERER base, SPHERE_DATA, CURVE_DATA, CAMERA_DATA, UV_SPHERE |
+| `AnariRenderer.h` | RENDERER::ANARI declaration |
+| `AnariRenderer.cpp` | ANARI implementation (device, scene retention, native surface) |
+| `UVSphere.cpp` | GenerateUVSphere implementation |

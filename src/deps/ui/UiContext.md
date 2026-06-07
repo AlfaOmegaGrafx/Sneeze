@@ -1,29 +1,36 @@
-# UI — User Interface Context
+# UI — RmlUi Context
 
-The `ui` module provides a placeholder for in-engine UI rendering (HUD
-elements, overlays, debug panels). The host application (Artemis) manages
-the platform-level chrome (title bar, menus); this module is for
-engine-rendered UI within the viewport.
+The `ui` module owns the RmlUi lifecycle (init/shutdown), the global system
+interface (elapsed time + logging), and the FreeType font engine. RmlUi is a
+retained-mode HTML/CSS UI toolkit.
 
 ## UI_CONTEXT
 
 ```cpp
-#include "ui/UiContext.h"
-
 DEP::UI_CONTEXT ui;
 ui.Initialize ();
 // ... engine runs ...
 ui.Shutdown ();
 ```
 
-## Unimplemented / Future Work
+`Initialize()` calls `Rml::Initialise()` with a stub render interface and the
+global system interface. FreeType activates automatically.
 
-This module is a stub. Planned features:
+## Dual-Context Architecture
 
-- **Debug overlay** — FPS counter, SOM node count, WASM store status.
-- **In-world UI** — 2D panels rendered as textured quads in 3D space
-  (e.g., fabric-provided menus, interaction prompts).
-- **Input routing** — dispatching mouse/keyboard events to focused UI
-  elements before they reach the camera or SOM.
-- **Layout engine** — a lightweight layout system for positioning UI
-  elements relative to the viewport or world objects.
+RmlUi is initialized once by Sneeze, but both Sneeze and Artemis create their
+own `Rml::Context` objects. Each context can have its own `RenderInterface`:
+
+- **Artemis contexts** — SDL-backed RenderInterface for browser chrome
+  (Inspector, URL bar, menus)
+- **Sneeze contexts** (future) — ANARI-backed RenderInterface for in-world UI
+  (service-provided HTML/CSS overlays)
+
+Shared globals (system interface, font engine) serve both sides.
+
+## Files
+
+| File | Contents |
+|------|----------|
+| `UiContext.h` | UI_CONTEXT declaration |
+| `UiContext.cpp` | Implementation (Rml::Initialise/Shutdown, system interface) |

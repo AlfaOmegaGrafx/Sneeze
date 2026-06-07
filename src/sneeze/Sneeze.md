@@ -1,199 +1,143 @@
-# Sneeze — Engine Runtime and Agent Infrastructure
+# Sneeze — Engine Core
 
-The `sneeze` module is the heart of the Sneeze engine. It owns the main engine
-object (`SNEEZE`), the agent thread infrastructure, and all shared subsystem
-lifecycles. Per-viewport concerns (scene, renderer, input, framebuffer) are
-owned by `VIEWPORT` instances, created and destroyed via `OpenViewport` /
-`CloseViewport`.
+The `sneeze` module is the heart of the Sneeze engine. It owns the ENGINE class
+(the single entry point for the host application), the THREAD base class for
+managed thread lifecycle, and the foundational types (VEC3, QUAT, constants).
 
-## SNEEZE
+## ENGINE
 
-`SNEEZE` is the singleton engine instance, created and owned by the host
-application (Artemis). It manages initialization, shutdown, the engine thread
-loop, viewport management, and exposes the public API for persona management
-and subsystem accessors.
+ENGINE is the single entry point the host application (Artemis) instantiates.
+Uses the pimpl idiom. Constructor takes `IENGINE*` (host interface).
 
 ```cpp
-#include "Sneeze.h"
+#include <Sneeze.h>
 
-auto* pHost = new SNEEZE_HOST ();
-pHost->sAppDataPath  = sPath;
-pHost->sRenderer     = "halogen";
-
-SNEEZE engine (pHost);
+auto* pHost = new ENGINE_HOST ();   // implements IENGINE
+ENGINE engine (pHost);
 engine.Initialize ();
 
-// Create a viewport (per-window)
-auto* pViewportHost = new VIEWPORT_HOST ();
-pViewportHost->pNativeWindow = hWnd;
-pViewportHost->nWidth        = 1280;
-pViewportHost->nHeight       = 720;
+// Open a context (one per browser tab)
+auto* pContextHost = new CONTEXT_HOST ();   // implements ICONTEXT
+CONTEXT* pContext = engine.Context_Open (pContextHost, "https://example.com/world.msf", kSESSION_PERSISTENT);
 
-SNEEZE::VIEWPORT* pViewport = engine.OpenViewport (pViewportHost, "https://example.com/world.msf");
+// Attach a viewport to the context (activates rendering)
+auto* pViewportHost = new VIEWPORT_HOST ();   // implements IVIEWPORT
+pContext->Viewport ()->Activate (pViewportHost);
 
 // Application event loop feeds input to the viewport
-pViewport->SetMouseInput (dx, dy, scroll, bLeft, bRight);
-pViewport->SetKeyInput (bSpace, bPlus, bMinus);
+pContext->Viewport ()->Input_Mouse (dx, dy, scroll, bLeft, bRight);
+pContext->Viewport ()->Input_Key (bSpace, bPlus, bMinus);
 
-// Present (fallback path -- native surface rendering skips this)
-int nW, nH;
-const uint32_t* pFB = pViewport->LockFrameBuffer (nW, nH);
-// blit pFB to screen
-pViewport->UnlockFrameBuffer ();
-
-engine.CloseViewport (pViewport);
-engine.Shutdown ();
+// Teardown
+pContext->Viewport ()->Deactivate ();
+engine.Context_Close (pContext);
 ```
 
-### Subsystem Lifecycle
+### Initialization
 
-`Initialize()` creates shared engine services, in order:
+`Initialize()` is parameterless — reads configuration from the `IENGINE*` host.
+Uses nested `if` success pattern with `bool m_bInitialized`. Creates engine-level
+services in order:
 
-1. WASM runtime, SPIR-V pipeline, XR runtime (if enabled)
-2. Network (file cache), storage system, UI context
-3. Agent threads (compositor self-paced, others at configured rates)
+1. curl_global_init
+2. WASM_RUNTIME
+3. SPV_PIPELINE
+4. XR_RUNTIME (if enabled)
+5. UI_CONTEXT
+6. PERSONA
+7. CONTROL (spawns the engine thread, creates all agent pools)
+8. InitializePaths (cache directory structure, orphan cleanup)
 
-`OpenViewport()` creates per-viewport resources:
+Shutdown tears down in reverse order.
 
-1. SCENE (root fabric, root node, primary attachment node, primary fabric)
-2. RENDERER (optional -- headless mode if no renderer library configured)
-3. ASTRO_SERVICE (populates the primary fabric with celestial nodes)
+### Context Lifecycle
 
-`Shutdown()` tears everything down in reverse order.
+- `Context_Open(pHost, sUrl, kSession)` — computes permanent/temporary paths,
+  creates CONTEXT, adds to `m_apContext` (add-before-init), calls Initialize
+- `Context_Close(pContext)` — captures temporary path, deletes, erases, queues
+  cleanup via SCRUB
 
-### Viewport Management
-
-Multiple viewports are supported. Each viewport is independent:
+### Persona
 
 ```cpp
-SNEEZE::VIEWPORT* pViewport1 = engine.OpenViewport (pHost1, "https://world-a.msf");
-SNEEZE::VIEWPORT* pViewport2 = engine.OpenViewport (pHost2, "https://world-b.msf");
-
-// Convenience: first viewport
-SNEEZE::VIEWPORT* pViewport = engine.Viewport ();
-
-// Full list
-const std::vector<SNEEZE::VIEWPORT*>& apViewport = engine.Viewports ();
+engine.Login ("Dean", "Abramson");
+engine.Logout ();
+engine.ChangePersona ("Jane", "Doe");   // Logout + Login
 ```
 
-### Persona and Teardown
+### Path Management
+
+ENGINE owns three path strings:
+- `m_sPath_Persistent` — `sAppDataPath/Sneeze/Cache/Persistent/`
+- `m_sPath_Transitory` — `sAppDataPath/Sneeze/Cache/Transitory/`
+- `m_sPath_Transitory_Session` — `.../Transitory/s<8-hex>/`
+
+`InitializePaths()` creates directories, scans for orphaned session folders,
+and queues them for cleanup via AGENT::SCRUB.
+
+## IENGINE
+
+Host interface between the application and the engine.
 
 ```cpp
-engine.Login ("Dean", "Abramson");    // Sets persona to "Dean.Abramson"
-engine.Logout ();                      // Phased teardown: signal, communicate, shutdown, destroy
-engine.ChangePersona ("Jane", "Doe"); // Logout + Login
-```
-
-`Logout()` runs a four-phase teardown:
-
-1. **Signal** -- notify active stores that teardown is imminent
-2. **Communicate** -- allow instances time to finalize with their services
-3. **Shutdown** -- call Shutdown on instances, destroy all WASM stores
-4. **Destroy** -- clear session caches, logout persona
-
-### ISNEEZE
-
-`ISNEEZE` is the engine-level interface between the host application and the
-engine. Per-viewport concerns have moved to `IVIEWPORT`.
-
-```cpp
-class ISNEEZE
+class IENGINE
 {
 public:
-   // Configuration (set by host before Initialize)
-   std::string sAppDataPath;
-   std::string sSessionPath;
-   std::string sRenderer;
-
-   std::string SessionPath () const;
-
-   // Callbacks
-   virtual void Log (eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage) = 0;
+   virtual std::string const& sAppDataPath () const& = 0;
+   virtual std::string const& sRenderer ()    const& = 0;
+   virtual void Log (eLOGLEVEL, const std::string& sModule, const std::string& sMessage) = 0;
 };
 ```
 
-### IVIEWPORT
+## ICONTEXT
 
-`IVIEWPORT` is the per-viewport interface. Each viewport gets its own host
-instance from the application.
+Per-context host interface for inspector callbacks. Optional virtual callbacks
+(default no-op) for NETWORK, STORAGE, and CONSOLE notifications.
+
+## IVIEWPORT
+
+Per-viewport host interface for rendering.
 
 ```cpp
 class IVIEWPORT
 {
 public:
-   // Configuration (set by host before OpenViewport)
-   void*  pNativeWindow = nullptr;
-   int    nWidth        = 0;
-   int    nHeight       = 0;
-
-   // Callbacks
-   virtual void OnFrameReady (const uint32_t* pFB, int nFbW, int nFbH) = 0;
-
-   // Optional inspector callbacks (default no-op)
-   virtual void OnNetworkFileCreated (NOTIFICATION* pNotification) {}
-   virtual void OnNetworkFileChanged (NOTIFICATION* pNotification) {}
-   virtual void OnNetworkFileDeleted (NOTIFICATION* pNotification) {}
-   virtual void OnStorageSiloCreated (NOTIFICATION* pNotification) {}
-   virtual void OnStorageSiloChanged (NOTIFICATION* pNotification) {}
-   virtual void OnStorageSiloDeleted (NOTIFICATION* pNotification) {}
+   virtual void* FrameWindow () = 0;
+   virtual void  FrameSize (int& nWidth, int& nHeight) = 0;
+   virtual void  OnFrameReady (const uint32_t* pFB, int nFbW, int nFbH) = 0;
 };
 ```
 
-## AGENT
+## THREAD
 
-`AGENT` is the base class for all engine agent threads. Each agent runs in
-its own thread and is woken by the engine thread at a configured frequency.
+Base class for managed thread lifecycle. Declared in `Engine.h`, implemented
+in `Thread.cpp`. All managed threads (CONTROL, every AGENT) inherit THREAD.
 
-| Agent                | Class                 | Frequency | Purpose                          |
-|----------------------|-----------------------|-----------|----------------------------------|
-| Compositor           | `AGENT::COMPOSITOR`    | Self-paced| Scene traversal, rendering       |
-| C through H          | `AGENT::C` .. `H`     | Varies    | Reserved for future use          |
-
-Agents override `Tick()` to perform their per-frame work. Self-paced agents
-(compositor) override `ThreadLoop()` instead.
-
-### AGENT::COMPOSITOR
-
-The compositor iterates all active viewports each frame. For each viewport it
-traverses the primary fabric's SOM tree, computes orbital positions for
-celestial bodies, submits geometry to the viewport's ANARI renderer, and
-publishes the resulting framebuffer via `pViewport->Host()->OnFrameReady()`.
-It also manages the camera, time scale, and pause state from user input
-(consumed from the first viewport).
-
-The compositor does NOT own a renderer or camera -- those are per-viewport.
+- `Initialize()` — spawns thread, blocks until `Ready()` is called
+- `Main()` — pure virtual entry point
+- `Wait(predicate)` / `Wait(duration)` — neither reads shutdown flag
+- `Signal(bShutdown)` — wakes thread, optionally latches shutdown
+- `Join()` — signals shutdown + joins; must be called in every derived destructor
+- `~THREAD()` — calls Join() as safety net, then deletes thread
 
 ## Types
 
-### VEC3, QUAT
+`Types.h` defines foundational types used across all modules:
 
 ```cpp
 struct VEC3 { double x, y, z; };
 struct QUAT { double dX, dY, dZ, dW; };
+
+constexpr double PI      = 3.14159265358979323846;
+constexpr double TWO_PI  = 6.28318530717958647692;
+constexpr double AU_M    = 149597870700.0;
 ```
 
-### Constants
+## Files
 
-| Name              | Value                    | Description                    |
-|-------------------|--------------------------|--------------------------------|
-| `AU_M`            | 149,597,870,700          | 1 AU in meters                 |
-| `GM_SUN_M3S2`     | 1.327e20                 | Solar GM (m^3/s^2)             |
-| `TICKS_PER_S`     | 64                       | Animation tick rate             |
-| `TICKS_PER_CY`    | 36525 * 86400 * 64      | Ticks per Julian century        |
-
-### EPOCH
-
-Julian Date utility for astronomical time calculations. Supports parsing
-calendar dates, computing delta-years between epochs, and propagating mean
-anomalies.
-
-## Unimplemented / Future Work
-
-- **Agent C** is reserved for the animator thread (64 Hz SOM animation
-  interpolation). Not yet connected.
-- **Agents D through H** are placeholder slots for future subsystems.
-- The phased teardown currently logs phases but does not yet await async
-  acknowledgements from WASM instances (phase 2 is synchronous).
-- `Resize()` is implemented but hot-resize during rendering is untested.
-- Multi-viewport input: currently only the first viewport's input drives
-  camera and time controls. Per-viewport input independence is future work.
+| File | Contents |
+|------|----------|
+| `Engine.cpp` | ENGINE::Impl (pimpl body, subsystem lifecycle, context management, paths) |
+| `Engine.h` | THREAD base class declaration |
+| `Thread.cpp` | THREAD implementation (spawn, signal, wait, shutdown, join) |
+| `Types.h` | VEC3, QUAT, constants |

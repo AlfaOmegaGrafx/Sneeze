@@ -1,182 +1,121 @@
-# MSF_FILE — Metaverse Spatial Fabric File
+# MSF — Metaverse Spatial Fabric File
 
-`MSF_FILE` is the single class for working with `.msf` files. It handles the
-full lifecycle: parsing an existing file, composing a new one, managing
-certificates, managing payload content (services, modules), signing, and
-verifying.
+The `msf` module provides signing and verification of `.msf` files using
+RFC 7515 JWS compact serialization, plus plain JSON (unsigned) MSF support.
 
-An `.msf` file is a JWS (JSON Web Signature) compact string with:
+`MSF` is the single class for the full lifecycle: parsing, signing, verification,
+certificate management, and typed payload access. `MSF::CHAIN` handles X.509
+chain validation. Both are in the `SNEEZE` namespace.
 
-- **Header** — algorithm (`alg`) and X.509 certificate chain (`x5c`)
-- **Payload** — JSON wrapped in a `data` claim (namespace, organization,
-  services, modules, successor)
-- **Signature** — cryptographic signature over header + payload
+Public header: `include/Msf.h`.
 
-## Reading and Verifying an MSF File
+## Reading and Verifying
 
 ```cpp
-#include "msf/MsfFile.h"
+#include <Msf.h>
 
-// 1. Create the object and optionally load trusted CA certs
-msf::MSF_FILE msf;
-msf.AddTrustedCert (sCaPem);     // feeds the trust store for chain validation
+SNEEZE::MSF msf;
+msf.AddTrustedCert (sCaPem);
 
-// 2. Parse the JWS string — always populates all fields
-msf.Parse (sJwsString);
+// Parse — always populates all fields, even if invalid
+msf.Parse (sJwsOrJson, sUrl);
 
-// 3. Verify (optional — parsed data is available either way)
-msf.VerifySignature ();           // checks the cryptographic signature
-msf.VerifyChain ();               // checks the certificate chain against the trust store
+// Verify (optional — parsed data is available either way)
+msf.VerifySignature ();
+msf.VerifyChain ();
 
-// 4. Read the results
-msf.Algorithm ();              // "RS256"
-msf.Fingerprint ();            // SHA-256 of leaf cert's SPKI
-msf.IsSignatureValid ();          // true / false
-msf.IsChainTrusted ();            // true / false
-msf.SignatureError ();         // "" if valid, error message otherwise
-msf.ChainError ();             // "" if trusted, error message otherwise
+// Read results
+msf.Algorithm ();            // "RS256"
+msf.Fingerprint ();          // SHA-256 of leaf cert's SPKI
+msf.Organization ();         // from cert subject
+msf.OrganizationHash ();     // truncated SHA-256 of organization
+msf.IsSignatureValid ();
+msf.IsChainTrusted ();
+msf.IsChainExpired ();
 
-// 5. Inspect the payload
-msf.Namespace ();              // "com.pokerstars.poker"
-msf.Organization ();           // "PokerStars"
-msf.Successor ();              // successor fingerprint (or "")
-msf.Services ();               // vector of MSF_SERVICE
-msf.Modules ();                // map of name -> MSF_MODULE
-msf.Payload ();                // raw nlohmann::json
-
-// 6. Inspect the certificate chain
-msf.CertInfos ();              // vector of CERT_INFO
-msf.CertCount ();              // number of certs in the chain
+// Inspect payload
+msf.Container ();            // container name
+msf.Services ();             // vector<SERVICE>
+msf.Modules ();              // vector<MODULE>
+msf.Payload ();              // raw nlohmann::json
+msf.Successor ();            // successor fingerprint
 ```
 
-### Key point: Parse is unconditional
+### Parse accepts both JWS and plain JSON
 
-`Parse()` splits the JWS, decodes the header, payload, and certificate chain
-into the object's fields. Everything is populated regardless of validity.
-`Parse()` returns `false` only if the string is not parseable as JWS (malformed
-dots or base64).
+`Parse(sInput, sUrl)` detects the format:
+- **JWS compact serialization** (signed) — splits header.payload.signature,
+  decodes certificates, extracts fingerprint
+- **Plain JSON** (unsigned) — parses directly, generates a synthetic fingerprint
+  from SHA-256 of the URL + content (100% untrustworthy, unique per file)
 
-Verification is separate. A viewer that just wants to display contents can call
-`Parse()` alone and skip `VerifySignature()` / `VerifyChain()`.
+The `sUrl` parameter is always required.
 
-## Composing and Signing a New MSF File
+## Composing and Signing
 
 ```cpp
-#include "msf/MsfFile.h"
-
-// 1. Create the object
-msf::MSF_FILE msf;
-
-// 2. Set payload fields
-msf.SetNamespace ("com.pokerstars.poker");
-msf.SetOrganization ("PokerStars");
-
-// 3. Add services
-msf.AddService ({"game-server", "websocket", "wss://rt.pokerstars.com/game",
-                  {"game-client.wasm"}});
-
-// 4. Add modules with their URLs and SHA-256 digests
-msf.AddModule ("game-client.wasm",
-               "https://cdn.pokerstars.com/modules/game-client.wasm",
-               "a1b2c3d4e5f6...");
-
-// 5. Add the signing certificate chain (leaf first, then CAs)
+SNEEZE::MSF msf;
+msf.SetContainer ("poker-table");
+msf.AddService ({"game-server", "websocket", "wss://rt.example.com/game", {"game.wasm"}});
+msf.AddModule ("https://cdn.example.com/game.wasm", "sha256-a1b2c3...");
 msf.AddCert (sLeafPem);
 msf.AddCert (sCaPem);
 
-// 6. Sign — returns the JWS compact string
 std::string sJws = msf.Sign (sPrivateKeyPem, "RS256");
 ```
 
-### Bulk payload access
+## Nested Types
 
-For cases where the typed methods don't cover a field, use `SetPayload()` and
-`Payload()` to work with the raw JSON directly:
+### MSF::SERVICE
 
-```cpp
-nlohmann::json payload;
-payload["namespace"]    = "com.example.app";
-payload["organization"] = "Example Corp";
-payload["custom_field"] = 42;
-msf.SetPayload (payload);
-```
+| Field | Type | Description |
+|-------|------|-------------|
+| `sName` | `string` | Service name |
+| `sType` | `string` | Protocol type (e.g. "websocket") |
+| `sEndpoint` | `string` | Service endpoint URL |
+| `aModules` | `vector<string>` | Module names this service uses |
 
-## Data Structs
+### MSF::MODULE
 
-### MSF_SERVICE
+| Field | Type | Description |
+|-------|------|-------------|
+| `sUrl` | `string` | Download URL |
+| `sHash` | `string` | SHA-256 hex digest |
 
-| Field       | Type                    | Description                        |
-|-------------|-------------------------|------------------------------------|
-| `sName`     | `std::string`           | Service name (e.g. "game-server")  |
-| `sType`     | `std::string`           | Protocol type (e.g. "websocket")   |
-| `sEndpoint` | `std::string`           | Service endpoint URL               |
-| `aModules`  | `std::vector<string>`   | Module names this service uses     |
+### MSF::CERT
 
-### MSF_MODULE
+| Field | Type | Description |
+|-------|------|-------------|
+| `sSubject` | `string` | Certificate subject |
+| `sIssuer` | `string` | Certificate issuer |
+| `sOrganization` | `string` | Organization from subject |
+| `sSerial` | `string` | Serial number (hex) |
+| `sNotBefore/After` | `string` | Validity dates |
+| `sKeyType` | `string` | "RSA", "EC", or "unknown" |
+| `nKeyBits` | `int` | Key size in bits |
+| `bIsCA` | `bool` | CA or leaf |
 
-| Field    | Type          | Description                              |
-|----------|---------------|------------------------------------------|
-| `sUrl`   | `std::string` | Download URL for the module binary       |
-| `sSha256`| `std::string` | SHA-256 hex digest of the module binary  |
+### MSF::CHAIN
 
-### CERT_INFO
+X.509 chain validation via BoringSSL's `X509_STORE`. Loads the OS root
+certificate store automatically. Computes the leaf certificate's SPKI
+fingerprint (SHA-256).
 
-| Field        | Type          | Description                          |
-|--------------|---------------|--------------------------------------|
-| `sSubject`   | `std::string` | Certificate subject (one-line)       |
-| `sIssuer`    | `std::string` | Certificate issuer (one-line)        |
-| `sSerial`    | `std::string` | Serial number (hex)                  |
-| `sNotBefore` | `std::string` | Validity start date                  |
-| `sNotAfter`  | `std::string` | Validity end date                    |
-| `sKeyType`   | `std::string` | "RSA", "EC", or "unknown"           |
-| `nKeyBits`   | `int`         | Key size in bits                     |
-| `bIsCA`      | `bool`        | `true` for CA certs, `false` for leaf|
-
-## Certificate Management
-
-**For signing (composition path):**
-
-- `AddCert(sPem)` — adds a PEM certificate to the chain. First call adds the
-  leaf cert (index 0); subsequent calls add CA/intermediate certs.
-- `RemoveCert(nIndex)` — removes the certificate at the given index.
-- Certificates added via `AddCert()` are embedded in the JWS `x5c` header when
-  `Sign()` is called.
-
-**For verification (parse path):**
-
-- `AddTrustedCert(sPem)` — loads a PEM certificate into the trust store. This
-  does NOT add it to the file's certificate chain — it is used only during
-  `VerifyChain()` to determine whether the chain is trusted.
-- The operating system's root certificate store is also loaded automatically.
-
-## CERT_CHAIN Static Utilities
-
-`CERT_CHAIN` exposes static methods for working with certificates outside of an
-`MSF_FILE` instance. These are useful when you need cert metadata without
-parsing a full `.msf` file.
-
-```cpp
-#include "msf/CertChain.h"
-
-using msf::CERT_CHAIN;
-using msf::CERT_INFO;
-
-// Decode a CERT_INFO from a base64 DER string (as found in x5c headers)
-CERT_INFO info = CERT_CHAIN::DecodeInfoDerBase64 (sB64Der, false);
-
-// Decode a CERT_INFO from a PEM string
-CERT_INFO info = CERT_CHAIN::DecodeInfoPem (sPem, false);
-
-// Compute the SPKI fingerprint (SHA-256) from a base64 DER cert
-std::string sFingerprint = CERT_CHAIN::ComputeFingerprint (sB64Der);
-
-// Extract the public key as PEM from a base64 DER cert
-std::string sPubKeyPem = CERT_CHAIN::ExtractPublicKeyPem (sB64Der);
-
-// Convert a PEM certificate to base64 DER (for building x5c headers)
-std::string sB64Der = CERT_CHAIN::PemToDerBase64 (sPem);
-```
+Static utilities (no MSF instance needed):
+- `DecodeInfoDerBase64()` / `DecodeInfoPem()` — parse cert metadata
+- `ComputeFingerprint()` — SHA-256 of SPKI from base64 DER
+- `ExtractPublicKeyPem()` — extract public key as PEM
+- `PemToDerBase64()` — convert PEM to base64 DER
+- `HashString()` — SHA-256 of arbitrary string
 
 ## Supported Algorithms
 
 RS256, RS384, RS512, ES256, ES384, ES512.
+
+## Files
+
+| File | Contents |
+|------|----------|
+| `include/Msf.h` | MSF class, SERVICE, MODULE, CERT, CHAIN |
+| `MsfFile.cpp` | MSF implementation (parse, sign, verify, payload access) |
+| `Chain.cpp` | CHAIN implementation (X509_STORE, fingerprint, cert utilities) |

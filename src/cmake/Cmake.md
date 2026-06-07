@@ -1,36 +1,36 @@
-# CMake — Find Modules
+# CMake — Find Modules and Build Configuration
 
-The `cmake` directory contains custom `Find*.cmake` modules used by the
-Sneeze build system to locate third-party dependencies. These are invoked
-by the top-level `CMakeLists.txt` via `find_package()`.
+The `cmake` directory contains custom `Find*.cmake` modules used by the Sneeze
+build system to locate third-party dependencies. Invoked by `src/CMakeLists.txt`
+via `find_package()`.
 
 ## Modules
 
-| File                       | Dependency      | Purpose                                |
-|----------------------------|-----------------|----------------------------------------|
-| `FindBoringSSL.cmake`      | BoringSSL       | TLS, SHA-256 hashing (persona, cache)  |
-| `FindSneezeCurl.cmake`     | libcurl         | HTTP client (net module)               |
-| `FindSneezeOpenXR.cmake`   | OpenXR SDK      | XR runtime detection                   |
-| `FindWasmtime.cmake`       | Wasmtime        | WASM compilation and execution         |
-| `FindJwtCpp.cmake`         | jwt-cpp         | JWS/JWT parsing (MSF module)           |
-| `FindSneezeRmlUi.cmake`    | RmlUi           | UI rendering (ui module, future)       |
-| `FindNlohmannJson.cmake`   | nlohmann/json   | JSON parsing (storage, MSF payload)    |
-| `FindSpirvTools.cmake`     | SPIRV-Tools     | SPIR-V validation and optimization     |
-| `FindGlslang.cmake`        | glslang         | GLSL-to-SPIR-V compilation             |
+| File | Dependency | Purpose |
+|------|-----------|---------|
+| `FindBoringSSL.cmake` | BoringSSL | Crypto: SHA-256, X.509, RSA/ECDSA |
+| `FindSneezeCurl.cmake` | libcurl | HTTP client (network module) |
+| `FindSneezeOpenXR.cmake` | OpenXR SDK | XR runtime detection |
+| `FindWasmtime.cmake` | Wasmtime | WASM compilation and execution |
+| `FindJwtCpp.cmake` | jwt-cpp | JWS/JWT parsing (MSF module) |
+| `FindSneezeRmlUi.cmake` | RmlUi | UI toolkit |
+| `FindSneezeFreeType.cmake` | FreeType | Font rasterization (dep of RmlUi) |
+| `FindNlohmannJson.cmake` | nlohmann/json | JSON parsing |
+| `FindSpirvTools.cmake` | SPIRV-Tools | SPIR-V validation |
+| `FindGlslang.cmake` | glslang | GLSL-to-SPIR-V compilation |
 
 ## Convention
 
-Each module sets the following variables on success:
-
-- `<NAME>_FOUND` — `TRUE` if the dependency was located
+Each module sets:
+- `<NAME>_FOUND` — `TRUE` if located
 - `<NAME>_INCLUDE_DIRS` — header search paths
 - `<NAME>_LIBRARIES` — library files to link
 
-Pre-built dependencies are expected in `deps/builds/<platform>/release/`.
+Dependencies are found in `${LIBS_DIR}/<Name>/install/`.
 
-## Adding a New Dependency
+## Multi-Config Rewriter
 
-1. Create `Find<Name>.cmake` in this directory.
-2. Add `find_package(<Name> REQUIRED)` in `src/CMakeLists.txt`.
-3. Add the include dirs and libraries to the appropriate target.
-4. Place pre-built binaries in `deps/builds/<platform>/release/`.
+`src/CMakeLists.txt` contains a path generalization block that rewrites dep
+paths using `$<LOWER_CASE:$<CONFIG>>` generator expressions, allowing a single
+CMake tree to emit both Debug and Release. The `_sneeze_resolve_variant` helper
+probes for Debug-suffix filename variants (`libcurl-d.lib`, `openxr_loaderd.lib`).

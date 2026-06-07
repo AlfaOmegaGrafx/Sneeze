@@ -1,19 +1,17 @@
-# WASM — WebAssembly Host Container
+# WASM — WebAssembly Sandbox
 
-The `wasm` module provides the sandboxed execution environment for
-WebAssembly modules loaded from MSF fabric payloads. It manages the
-Wasmtime engine, isolated stores, compiled instances, host function
-bindings, and a thread pool for parallel execution.
+The `wasm` module provides the sandboxed execution environment for WebAssembly
+modules loaded from MSF fabric payloads. It manages the Wasmtime engine,
+isolated stores, compiled instances, and host function bindings.
 
 ## Architecture
 
 ```
 WASM_RUNTIME (owns wasm_engine_t)
-  ├─ WASM_STORE (one per CONTAINER)
-  │    ├─ WASM_INSTANCE (url + sha256) — refcount: 2
-  │    └─ WASM_INSTANCE (url + sha256) — refcount: 1
-  └─ WASM_STORE (another container)
-       └─ ...
+ ├── WASM_STORE (one per container identity)
+ │    ├── WASM_INSTANCE (url + sha256)
+ │    └── WASM_INSTANCE (url + sha256)
+ └── WASM_STORE (another container)
 ```
 
 ## WASM_RUNTIME
@@ -21,112 +19,103 @@ WASM_RUNTIME (owns wasm_engine_t)
 Top-level manager. Owns the shared Wasmtime engine and all active stores.
 
 ```cpp
-#include "wasm/Wasm.h"
-
 DEP::WASM_RUNTIME runtime;
 runtime.Initialize ();
 
 auto* pStore = runtime.Store_Open ();
-// ... add instances, bump fabric refs ...
-
-runtime.Store_Close (pStore);  // teardown
+// ... add instances ...
+runtime.Store_Close (pStore);
 ```
 
 ## WASM_STORE
 
-An isolated execution context identified by the triple
-(persona hash, fingerprint, container name). Multiple fabrics from the same
-organization and container share one store.
+Isolated execution context identified by (persona hash, fingerprint, container
+name). Multiple fabrics from the same organization and container share one store.
 
-### Fabric Reference Counting
-
-Every fabric that maps to a store calls `Fabric_AddRef()`. When a fabric is
-detached, it calls `Fabric_ReleaseRef()`. When the refcount reaches zero,
-the store is eligible for destruction.
-
-```cpp
-pStore->Fabric_AddRef ();      // fabric loaded
-pStore->Fabric_ReleaseRef ();  // fabric unloaded
-```
+`Fabric_AddRef()` / `Fabric_ReleaseRef()` track fabric usage. When refcount
+reaches zero, the store is eligible for destruction.
 
 ## WASM_INSTANCE
 
-A single compiled WASM module within a store. Identity is URL + SHA-256 —
-identical bytecode from different URLs are treated as separate instances.
+A single compiled WASM module within a store. Identity is URL + SHA-256.
 
-### Lifecycle
-
-```
-   Compile (pEngine, pBytes, nSize)     compile the .wasm bytecode
-        │
-        ▼
-   Open (twFabricIx, pParams, n)        refcount 0→1 fires Initialize, then Open
-        │
-        ▼
-   Close (twFabricIx)                  Close, then refcount 1→0 fires Finalize
-```
-
-Refcounting is internal to `Open`/`Close`. The first `Open` fires
-`Initialize` before the guest Open export; the last `Close` fires
-`Finalize` after the guest Close export. Callers never touch the
-refcount directly.
-
-Instances cannot be unloaded from a live store. When dormant they simply
-stop receiving calls.
-
-### Usage
-
-```cpp
-auto* pInstance = pStore->Instance_Open (twFabricIx, sUrl, sSha256, pBytes, nBytes, nullptr, 0);
-// ...
-pInstance->Close (twFabricIx);
-```
+Lifecycle:
+1. **Compile** (engine, bytes, size)
+2. **Open** (fabricIx, params) — refcount 0->1 fires Initialize, then Open
+3. **Close** (fabricIx) — Close, then refcount 1->0 fires Finalize
 
 ## Host Functions
 
-C-linkage callbacks exposed to WASM modules via the Wasmtime linker.
-Naming convention: `Concept_Action`.
+32 host functions registered with the Wasmtime linker, organized by module:
 
-### SOM Functions
+### Console (module: "Console")
 
-| Function             | Description                              |
-|----------------------|------------------------------------------|
-| `SOM_Node_Create`    | Create a new node in the caller's fabric |
-| `SOM_Node_Remove`    | Remove a node from the SOM              |
-| `SOM_Transform_Set`  | Set position/scale on a map object       |
-| `SOM_Transform_Get`  | Read position/scale from a map object    |
-| `SOM_Property_Set`   | Set a named property on a node           |
-| `SOM_Property_Get`   | Read a named property from a node        |
-| `SOM_Watch_Node`     | Register an event watcher on a node      |
-| `SOM_Watch_Tree`     | Register a recursive event watcher       |
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `Console_Log` | (ptr, len) | Log message |
+| `Console_Debug` | (ptr, len) | Debug message |
+| `Console_Info` | (ptr, len) | Info message |
+| `Console_Warn` | (ptr, len) | Warning |
+| `Console_Error` | (ptr, len) | Error |
+| `Console_Assert` | (cond, ptr, len) | Conditional error |
+| `Console_Group` | (ptr, len) | Open group |
+| `Console_GroupCollapsed` | (ptr, len) | Open collapsed group |
+| `Console_GroupEnd` | () | Close group |
+| `Console_Count` | (ptr, len) | Increment counter |
+| `Console_CountReset` | (ptr, len) | Reset counter |
+| `Console_Time` | (ptr, len) | Start timer |
+| `Console_TimeEnd` | (ptr, len) | Stop timer |
+| `Console_TimeLog` | (ptr, len) | Log timer |
 
-### Storage Functions
+### Storage (module: "Storage")
 
-| Function          | Description                                   |
-|-------------------|-----------------------------------------------|
-| `Storage_Get`     | Read a key from the store's container scope    |
-| `Storage_Set`     | Write a key to the store's container scope     |
-| `Storage_Remove`  | Delete a key from the store's container scope  |
-| `Storage_Has`     | Check if a key exists in the container scope   |
+| Function | Description |
+|----------|-------------|
+| `Storage_Get` | Read key from container scope |
+| `Storage_Set` | Write key to container scope |
+| `Storage_Remove` | Delete key |
+| `Storage_Has` | Check key existence |
+| `Storage_GetJson` | Bulk JSON read |
+| `Storage_SetJson` | Bulk JSON write |
+
+### Scene (module: "Scene")
+
+| Function | Description |
+|----------|-------------|
+| `Scene_Node_Root` | Get root node index |
+| `Scene_Node_Open` | Create a node |
+| `Scene_Node_Close` | Remove a node |
+| `Scene_Node_Position` | Set position |
+| `Scene_Node_Scale` | Set scale |
+| `Scene_Node_Bound` | Set bounding sphere |
+| `Scene_Node_Color` | Set color |
+| `Scene_Node_Name` | Set name |
+| `Scene_Node_Radius` | Set radius |
+| `Scene_Node_Texture` | Set texture URL |
+
+### Timer (module: "Timer")
+
+| Function | Description |
+|----------|-------------|
+| `Timer_Set` | Schedule a callback |
+| `Timer_Clear` | Cancel a scheduled callback |
 
 All host functions receive the store pointer as `pEnv`, providing access to
 the calling store's identity for access control and storage scoping.
+`ReadWasmString()` extracts a string from WASM linear memory.
 
 ## Dependencies
 
-- **Wasmtime** — C API for WASM compilation and execution.
+- **Wasmtime** v43.0.0 — C API for WASM compilation and execution.
 
-## Unimplemented / Future Work
+## Files
 
-- **Host function implementations** — all host functions are currently stubs
-  that log and return null. They need to be wired to the SOM, storage, and
-  event system.
-- **Linker registration** — host functions are declared but not yet
-  registered with the Wasmtime linker during store creation.
-- **CPU budgeting** — no per-store or per-instance execution time limits.
-- **Memory caps** — no per-store linear memory limits.
-- **WASI integration** — no WASI imports are provided. Modules that require
-  filesystem or clock access will trap.
-- **Module hot-reload** — when a cached module's hash changes, the old
-  instance should be shut down and a new one compiled. This path is not
-  yet implemented.
+| File | Contents |
+|------|----------|
+| `Wasm.h` | WASM_RUNTIME, WASM_STORE, WASM_INSTANCE declarations |
+| `WasmRuntime.cpp` | WASM_RUNTIME implementation |
+| `WasmStore.cpp` | WASM_STORE implementation |
+| `WasmInstance.cpp` | WASM_INSTANCE implementation |
+| `HostFunctions.h` | Host function declarations (32 functions) |
+| `HostFunctions.cpp` | Host function implementations |
+| `ThreadPool.h/cpp` | Fixed-size worker pool for parallel WASM execution |
