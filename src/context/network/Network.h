@@ -25,9 +25,11 @@ namespace SNEEZE
       INETWORK_IMPL ();
       virtual ~INETWORK_IMPL ();
 
-      virtual ASSET*             Asset_Open  (FILE* pFile)                                                              = 0;
-      virtual void               Asset_Close (FILE* pFile, ASSET* pAsset)                                               = 0;
-      virtual uint32_t           Asset_Index ()                                                                            = 0;
+      virtual void               Asset_Lock   ()                                                                           = 0;
+      virtual void               Asset_Unlock ()                                                                           = 0;
+      virtual ASSET*             Asset_Open   (FILE* pFile)                                                                = 0;
+      virtual void               Asset_Close  (FILE* pFile, ASSET* pAsset)                                                 = 0;
+      virtual uint32_t           Asset_Index  ()                                                                           = 0;
 
       virtual bool               Rules_Stale (ASSET* pAsset) const                                                         = 0;
       virtual void               Queue_Post_Fetch (JOB_FETCH* pJob_Fetch)                                                  = 0;
@@ -39,9 +41,9 @@ namespace SNEEZE
 
       virtual ICONTEXT*          Host () const                                                                             = 0;
 
-      virtual void               File_Clear (FILE* pFile)                                                               = 0;
-      virtual void               File_Close (FILE* pFile)                                                               = 0;
-      virtual void               File_Reset (FILE* pFile)                                                               = 0;
+      virtual void               File_Clear (FILE* pFile)                                                                  = 0;
+      virtual void               File_Close (FILE* pFile)                                                                  = 0;
+      virtual void               File_Reset (FILE* pFile)                                                                  = 0;
 
    private:
    };
@@ -60,15 +62,17 @@ namespace SNEEZE
       virtual ~ASSET ();
 
       // Lifecycle
-      void        Open (FILE* pFile);
-      size_t      Close (FILE* pFile);
+      void        Open   (FILE* pFile);
+      size_t      Close  (FILE* pFile);
 
       bool        Attach (FILE* pFile, bool bFetch_Allowed);
       void        Detach (FILE* pFile);
 
       // Fetch completion (called by FETCH thread)
-      void        FetchComplete (const FETCH_RESULT& Fetch_Result);
-      void        FetchComplete (FILE* pFile, eASSET_STATE bState);
+      void        Fetch_Lock ();
+      void        Fetch_Unlock ();
+      void        Fetch_Complete (const FETCH_RESULT& Fetch_Result);
+      void        Fetch_Complete (eASSET_STATE bState);
 
       // Hash verification
       bool        VerifyHash (const std::string& sFilePath, const std::string& sHash) const;
@@ -77,7 +81,7 @@ namespace SNEEZE
       std::string RspHeader (const std::string& sName) const;
 
       // Accessors
-      eASSET_STATE       State             () const;
+      eASSET_STATE         State             () const;
       bool                 IsReset           () const;
       size_t               File_Count        () const;
       const std::string&   Url               () const;

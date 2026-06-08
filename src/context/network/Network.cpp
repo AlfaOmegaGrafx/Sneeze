@@ -356,6 +356,16 @@ public:
    // INETWORK_IMPL
    // ---------------------------------------------------------------------------
 
+   void Asset_Lock () override
+   {
+      m_mxNetwork.lock ();
+   }
+
+   void Asset_Unlock () override
+   {
+      m_mxNetwork.unlock ();
+   }
+
    ASSET* Asset_Open (FILE* pFile) override
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxNetwork);
@@ -415,12 +425,12 @@ public:
    {
       if (pFile)
       {
-         std::lock_guard<std::recursive_mutex> guard (m_mxNetwork);
-
          if (pFile->Pending_Close ())
          {
             if (pFile->IsPending_Clear ())
             {
+               std::lock_guard<std::recursive_mutex> guard (m_mxNetwork);
+
                auto it = std::find (m_apFile.begin (), m_apFile.end (), pFile);
                if (it != m_apFile.end ())
                {
@@ -437,12 +447,12 @@ public:
    {
       if (pFile)
       {
-         std::lock_guard<std::recursive_mutex> guard (m_mxNetwork);
-
          if (pFile->Pending_Clear ())
          {
             if (pFile->IsPending_Close ())
             {
+               std::lock_guard<std::recursive_mutex> guard (m_mxNetwork);
+
                auto it = std::find (m_apFile.begin (), m_apFile.end (), pFile);
                if (it != m_apFile.end ())
                {

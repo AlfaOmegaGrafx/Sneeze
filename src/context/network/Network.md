@@ -115,6 +115,57 @@ OnNetworkFileDeleted (FILE*)
 - `ASSET` — `m_mxAsset` (recursive_mutex per asset)
 - `FILE` — `m_mxFile` (recursive_mutex per file)
 
+### Lock Ordering: m_mxNetwork -> m_mxAsset
+
+All code paths that acquire both `m_mxNetwork` and `m_mxAsset` must acquire
+`m_mxNetwork` first. This is enforced everywhere:
+
+- **Asset_Open** — called inside `m_mxNetwork` guard; `pAsset->Open()` acquires
+  `m_mxAsset`. Order: `m_mxNetwork` -> `m_mxAsset`.
+- **Asset_Close** — called inside `m_mxNetwork` guard; `pAsset->Close()` acquires
+  `m_mxAsset`. Order: `m_mxNetwork` -> `m_mxAsset`.
+- **FetchComplete** — called from `AGENT::FETCH` worker threads. The entry point
+  (`ASSET_FETCH::OnFetch_Complete`) calls `Fetch_Lock()` to acquire `m_mxNetwork`
+  *before* entering FetchComplete, which acquires `m_mxAsset` internally. This
+  ensures the same `m_mxNetwork` -> `m_mxAsset` order. `Fetch_Unlock()` releases
+  `m_mxNetwork` after FetchComplete returns.
+
+`Fetch_Lock()` / `Fetch_Unlock()` on ASSET delegate to `Asset_Lock()` /
+`Asset_Unlock()` on `INETWORK_IMPL`, which expose `m_mxNetwork` via explicit
+lock/unlock (not a lock_guard, because the acquire and release span the
+ASSET_FETCH callback boundary).
+
+**Why this matters:** FetchComplete iterates `m_apFiles` and fires listener
+callbacks (OnFileReady/OnFileFailed) under `m_mxAsset`. A listener callback
+may call `File_Close`, which acquires `m_mxNetwork`. Because `m_mxNetwork` is
+already held by `Fetch_Lock` on the same thread, and both mutexes are recursive,
+re-entrant acquisition succeeds without deadlock. Meanwhile, any other thread
+calling `Asset_Open` or `Asset_Close` blocks on `m_mxNetwork` until FetchComplete
+finishes — same ordering, no inversion.
+
+Paths that acquire only `m_mxAsset` (without `m_mxNetwork`) are safe as long as
+they never call into NETWORK while holding `m_mxAsset`:
+- `FILE::Attach` / `FILE::Detach` — acquire `m_mxAsset` via the ASSET, do not
+  touch `m_mxNetwork`.
+
+### Notify-Only Fetch Completion
+
+When a FILE attaches to an ASSET that is already READY or FAILED, a notify-only
+`ASSET_FETCH` job is posted to the fetch pool instead of delivering the callback
+synchronously. This prevents re-entrancy during `File_Open` / `Initialize`.
+
+The notify-only path sets `m_bState = kASSET_STATE_FETCHING` while the job is
+in flight to prevent overlapping jobs from overwriting `m_pAsset_Fetch`. If
+additional FILEs attach during this window, they land in the FETCHING branch
+and wait. When the notify-only job fires, `Fetch_Complete(eASSET_STATE)` iterates
+**all** files in `m_apFiles` — not just the original requester — so every FILE
+that arrived during the window receives its SnapshotFinal, Notify_Changed, and
+listener callback.
+
+The trade-off: FILEs that piggy-back on a notify-only job inherit the same
+fetch timing and served-from-cache values as the original. This is a minor
+reporting approximation — the data they receive is identical.
+
 ## Files
 
 | File | Contents |

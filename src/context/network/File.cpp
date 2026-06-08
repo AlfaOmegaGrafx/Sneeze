@@ -57,6 +57,7 @@ public:
       if (m_pAsset)
       {
          m_pINetwork_Impl->Asset_Close (m_pFile, m_pAsset);
+         
          m_pAsset = nullptr;
       }
    }
@@ -72,9 +73,7 @@ public:
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxFile);
 
-         m_pAsset = m_pINetwork_Impl->Asset_Open (m_pFile);
-
-         if (m_pAsset)
+         if (m_pAsset = m_pINetwork_Impl->Asset_Open (m_pFile))
          {
             m_pListener = pListener;
 

@@ -242,6 +242,18 @@ and issue explicit API calls to the browser (e.g., "connect to this map
 service" or "create this node"). The browser is the execution environment;
 the WASM code is the driver.
 
+## Threading
+
+SCENE uses `m_mxScene` (recursive_mutex) to protect `m_umpFabric` and
+`m_twFabricIx_Next`. The guard is held during `Fabric_Close`, `Fabric_Find`,
+and the fabric-creation block in `OnMsfReady` (assign index, create FABRIC,
+insert into map).
+
+MSF fetches route through the NETWORK fetch pool. The lock ordering contract
+between `m_mxNetwork` and `m_mxAsset` (documented in `Network.md`) governs
+all fetch completion callbacks, including those triggered by SCENE's
+`MSF_FETCH` listener.
+
 ## Access Control
 
 `AccessControl.h` provides `CanRead()` / `CanWrite()` functions for WASM host

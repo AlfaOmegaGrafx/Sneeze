@@ -26,30 +26,34 @@ using namespace SNEEZE;
 class ASSET_FETCH : public JOB_FETCH
 {
 public:
-   ASSET_FETCH (ASSET* pAsset, const std::string& sUrl, const std::string& sPath_Temp, const std::string& sPath_Data, const std::string& sHash, std::unordered_map<std::string, std::string>& mapReqHeaders)
-      : JOB_FETCH (true, sUrl, sPath_Temp, sPath_Data, sHash, mapReqHeaders),
+   ASSET_FETCH (ASSET* pAsset, const std::string& sUrl, const std::string& sPath_Temp, const std::string& sPath_Data, const std::string& sHash, std::unordered_map<std::string, std::string>& umsReqHeaders)
+      : JOB_FETCH (true, sUrl, sPath_Temp, sPath_Data, sHash, umsReqHeaders),
         m_pAsset  (pAsset),
-        m_pFile   (nullptr),
         m_bState  (kASSET_STATE_FETCHING)
    {}
 
-   ASSET_FETCH (ASSET* pAsset, SNEEZE::FILE* pFile, eASSET_STATE bState)
+   ASSET_FETCH (ASSET* pAsset, eASSET_STATE bState)
       : JOB_FETCH (false),
         m_pAsset  (pAsset),
-        m_pFile   (pFile),
         m_bState  (bState)
    {}
 
    void OnFetch_Complete (const FETCH_RESULT& Fetch_Result) override
    {
-      if (IsFetch ())
-         m_pAsset->FetchComplete (Fetch_Result);
-      else m_pAsset->FetchComplete (m_pFile, m_bState);
+      // The Fetch_Lock/Unlock prevents a really nasty deadlock in which the only viable solution was to guarantee that we lock mxNetwork before mxAsset.
+      // All possible solutions were explored. A different solution will require a substantial change to the architecture.
+      
+      m_pAsset->Fetch_Lock ();
+      {
+         if (IsFetch ())
+            m_pAsset->Fetch_Complete (Fetch_Result);
+         else m_pAsset->Fetch_Complete (m_bState);
+      }
+      m_pAsset->Fetch_Unlock ();
    }
 
 private:
    ASSET*            m_pAsset;
-   SNEEZE::FILE*     m_pFile;
    eASSET_STATE      m_bState;
 };
 
@@ -139,13 +143,13 @@ public:
                if (jMeta.contains ("reqheaders"))
                {
                   for (auto& [sKey, sVal] : jMeta["reqheaders"].items ())
-                     m_mapReqHeaders[sKey] = sVal.get<std::string> ();
+                     m_umsReqHeaders[sKey] = sVal.get<std::string> ();
                }
 
                if (jMeta.contains ("rspheaders"))
                {
                   for (auto& [sKey, sVal] : jMeta["rspheaders"].items ())
-                     m_mapRspHeaders[sKey] = sVal.get<std::string> ();
+                     m_umsRspHeaders[sKey] = sVal.get<std::string> ();
                }
             }
          }
@@ -170,12 +174,12 @@ public:
       jMeta["reset"]          = m_bReset;
 
       nlohmann::json jRspHeaders = nlohmann::json::object ();
-      for (auto& [sKey, sVal] : m_mapRspHeaders)
+      for (auto& [sKey, sVal] : m_umsRspHeaders)
          jRspHeaders[sKey] = sVal;
       jMeta["rspheaders"] = jRspHeaders;
 
       nlohmann::json jReqHeaders = nlohmann::json::object ();
-      for (auto& [sKey, sVal] : m_mapReqHeaders)
+      for (auto& [sKey, sVal] : m_umsReqHeaders)
          jReqHeaders[sKey] = sVal;
       jMeta["reqheaders"] = jReqHeaders;
 
@@ -237,8 +241,8 @@ public:
       m_bServedFromCache = false;
       m_bReset = false;
       m_nAssetIx = 0;
-      m_mapReqHeaders.clear ();
-      m_mapRspHeaders.clear ();
+      m_umsReqHeaders.clear ();
+      m_umsRspHeaders.clear ();
    }
 
    void Evict ()
@@ -250,8 +254,8 @@ public:
       m_dFetchStartTime = 0.0;
       m_dFetchEndTime = 0.0;
       m_bServedFromCache = false;
-      m_mapReqHeaders.clear ();
-      m_mapRspHeaders.clear ();
+      m_umsReqHeaders.clear ();
+      m_umsRspHeaders.clear ();
    }
 
    // ---------------------------------------------------------------------------
@@ -477,24 +481,24 @@ public:
             m_nCount_Open++;
             m_nCount_Attach++;
 
-            std::unordered_map<std::string, std::string> mapReqHeaders;
+            std::unordered_map<std::string, std::string> umsReqHeaders;
 
-            mapReqHeaders.insert ({ "User-Agent", "Artemis/1.0 Sneeze/1.0 (Windows NT 10.0; Win64; x64)" });
-         // mapReqHeaders.insert ({ "Accept-Encoding", "gzip, deflate, br, zstd" });
+            umsReqHeaders.insert ({ "User-Agent", "Artemis/1.0 Sneeze/1.0 (Windows NT 10.0; Win64; x64)" });
+         // umsReqHeaders.insert ({ "Accept-Encoding", "gzip, deflate, br, zstd" });
 
-            auto* pJob = new ASSET_FETCH (m_pAsset, m_sUrl, Path (kASSET_EXT_TEMP), Path (kASSET_EXT_DATA), m_sHash, mapReqHeaders);
+            auto* pJob = new ASSET_FETCH (m_pAsset, m_sUrl, Path (kASSET_EXT_TEMP), Path (kASSET_EXT_DATA), m_sHash, umsReqHeaders);
 
             m_pAsset_Fetch = pJob;
             m_pINetwork_Impl->Queue_Post_Fetch (pJob);
          }
          else if (bReady  ||  bFailed)
          {
-            pFile->SnapshotFinal ();
+            m_bState = kASSET_STATE_FETCHING;
 
             m_nCount_Open++;
             m_nCount_Attach++;
 
-            auto* pJob = new ASSET_FETCH (m_pAsset, pFile, bState);
+            auto* pJob = new ASSET_FETCH (m_pAsset, bState);
 
             m_pAsset_Fetch = pJob;
             m_pINetwork_Impl->Queue_Post_Fetch (pJob);
@@ -544,31 +548,64 @@ public:
    // Fetch
    // ---------------------------------------------------------------------------
 
-   void FetchComplete (const FETCH_RESULT& Fetch_Result)
+   void Fetch_Lock ()
+   {
+      m_pINetwork_Impl->Asset_Lock ();
+   }
+
+   void Fetch_Unlock ()
+   {
+      m_pINetwork_Impl->Asset_Unlock ();
+   }
+
+   void Fetch_Complete (const FETCH_RESULT& Fetch_Result)
    {
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxAsset);
 
-         m_nHttpStatus     = Fetch_Result.nHttpStatus;
          m_dFetchEndTime   = m_pINetwork_Impl->SecondsSinceEpoch ();
+         m_nHttpStatus     = Fetch_Result.nHttpStatus;
          m_sRemoteAddress  = Fetch_Result.sRemoteAddress;
+         m_umsReqHeaders   = Fetch_Result.mapReqHeaders;
+         m_umsRspHeaders   = Fetch_Result.mapRspHeaders;
 
          if (Fetch_Result.bSuccess)
          {
-            m_nSizeBytes = Fetch_Result.nSizeBytes;
-            m_mapReqHeaders = Fetch_Result.mapReqHeaders;
-            m_mapRspHeaders = Fetch_Result.mapRspHeaders;
-            m_bState     = kASSET_STATE_READY;
-         }
-         else
-         {
-            if (!Fetch_Result.mapReqHeaders.empty ())
-               m_mapReqHeaders = Fetch_Result.mapReqHeaders;
+            m_nSizeBytes    = Fetch_Result.nSizeBytes;
 
-            if (!Fetch_Result.mapRspHeaders.empty ())
-               m_mapRspHeaders = Fetch_Result.mapRspHeaders;
-            m_bState     = kASSET_STATE_FAILED;
+            m_bState = kASSET_STATE_READY;
          }
+         else m_bState = kASSET_STATE_FAILED;
+
+         for (auto* pFile : m_apFiles)
+         {
+            pFile->SnapshotFinal ();
+            pFile->Notify_Changed ();
+   
+            IFILE* pListener = pFile->Listener ();
+            if (pListener)
+            {
+               if (m_bState == kASSET_STATE_READY)
+                  pListener->OnFileReady (pFile);
+               else pListener->OnFileFailed (pFile);
+            }   
+   
+            // the listener may close the file, so neither pFile nor pListener may be referenced once the notification is called
+         }
+
+         m_pAsset_Fetch = nullptr;
+      }
+   
+      Detach (nullptr);
+      m_pINetwork_Impl->Asset_Close (nullptr, m_pAsset);
+   }
+
+   void Fetch_Complete (eASSET_STATE bState)
+   {
+      {
+         std::lock_guard<std::recursive_mutex> guard (m_mxAsset);
+
+         m_bState = bState;
 
          for (auto* pFile : m_apFiles)
          {
@@ -578,36 +615,12 @@ public:
             IFILE* pListener = pFile->Listener ();
             if (pListener)
             {
-               if (Fetch_Result.bSuccess)
+               if (m_bState == kASSET_STATE_READY)
                   pListener->OnFileReady (pFile);
                else pListener->OnFileFailed (pFile);
-            }   
+            }
 
-            // the listener may close the file, so it may not be referenced after the notification is called
-         }
-
-         m_pINetwork_Impl->Log (IENGINE::kLOGLEVEL_Trace, "NETWORK", (Fetch_Result.bSuccess ? "Cached " : "Failed ") + m_sUrl + " (" + std::to_string (Fetch_Result.nSizeBytes) + " bytes)");
-
-         m_pAsset_Fetch = nullptr;
-      }
-   
-      Detach (nullptr);
-      m_pINetwork_Impl->Asset_Close (nullptr, m_pAsset);
-   }
-
-   void FetchComplete (FILE* pFile, eASSET_STATE bState)
-   {
-      {
-         std::lock_guard<std::recursive_mutex> guard (m_mxAsset);
-
-         IFILE* pListener = pFile->Listener ();
-         if (pListener)
-         {
-            if (bState == kASSET_STATE_READY)
-               pListener->OnFileReady (pFile);
-            else pListener->OnFileFailed (pFile);
-
-            // the listener may close the file, so it may not be referenced after the notification is called
+            // the listener may close the file, so neither pFile nor pListener may be referenced once the notification is called
          }
 
          m_pAsset_Fetch = nullptr;
@@ -649,8 +662,8 @@ public:
 
       std::string sResult;
 
-      auto it = m_mapRspHeaders.find (sName);
-      if (it != m_mapRspHeaders.end ())
+      auto it = m_umsRspHeaders.find (sName);
+      if (it != m_umsRspHeaders.end ())
          sResult = it->second;
 
       return sResult;
@@ -684,7 +697,7 @@ public:
    std::string                   m_sUrl;
    std::string                   m_sHash;
    std::string                   m_sPathname;
-   eASSET_STATE                m_bState;
+   eASSET_STATE                  m_bState;
 
    uint64_t                      m_nSizeBytes;
    std::string                   m_sCreatedAt;
@@ -709,8 +722,8 @@ public:
 
    mutable std::recursive_mutex  m_mxAsset;
 
-   std::unordered_map<std::string, std::string> m_mapRspHeaders;
-   std::unordered_map<std::string, std::string> m_mapReqHeaders;
+   std::unordered_map<std::string, std::string> m_umsRspHeaders;
+   std::unordered_map<std::string, std::string> m_umsReqHeaders;
 };
 
 // ---------------------------------------------------------------------------
@@ -735,21 +748,23 @@ void        ASSET::Open          (FILE* pFile)                              {   
 size_t      ASSET::Close         (FILE* pFile)                              { return m_pImpl->Close         (pFile); }
 bool        ASSET::Attach        (FILE* pFile, bool bFetch_Allowed)         { return m_pImpl->Attach        (pFile, bFetch_Allowed); }
 void        ASSET::Detach        (FILE* pFile)                              {        m_pImpl->Detach        (pFile); }
-void        ASSET::Reset         ()                                                  {        m_pImpl->Reset         (); }
+void        ASSET::Reset         ()                                         {        m_pImpl->Reset         (); }
 
 // ---------------------------------------------------------------------------
 // Fetch
 // ---------------------------------------------------------------------------
 
-void        ASSET::FetchComplete (const FETCH_RESULT& Fetch_Result)                  {        m_pImpl->FetchComplete (Fetch_Result); }
-void        ASSET::FetchComplete (FILE* pFile, eASSET_STATE bState)       {        m_pImpl->FetchComplete (pFile, bState); }
+void        ASSET::Fetch_Lock     ()                                        {        m_pImpl->Fetch_Lock     (); }
+void        ASSET::Fetch_Unlock   ()                                        {        m_pImpl->Fetch_Unlock   (); }
+void        ASSET::Fetch_Complete (const FETCH_RESULT& Fetch_Result)        {        m_pImpl->Fetch_Complete (Fetch_Result); }
+void        ASSET::Fetch_Complete (eASSET_STATE bState)                     {        m_pImpl->Fetch_Complete (bState); }
 
 // ---------------------------------------------------------------------------
 // Data access
 // ---------------------------------------------------------------------------
 
-void        ASSET::ReadData      (std::vector<uint8_t>& aData) const                 {        m_pImpl->ReadData      (aData); }
-std::string ASSET::RspHeader     (const std::string& sName) const                    { return m_pImpl->RspHeader     (sName); }
+void        ASSET::ReadData      (std::vector<uint8_t>& aData) const        {        m_pImpl->ReadData      (aData); }
+std::string ASSET::RspHeader     (const std::string& sName) const           { return m_pImpl->RspHeader     (sName); }
 
 // ---------------------------------------------------------------------------
 // Hash verification
@@ -761,7 +776,7 @@ bool        ASSET::VerifyHash    (const std::string& sFilePath, const std::strin
 // Accessors
 // ---------------------------------------------------------------------------
 
-eASSET_STATE       ASSET::State ()                        const { return m_pImpl->m_bState;            }
+eASSET_STATE         ASSET::State ()                        const { return m_pImpl->m_bState;            }
 bool                 ASSET::IsReset ()                      const { return m_pImpl->m_bReset;            }
 size_t               ASSET::File_Count ()                   const { return m_pImpl->m_apFiles.size ();   }
 const std::string&   ASSET::Url ()                          const { return m_pImpl->m_sUrl;              }
@@ -774,7 +789,7 @@ const std::string&   ASSET::Hash ()                         const { return m_pIm
 bool                 ASSET::IsHashed ()                     const { return !m_pImpl->m_sHash.empty ();   }
 std::string          ASSET::DiskPath ()                     const { return m_pImpl->Path (kASSET_EXT_DATA); }
 const std::string&   ASSET::Pathname ()                     const { return m_pImpl->m_sPathname;         }
-std::string          ASSET::Path (eASSET_EXT eType)       const { return m_pImpl->Path (eType);        }
+std::string          ASSET::Path (eASSET_EXT eType)         const { return m_pImpl->Path (eType);        }
 long                 ASSET::HttpStatus ()                   const { return m_pImpl->m_nHttpStatus;       }
 double               ASSET::FetchStartTime ()               const { return m_pImpl->m_dFetchStartTime;   }
 double               ASSET::FetchEndTime ()                 const { return m_pImpl->m_dFetchEndTime;     }
@@ -784,5 +799,5 @@ double               ASSET::QueueDuration ()                const { return m_pIm
 bool                 ASSET::IsServedFromCache ()            const { return m_pImpl->m_bServedFromCache;  }
 const std::string&   ASSET::RemoteAddress ()                const { return m_pImpl->m_sRemoteAddress;    }
 
-const std::unordered_map<std::string, std::string>&   ASSET::RspHeaders ()      const { return m_pImpl->m_mapRspHeaders; }
-const std::unordered_map<std::string, std::string>&   ASSET::ReqHeaders ()      const { return m_pImpl->m_mapReqHeaders; }
+const std::unordered_map<std::string, std::string>&   ASSET::RspHeaders ()      const { return m_pImpl->m_umsRspHeaders; }
+const std::unordered_map<std::string, std::string>&   ASSET::ReqHeaders ()      const { return m_pImpl->m_umsReqHeaders; }
