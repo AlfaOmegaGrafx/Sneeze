@@ -25,8 +25,6 @@ namespace SNEEZE
       INETWORK_IMPL ();
       virtual ~INETWORK_IMPL ();
 
-      virtual void               Asset_Lock   ()                                                                           = 0;
-      virtual void               Asset_Unlock ()                                                                           = 0;
       virtual ASSET*             Asset_Open   (FILE* pFile)                                                                = 0;
       virtual void               Asset_Close  (FILE* pFile, ASSET* pAsset)                                                 = 0;
       virtual uint32_t           Asset_Index  ()                                                                           = 0;
@@ -69,8 +67,6 @@ namespace SNEEZE
       void        Detach (FILE* pFile);
 
       // Fetch completion (called by FETCH thread)
-      void        Fetch_Lock ();
-      void        Fetch_Unlock ();
       void        Fetch_Complete (const FETCH_RESULT& Fetch_Result, eASSET_STATE bState);
 
       // Hash verification

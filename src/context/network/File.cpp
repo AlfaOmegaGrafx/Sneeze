@@ -45,7 +45,8 @@ public:
       m_dFetchEndTime    (0.0),
       m_bServedFromCache (false),
       m_bPending_Clear   (false),
-      m_bPending_Close   (false)
+      m_bPending_Close   (false),
+      m_bGuarded         (false)
    {
    }
 
@@ -57,7 +58,7 @@ public:
       if (m_pAsset)
       {
          m_pINetwork_Impl->Asset_Close (m_pFile, m_pAsset);
-         
+
          m_pAsset = nullptr;
       }
    }
@@ -281,6 +282,7 @@ public:
 
    bool                           m_bPending_Clear;
    bool                           m_bPending_Close;
+   std::atomic<bool>              m_bGuarded;
 };
 
 // ---------------------------------------------------------------------------
@@ -309,6 +311,7 @@ SNEEZE::FILE::~FILE ()
 bool SNEEZE::FILE::Attach        ()                              { return m_pImpl->Attach           (false); }
 void SNEEZE::FILE::Detach        ()                              {        m_pImpl->Detach           (); }
 
+bool SNEEZE::FILE::Guard         (bool bValue)                   { return m_pImpl->m_bGuarded.exchange (bValue); }
 void SNEEZE::FILE::Clear         ()                              {        m_pImpl->Clear            (); }
 void SNEEZE::FILE::Close         ()                              {        m_pImpl->Close            (); }
 void SNEEZE::FILE::Reset         ()                              {        m_pImpl->Reset            (); }

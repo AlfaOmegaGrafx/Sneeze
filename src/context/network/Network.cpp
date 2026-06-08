@@ -356,16 +356,6 @@ public:
    // INETWORK_IMPL
    // ---------------------------------------------------------------------------
 
-   void Asset_Lock () override
-   {
-      m_mxNetwork.lock ();
-   }
-
-   void Asset_Unlock () override
-   {
-      m_mxNetwork.unlock ();
-   }
-
    ASSET* Asset_Open (FILE* pFile) override
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxNetwork);
@@ -423,7 +413,7 @@ public:
 
    void File_Close (FILE* pFile) override
    {
-      if (pFile)
+      if (pFile  &&  !pFile->Guard (false)) // the guard defers closure and deletion of a file in the middle of processing a fetch completion
       {
          if (pFile->Pending_Close ())
          {

@@ -130,6 +130,7 @@ namespace SNEEZE
       bool   Initialize (IFILE* pListener = nullptr);
       bool   Attach     ();
       void   Detach     ();
+      bool   Guard      (bool bValue);
       void   Clear      ();
       void   Close      ();
       void   Reset      ();

@@ -204,3 +204,12 @@
 - Added REVISIT comment in Container.cpp at Scene Node Handle Table section
 - All 10 test suites pass (312 assertions, 0 failures), Artemis runs clean
 - Updated project.mdc with fabric lifecycle, ownership modes, and duplicate index problem
+
+## June 8, 2026 — Dean Abramson (morning session)
+
+- Replaced the `Asset_Lock`/`Asset_Unlock` deadlock solution with a lightweight per-FILE atomic guard flag (`m_bGuarded`)
+- Consolidated the two `Fetch_Complete` overloads into a single function (carried over from prior session)
+- New deadlock avoidance: `FILE::Guard(bool)` uses `std::atomic<bool>::exchange` to arm/disarm a guard flag; `NETWORK::Impl::File_Close` checks the guard before acquiring `m_mxNetwork` — if guarded, the entire close is deferred
+- `ASSET::Impl::Fetch_Complete` arms guards before the notification loop, collects deferred closes after the loop, processes them after releasing `m_mxAsset`
+- Removed all `Asset_Lock`/`Asset_Unlock`/`Fetch_Lock`/`Fetch_Unlock` code from Asset.cpp, Network.cpp, and Network.h (both public and private headers)
+- Updated Network.md thread safety documentation with the guard flag mechanism, replacing the old lock-ordering section

@@ -114,39 +114,66 @@ OnNetworkFileDeleted (FILE*)
 - `NETWORK` — `m_mxNetwork` (recursive_mutex)
 - `ASSET` — `m_mxAsset` (recursive_mutex per asset)
 - `FILE` — `m_mxFile` (recursive_mutex per file)
+- `FILE` — `m_bGuarded` (atomic bool, deadlock avoidance during fetch completion)
 
 ### Lock Ordering: m_mxNetwork -> m_mxAsset
 
 All code paths that acquire both `m_mxNetwork` and `m_mxAsset` must acquire
-`m_mxNetwork` first. This is enforced everywhere:
+`m_mxNetwork` first:
 
 - **Asset_Open** — called inside `m_mxNetwork` guard; `pAsset->Open()` acquires
   `m_mxAsset`. Order: `m_mxNetwork` -> `m_mxAsset`.
 - **Asset_Close** — called inside `m_mxNetwork` guard; `pAsset->Close()` acquires
   `m_mxAsset`. Order: `m_mxNetwork` -> `m_mxAsset`.
-- **FetchComplete** — called from `AGENT::FETCH` worker threads. The entry point
-  (`ASSET_FETCH::OnFetch_Complete`) calls `Fetch_Lock()` to acquire `m_mxNetwork`
-  *before* entering FetchComplete, which acquires `m_mxAsset` internally. This
-  ensures the same `m_mxNetwork` -> `m_mxAsset` order. `Fetch_Unlock()` releases
-  `m_mxNetwork` after FetchComplete returns.
+- **File_Close** / **File_Clear** — `Pending_Close()` / `Pending_Clear()` acquire
+  `m_mxFile` then call `ASSET::Detach` which acquires `m_mxAsset`. After returning,
+  the deletion path acquires `m_mxNetwork`. The mutexes are sequential (never
+  nested), so no ordering conflict.
 
-`Fetch_Lock()` / `Fetch_Unlock()` on ASSET delegate to `Asset_Lock()` /
-`Asset_Unlock()` on `INETWORK_IMPL`, which expose `m_mxNetwork` via explicit
-lock/unlock (not a lock_guard, because the acquire and release span the
-ASSET_FETCH callback boundary).
-
-**Why this matters:** FetchComplete iterates `m_apFiles` and fires listener
-callbacks (OnFileReady/OnFileFailed) under `m_mxAsset`. A listener callback
-may call `File_Close`, which acquires `m_mxNetwork`. Because `m_mxNetwork` is
-already held by `Fetch_Lock` on the same thread, and both mutexes are recursive,
-re-entrant acquisition succeeds without deadlock. Meanwhile, any other thread
-calling `Asset_Open` or `Asset_Close` blocks on `m_mxNetwork` until FetchComplete
-finishes — same ordering, no inversion.
-
-Paths that acquire only `m_mxAsset` (without `m_mxNetwork`) are safe as long as
-they never call into NETWORK while holding `m_mxAsset`:
+Paths that acquire only `m_mxAsset` (without `m_mxNetwork`) are safe:
 - `FILE::Attach` / `FILE::Detach` — acquire `m_mxAsset` via the ASSET, do not
   touch `m_mxNetwork`.
+
+### Fetch Completion and the Guard Flag
+
+`ASSET::Impl::Fetch_Complete` runs on an `AGENT::FETCH` worker thread. It holds
+`m_mxAsset` while iterating `m_apFiles` to snapshot and notify all attached
+FILEs. A listener callback (OnFileReady/OnFileFailed) typically calls
+`pFile->Close()`, which flows through `NETWORK::Impl::File_Close`. If both
+pending flags are set (`m_bPending_Close` and `m_bPending_Clear`), `File_Close`
+acquires `m_mxNetwork` to erase and delete the file. If another thread
+simultaneously holds `m_mxNetwork` and is waiting on `m_mxAsset` (e.g., inside
+`File_Open` -> `Asset_Open`), the result is a deadlock: the fetch thread holds
+`m_mxAsset` and wants `m_mxNetwork`, the other thread holds `m_mxNetwork` and
+wants `m_mxAsset`.
+
+The solution is a per-FILE atomic guard flag (`m_bGuarded`) that defers file
+deletion during fetch completion:
+
+1. **Before the notification loop**, `Fetch_Complete` arms the guard on each
+   FILE: `pFile->Guard(true)`.
+
+2. **During the loop**, if a listener callback calls `File_Close`, the deletion
+   path in `NETWORK::Impl::File_Close` checks the guard via
+   `pFile->Guard(false)` (atomic exchange). If the file was guarded, the
+   exchange returns `true`, and `File_Close` skips the entire close — no
+   `Pending_Close`, no `Detach`, no `m_mxNetwork` acquisition. The exchange
+   atomically clears the guard, signaling that a close was attempted.
+
+3. **After the loop**, `Fetch_Complete` checks each file's guard via
+   `pFile->Guard(false)`. If the exchange returns `true`, the guard was still
+   set — no close was attempted, nothing to do. If it returns `false`, the
+   guard was cleared by `File_Close` during the callback — the file is
+   collected into a local `apDelete` vector.
+
+4. **After releasing `m_mxAsset`**, `Fetch_Complete` processes the deferred
+   closes by calling `pFile->Close()` on each collected file. At this point no
+   conflicting mutex is held, so the full close path (Pending_Close -> Detach
+   -> deletion under `m_mxNetwork`) proceeds without deadlock.
+
+The guard flag is lightweight (one atomic bool per FILE), requires no changes
+to the mutex hierarchy, and confines the deadlock avoidance to the single code
+path that needs it.
 
 ### Notify-Only Fetch Completion
 
@@ -157,9 +184,9 @@ synchronously. This prevents re-entrancy during `File_Open` / `Initialize`.
 The notify-only path sets `m_bState = kASSET_STATE_FETCHING` while the job is
 in flight to prevent overlapping jobs from overwriting `m_pAsset_Fetch`. If
 additional FILEs attach during this window, they land in the FETCHING branch
-and wait. When the notify-only job fires, `Fetch_Complete(eASSET_STATE)` iterates
-**all** files in `m_apFiles` — not just the original requester — so every FILE
-that arrived during the window receives its SnapshotFinal, Notify_Changed, and
+and wait. When the notify-only job fires, `Fetch_Complete` iterates **all**
+files in `m_apFiles` — not just the original requester — so every FILE that
+arrived during the window receives its SnapshotFinal, Notify_Changed, and
 listener callback.
 
 The trade-off: FILEs that piggy-back on a notify-only job inherit the same

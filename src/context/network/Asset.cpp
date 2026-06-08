@@ -541,10 +541,7 @@ public:
 
    void Fetch_Complete (const FETCH_RESULT& Fetch_Result, eASSET_STATE bState)
    {
-      // The m_pINetwork_Impl->Asset_Lock/Unlock prevents a really nasty deadlock in which the only viable solution was to guarantee that we lock 
-      // mxNetwork before mxAsset.All possible solutions were explored. A different solution will require a substantial change to the architecture.
-
-      m_pINetwork_Impl->Asset_Lock ();
+      std::vector<FILE*> apDelete;
 
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxAsset);
@@ -570,6 +567,8 @@ public:
 
          for (auto* pFile : m_apFiles)
          {
+            pFile->Guard (true); // the guard defers closure and deletion of a file in the middle of processing a fetch completion
+
             pFile->SnapshotFinal ();
             pFile->Notify_Changed ();
 
@@ -581,16 +580,18 @@ public:
                else pListener->OnFileFailed (pFile);
             }
 
-            // the listener may close the file, so neither pFile nor pListener may be referenced once the notification is called
+            if (!pFile->Guard (false))
+               apDelete.push_back (pFile);
          }
 
          m_pAsset_Fetch = nullptr;
       }
 
+      for (auto* pFile : apDelete)
+         pFile->Close ();
+
       Detach (nullptr);
       m_pINetwork_Impl->Asset_Close (nullptr, m_pAsset);
-
-      m_pINetwork_Impl->Asset_Unlock ();
    }
 
    // ---------------------------------------------------------------------------
