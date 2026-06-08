@@ -151,11 +151,11 @@ void JOB_COMPOSITOR::Complete_Deliver ()
 // ===========================================================================
 
 static constexpr float METERS_TO_AU     = 1.0f / 149597870700.0f;
-static constexpr float MIN_SPHERE_RADIUS = 0.0005f;
+static constexpr float MIN_SPHERE_RADIUS = 0.001f;
 static constexpr float SPHERE_SCALE      = 0.3f;
 static constexpr int    TRAIL_SEGMENTS   = 128;
 static constexpr double TRAIL_FRACTION   = 0.75;
-static constexpr float  TRAIL_RADIUS_PLANET = 0.0005f;
+static constexpr float  TRAIL_RADIUS_PLANET = 0.0015f;
 static constexpr float  TRAIL_RADIUS_MOON   = 0.000075f;
 
 static void ColorFromU32 (uint32_t nColor, float& r, float& g, float& b)
