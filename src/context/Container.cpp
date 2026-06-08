@@ -57,7 +57,6 @@ public:
       m_pStream           (nullptr),
       m_pSilo             (nullptr),
       m_pWasm_Store       (nullptr),
-      m_twFabricIx_Next   (0),
       m_twObjectIx_Next   (0)
    {
    }
@@ -76,15 +75,11 @@ public:
    // Lifecycle
    // -----------------------------------------------------------------------
 
-   bool Open (FABRIC* pFabric)
+   bool Open ()
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxContainer);
 
       bool bResult = false;
-
-      pFabric->FabricIx (++m_twFabricIx_Next);
-
-      m_umpFabric[pFabric->FabricIx ()] = pFabric;
 
       if (m_nCount_Open++ == 0)
       {
@@ -107,12 +102,12 @@ public:
       else bResult = true;
 
       if (!bResult)
-         Close (pFabric);
+         Close ();
 
       return bResult;
    }
 
-   size_t Close (FABRIC* pFabric)
+   size_t Close ()
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxContainer);
 
@@ -139,20 +134,7 @@ public:
          }
       }
 
-      m_umpFabric.erase (pFabric->FabricIx ());
-
       return m_nCount_Open;
-   }
-
-   FABRIC* Fabric_Find (uint64_t twFabricIx) const
-   {
-      FABRIC* pFabric = nullptr;
-
-      auto it = m_umpFabric.find (twFabricIx);
-      if (it != m_umpFabric.end ())
-         pFabric = it->second;
-
-      return pFabric;
    }
 
    // -----------------------------------------------------------------------
@@ -171,6 +153,17 @@ public:
 
    // -----------------------------------------------------------------------
    // Scene Node Handle Table
+   //
+   // REVISIT: Fabrics will operate in one of two mutually exclusive modes:
+   // (a) WASM-managed — the WASM code builds the scene graph via Node_Root
+   //     and Node_Open, or
+   // (b) Map-managed — the WASM code delegates to a map service, and the
+   //     browser manages the root node on the fabric's behalf.
+   //
+   // When the same MSF is loaded into multiple fabrics under the same
+   // container, WASM-managed mode requires unique node indices per fabric
+   // (the current per-container map cannot hold duplicate template indices).
+   // See Scene.md "Fabric Ownership Modes" for the full discussion.
    // -----------------------------------------------------------------------
 
    uint64_t Node_Root (uint64_t twFabricIx, const RMCOBJECT* pRMCObject)
@@ -181,9 +174,9 @@ public:
 
       if (pRMCObject)
       {
-         FABRIC* pFabric = Fabric_Find (twFabricIx);
+         FABRIC* pFabric = m_pContext->Scene ()->Fabric_Find (twFabricIx);
 
-         if (pFabric  &&  pFabric->Node_Root () == nullptr)
+         if (pFabric  &&  pFabric->Node_Root () == nullptr  &&  pFabric->Container () == m_pContainer)
             twResult = Node_Create (pFabric, nullptr, pRMCObject);
       }
 
@@ -312,9 +305,6 @@ public:
    uint64_t                               m_twObjectIx_Next;
    std::unordered_map<uint64_t, NODE*>    m_umpNode;
    std::vector<MAP_OBJECT*>               m_apMap_Object;
-
-   uint64_t                               m_twFabricIx_Next;
-   std::unordered_map<uint64_t, FABRIC*>  m_umpFabric;
 };
 
 
@@ -332,8 +322,8 @@ CONTAINER::~CONTAINER ()
    delete m_pImpl;
 }
 
-bool                  CONTAINER::Open       (FABRIC* pFabric)                                  { return m_pImpl->Open  (pFabric); }
-size_t                CONTAINER::Close      (FABRIC* pFabric)                                  { return m_pImpl->Close (pFabric); }
+bool                  CONTAINER::Open       ()                                                 { return m_pImpl->Open  (); }
+size_t                CONTAINER::Close      ()                                                 { return m_pImpl->Close (); }
 
 uint64_t              CONTAINER::Node_Root  (uint64_t twFabricIx, const RMCOBJECT* pRMCObject) { return m_pImpl->Node_Root          (twFabricIx, pRMCObject); }
 uint64_t              CONTAINER::Node_Open  (uint64_t twParentIx, const RMCOBJECT* pRMCObject) { return m_pImpl->Node_Open          (twParentIx, pRMCObject); }

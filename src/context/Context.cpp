@@ -124,14 +124,12 @@ public:
          m_pNetwork->Clear ();
    }
 
-   CONTAINER* Container_Open (FABRIC* pFabric)
+   CONTAINER* Container_Open (MSF* pMsf)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxContainer);
 
       CONTAINER* pContainer = nullptr;
       CONTAINER::CID CID;
-
-      MSF* pMsf = pFabric->Msf ();
 
       if (pMsf)
       {
@@ -170,17 +168,22 @@ public:
       }
       else pContainer = it->second;
 
-      if (!pContainer->Open (pFabric))
+      if (!pContainer->Open ())
+      {
+         m_umpContainer.erase (sKey);
+         delete pContainer;
+
          pContainer = nullptr;
+      }   
 
       return pContainer;
    }
 
-   void Container_Close (FABRIC* pFabric, CONTAINER* pContainer)
+   void Container_Close (CONTAINER* pContainer)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxContainer);
 
-      pContainer->Close (pFabric);
+      pContainer->Close ();
    }
 
 public:
@@ -240,8 +243,12 @@ const std::string&          SNEEZE::CONTEXT::Path_Temporary () const { return m_
 // Methods
 // ---------------------------------------------------------------------------
 
-void                          SNEEZE::CONTEXT::Url             (const std::string& sUrl)                {        m_pImpl->Url (sUrl); }
-void                          SNEEZE::CONTEXT::Logout          ()                                       {        m_pImpl->Logout (); }
+void                        SNEEZE::CONTEXT::Url             (const std::string& sUrl)                {        m_pImpl->Url (sUrl); }
+void                        SNEEZE::CONTEXT::Logout          ()                                       {        m_pImpl->Logout (); }
 
-SNEEZE::CONTAINER*            SNEEZE::CONTEXT::Container_Open  (FABRIC* pFabric)                        { return m_pImpl->Container_Open  (pFabric); }
-void                          SNEEZE::CONTEXT::Container_Close (FABRIC* pFabric, CONTAINER* pContainer) {        m_pImpl->Container_Close (pFabric, pContainer); }
+// ---------------------------------------------------------------------------
+// Internal functions
+// ---------------------------------------------------------------------------
+
+SNEEZE::CONTAINER*          SNEEZE::CONTEXT::Container_Open  (MSF* pMsf)                              { return m_pImpl->Container_Open  (pMsf); }
+void                        SNEEZE::CONTEXT::Container_Close (CONTAINER* pContainer)                  {        m_pImpl->Container_Close (pContainer); }

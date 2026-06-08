@@ -67,7 +67,7 @@ public:
    ~Impl ()
    {
       {
-         std::lock_guard<std::recursive_mutex> guard (m_mutex);
+         std::lock_guard<std::recursive_mutex> guard (m_mxNetwork);
 
          for (auto* pFile : m_apFile)
          {
@@ -143,7 +143,7 @@ public:
 
    void Rules_Load ()
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+      std::lock_guard<std::recursive_mutex> guard (m_mxNetwork);
 
       std::string sRulesPath = (std::filesystem::path (m_sCachePath) / "rules.json").string ();
       std::ifstream file (sRulesPath);
@@ -188,7 +188,7 @@ public:
 
    void Rules_Save ()
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+      std::lock_guard<std::recursive_mutex> guard (m_mxNetwork);
 
       nlohmann::json jDoc;
       jDoc["nNextMetaIx"] = m_nNextAssetIx;
@@ -219,7 +219,7 @@ public:
 
    bool Rules_Stale (ASSET* pAsset) const
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+      std::lock_guard<std::recursive_mutex> guard (m_mxNetwork);
 
       bool bResult = false;
 
@@ -243,7 +243,7 @@ public:
 
    void Rules_Add (const std::string& sContentType, const std::string& sOlderThan)
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+      std::lock_guard<std::recursive_mutex> guard (m_mxNetwork);
 
       if (sContentType.empty ())
          m_aRules.clear ();
@@ -265,7 +265,7 @@ public:
       FILE* pFile = nullptr;
 
       {
-         std::lock_guard<std::recursive_mutex> guard (m_mutex);
+         std::lock_guard<std::recursive_mutex> guard (m_mxNetwork);
 
          pFile = new FILE (this, pContainer, m_nNextFileIx++, sUrl, sHash, m_bCacheEnabled);
 
@@ -279,7 +279,7 @@ public:
 
    void File_Enum (IENUM_FILE* pEnum)
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+      std::lock_guard<std::recursive_mutex> guard (m_mxNetwork);
 
       for (FILE* pFile : m_apFile)
          pEnum->OnAsset (pFile);
@@ -291,7 +291,7 @@ public:
 
    void Clear ()
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+      std::lock_guard<std::recursive_mutex> guard (m_mxNetwork);
 
       auto it = m_apFile.begin ();
       while (it != m_apFile.end ())
@@ -319,7 +319,7 @@ public:
 
 
    // ---------------------------------------------------------------------------
-   // Notification helpers (called under m_mutex -- recursive lock allows re-entry)
+   // Notification helpers (called under m_mxNetwork -- recursive lock allows re-entry)
    // ---------------------------------------------------------------------------
 
    void NotifyFiles (const std::vector<FILE*>& apFiles, eASSET_STATE bState)
@@ -358,7 +358,7 @@ public:
 
    ASSET* Asset_Open (FILE* pFile) override
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+      std::lock_guard<std::recursive_mutex> guard (m_mxNetwork);
 
       ASSET* pAsset = nullptr;
 
@@ -381,7 +381,7 @@ public:
 
    void Asset_Close (FILE* pFile, ASSET* pAsset) override
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+      std::lock_guard<std::recursive_mutex> guard (m_mxNetwork);
 
       if (pAsset->Close (pFile) == 0)
       {
@@ -415,7 +415,7 @@ public:
    {
       if (pFile)
       {
-         std::lock_guard<std::recursive_mutex> guard (m_mutex);
+         std::lock_guard<std::recursive_mutex> guard (m_mxNetwork);
 
          if (pFile->Pending_Close ())
          {
@@ -437,7 +437,7 @@ public:
    {
       if (pFile)
       {
-         std::lock_guard<std::recursive_mutex> guard (m_mutex);
+         std::lock_guard<std::recursive_mutex> guard (m_mxNetwork);
 
          if (pFile->Pending_Clear ())
          {
@@ -459,7 +459,7 @@ public:
    {
       if (pFile)
       {
-         std::lock_guard<std::recursive_mutex> guard (m_mutex);
+         std::lock_guard<std::recursive_mutex> guard (m_mxNetwork);
 
          pFile->Pending_Reset ();
       }
@@ -474,7 +474,7 @@ public:
 
    std::unordered_map<std::string, ASSET*> m_umpAsset;
 
-   mutable std::recursive_mutex            m_mutex;
+   mutable std::recursive_mutex            m_mxNetwork;
 
    bool                                    m_bCacheEnabled;
 
@@ -483,7 +483,7 @@ public:
    uint32_t                                m_nNextAssetIx;
 
    // Network inspector
-   std::vector<FILE*>                   m_apFile;
+   std::vector<FILE*>                      m_apFile;
    uint32_t                                m_nNextFileIx;
    std::chrono::steady_clock::time_point   m_tpEpoch;
 };

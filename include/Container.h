@@ -61,8 +61,8 @@ namespace SNEEZE
       CONTAINER               (CONTAINER const  & other) = delete;
       CONTAINER               (CONTAINER       && other) = delete;
 
-      bool     Open           (FABRIC* pFabric);
-      size_t   Close          (FABRIC* pFabric);
+      bool     Open           ();
+      size_t   Close          ();
 
       bool     Instance_Open  (uint64_t twFabricIx, const std::string& sUrl, const std::string& sHash, const std::vector<uint8_t>& aWasmBytes);
       void     Instance_Close (uint64_t twFabricIx, const std::string& sUrl, const std::string& sHash);

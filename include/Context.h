@@ -23,6 +23,7 @@ namespace SNEEZE
    class ICONTEXT;
    class IVIEWPORT;
    class CONSOLE;
+   class MSF;
    class NETWORK;
    class STORAGE;
    class SCENE;
@@ -56,21 +57,22 @@ namespace SNEEZE
       void Url (const std::string& sUrl);
       void Logout ();
 
-      ENGINE*    Engine   () const;
-      ICONTEXT*  Host     () const;
+      // Accessors
+      ICONTEXT*           Host            () const;
+      ENGINE*             Engine          () const;
+      CONSOLE*            Console         () const;
+      NETWORK*            Network         () const;
+      STORAGE*            Storage         () const;
+      DEP::WASM_RUNTIME*  WasmRuntime     () const;
+      VIEWPORT*           Viewport        () const;
+      SCENE*              Scene           () const;
 
-      CONSOLE*            Console     () const;
-      NETWORK*            Network     () const;
-      STORAGE*            Storage     () const;
-      SCENE*              Scene       () const;
-      VIEWPORT*           Viewport    () const;
-      DEP::WASM_RUNTIME*  WasmRuntime () const;
+      const std::string&  Path_Permanent  () const;
+      const std::string&  Path_Temporary  () const;
 
-      const std::string& Path_Permanent () const;
-      const std::string& Path_Temporary () const;
-
-      CONTAINER* Container_Open  (FABRIC* pFabric);
-      void       Container_Close (FABRIC* pFabric, CONTAINER* pContainer);
+      // Internal functions
+      CONTAINER*          Container_Open  (MSF* pMsf);
+      void                Container_Close (CONTAINER* pContainer);
 
    private:
       class Impl;

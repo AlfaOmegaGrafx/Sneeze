@@ -109,7 +109,7 @@ public:
       if (m_pMap_Object  &&  m_pMap_Object->m_Resource.sReference[0] != '\0')
       {
          if (m_pMap_Object->m_Type.bSubtype == 255)
-            bResult = Fabric_Open (m_pMap_Object->m_Resource.sReference);
+            Fabric_Open (m_pMap_Object->m_Resource.sReference);
          else
             Texture_Request ();
       }
@@ -131,34 +131,19 @@ public:
       else m_pFabric->Node_Root (nullptr);
    }
 
-   bool Fabric_Open (const std::string& sUrl)
+   void Fabric_Open (const std::string& sUrl)
    {
-      bool bResult = true;
-
       if (!sUrl.empty ())
       {
-         if (m_pFabric_Attachment)
-            Fabric_Close ();
-
-         m_pFabric_Attachment = new FABRIC (m_pFabric->Scene (), m_pNode);
-
-         if (!m_pFabric_Attachment->Initialize (sUrl))
-         {
-            delete m_pFabric_Attachment;
-            m_pFabric_Attachment = nullptr;
-
-            bResult = false;
-         }
+         m_pFabric->Scene ()->Fabric_Open (m_pNode, sUrl);
       }
-
-      return bResult;
    }
 
    void Fabric_Close ()
    {
       if (m_pFabric_Attachment)
       {
-         delete m_pFabric_Attachment;
+         m_pFabric->Scene ()->Fabric_Close (m_pFabric_Attachment);
          m_pFabric_Attachment = nullptr;
       }
    }
@@ -224,7 +209,7 @@ public:
 // Accessors
 // -----------------------------------------------------------------------
 
-NODE* Parent () const
+   NODE* Parent () const
    {
       NODE* pResult = m_pNode_Parent;
 
@@ -339,6 +324,9 @@ void        NODE::ObjectIx          (uint64_t twObjectIx)       {        m_pImpl
 // -----------------------------------------------------------------------
 // Called internally from child nodes
 // -----------------------------------------------------------------------
+
+void        NODE::Fabric_Add        (FABRIC* pFabric_Child)     {        m_pImpl->m_pFabric_Attachment = pFabric_Child; m_pImpl->m_pFabric->Fabric_Add    (pFabric_Child); }
+void        NODE::Fabric_Remove     (FABRIC* pFabric_Child)     {        m_pImpl->m_pFabric_Attachment = nullptr;       m_pImpl->m_pFabric->Fabric_Remove (pFabric_Child); }
 
 void        NODE::Node_Add          (NODE* pNode_Child)         {        m_pImpl->Node_Add    (pNode_Child); }
 void        NODE::Node_Remove       (NODE* pNode_Child)         {        m_pImpl->Node_Remove (pNode_Child); }

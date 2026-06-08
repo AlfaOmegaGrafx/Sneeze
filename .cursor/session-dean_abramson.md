@@ -188,3 +188,19 @@
 - Analyzed compositor orbit trail rendering: identified ANARI `"curve"` geometry as source of visual quality issues (thick PBR-lit tubes vs. desired thin screen-space lines) and major performance bottleneck (~80-90% of 1 FPS drop with all moons)
 - Decided to prioritize visual quality improvements (unlit/emissive material, camera-distance radius scaling) before performance optimizations
 - Updated project.mdc with all deletions, architectural changes, and orbit trail analysis
+
+## June 7, 2026 — ~evening PDT
+
+**Fabric refactoring finalization, mutex, MSF ownership, fabric ownership modes**
+
+- Continued fabric loading refactoring from earlier session (SCENE orchestrates fabric lifecycle)
+- Added `m_mxScene` (recursive_mutex) to `SCENE::Impl` — guards `Fabric_Close`, `Fabric_Find`, and the critical section in `OnMsfReady` (index increment + fabric creation + map insert). Removed unnecessary guard from `Fabric_Open` (no shared state mutation — only kicks off async MSF fetch). Dean further localized the guard in `OnMsfReady` to wrap only the three mutation lines.
+- Moved MSF ownership from FABRIC to SCENE — `SCENE::OnMsfReady` creates the `MSF*`, `SCENE::Fabric_Close` deletes it. FABRIC holds a non-owning pointer. Symmetric with creation order: MSF → Container → Fabric, teardown: Fabric → Container → MSF.
+- Removed defensive null checks for `m_pContainer` in Fabric.cpp (dead code — FABRIC is always constructed with a valid container)
+- Removed `if (m_pFabric_Attachment) Fabric_Close()` guard from `NODE::Impl::Fabric_Open` — URL changes would be handled by explicit close-then-open, not implicit close inside open
+- Renamed `m_mutex` to `m_mxNetwork` in Network.cpp (coding standards)
+- Discussed and documented fabric ownership modes (WASM-managed vs map-managed) and the duplicate index problem when same MSF is loaded into multiple fabrics sharing one container
+- Added "Fabric Ownership Modes" section to Scene.md with full discussion
+- Added REVISIT comment in Container.cpp at Scene Node Handle Table section
+- All 10 test suites pass (312 assertions, 0 failures), Artemis runs clean
+- Updated project.mdc with fabric lifecycle, ownership modes, and duplicate index problem

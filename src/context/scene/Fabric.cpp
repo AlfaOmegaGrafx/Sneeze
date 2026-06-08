@@ -20,45 +20,6 @@
 using namespace SNEEZE;
 
 // ---------------------------------------------------------------------------
-// MSF_FETCH — file-local helper that handles the async MSF file fetch.
-// Delegates to FABRIC's public callback methods (no Impl access).
-// ---------------------------------------------------------------------------
-
-class MSF_FETCH : public IFILE
-{
-public:
-   MSF_FETCH (FABRIC* pFabric, SCENE* pScene) :
-      m_pFabric (pFabric),
-      m_pScene  (pScene),
-      m_pFile   (nullptr)
-   {
-   }
-
-   bool Initialize (CONTAINER* pContainer, const std::string& sUrl)
-   {
-      m_pFile = m_pScene->Network ()->File_Open (pContainer, sUrl, this);
-
-      return (m_pFile != nullptr);
-   }
-
-   ~MSF_FETCH ()
-   {
-      if (m_pFile)
-      {
-         m_pFile->Close ();
-         m_pFile = nullptr;
-      }
-   }
-
-   void OnFileReady  (SNEEZE::FILE* pFile) override { m_pFabric->OnMsfReady  (pFile); delete this; }
-   void OnFileFailed (SNEEZE::FILE* pFile) override { m_pFabric->OnMsfFailed (pFile); delete this; }
-
-   FABRIC*        m_pFabric;
-   SCENE*         m_pScene;
-   SNEEZE::FILE*  m_pFile;
-};
-
-// ---------------------------------------------------------------------------
 // WASM_FETCH — file-local helper that handles async .wasm module fetches.
 // One instance per module declared in the MSF payload.
 // ---------------------------------------------------------------------------
@@ -109,32 +70,46 @@ public:
 class FABRIC::Impl
 {
 public:
-   Impl (FABRIC* pFabric, SCENE* pScene, NODE* pNode_Attach) :
+   Impl (FABRIC* pFabric, SCENE* pScene, CONTAINER* pContainer, uint64_t twFabricIx, NODE* pNode_Attach, MSF* pMsf) :
       m_pFabric        (pFabric),
       m_pScene         (pScene),
+      m_pContainer     (pContainer),
+      m_twFabricIx     (twFabricIx),
       m_pNode_Attach   (pNode_Attach),
+      m_pMsf           (pMsf),
       m_pFabric_Parent (pNode_Attach ? pNode_Attach->Fabric () : nullptr),
-      m_pNode_Root     (nullptr),
-      m_pContainer     (nullptr),
-      m_twFabricIx     (0),
-      m_pMsf           (nullptr),
-      m_pMsf_Fetch     (nullptr)
+      m_pNode_Root     (nullptr)
    {
-      if (m_pFabric_Parent)
-         m_pFabric_Parent->Fabric_Add (m_pFabric);
+      if (m_pNode_Attach)
+         m_pNode_Attach->Fabric_Add (m_pFabric);
    }
 
-   bool Initialize (const std::string& sUrl)
+   bool Initialize ()
    {
-      bool bResult = false;
+      bool bResult = true;
 
-      m_sUrl = sUrl;
-
-      if (m_pFabric_Parent)
+      if (m_pMsf)
       {
-         m_pMsf_Fetch = new MSF_FETCH (m_pFabric, m_pScene);
+         auto aModule = m_pMsf->Modules ();
 
-         bResult = m_pMsf_Fetch->Initialize (m_pFabric_Parent->Container (), m_sUrl);
+         if (!aModule.empty ())
+         {
+            for (auto& Module : aModule)
+            {
+               WASM_FETCH* pWasm_Fetch = new WASM_FETCH (m_pFabric, m_pScene, Module.sUrl, Module.sHash);
+
+               m_apWasm_Fetch.push_back (pWasm_Fetch);
+
+               pWasm_Fetch->Initialize (m_pContainer);
+            }
+
+            std::string sModMsg = "Fetching " + std::to_string (aModule.size ()) + " WASM module(s)";
+            m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "FABRIC", sModMsg);
+            m_pContainer->Stream ()->Info (sModMsg, true);
+         }
+
+         if (m_apWasm_Fetch.empty ())
+            WasmFetch_Complete ();
       }
 
       return bResult;
@@ -142,16 +117,8 @@ public:
 
    ~Impl ()
    {
-      if (m_pMsf_Fetch)
-      {
-         delete m_pMsf_Fetch;
-         m_pMsf_Fetch = nullptr;
-      }   
-
       for (auto* pWasm_Fetch : m_apWasm_Fetch)
-      {
          delete pWasm_Fetch;
-      }
       m_apWasm_Fetch.clear ();
 
       if (m_pNode_Root)
@@ -163,118 +130,25 @@ public:
       if (!m_apFabric.empty ())
          m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "FABRIC", "Leaked " + std::to_string (m_apFabric.size ()) + " child fabric(s)");
 
-      if (m_pContainer)
-      {
-         for (auto& pair : m_aModule)
-            m_pContainer->Instance_Close (m_twFabricIx, pair.first, pair.second);
-         m_aModule.clear ();
+      for (auto& pair : m_aModule)
+         m_pContainer->Instance_Close (m_twFabricIx, pair.first, pair.second);
+      m_aModule.clear ();
 
-         m_pScene->Context ()->Container_Close (m_pFabric, m_pContainer);
-         m_pContainer = nullptr;
-      }
-
-      delete m_pMsf;
-      m_pMsf = nullptr;
-
-      if (m_pFabric_Parent)
-         m_pFabric_Parent->Fabric_Remove (m_pFabric);
-   }
-
-// -----------------------------------------------------------------------
-// MSF loaded — open container, enumerate modules, begin WASM fetches
-// -----------------------------------------------------------------------
-
-   void OnMsfReady (FILE* pFile)
-   {
-      std::vector<uint8_t> aData;
-
-      pFile->ReadData (aData);
-
-      if (!aData.empty ())
-      {
-         std::string sMsf (aData.begin (), aData.end ());
-
-         m_pMsf = new MSF (m_pScene->Engine ());
-
-         if (m_pMsf->Parse (sMsf, m_sUrl))
-         {
-            m_pMsf->VerifySignature ();
-            m_pMsf->VerifyChain ();
-
-            if ((m_pContainer = m_pScene->Context ()->Container_Open (m_pFabric)))
-            {
-               std::string sMsg = "Loaded MSF: " + m_pContainer->Identity ()->DisplayName () + " (trust: " + std::to_string (m_pContainer->Identity ()->eTrust) + ")";
-               m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "FABRIC", sMsg);
-               m_pContainer->Stream ()->Info (sMsg, true);
-
-               auto aModule = m_pMsf->Modules ();
-
-               if (!aModule.empty ())
-               {
-                  for (auto& Module : aModule)
-                  {
-                     WASM_FETCH* pWasm_Fetch = new WASM_FETCH (m_pFabric, m_pScene, Module.sUrl, Module.sHash);
-
-                     m_apWasm_Fetch.push_back (pWasm_Fetch);
-
-                     pWasm_Fetch->Initialize (m_pContainer);
-                  }
-
-                  std::string sModMsg = "Fetching " + std::to_string (aModule.size ()) + " WASM module(s)";
-                  m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "FABRIC", sModMsg);
-                  m_pContainer->Stream ()->Info (sModMsg, true);
-               }
-
-               if (m_apWasm_Fetch.empty ())
-                  WasmFetch_Complete ();
-            }
-            else
-            {
-               std::string sErr = "Container_Open failed for " + m_sUrl;
-               m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "FABRIC", sErr);
-               m_pFabric_Parent->Container ()->Stream ()->Error (sErr, true);
-            }
-         }
-         else
-         {
-            std::string sErr = "Failed to parse MSF from " + m_sUrl;
-            m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "FABRIC", sErr);
-            m_pFabric_Parent->Container ()->Stream ()->Error (sErr, true);
-
-            delete m_pMsf;
-            m_pMsf = nullptr;
-         }
-      }
-      else
-      {
-         std::string sErr = "MSF was empty for " + m_sUrl;
-         m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "FABRIC", sErr);
-         m_pFabric_Parent->Container ()->Stream ()->Error (sErr, true);
-      }   
-
-      m_pMsf_Fetch = nullptr;
-   }
-
-   void OnMsfFailed (FILE* pFile)
-   {
-      std::string sErr = "Failed to fetch MSF from " + m_sUrl;
-      m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "FABRIC", sErr);
-      m_pFabric_Parent->Container ()->Stream ()->Error (sErr, true);
-
-      m_pMsf_Fetch = nullptr;
+      if (m_pNode_Attach)
+         m_pNode_Attach->Fabric_Remove (m_pFabric);
    }
 
 // -----------------------------------------------------------------------
 // WASM module fetched — compile and insert into container
 // -----------------------------------------------------------------------
 
-   void OnWasmReady (FILE* pFile, const std::string& sUrl, const std::string& sHash)
+   void OnWasmReady (SNEEZE::FILE* pFile, const std::string& sUrl, const std::string& sHash)
    {
       std::vector<uint8_t> aData;
 
       pFile->ReadData (aData);
 
-      if (!aData.empty ()  &&  m_pContainer)
+      if (!aData.empty ())
       {
          if (m_pContainer->Instance_Open (m_twFabricIx, sUrl, sHash, aData))
          {
@@ -295,7 +169,7 @@ public:
       WasmFetch_Remove (sUrl);
    }
 
-   void OnWasmFailed (FILE* pFile, const std::string& sUrl)
+   void OnWasmFailed (SNEEZE::FILE* pFile, const std::string& sUrl)
    {
       std::string sFetchErr = "Failed to fetch WASM: " + sUrl;
       m_pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "FABRIC", sFetchErr);
@@ -330,26 +204,13 @@ public:
    }
 
 // -----------------------------------------------------------------------
-// Reload the fabric with a new URL
-// -----------------------------------------------------------------------
-
-   void Url (const std::string& sUrl)
-   {
-      // This will reload the fabric with the new URL.
-
-      // Delete nodes from the root
-      // Delete the MSF file
-      // Open a new MSF file
-      // Reset the Container
-   }
-
-// -----------------------------------------------------------------------
 // Called internally from child fabrics
 // -----------------------------------------------------------------------
 
    void Fabric_Add (FABRIC* pFabric_Child)
    {
       std::lock_guard<std::recursive_mutex> lock (m_mxFabric);
+
       m_apFabric.push_back (pFabric_Child);
    }
 
@@ -375,10 +236,8 @@ public:
    CONTAINER*                                          m_pContainer;
    uint64_t                                            m_twFabricIx;
    MSF*                                                m_pMsf;
-   MSF_FETCH*                                          m_pMsf_Fetch;
    std::vector<WASM_FETCH*>                            m_apWasm_Fetch;
    std::vector<std::pair<std::string, std::string>>    m_aModule;
-   std::string                                         m_sUrl;
    mutable std::recursive_mutex                        m_mxFabric;
 };
 
@@ -386,14 +245,14 @@ public:
 // FABRIC
 // ---------------------------------------------------------------------------
 
-FABRIC::FABRIC (SCENE* pScene, NODE* pNode_Attach) :
-   m_pImpl (new Impl (this, pScene, pNode_Attach))
+FABRIC::FABRIC (SCENE* pScene, CONTAINER* pContainer, uint64_t twFabricIx, NODE* pNode_Attach, MSF* pMsf) :
+   m_pImpl (new Impl (this, pScene, pContainer, twFabricIx, pNode_Attach, pMsf))
 {
 }
 
-bool FABRIC::Initialize (const std::string& sUrl)
+bool FABRIC::Initialize ()
 {
-   return m_pImpl->Initialize (sUrl);
+   return m_pImpl->Initialize ();
 }
 
 FABRIC::~FABRIC ()
@@ -413,16 +272,13 @@ uint64_t           FABRIC::FabricIx       ()                         const { ret
 FABRIC*            FABRIC::Fabric_Parent  ()                         const { return m_pImpl->m_pFabric_Parent; }
 NODE*              FABRIC::Node_Root      ()                         const { return m_pImpl->m_pNode_Root; }
 NODE*              FABRIC::Node_Attach    ()                         const { return m_pImpl->m_pNode_Attach; }
-const std::string& FABRIC::Url            ()                         const { return m_pImpl->m_sUrl; }
+const std::string& FABRIC::Url            ()                         const { static std::string sEmpty; return sEmpty; }
 
 // -----------------------------------------------------------------------
 // Mutators
 // -----------------------------------------------------------------------
 
-void               FABRIC::Container      (CONTAINER* pContainer)         {         m_pImpl->m_pContainer = pContainer; }
-void               FABRIC::FabricIx       (uint64_t twFabricIx)           {         m_pImpl->m_twFabricIx = twFabricIx; }
 void               FABRIC::Node_Root      (NODE* pNode_Root)              {         m_pImpl->m_pNode_Root = pNode_Root; }
-void               FABRIC::Url            (const std::string& sUrl)       {         m_pImpl->Url (sUrl); }
 
 // -----------------------------------------------------------------------
 // Called internally from child fabrics
@@ -432,21 +288,19 @@ void               FABRIC::Fabric_Add     (FABRIC* pFabric_Child)         {     
 void               FABRIC::Fabric_Remove  (FABRIC* pFabric_Child)         {         m_pImpl->Fabric_Remove (pFabric_Child); }
 
 // -----------------------------------------------------------------------
-// Fetch callbacks (delegated from MSF_FETCH / WASM_FETCH helpers)
+// Fetch callbacks (delegated from WASM_FETCH helpers)
 // -----------------------------------------------------------------------
 
-void               FABRIC::OnMsfReady    (FILE* pFile)                                                      { m_pImpl->OnMsfReady   (pFile); }
-void               FABRIC::OnMsfFailed   (FILE* pFile)                                                      { m_pImpl->OnMsfFailed  (pFile); }
-void               FABRIC::OnWasmReady   (FILE* pFile, const std::string& sUrl, const std::string& sHash)   { m_pImpl->OnWasmReady  (pFile, sUrl, sHash); }
-void               FABRIC::OnWasmFailed  (FILE* pFile, const std::string& sUrl)                             { m_pImpl->OnWasmFailed (pFile, sUrl); } 
+void               FABRIC::OnWasmReady   (SNEEZE::FILE* pFile, const std::string& sUrl, const std::string& sHash)   { m_pImpl->OnWasmReady  (pFile, sUrl, sHash); }
+void               FABRIC::OnWasmFailed  (SNEEZE::FILE* pFile, const std::string& sUrl)                             { m_pImpl->OnWasmFailed (pFile, sUrl); } 
 
 // ===========================================================================
 // FABRIC_ROOT
 // ===========================================================================
 
 
-FABRIC_ROOT::FABRIC_ROOT (SCENE* pScene) :
-   FABRIC (pScene, nullptr),
+FABRIC_ROOT::FABRIC_ROOT (SCENE* pScene, CONTAINER* pContainer, uint64_t twFabricIx) :
+   FABRIC (pScene, pContainer, twFabricIx, nullptr, nullptr),
    m_pNode_Primary (nullptr)
 {
 }
@@ -455,23 +309,18 @@ bool FABRIC_ROOT::Initialize (const std::string& sUrl)
 {
    bool bResult = false;
 
-   m_pImpl->m_pContainer = Scene ()->Context ()->Container_Open (this);
+   NODE* pNode_Root = new NODE (this, nullptr);
 
-   if (m_pImpl->m_pContainer)
+   if (pNode_Root->Initialize (nullptr))
    {
-      NODE* pNode_Root = new NODE (this, nullptr);
+      auto* pMap_Object  = new MAP_OBJECT_ROOT ();
 
-      if (pNode_Root->Initialize (nullptr))
-      {
-         auto* pMap_Object  = new MAP_OBJECT_ROOT ();
+      pMap_Object->m_Type.bSubtype = 255;
+      strncpy (pMap_Object->m_Resource.sReference, sUrl.c_str (), sizeof (pMap_Object->m_Resource.sReference) - 1);
 
-         pMap_Object->m_Type.bSubtype = 255;
-         strncpy (pMap_Object->m_Resource.sReference, sUrl.c_str (), sizeof (pMap_Object->m_Resource.sReference) - 1);
+      m_pNode_Primary = new NODE (this, pNode_Root);
 
-         m_pNode_Primary = new NODE (this, pNode_Root);
-
-         bResult = m_pNode_Primary->Initialize (pMap_Object);
-      }
+      bResult = m_pNode_Primary->Initialize (pMap_Object);
    }
 
    return bResult;

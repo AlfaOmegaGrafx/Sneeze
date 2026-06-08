@@ -71,6 +71,8 @@ namespace SNEEZE
       // Mutators
       void               ObjectIx          (uint64_t twObjectIx);
       void               Private           (bool bPrivate);
+      void               Fabric_Add        (FABRIC* pFabric_Child);
+      void               Fabric_Remove     (FABRIC* pFabric_Child);
 
       // Methods
       void               Node_Add          (NODE* pNode_Child);
@@ -93,10 +95,10 @@ namespace SNEEZE
    class FABRIC
    {
    public:
-      FABRIC  (SCENE* pScene, NODE* pNode_Attach);
+      FABRIC  (SCENE* pScene, CONTAINER* pContainer, uint64_t twFabricIx, NODE* pNode_Attach, MSF* pMsf);
       virtual ~FABRIC ();
 
-      bool               Initialize     (const std::string& sUrl);
+      bool               Initialize     ();
 
       // Accessors
       SCENE*             Scene          () const;
@@ -110,15 +112,10 @@ namespace SNEEZE
 
       // Mutators
       void               Node_Root      (NODE* pNode_Root);
-      void               Container      (CONTAINER* pContainer);
-      void               FabricIx       (uint64_t twFabricIx);
-      void               Url            (const std::string& sUrl);
 
       // Methods
       void               Fabric_Add     (FABRIC* pFabric_Child);
       void               Fabric_Remove  (FABRIC* pFabric_Child);
-      void               OnMsfReady     (FILE* pFile);
-      void               OnMsfFailed    (FILE* pFile);
       void               OnWasmReady    (FILE* pFile, const std::string& sUrl, const std::string& sHash);
       void               OnWasmFailed   (FILE* pFile, const std::string& sUrl);
 
@@ -138,7 +135,7 @@ namespace SNEEZE
    class FABRIC_ROOT : public FABRIC
    {
    public:
-      FABRIC_ROOT (SCENE* pScene);
+      FABRIC_ROOT (SCENE* pScene, CONTAINER* pContainer, uint64_t twFabricIx);
 
       bool               Initialize    (const std::string& sUrl);
 
@@ -175,9 +172,18 @@ namespace SNEEZE
       // Mutators
       void               Url             (const std::string& sUrl);
 
+      // Internal functions
+      void               Fabric_Open     (NODE* pNode_Attach, const std::string& sUrl);
+      void               Fabric_Close    (FABRIC* pFabric);
+      FABRIC*            Fabric_Find     (uint64_t twFabricIx) const;
+
+      // Internal callbacks (used by file-local MSF_FETCH)
+      void               OnMsfReady      (NODE* pNode_Attach, FILE* pFile);
+      void               OnMsfFailed     (NODE* pNode_Attach, FILE* pFile);
+
    private:
-      CONTEXT*           m_pContext;
-      FABRIC_ROOT*       m_pFabric_Root;
+      class Impl;
+      Impl*              m_pImpl;
    };
 }
 #endif // SNEEZE_SCENE_H
