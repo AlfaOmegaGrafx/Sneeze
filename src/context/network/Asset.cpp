@@ -40,16 +40,7 @@ public:
 
    void OnFetch_Complete (const FETCH_RESULT& Fetch_Result) override
    {
-      // The Fetch_Lock/Unlock prevents a really nasty deadlock in which the only viable solution was to guarantee that we lock mxNetwork before mxAsset.
-      // All possible solutions were explored. A different solution will require a substantial change to the architecture.
-      
-      m_pAsset->Fetch_Lock ();
-      {
-         if (IsFetch ())
-            m_pAsset->Fetch_Complete (Fetch_Result);
-         else m_pAsset->Fetch_Complete (m_bState);
-      }
-      m_pAsset->Fetch_Unlock ();
+      m_pAsset->Fetch_Complete (Fetch_Result, m_bState);
    }
 
 private:
@@ -548,62 +539,32 @@ public:
    // Fetch
    // ---------------------------------------------------------------------------
 
-   void Fetch_Lock ()
+   void Fetch_Complete (const FETCH_RESULT& Fetch_Result, eASSET_STATE bState)
    {
+      // The m_pINetwork_Impl->Asset_Lock/Unlock prevents a really nasty deadlock in which the only viable solution was to guarantee that we lock 
+      // mxNetwork before mxAsset.All possible solutions were explored. A different solution will require a substantial change to the architecture.
+
       m_pINetwork_Impl->Asset_Lock ();
-   }
 
-   void Fetch_Unlock ()
-   {
-      m_pINetwork_Impl->Asset_Unlock ();
-   }
-
-   void Fetch_Complete (const FETCH_RESULT& Fetch_Result)
-   {
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxAsset);
 
-         m_dFetchEndTime   = m_pINetwork_Impl->SecondsSinceEpoch ();
-         m_nHttpStatus     = Fetch_Result.nHttpStatus;
-         m_sRemoteAddress  = Fetch_Result.sRemoteAddress;
-         m_umsReqHeaders   = Fetch_Result.mapReqHeaders;
-         m_umsRspHeaders   = Fetch_Result.mapRspHeaders;
-
-         if (Fetch_Result.bSuccess)
+         if (bState == kASSET_STATE_FETCHING)
          {
-            m_nSizeBytes    = Fetch_Result.nSizeBytes;
+            m_dFetchEndTime   = m_pINetwork_Impl->SecondsSinceEpoch ();
+            m_nHttpStatus     = Fetch_Result.nHttpStatus;
+            m_sRemoteAddress  = Fetch_Result.sRemoteAddress;
+            m_umsReqHeaders   = Fetch_Result.mapReqHeaders;
+            m_umsRspHeaders   = Fetch_Result.mapRspHeaders;
 
-            m_bState = kASSET_STATE_READY;
-         }
-         else m_bState = kASSET_STATE_FAILED;
-
-         for (auto* pFile : m_apFiles)
-         {
-            pFile->SnapshotFinal ();
-            pFile->Notify_Changed ();
-   
-            IFILE* pListener = pFile->Listener ();
-            if (pListener)
+            if (Fetch_Result.bSuccess)
             {
-               if (m_bState == kASSET_STATE_READY)
-                  pListener->OnFileReady (pFile);
-               else pListener->OnFileFailed (pFile);
-            }   
-   
-            // the listener may close the file, so neither pFile nor pListener may be referenced once the notification is called
+               m_nSizeBytes = Fetch_Result.nSizeBytes;
+
+               bState = kASSET_STATE_READY;
+            }
+            else bState = kASSET_STATE_FAILED;
          }
-
-         m_pAsset_Fetch = nullptr;
-      }
-   
-      Detach (nullptr);
-      m_pINetwork_Impl->Asset_Close (nullptr, m_pAsset);
-   }
-
-   void Fetch_Complete (eASSET_STATE bState)
-   {
-      {
-         std::lock_guard<std::recursive_mutex> guard (m_mxAsset);
 
          m_bState = bState;
 
@@ -625,9 +586,11 @@ public:
 
          m_pAsset_Fetch = nullptr;
       }
-   
+
       Detach (nullptr);
       m_pINetwork_Impl->Asset_Close (nullptr, m_pAsset);
+
+      m_pINetwork_Impl->Asset_Unlock ();
    }
 
    // ---------------------------------------------------------------------------
@@ -754,10 +717,7 @@ void        ASSET::Reset         ()                                         {   
 // Fetch
 // ---------------------------------------------------------------------------
 
-void        ASSET::Fetch_Lock     ()                                        {        m_pImpl->Fetch_Lock     (); }
-void        ASSET::Fetch_Unlock   ()                                        {        m_pImpl->Fetch_Unlock   (); }
-void        ASSET::Fetch_Complete (const FETCH_RESULT& Fetch_Result)        {        m_pImpl->Fetch_Complete (Fetch_Result); }
-void        ASSET::Fetch_Complete (eASSET_STATE bState)                     {        m_pImpl->Fetch_Complete (bState); }
+void        ASSET::Fetch_Complete (const FETCH_RESULT& Fetch_Result, eASSET_STATE bState) { m_pImpl->Fetch_Complete (Fetch_Result, bState); }
 
 // ---------------------------------------------------------------------------
 // Data access

@@ -71,8 +71,7 @@ namespace SNEEZE
       // Fetch completion (called by FETCH thread)
       void        Fetch_Lock ();
       void        Fetch_Unlock ();
-      void        Fetch_Complete (const FETCH_RESULT& Fetch_Result);
-      void        Fetch_Complete (eASSET_STATE bState);
+      void        Fetch_Complete (const FETCH_RESULT& Fetch_Result, eASSET_STATE bState);
 
       // Hash verification
       bool        VerifyHash (const std::string& sFilePath, const std::string& sHash) const;
