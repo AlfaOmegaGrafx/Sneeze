@@ -21,6 +21,7 @@ namespace SNEEZE
    class FABRIC;
    class NODE;
    class STREAM;
+   class SILO;
    struct RMCOBJECT;
 
    enum eTRUST
@@ -76,6 +77,7 @@ namespace SNEEZE
       const CID*         Identity () const;
       const std::string& Key      () const;
       STREAM*            Stream   () const;
+      SILO*              Silo     () const;
 
    private:
       class Impl;

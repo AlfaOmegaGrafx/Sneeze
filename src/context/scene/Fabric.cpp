@@ -84,9 +84,11 @@ public:
          m_pNode_Attach->Fabric_Add (m_pFabric);
    }
 
-   bool Initialize ()
+   bool Initialize (const std::string& sUrl)
    {
       bool bResult = true;
+
+      m_sUrl = sUrl;
 
       if (m_pMsf)
       {
@@ -236,6 +238,7 @@ public:
    CONTAINER*                                          m_pContainer;
    uint64_t                                            m_twFabricIx;
    MSF*                                                m_pMsf;
+   std::string                                         m_sUrl;
    std::vector<WASM_FETCH*>                            m_apWasm_Fetch;
    std::vector<std::pair<std::string, std::string>>    m_aModule;
    mutable std::recursive_mutex                        m_mxFabric;
@@ -250,9 +253,9 @@ FABRIC::FABRIC (SCENE* pScene, CONTAINER* pContainer, uint64_t twFabricIx, NODE*
 {
 }
 
-bool FABRIC::Initialize ()
+bool FABRIC::Initialize (const std::string& sUrl)
 {
-   return m_pImpl->Initialize ();
+   return m_pImpl->Initialize (sUrl);
 }
 
 FABRIC::~FABRIC ()
@@ -272,7 +275,7 @@ uint64_t           FABRIC::FabricIx       ()                         const { ret
 FABRIC*            FABRIC::Fabric_Parent  ()                         const { return m_pImpl->m_pFabric_Parent; }
 NODE*              FABRIC::Node_Root      ()                         const { return m_pImpl->m_pNode_Root; }
 NODE*              FABRIC::Node_Attach    ()                         const { return m_pImpl->m_pNode_Attach; }
-const std::string& FABRIC::Url            ()                         const { static std::string sEmpty; return sEmpty; }
+const std::string& FABRIC::Url            ()                         const { return m_pImpl->m_sUrl; }
 
 // -----------------------------------------------------------------------
 // Mutators
@@ -308,6 +311,8 @@ FABRIC_ROOT::FABRIC_ROOT (SCENE* pScene, CONTAINER* pContainer, uint64_t twFabri
 bool FABRIC_ROOT::Initialize (const std::string& sUrl)
 {
    bool bResult = false;
+
+   m_pImpl->m_sUrl = sUrl;
 
    NODE* pNode_Root = new NODE (this, nullptr);
 

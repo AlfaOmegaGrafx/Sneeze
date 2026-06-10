@@ -146,6 +146,7 @@ public:
          else if (pMsf->IsChainExpired ())
             CID.eTrust = kTRUST_EXPIRED;
          else CID.eTrust = kTRUST_VERIFIED;
+CID.eTrust = kTRUST_EXPIRED;
       }
       else
       {

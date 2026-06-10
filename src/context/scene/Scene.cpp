@@ -77,6 +77,20 @@ public:
 
    bool Initialize (const std::string& sUrl)
    {
+      return Fabric_Root_Create (sUrl);
+   }
+
+   ~Impl ()
+   {
+      Fabric_Root_Destroy ();
+   }
+
+// -----------------------------------------------------------------------
+// Root fabric lifecycle
+// -----------------------------------------------------------------------
+
+   bool Fabric_Root_Create (const std::string& sUrl)
+   {
       bool bResult = false;
 
       CONTAINER* pContainer;
@@ -96,46 +110,121 @@ public:
 
          if (m_pFabric_Root->Initialize (sUrl))
          {
-            m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "SCENE", "Initialized (root fabric)");
+            m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "SCENE", "Loaded " + sUrl);
 
             bResult = true;
          }
-         else
-         {
-            delete m_pFabric_Root;
-            m_pFabric_Root = nullptr;
-
-            m_umpFabric.erase (twFabricIx);
-
-            m_pContext->Container_Close (pContainer);
-         }
+         else Fabric_Root_Destroy ();
       }
 
       return bResult;
    }
 
-   ~Impl ()
+   void Fabric_Root_Destroy ()
    {
       // Deleting the root fabric triggers a cascade: deleting its nodes will
       // recursively delete all child nodes. When a node is an attachment
       // point, the fabric attached to it will also be deleted. By the time
-      // the root fabric is fully destroyed, all descendant fabrics (including
+      // the root fabric is fully deleted, all descendant fabrics (including
       // the primary) should have been deleted as well.
 
       if (m_pFabric_Root)
       {
+         MSF*       pMsf       = nullptr;
          CONTAINER* pContainer = m_pFabric_Root->Container ();
+         uint64_t   twFabricIx = m_pFabric_Root->FabricIx  ();
 
          delete m_pFabric_Root;
          m_pFabric_Root = nullptr;
+
+         m_umpFabric.erase (twFabricIx);
+
+         if (!m_umpFabric.empty ())
+            m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "SCENE", "Leaked " + std::to_string (m_umpFabric.size ()) + " fabric(s)");
+         m_umpFabric.clear ();
 
          if (pContainer)
             m_pContext->Container_Close (pContainer);
       }
 
-      if (!m_umpFabric.empty ())
-         m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "SCENE", "Leaked " + std::to_string (m_umpFabric.size ()) + " fabric(s)");
+      m_twFabricIx_Next = 0;
    }
+
+// -----------------------------------------------------------------------
+// MSF loaded — open container, create fabric, begin WASM fetches
+// -----------------------------------------------------------------------
+
+void OnMsfReady (NODE* pNode_Attach, FILE* pFile)
+{
+   CONTAINER* pContainer;
+   uint64_t   twFabricIx;
+   FABRIC*    pFabric;
+
+   std::vector<uint8_t> aData;
+
+   pFile->ReadData (aData);
+
+   if (!aData.empty ())
+   {
+      std::string sMsf (aData.begin (), aData.end ());
+
+      MSF* pMsf = new MSF (m_pContext->Engine ());
+
+      if (pMsf->Parse (sMsf, pFile->Url ()))
+      {
+         pMsf->VerifySignature ();
+         pMsf->VerifyChain ();
+
+         if (pContainer = m_pContext->Container_Open (pMsf))
+         {
+            std::string sMsg = "Loaded MSF: " + pContainer->Identity ()->DisplayName () + " (trust: " + std::to_string (pContainer->Identity ()->eTrust) + ")";
+            m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "SCENE", sMsg);
+            m_pFabric_Root->Container ()->Stream ()->Info (sMsg, true);
+
+            {
+               std::lock_guard<std::recursive_mutex> guard (m_mxScene);
+   
+               twFabricIx = ++m_twFabricIx_Next;
+
+               pFabric = new FABRIC (m_pScene, pContainer, twFabricIx, pNode_Attach, pMsf);
+
+               m_umpFabric[twFabricIx] = pFabric;
+            }
+
+            pFabric->Initialize (pFile->Url ());
+         }
+         else
+         {
+            std::string sErr = "Container_Open failed for " + pFile->Url ();
+            m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "SCENE", sErr);
+            m_pFabric_Root->Container ()->Stream ()->Error (sErr, true);
+
+            delete pMsf;
+         }
+      }
+      else
+      {
+         std::string sErr = "Failed to parse MSF from " + pFile->Url ();
+         m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "SCENE", sErr);
+         m_pFabric_Root->Container ()->Stream ()->Error (sErr, true);
+
+         delete pMsf;
+      }
+   }
+   else
+   {
+      std::string sErr = "MSF was empty for " + pFile->Url ();
+      m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "SCENE", sErr);
+      m_pFabric_Root->Container ()->Stream ()->Error (sErr, true);
+   }
+}
+
+void OnMsfFailed (NODE* pNode_Attach, FILE* pFile)
+{
+   std::string sErr = "Failed to fetch MSF from " + pFile->Url ();
+   m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "SCENE", sErr);
+   m_pFabric_Root->Container ()->Stream ()->Error (sErr, true);
+}
 
 // -----------------------------------------------------------------------
 // Fabric management
@@ -163,9 +252,9 @@ public:
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxScene);
 
-      MSF*       pMsf       = pFabric->Msf ();
+      MSF*       pMsf       = pFabric->Msf       ();
       CONTAINER* pContainer = pFabric->Container ();
-      uint64_t   twFabricIx = pFabric->FabricIx ();
+      uint64_t   twFabricIx = pFabric->FabricIx  ();
 
       delete pFabric;
 
@@ -192,79 +281,30 @@ public:
    }
 
 // -----------------------------------------------------------------------
-// MSF loaded — open container, create fabric, begin WASM fetches
+// Methods
 // -----------------------------------------------------------------------
 
-   void OnMsfReady (NODE* pNode_Attach, FILE* pFile)
+   bool Reload (bool bReset)
    {
-      CONTAINER* pContainer;
-      uint64_t   twFabricIx;
-      FABRIC*    pFabric;
-
-      std::vector<uint8_t> aData;
-
-      pFile->ReadData (aData);
-
-      if (!aData.empty ())
+      if (bReset)
       {
-         std::string sMsf (aData.begin (), aData.end ());
-
-         MSF* pMsf = new MSF (m_pContext->Engine ());
-
-         if (pMsf->Parse (sMsf, pFile->Url ()))
-         {
-            pMsf->VerifySignature ();
-            pMsf->VerifyChain ();
-
-            if (pContainer = m_pContext->Container_Open (pMsf))
-            {
-               std::string sMsg = "Loaded MSF: " + pContainer->Identity ()->DisplayName () + " (trust: " + std::to_string (pContainer->Identity ()->eTrust) + ")";
-               m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "SCENE", sMsg);
-               m_pFabric_Root->Container ()->Stream ()->Info (sMsg, true);
-
-               {
-                  std::lock_guard<std::recursive_mutex> guard (m_mxScene);
-      
-                  twFabricIx = ++m_twFabricIx_Next;
-
-                  pFabric = new FABRIC (m_pScene, pContainer, twFabricIx, pNode_Attach, pMsf);
-
-                  m_umpFabric[twFabricIx] = pFabric;
-               }
-
-               pFabric->Initialize ();
-            }
-            else
-            {
-               std::string sErr = "Container_Open failed for " + pFile->Url ();
-               m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "SCENE", sErr);
-               m_pFabric_Root->Container ()->Stream ()->Error (sErr, true);
-
-               delete pMsf;
-            }
-         }
-         else
-         {
-            std::string sErr = "Failed to parse MSF from " + pFile->Url ();
-            m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "SCENE", sErr);
-            m_pFabric_Root->Container ()->Stream ()->Error (sErr, true);
-
-            delete pMsf;
-         }
+         // reset the cache
       }
-      else
-      {
-         std::string sErr = "MSF was empty for " + pFile->Url ();
-         m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "SCENE", sErr);
-         m_pFabric_Root->Container ()->Stream ()->Error (sErr, true);
-      }
+
+      return Url (m_pFabric_Root->Url ());
    }
 
-   void OnMsfFailed (NODE* pNode_Attach, FILE* pFile)
+   bool Url (const std::string& sUrl)
    {
-      std::string sErr = "Failed to fetch MSF from " + pFile->Url ();
-      m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "SCENE", sErr);
-      m_pFabric_Root->Container ()->Stream ()->Error (sErr, true);
+      Fabric_Root_Destroy ();
+
+      bool bResult = Fabric_Root_Create (sUrl);
+
+      VIEWPORT* pViewport = m_pContext->Viewport ();
+      if (pViewport)
+         pViewport->Scene_Invalidate ();
+
+      return bResult;
    }
 
 public:
@@ -297,26 +337,34 @@ SCENE::~SCENE ()
    m_pImpl = nullptr;
 }
 
-void SCENE::Url (const std::string& sUrl)
-{
-   // URL change (tab navigation). Not yet implemented.
-   // When implemented: delete root fabric (cascades through all
-   // fabrics/nodes/containers), create new root fabric with sUrl,
-   // initialize it.
+// -----------------------------------------------------------------------
+// Accessors
+// -----------------------------------------------------------------------
 
-   // See ~Impl ()
-}
+SNEEZE::ENGINE*  SCENE::Engine         () const { return m_pImpl->m_pContext->Engine (); }
+SNEEZE::CONTEXT* SCENE::Context        () const { return m_pImpl->m_pContext; }
+SNEEZE::NETWORK* SCENE::Network        () const { return m_pImpl->m_pContext->Network (); }
+FABRIC_ROOT*     SCENE::Fabric_Root    () const { return m_pImpl->m_pFabric_Root; }
+FABRIC*          SCENE::Fabric_Primary () const { return m_pImpl->m_pFabric_Root ? m_pImpl->m_pFabric_Root->Node_Primary ()->Fabric_Attachment () : nullptr; }
 
-void    SCENE::Fabric_Open  (NODE* pNode_Attach, const std::string& sUrl) {        m_pImpl->Fabric_Open  (pNode_Attach, sUrl); }
-void    SCENE::Fabric_Close (FABRIC* pFabric)                             {        m_pImpl->Fabric_Close (pFabric); }
-FABRIC* SCENE::Fabric_Find  (uint64_t twFabricIx)                   const { return m_pImpl->Fabric_Find  (twFabricIx); }
+// -----------------------------------------------------------------------
+// Methods
+// -----------------------------------------------------------------------
+
+bool             SCENE::Reload         (bool bReset)                      { return m_pImpl->Reload       (bReset); }
+bool             SCENE::Url            (const std::string& sUrl)          { return m_pImpl->Url          (sUrl); }
+
+// -----------------------------------------------------------------------
+// Internal functions
+// -----------------------------------------------------------------------
 
 void    SCENE::OnMsfReady   (NODE* pNode_Attach, SNEEZE::FILE* pFile)     {        m_pImpl->OnMsfReady   (pNode_Attach, pFile); }
 void    SCENE::OnMsfFailed  (NODE* pNode_Attach, SNEEZE::FILE* pFile)     {        m_pImpl->OnMsfFailed  (pNode_Attach, pFile); }
 
-SNEEZE::CONTEXT* SCENE::Context        () const { return m_pImpl->m_pContext; }
+// -----------------------------------------------------------------------
+// Scene Internal functions
+// -----------------------------------------------------------------------
 
-SNEEZE::ENGINE*  SCENE::Engine         () const { return m_pImpl->m_pContext->Engine (); }
-SNEEZE::NETWORK* SCENE::Network        () const { return m_pImpl->m_pContext->Network (); }
-FABRIC_ROOT*     SCENE::Fabric_Root    () const { return m_pImpl->m_pFabric_Root; }
-FABRIC*          SCENE::Fabric_Primary () const { return m_pImpl->m_pFabric_Root ? m_pImpl->m_pFabric_Root->Node_Primary ()->Fabric_Attachment () : nullptr; }
+void    SCENE::Fabric_Open  (NODE* pNode_Attach, const std::string& sUrl) {        m_pImpl->Fabric_Open  (pNode_Attach, sUrl); }
+void    SCENE::Fabric_Close (FABRIC* pFabric)                             {        m_pImpl->Fabric_Close (pFabric); }
+FABRIC* SCENE::Fabric_Find  (uint64_t twFabricIx)                   const { return m_pImpl->Fabric_Find  (twFabricIx); }

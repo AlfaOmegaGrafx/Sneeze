@@ -64,7 +64,20 @@ NETWORK* pNetwork = pScene->Network ();
 pScene->Fabric_Open (pNode, sUrl);       // async — triggers MSF fetch
 pScene->Fabric_Close (pFabric);          // sync — deletes fabric + closes container
 FABRIC* pF = pScene->Fabric_Find (42);   // lookup by scene-global index
+
+// Navigation
+pScene->Url (sUrl);                       // swap the root fabric to a new URL
+pScene->Reload (bReset);                  // reload the current root fabric URL
+const std::string& sUrl = pScene->Fabric_Root ()->Url (); // current URL
 ```
+
+`Url(sUrl)` tears down the existing root fabric, resets the scene-global fabric
+index, and rebuilds FABRIC_ROOT from the new URL. `Reload(bReset)` re-issues
+`Url()` with the root fabric's current URL (`bReset` requests a cache reset).
+Because a scene swap replaces all geometry, `Url()` calls
+`VIEWPORT::Scene_Invalidate()` so the renderer rebuilds rather than updating
+stale objects (see `Viewport.md`). The scene's URL is not stored on SCENE — it
+is read from the root FABRIC, which records its URL at `Initialize()`.
 
 ## FABRIC
 

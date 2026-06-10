@@ -69,14 +69,25 @@ Lifecycle:
 
 ### Storage (module: "Storage")
 
+Forwarded to the calling container's SILO (`CONTAINER::Silo()`). Every call
+takes a scope selector (org/container × permanent/temporary). Keys are
+dot-notation paths with array brackets (e.g. `game.poker.table[5].card-color`).
+Values are JSON text in both directions — a value can be a scalar, object, or
+array (`{ "a": [0, 1, 2], "b": 6 }`).
+
 | Function | Description |
 |----------|-------------|
-| `Storage_Get` | Read key from container scope |
-| `Storage_Set` | Write key to container scope |
-| `Storage_Remove` | Delete key |
-| `Storage_Has` | Check key existence |
-| `Storage_GetJson` | Bulk JSON read |
-| `Storage_SetJson` | Bulk JSON write |
+| `Storage_Get` | Read the JSON value at a path |
+| `Storage_Set` | Write a JSON value at a path |
+| `Storage_Remove` | Delete a path |
+| `Storage_Has` | Check whether a path exists |
+| `Storage_GetJson` | Read the whole scope document as JSON |
+| `Storage_SetJson` | Replace the whole scope document from JSON |
+
+`Storage_Get` and `Storage_GetJson` return the **full byte size** of the
+result, not the number of bytes written. The caller detects truncation when
+the returned size exceeds the supplied buffer length, and may pass a length of
+0 to query the required size without writing.
 
 ### Scene (module: "Scene")
 
@@ -101,8 +112,17 @@ Lifecycle:
 | `Timer_Clear` | Cancel a scheduled callback |
 
 All host functions receive the store pointer as `pEnv`, providing access to
-the calling store's identity for access control and storage scoping.
-`ReadWasmString()` extracts a string from WASM linear memory.
+the calling store's identity (and its CONTAINER) for access control and
+storage scoping. Console functions forward to the container's STREAM
+(`CONTAINER::Stream()`); Storage functions forward to its SILO
+(`CONTAINER::Silo()`).
+
+String/byte I/O helpers move data across the WASM boundary:
+
+- `ReadWasmString()` / `ReadWasmBytes()` — copy data out of WASM linear memory.
+- `WriteWasmString()` — copy a UTF-8 string into WASM linear memory and return
+  the full size the string requires (so callers can detect truncation and
+  re-query with a larger buffer).
 
 ## Dependencies
 

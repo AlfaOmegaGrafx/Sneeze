@@ -94,6 +94,8 @@ public:
                   m_pWasm_Store->HostData (static_cast<void*> (m_pContainer));
                   m_pWasm_Store->Linker_Initialize ();
 
+                  m_pContext->Host ()->OnContainerCreated (m_pContainer);
+
                   bResult = true;
                }
             }
@@ -113,6 +115,8 @@ public:
 
       if (--m_nCount_Open == 0)
       {
+         m_pContext->Host ()->OnContainerDeleted (m_pContainer);
+
          if (m_pWasm_Store)
          {
             m_pContext->WasmRuntime ()->Store_Close (m_pWasm_Store);
@@ -334,6 +338,7 @@ SNEEZE::CONTEXT*      CONTAINER::Context    () const                            
 const CONTAINER::CID* CONTAINER::Identity   () const                                           { return &m_pImpl->m_CID; }
 const std::string&    CONTAINER::Key        () const                                           { return  m_pImpl->m_sKey; }
 STREAM*               CONTAINER::Stream     () const                                           { return  m_pImpl->m_pStream; }
+SILO*                 CONTAINER::Silo       () const                                           { return  m_pImpl->m_pSilo; }
 
 bool CONTAINER::Instance_Open (uint64_t twFabricIx, const std::string& sUrl, const std::string& sHash, const std::vector<uint8_t>& aWasmBytes)
 {

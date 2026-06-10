@@ -85,6 +85,9 @@ namespace SNEEZE
       virtual void SubmitCurves (const std::vector<CURVE_DATA>& aCurves) = 0;
       virtual void EndFrame () = 0;
 
+      // Forces a full scene rebuild on the next frame (e.g. after a scene swap).
+      virtual void InvalidateScene () {}
+
       virtual const uint32_t* GetFrameBuffer () const = 0;
       virtual int GetWidth () const = 0;
       virtual int GetHeight () const = 0;

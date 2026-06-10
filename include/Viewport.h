@@ -97,6 +97,11 @@ namespace SNEEZE
 
       RENDERER* Renderer () const;
 
+      // --- Scene invalidation (set from any thread, consumed by compositor) ---
+
+      void Scene_Invalidate         ();
+      bool Scene_Invalidate_Consume ();
+
       // --- Frame timing (written by compositor, per-viewport) ---
 
       enum eACCUMULATE

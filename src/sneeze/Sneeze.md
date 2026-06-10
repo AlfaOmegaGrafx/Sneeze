@@ -92,7 +92,10 @@ public:
 ## ICONTEXT
 
 Per-context host interface for inspector callbacks. Optional virtual callbacks
-(default no-op) for NETWORK, STORAGE, and CONSOLE notifications.
+(default no-op) for NETWORK file, STORAGE silo, CONSOLE entry, and CONTAINER
+lifecycle notifications. `OnContainerCreated(CONTAINER*)` /
+`OnContainerDeleted(CONTAINER*)` fire when a container's resources open and
+close — the `CONTAINER*` exposes `Stream()` and `Silo()` for inspection.
 
 ## IVIEWPORT
 

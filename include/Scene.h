@@ -98,7 +98,7 @@ namespace SNEEZE
       FABRIC  (SCENE* pScene, CONTAINER* pContainer, uint64_t twFabricIx, NODE* pNode_Attach, MSF* pMsf);
       virtual ~FABRIC ();
 
-      bool               Initialize     ();
+      bool               Initialize     (const std::string& sUrl);
 
       // Accessors
       SCENE*             Scene          () const;
@@ -170,7 +170,8 @@ namespace SNEEZE
       FABRIC*            Fabric_Primary  () const;
 
       // Mutators
-      void               Url             (const std::string& sUrl);
+      bool               Reload          (bool bReset);
+      bool               Url             (const std::string& sUrl);
 
       // Internal functions
       void               Fabric_Open     (NODE* pNode_Attach, const std::string& sUrl);

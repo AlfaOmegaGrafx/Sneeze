@@ -161,6 +161,7 @@ RENDERER::ANARI::ANARI (ENGINE* pEngine, const std::string& sLibrary)
    , m_nHeight (0)
    , m_bUnitSphereReady (false)
    , m_pSceneState (new SCENE_STATE ())
+   , m_bSceneDirty (false)
    , m_dLastSubmitSeconds (0.0)
    , m_dLastRenderSeconds (0.0)
 {
@@ -442,10 +443,12 @@ void RENDERER::ANARI::EndFrame ()
 {
    auto tpSubmitStart = std::chrono::steady_clock::now ();
 
-   if (!m_pSceneState->bBuilt  ||  SceneNeedsRebuild (m_aSpheres, m_aCurves))
+   if (!m_pSceneState->bBuilt  ||  m_bSceneDirty  ||  SceneNeedsRebuild (m_aSpheres, m_aCurves))
    {
       ReleaseScene ();
       BuildScene (m_aSpheres, m_aCurves);
+
+      m_bSceneDirty = false;
    }
    else
    {
@@ -476,6 +479,11 @@ void RENDERER::ANARI::EndFrame ()
          anariUnmapFrame (m_pDevice, m_pFrame, "channel.color");
       }
    }
+}
+
+void RENDERER::ANARI::InvalidateScene ()
+{
+   m_bSceneDirty = true;
 }
 
 const uint32_t* RENDERER::ANARI::GetFrameBuffer () const
@@ -797,6 +805,10 @@ void RENDERER::ANARI::BuildScene (const std::vector<SPHERE_DATA>& aSpheres,
       S.pWorldInstArr = anariNewArray1D (m_pDevice, aInstanceHandles.data (), nullptr, nullptr,
                                           ANARI_INSTANCE, aInstanceHandles.size ());
       anariSetParameter (m_pDevice, m_pWorld, "instance", ANARI_ARRAY1D, &S.pWorldInstArr);
+   }
+   else
+   {
+      anariUnsetParameter (m_pDevice, m_pWorld, "instance");
    }
 
    // --- Point light at origin ---

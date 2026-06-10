@@ -143,8 +143,7 @@ bool MSF::Parse (const std::string& sJws, const std::string& sUrl)
 // Sign
 // ---------------------------------------------------------------------------
 
-std::string MSF::Sign (const std::string& sPrivateKeyPem,
-                       const std::string& sAlgorithm)
+std::string MSF::Sign (const std::string& sPrivateKeyPem, const std::string& sAlgorithm)
 {
    std::string sResult;
 

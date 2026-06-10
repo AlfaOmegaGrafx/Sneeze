@@ -55,6 +55,8 @@ namespace SNEEZE
       void SubmitCurves (const std::vector<CURVE_DATA>& aCurves) override;
       void EndFrame () override;
 
+      void InvalidateScene () override;
+
       const uint32_t* GetFrameBuffer () const override;
       int GetWidth () const override;
       int GetHeight () const override;
@@ -90,6 +92,8 @@ namespace SNEEZE
 
       struct SCENE_STATE;
       SCENE_STATE* m_pSceneState;
+
+      bool m_bSceneDirty;
 
       void ReleaseScene ();
       void BuildScene (const std::vector<SPHERE_DATA>& aSpheres, const std::vector<CURVE_DATA>& aCurves);

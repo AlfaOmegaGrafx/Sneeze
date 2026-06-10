@@ -80,53 +80,87 @@ const uint8_t* ReadWasmBytes (wasmtime_caller_t* pCaller, int32_t nPtr, int32_t 
 }
 
 // ---------------------------------------------------------------------------
-// GetContainer — recovers the CONTAINER* from the env pointer chain.
-// pEnv is a WASM_STORE* whose HostData() points to the owning CONTAINER*.
+// WriteWasmString — writes a UTF-8 string into the caller's linear memory.
+//
+// Always returns the full size of sValue (the bytes needed), regardless of
+// how many were actually written. Writes up to nLen bytes; the caller derives
+// the count written as min(return, nLen). A query call (nLen == 0) returns the
+// required size without writing — the caller can then allocate exactly and
+// call again. A return greater than the nLen passed in signals truncation.
 // ---------------------------------------------------------------------------
 
-static CONTAINER* GetContainer (void* pEnv)
+int32_t WriteWasmString (wasmtime_caller_t* pCaller, int32_t nPtr, int32_t nLen, const std::string& sValue)
 {
-   auto* pStore = static_cast<WASM_STORE*> (pEnv);
-   if (!pStore  ||  !pStore->HostData ())
-      return nullptr;
+   int32_t nNeeded = static_cast<int32_t> (sValue.size ());
 
-   return static_cast<CONTAINER*> (pStore->HostData ());
+   if (nPtr >= 0  &&  nLen > 0)
+   {
+      wasmtime_extern_t ext;
+      bool bFound = wasmtime_caller_export_get (pCaller, "memory", 6, &ext);
+
+      if (bFound  &&  ext.kind == WASMTIME_EXTERN_MEMORY)
+      {
+         wasmtime_context_t* pCtx = wasmtime_caller_context (pCaller);
+         uint8_t* pData = wasmtime_memory_data (pCtx, &ext.of.memory);
+         size_t nMemSize = wasmtime_memory_data_size (pCtx, &ext.of.memory);
+
+         if (static_cast<size_t> (nPtr + nLen) <= nMemSize)
+         {
+            int32_t nWritten = (nNeeded < nLen) ? nNeeded : nLen;
+
+            memcpy (pData + nPtr, sValue.data (), static_cast<size_t> (nWritten));
+         }
+      }
+   }
+
+   return nNeeded;
 }
 
 // ---------------------------------------------------------------------------
-// Helper — recovers the STREAM from the env pointer chain.
+// Container — recovers the CONTAINER* from the env pointer chain.
 // pEnv is a WASM_STORE* whose HostData() points to the owning CONTAINER*.
 // ---------------------------------------------------------------------------
 
-static STREAM* GetStream (void* pEnv)
+static CONTAINER* Container (void* pEnv)
 {
-   auto* pStore = static_cast<WASM_STORE*> (pEnv);
-   if (!pStore  ||  !pStore->HostData ())
-      return nullptr;
+   WASM_STORE* pWasm_Store = static_cast<WASM_STORE*> (pEnv);
 
-   auto* pContainer = static_cast<CONTAINER*> (pStore->HostData ());
-   (void) pContainer;
+   CONTAINER* pContainer = nullptr;
 
-   return nullptr;
+   if (pWasm_Store)
+   {
+      pContainer = static_cast<CONTAINER*> (pWasm_Store->HostData ());
+   }
+
+   return pContainer;
+}
+
+static STREAM* Stream (void* pEnv)
+{
+   CONTAINER* pContainer = Container (pEnv);
+
+   return pContainer ? pContainer->Stream () : nullptr;
+}
+
+static SILO* Silo (void* pEnv)
+{
+   CONTAINER* pContainer = Container (pEnv);
+
+   return pContainer ? pContainer->Silo () : nullptr;
 }
 
 // ---------------------------------------------------------------------------
-// Console host functions — forward calls to the STREAM.
-// For now, log via ENGINE as the CONTAINER/STREAM wiring is indirect.
+// Console host functions — forward calls to the container's STREAM.
 // ---------------------------------------------------------------------------
 
 wasm_trap_t* Console_Log (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults)
 {
    (void) pResults; (void) nResults;
 
-   if (nArgs >= 2)
-   {
-      std::string sMsg = ReadWasmString (pCaller, pArgs[0].of.i32, pArgs[1].of.i32);
+   STREAM* pStream;
 
-      auto* pStore = static_cast<WASM_STORE*> (pEnv);
-      if (pStore)
-         pStore->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "WASM", sMsg);
-   }
+   if (nArgs >= 2  &&  (pStream = Stream (pEnv)))
+      pStream->Log (ReadWasmString (pCaller, pArgs[0].of.i32, pArgs[1].of.i32));
 
    return nullptr;
 }
@@ -135,14 +169,10 @@ wasm_trap_t* Console_Debug (void* pEnv, wasmtime_caller_t* pCaller, const wasmti
 {
    (void) pResults; (void) nResults;
 
-   if (nArgs >= 2)
-   {
-      std::string sMsg = ReadWasmString (pCaller, pArgs[0].of.i32, pArgs[1].of.i32);
+   STREAM* pStream;
 
-      auto* pStore = static_cast<WASM_STORE*> (pEnv);
-      if (pStore)
-         pStore->Engine ()->Log (IENGINE::kLOGLEVEL_Trace, "WASM", sMsg);
-   }
+   if (nArgs >= 2  &&  (pStream = Stream (pEnv)))
+      pStream->Debug (ReadWasmString (pCaller, pArgs[0].of.i32, pArgs[1].of.i32));
 
    return nullptr;
 }
@@ -151,14 +181,10 @@ wasm_trap_t* Console_Info (void* pEnv, wasmtime_caller_t* pCaller, const wasmtim
 {
    (void) pResults; (void) nResults;
 
-   if (nArgs >= 2)
-   {
-      std::string sMsg = ReadWasmString (pCaller, pArgs[0].of.i32, pArgs[1].of.i32);
+   STREAM* pStream;
 
-      auto* pStore = static_cast<WASM_STORE*> (pEnv);
-      if (pStore)
-         pStore->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "WASM", sMsg);
-   }
+   if (nArgs >= 2  &&  (pStream = Stream (pEnv)))
+      pStream->Info (ReadWasmString (pCaller, pArgs[0].of.i32, pArgs[1].of.i32));
 
    return nullptr;
 }
@@ -167,14 +193,10 @@ wasm_trap_t* Console_Warn (void* pEnv, wasmtime_caller_t* pCaller, const wasmtim
 {
    (void) pResults; (void) nResults;
 
-   if (nArgs >= 2)
-   {
-      std::string sMsg = ReadWasmString (pCaller, pArgs[0].of.i32, pArgs[1].of.i32);
+   STREAM* pStream;
 
-      auto* pStore = static_cast<WASM_STORE*> (pEnv);
-      if (pStore)
-         pStore->Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "WASM", sMsg);
-   }
+   if (nArgs >= 2  &&  (pStream = Stream (pEnv)))
+      pStream->Warn (ReadWasmString (pCaller, pArgs[0].of.i32, pArgs[1].of.i32));
 
    return nullptr;
 }
@@ -183,14 +205,10 @@ wasm_trap_t* Console_Error (void* pEnv, wasmtime_caller_t* pCaller, const wasmti
 {
    (void) pResults; (void) nResults;
 
-   if (nArgs >= 2)
-   {
-      std::string sMsg = ReadWasmString (pCaller, pArgs[0].of.i32, pArgs[1].of.i32);
+   STREAM* pStream;
 
-      auto* pStore = static_cast<WASM_STORE*> (pEnv);
-      if (pStore)
-         pStore->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "WASM", sMsg);
-   }
+   if (nArgs >= 2  &&  (pStream = Stream (pEnv)))
+      pStream->Error (ReadWasmString (pCaller, pArgs[0].of.i32, pArgs[1].of.i32));
 
    return nullptr;
 }
@@ -199,109 +217,254 @@ wasm_trap_t* Console_Assert (void* pEnv, wasmtime_caller_t* pCaller, const wasmt
 {
    (void) pResults; (void) nResults;
 
-   if (nArgs >= 3  &&  pArgs[0].of.i32 == 0)
-   {
-      std::string sMsg = ReadWasmString (pCaller, pArgs[1].of.i32, pArgs[2].of.i32);
+   STREAM* pStream;
 
-      auto* pStore = static_cast<WASM_STORE*> (pEnv);
-      if (pStore)
-         pStore->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "WASM", "Assertion failed: " + sMsg);
-   }
+   if (nArgs >= 3  &&  (pStream = Stream (pEnv)))
+      pStream->Assert (pArgs[0].of.i32 != 0, ReadWasmString (pCaller, pArgs[1].of.i32, pArgs[2].of.i32));
 
    return nullptr;
 }
 
 wasm_trap_t* Console_Group (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults)
 {
-   (void) pEnv; (void) pCaller; (void) pArgs; (void) nArgs; (void) pResults; (void) nResults;
+   (void) pResults; (void) nResults;
+
+   STREAM* pStream;
+
+   if (nArgs >= 2  &&  (pStream = Stream (pEnv)))
+      pStream->Group (ReadWasmString (pCaller, pArgs[0].of.i32, pArgs[1].of.i32));
+
    return nullptr;
 }
 
 wasm_trap_t* Console_GroupCollapsed (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults)
 {
-   (void) pEnv; (void) pCaller; (void) pArgs; (void) nArgs; (void) pResults; (void) nResults;
+   (void) pResults; (void) nResults;
+
+   STREAM* pStream;
+
+   if (nArgs >= 2  &&  (pStream = Stream (pEnv)))
+      pStream->GroupCollapsed (ReadWasmString (pCaller, pArgs[0].of.i32, pArgs[1].of.i32));
+
    return nullptr;
 }
 
 wasm_trap_t* Console_GroupEnd (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults)
 {
-   (void) pEnv; (void) pCaller; (void) pArgs; (void) nArgs; (void) pResults; (void) nResults;
+   (void) pCaller; (void) pArgs; (void) nArgs; (void) pResults; (void) nResults;
+
+   STREAM* pStream;
+
+   if ((pStream = Stream (pEnv)))
+      pStream->GroupEnd ();
+
    return nullptr;
 }
 
 wasm_trap_t* Console_Count (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults)
 {
-   (void) pEnv; (void) pCaller; (void) pArgs; (void) nArgs; (void) pResults; (void) nResults;
+   (void) pResults; (void) nResults;
+
+   STREAM* pStream;
+
+   if (nArgs >= 2  &&  (pStream = Stream (pEnv)))
+      pStream->Count (ReadWasmString (pCaller, pArgs[0].of.i32, pArgs[1].of.i32));
+
    return nullptr;
 }
 
 wasm_trap_t* Console_CountReset (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults)
 {
-   (void) pEnv; (void) pCaller; (void) pArgs; (void) nArgs; (void) pResults; (void) nResults;
+   (void) pResults; (void) nResults;
+
+   STREAM* pStream;
+
+   if (nArgs >= 2  &&  (pStream = Stream (pEnv)))
+      pStream->CountReset (ReadWasmString (pCaller, pArgs[0].of.i32, pArgs[1].of.i32));
+
    return nullptr;
 }
 
 wasm_trap_t* Console_Time (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults)
 {
-   (void) pEnv; (void) pCaller; (void) pArgs; (void) nArgs; (void) pResults; (void) nResults;
+   (void) pResults; (void) nResults;
+
+   STREAM* pStream;
+
+   if (nArgs >= 2  &&  (pStream = Stream (pEnv)))
+      pStream->Time (ReadWasmString (pCaller, pArgs[0].of.i32, pArgs[1].of.i32));
+
    return nullptr;
 }
 
 wasm_trap_t* Console_TimeEnd (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults)
 {
-   (void) pEnv; (void) pCaller; (void) pArgs; (void) nArgs; (void) pResults; (void) nResults;
+   (void) pResults; (void) nResults;
+
+   STREAM* pStream;
+
+   if (nArgs >= 2  &&  (pStream = Stream (pEnv)))
+      pStream->TimeEnd (ReadWasmString (pCaller, pArgs[0].of.i32, pArgs[1].of.i32));
+
    return nullptr;
 }
 
 wasm_trap_t* Console_TimeLog (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults)
 {
-   (void) pEnv; (void) pCaller; (void) pArgs; (void) nArgs; (void) pResults; (void) nResults;
+   (void) pResults; (void) nResults;
+
+   STREAM* pStream;
+
+   if (nArgs >= 2  &&  (pStream = Stream (pEnv)))
+      pStream->TimeLog (ReadWasmString (pCaller, pArgs[0].of.i32, pArgs[1].of.i32));
+
    return nullptr;
 }
 
 // ---------------------------------------------------------------------------
-// Storage host function stubs
+// Storage host functions — forward calls to the container's SILO.
+//
+// Get:     (i32 scope, i32 pathPtr, i32 pathLen, i32 outPtr, i32 outLen) -> i32 size needed
+// Set:     (i32 scope, i32 pathPtr, i32 pathLen, i32 valPtr, i32 valLen) -> i32 success
+// Remove:  (i32 scope, i32 pathPtr, i32 pathLen)                         -> i32 success
+// Has:     (i32 scope, i32 pathPtr, i32 pathLen)                         -> i32 bool
+// GetJson: (i32 scope, i32 outPtr,  i32 outLen)                          -> i32 size needed
+// SetJson: (i32 scope, i32 jsonPtr, i32 jsonLen)                         -> i32 success
+//
+// Get/GetJson return the full byte size of the value. The caller derives the
+// count written as min(return, outLen); a return > outLen means truncation —
+// reallocate to the returned size and call again. Passing outLen == 0 queries
+// the size without writing.
 // ---------------------------------------------------------------------------
 
 wasm_trap_t* Storage_Get (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults)
 {
-   (void) pEnv; (void) pCaller; (void) pArgs; (void) nArgs;
-   if (nResults > 0) pResults[0].of.i32 = 0;
+   int32_t nResult = 0;
+
+   SILO* pSilo;
+
+   if (nArgs >= 5  &&  (pSilo = Silo (pEnv)))
+   {
+      eSILO_SCOPE eScope = static_cast<eSILO_SCOPE> (pArgs[0].of.i32);
+      std::string sPath  = ReadWasmString (pCaller, pArgs[1].of.i32, pArgs[2].of.i32);
+
+      nlohmann::json jValue = pSilo->Get (eScope, sPath);
+
+      std::string sValue = jValue.is_null () ? std::string () : jValue.dump ();
+
+      nResult = WriteWasmString (pCaller, pArgs[3].of.i32, pArgs[4].of.i32, sValue);
+   }
+
+   if (nResults > 0) pResults[0].of.i32 = nResult;
+
    return nullptr;
 }
 
 wasm_trap_t* Storage_Set (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults)
 {
-   (void) pEnv; (void) pCaller; (void) pArgs; (void) nArgs;
-   if (nResults > 0) pResults[0].of.i32 = 0;
+   int32_t nResult = 0;
+
+   SILO* pSilo;
+
+   if (nArgs >= 5  &&  (pSilo = Silo (pEnv)))
+   {
+      eSILO_SCOPE eScope = static_cast<eSILO_SCOPE> (pArgs[0].of.i32);
+      std::string sPath  = ReadWasmString (pCaller, pArgs[1].of.i32, pArgs[2].of.i32);
+      std::string sValue = ReadWasmString (pCaller, pArgs[3].of.i32, pArgs[4].of.i32);
+
+      nlohmann::json jValue = nlohmann::json::parse (sValue, nullptr, false);
+
+      if (!jValue.is_discarded ())
+      {
+         pSilo->Set (eScope, sPath, jValue);
+
+         nResult = 1;
+      }
+   }
+
+   if (nResults > 0) pResults[0].of.i32 = nResult;
+
    return nullptr;
 }
 
 wasm_trap_t* Storage_Remove (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults)
 {
-   (void) pEnv; (void) pCaller; (void) pArgs; (void) nArgs;
-   if (nResults > 0) pResults[0].of.i32 = 0;
+   int32_t nResult = 0;
+
+   SILO* pSilo;
+
+   if (nArgs >= 3  &&  (pSilo = Silo (pEnv)))
+   {
+      eSILO_SCOPE eScope = static_cast<eSILO_SCOPE> (pArgs[0].of.i32);
+      std::string sPath  = ReadWasmString (pCaller, pArgs[1].of.i32, pArgs[2].of.i32);
+
+      pSilo->Remove (eScope, sPath);
+
+      nResult = 1;
+   }
+
+   if (nResults > 0) pResults[0].of.i32 = nResult;
+
    return nullptr;
 }
 
 wasm_trap_t* Storage_Has (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults)
 {
-   (void) pEnv; (void) pCaller; (void) pArgs; (void) nArgs;
-   if (nResults > 0) pResults[0].of.i32 = 0;
+   int32_t nResult = 0;
+
+   SILO* pSilo;
+
+   if (nArgs >= 3  &&  (pSilo = Silo (pEnv)))
+   {
+      eSILO_SCOPE eScope = static_cast<eSILO_SCOPE> (pArgs[0].of.i32);
+      std::string sPath  = ReadWasmString (pCaller, pArgs[1].of.i32, pArgs[2].of.i32);
+
+      nResult = pSilo->Has (eScope, sPath) ? 1 : 0;
+   }
+
+   if (nResults > 0) pResults[0].of.i32 = nResult;
+
    return nullptr;
 }
 
 wasm_trap_t* Storage_GetJson (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults)
 {
-   (void) pEnv; (void) pCaller; (void) pArgs; (void) nArgs;
-   if (nResults > 0) pResults[0].of.i32 = 0;
+   int32_t nResult = 0;
+
+   SILO* pSilo;
+
+   if (nArgs >= 3  &&  (pSilo = Silo (pEnv)))
+   {
+      eSILO_SCOPE eScope = static_cast<eSILO_SCOPE> (pArgs[0].of.i32);
+
+      std::string sJson = pSilo->Json (eScope);
+
+      nResult = WriteWasmString (pCaller, pArgs[1].of.i32, pArgs[2].of.i32, sJson);
+   }
+
+   if (nResults > 0) pResults[0].of.i32 = nResult;
+
    return nullptr;
 }
 
 wasm_trap_t* Storage_SetJson (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults)
 {
-   (void) pEnv; (void) pCaller; (void) pArgs; (void) nArgs;
-   if (nResults > 0) pResults[0].of.i32 = 0;
+   int32_t nResult = 0;
+
+   SILO* pSilo;
+
+   if (nArgs >= 3  &&  (pSilo = Silo (pEnv)))
+   {
+      eSILO_SCOPE eScope = static_cast<eSILO_SCOPE> (pArgs[0].of.i32);
+      std::string sJson  = ReadWasmString (pCaller, pArgs[1].of.i32, pArgs[2].of.i32);
+
+      pSilo->Json (eScope, sJson);
+
+      nResult = 1;
+   }
+
+   if (nResults > 0) pResults[0].of.i32 = nResult;
+
    return nullptr;
 }
 
@@ -339,7 +502,7 @@ wasm_trap_t* Scene_Node_Root (void* pEnv, wasmtime_caller_t* pCaller, const wasm
 
          if (pBytes)
          {
-            auto* pContainer = GetContainer (pEnv);
+            auto* pContainer = Container (pEnv);
 
             if (pContainer)
             {
@@ -375,7 +538,7 @@ wasm_trap_t* Scene_Node_Open (void* pEnv, wasmtime_caller_t* pCaller, const wasm
 
          if (pBytes)
          {
-            auto* pContainer = GetContainer (pEnv);
+            auto* pContainer = Container (pEnv);
 
             if (pContainer)
             {
@@ -404,7 +567,7 @@ wasm_trap_t* Scene_Node_Close (void* pEnv, wasmtime_caller_t* pCaller, const was
    if (nArgs >= 1)
    {
       uint64_t twObjectIx = static_cast<uint64_t> (pArgs[0].of.i64);
-      auto* pContainer = GetContainer (pEnv);
+      auto* pContainer = Container (pEnv);
 
       if (pContainer  &&  pContainer->Node_Close (twObjectIx))
          nResult = 1;
@@ -422,7 +585,7 @@ wasm_trap_t* Scene_Node_Position (void* pEnv, wasmtime_caller_t* pCaller, const 
    if (nArgs >= 4)
    {
       uint64_t twObjectIx = static_cast<uint64_t> (pArgs[0].of.i64);
-      auto* pContainer = GetContainer (pEnv);
+      auto* pContainer = Container (pEnv);
 
       if (pContainer)
       {
@@ -448,7 +611,7 @@ wasm_trap_t* Scene_Node_Scale (void* pEnv, wasmtime_caller_t* pCaller, const was
    if (nArgs >= 2)
    {
       uint64_t twObjectIx = static_cast<uint64_t> (pArgs[0].of.i64);
-      auto* pContainer = GetContainer (pEnv);
+      auto* pContainer = Container (pEnv);
 
       if (pContainer)
       {
@@ -470,7 +633,7 @@ wasm_trap_t* Scene_Node_Bound (void* pEnv, wasmtime_caller_t* pCaller, const was
    if (nArgs >= 2)
    {
       uint64_t twObjectIx = static_cast<uint64_t> (pArgs[0].of.i64);
-      auto* pContainer = GetContainer (pEnv);
+      auto* pContainer = Container (pEnv);
 
       if (pContainer)
       {
@@ -496,7 +659,7 @@ wasm_trap_t* Scene_Node_Color (void* pEnv, wasmtime_caller_t* pCaller, const was
    if (nArgs >= 2)
    {
       uint64_t twObjectIx = static_cast<uint64_t> (pArgs[0].of.i64);
-      auto* pContainer = GetContainer (pEnv);
+      auto* pContainer = Container (pEnv);
 
       if (pContainer)
       {
@@ -521,7 +684,7 @@ wasm_trap_t* Scene_Node_Name (void* pEnv, wasmtime_caller_t* pCaller, const wasm
    if (nArgs >= 3)
    {
       uint64_t twObjectIx = static_cast<uint64_t> (pArgs[0].of.i64);
-      auto* pContainer = GetContainer (pEnv);
+      auto* pContainer = Container (pEnv);
 
       if (pContainer)
       {
@@ -550,7 +713,7 @@ wasm_trap_t* Scene_Node_Radius (void* pEnv, wasmtime_caller_t* pCaller, const wa
    if (nArgs >= 2)
    {
       uint64_t twObjectIx = static_cast<uint64_t> (pArgs[0].of.i64);
-      auto* pContainer = GetContainer (pEnv);
+      auto* pContainer = Container (pEnv);
 
       if (pContainer)
       {
@@ -576,7 +739,7 @@ wasm_trap_t* Scene_Node_Texture (void* pEnv, wasmtime_caller_t* pCaller, const w
    if (nArgs >= 3)
    {
       uint64_t twObjectIx = static_cast<uint64_t> (pArgs[0].of.i64);
-      auto* pContainer = GetContainer (pEnv);
+      auto* pContainer = Container (pEnv);
 
       if (pContainer)
       {

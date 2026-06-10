@@ -213,3 +213,16 @@
 - `ASSET::Impl::Fetch_Complete` arms guards before the notification loop, collects deferred closes after the loop, processes them after releasing `m_mxAsset`
 - Removed all `Asset_Lock`/`Asset_Unlock`/`Fetch_Lock`/`Fetch_Unlock` code from Asset.cpp, Network.cpp, and Network.h (both public and private headers)
 - Updated Network.md thread safety documentation with the guard flag mechanism, replacing the old lock-ordering section
+
+## June 9, 2026 — Dean Abramson
+
+**SCENE navigation, WASM host wiring, container callbacks, renderer scene invalidation**
+
+- Implemented `SCENE::Url(sUrl)` (swap root fabric) and `SCENE::Reload(bReset)` (re-issue with current URL); FABRIC records its URL at `Initialize()`, so the scene reads the current URL from `Fabric_Root()->Url()` rather than storing a duplicate
+- Wired all Storage WASM host functions (`Storage_Get/Set/Remove/Has/GetJson/SetJson`) to forward to the calling container's `Silo()`; re-verified Console host functions forward to `Stream()`
+- Storage ABI: scope selector + dot/bracket path keys + JSON values both directions; added `WriteWasmString` helper that returns the full size needed (callers detect truncation; length 0 queries size)
+- Added `SILO* CONTAINER::Silo()` accessor (with `class SILO;` forward decl in Container.h)
+- Replaced `ICONTEXT::OnConsoleStreamCreated/Deleted` with `OnContainerCreated/Deleted`, fired from `CONTAINER::Open/Close` at the 0→1 / 1→0 refcount transitions (guarded by `m_bNotified_Open` so delete only fires if create did)
+- Fixed ANARI renderer retaining old geometry: `BuildScene()` now unsets the world `"instance"` parameter when there are no instances (empty-scene transition clears the screen)
+- Added explicit scene-invalidation path for non-structural scene swaps: `RENDERER::InvalidateScene()` (dirty flag → full rebuild in `EndFrame()`), `VIEWPORT::Scene_Invalidate()/Scene_Invalidate_Consume()` (atomic, cross-thread), compositor consumes it in `Execute_Render`, `SCENE::Url()` triggers it
+- Updated docs: Wasm.md (Console→STREAM / Storage→SILO forwarding, storage ABI, WriteWasmString), Viewport.md (empty-scene clear + invalidation), Scene.md (Url/Reload navigation), Console.md and Sneeze.md (container lifecycle callbacks)

@@ -83,6 +83,9 @@ namespace SNEEZE
    public:
       virtual ~ICONTEXT () = default;
 
+      virtual void OnContainerCreated     (CONTAINER*) {}
+      virtual void OnContainerDeleted     (CONTAINER*) {}
+
       virtual bool OnNetworkFileCreated   (FILE*) { return true; }
       virtual void OnNetworkFileChanged   (FILE*) {}
       virtual void OnNetworkFileDeleted   (FILE*) {}
@@ -90,9 +93,6 @@ namespace SNEEZE
       virtual void OnStorageSiloCreated   (SILO*) {}
       virtual void OnStorageSiloChanged   (SILO*, eSILO_SCOPE eScope, const std::string&) {}
       virtual void OnStorageSiloDeleted   (SILO*) {}
-
-      virtual void OnConsoleStreamCreated (STREAM*) {}
-      virtual void OnConsoleStreamDeleted (STREAM*) {}
 
       virtual void OnConsoleEntryCreated  (std::shared_ptr<const ENTRY>) {}
       virtual void OnConsoleEntryDeleted  (std::shared_ptr<const ENTRY>) {}

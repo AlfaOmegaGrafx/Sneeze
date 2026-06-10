@@ -463,6 +463,9 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
 
       pViewport->Accumulate (VIEWPORT::kACCUMULATE_SCENE, tpSceneStart);
 
+      if (pViewport->Scene_Invalidate_Consume ())
+         pRenderer->InvalidateScene ();
+
       pRenderer->BeginFrame ();
       pRenderer->SubmitSpheres (aSpheres);
       pRenderer->SubmitCurves (aCurves);

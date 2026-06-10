@@ -32,6 +32,9 @@ Owned by CONTEXT. pImpl pattern.
   `FrameBuffer_Release()` (producer-consumer with mutex).
 - Timing: `Accumulate()` tracks per-section durations; `Diagnostics()` logs
   FPS and averages once per second.
+- Scene invalidation: `Scene_Invalidate()` (set, called from any thread) /
+  `Scene_Invalidate_Consume()` (test-and-clear, called by the compositor) carry
+  a request to fully rebuild the renderer scene across threads (atomic flag).
 
 ## RENDERER (abstract)
 
@@ -69,8 +72,24 @@ framebuffer publish path is skipped entirely.
 
 Concrete ANARI backend. Constructor takes library name (e.g. `"halogen"`).
 Scene retention: ANARI objects created once via `BuildScene()`, updated via
-`UpdateScene()`. `SceneNeedsRebuild()` detects structural changes. Timing
-exposed via `GetLastSubmitSeconds()` / `GetLastRenderSeconds()`.
+`UpdateScene()`. `SceneNeedsRebuild()` detects structural changes (sphere/curve
+counts, texture presence). When there is no geometry, `BuildScene()` clears the
+world's `"instance"` parameter so a transition to an empty scene leaves nothing
+on screen. Timing exposed via `GetLastSubmitSeconds()` / `GetLastRenderSeconds()`.
+
+### Scene Invalidation
+
+`UpdateScene()` only refreshes transforms and position/radius arrays — it does
+not notice content changes (colors, materials) when the structure is unchanged.
+When the whole scene is swapped (e.g. `SCENE::Url()` loads a different fabric),
+the renderer must rebuild from scratch instead of updating stale objects.
+
+`RENDERER::InvalidateScene()` (virtual on the abstract base) sets a dirty flag;
+the next `EndFrame()` releases and rebuilds the scene, then clears the flag.
+The flag is delivered across threads: SCENE (UI thread) calls
+`VIEWPORT::Scene_Invalidate()`, the compositor agent reads it via
+`VIEWPORT::Scene_Invalidate_Consume()` and forwards to `InvalidateScene()`
+before the frame.
 
 ## VIEW (Camera Orbit)
 

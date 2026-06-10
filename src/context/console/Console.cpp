@@ -73,8 +73,6 @@ public:
             m_umpStream[pContainer] = pStream;
 
             pStream->Initialize (m_nBlocks, m_nEntries_Block);
-
-            m_pContext->Host ()->OnConsoleStreamCreated (pStream);
          }
       }
 
@@ -86,8 +84,6 @@ public:
       if (pStream)
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
-
-         m_pContext->Host ()->OnConsoleStreamDeleted (pStream);
 
          for (auto it = m_umpStream.begin (); it != m_umpStream.end (); ++it)
          {

@@ -37,6 +37,7 @@ public:
       m_pHost            (nullptr),
       m_pJob_Compositor  (nullptr),
       m_pRenderer        (nullptr),
+      m_bScene_Invalidate (false),
       m_nFbWidth         (0),
       m_nFbHeight        (0),
       m_nWidth           (0),
@@ -210,6 +211,7 @@ public:
    IVIEWPORT*              m_pHost;
    JOB_COMPOSITOR*         m_pJob_Compositor;
    RENDERER*               m_pRenderer;
+   std::atomic<bool>       m_bScene_Invalidate;
    std::mutex              m_mxViewport;
 
    // Input
@@ -289,6 +291,16 @@ SNEEZE::SCENE*       VIEWPORT::Scene           () const { return m_pImpl->m_pCon
 bool                 VIEWPORT::IsActive        () const { return m_pImpl->m_pHost != nullptr;     }
 VIEWPORT::VIEW&      VIEWPORT::View            ()       { return m_pImpl->m_View;                }
 VIEWPORT::RENDERER*  VIEWPORT::Renderer        () const { return m_pImpl->m_pRenderer;           }
+
+void VIEWPORT::Scene_Invalidate ()
+{
+   m_pImpl->m_bScene_Invalidate.store (true);
+}
+
+bool VIEWPORT::Scene_Invalidate_Consume ()
+{
+   return m_pImpl->m_bScene_Invalidate.exchange (false);
+}
 
 void VIEWPORT::Size (int& nWidth, int& nHeight)
 {

@@ -76,8 +76,8 @@ Immutable, self-stamps with `system_clock::now()` in constructor.
 
 | Method | Effect |
 |--------|--------|
-| `Stream_Open(pContainer)` | Creates STREAM, fires OnConsoleStreamCreated |
-| `Stream_Close(pStream)` | Fires OnConsoleStreamDeleted, deletes |
+| `Stream_Open(pContainer)` | Creates STREAM |
+| `Stream_Close(pStream)` | Deletes STREAM |
 | `Stream_Enum(pEnum)` | Walks active streams |
 | `Entry_Enum(pEnum)` | Walks global ring buffer |
 | `Clear()` | Clears ring buffer |
@@ -97,9 +97,11 @@ Immutable, self-stamps with `system_clock::now()` in constructor.
 ```cpp
 OnConsoleEntryCreated (shared_ptr<const ENTRY>)
 OnConsoleEntryDeleted (shared_ptr<const ENTRY>)
-OnConsoleStreamCreated (STREAM*)
-OnConsoleStreamDeleted (STREAM*)
 ```
+
+Container lifecycle (`OnContainerCreated` / `OnContainerDeleted`, also on
+`ICONTEXT`) fires when a container's resources open and close — the
+`CONTAINER*` exposes both `Stream()` and `Silo()` for inspection.
 
 ## Files
 
