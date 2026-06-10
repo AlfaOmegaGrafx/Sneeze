@@ -45,7 +45,7 @@ public:
    {
    }
 
-   bool Initialize ()
+   bool Initialize (bool bReset)
    {
       bool bResult = false;
 
@@ -497,9 +497,9 @@ NETWORK::NETWORK (CONTEXT* pContext) :
 {
 }
 
-bool NETWORK::Initialize ()
+bool NETWORK::Initialize (bool bReset)
 {
-   return m_pImpl->Initialize ();
+   return m_pImpl->Initialize (bReset);
 }
 
 NETWORK::~NETWORK ()

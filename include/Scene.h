@@ -148,7 +148,6 @@ namespace SNEEZE
       FABRIC*            Fabric_Primary  () const;
 
       // Mutators
-      bool               Reload          (bool bReset);
       bool               Url             (const std::string& sUrl);
 
       // Internal functions

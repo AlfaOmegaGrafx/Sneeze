@@ -443,20 +443,6 @@ public:
 // Methods
 // -----------------------------------------------------------------------
 
-   bool Reload (bool bReset)
-   {
-      // a copy of the url must be saved because the pabric will be destroyed before we use this again.
-      
-      std::string sUrl = m_pFabric_Root->Url ();
-
-      if (bReset)
-      {
-         // reset the cache
-      }
-
-      return Url (sUrl);
-   }
-
    bool Url (const std::string& sUrl)
    {
       Fabric_Root_Destroy ();
@@ -520,7 +506,6 @@ FABRIC*          SCENE::Fabric_Primary () const { return m_pImpl->m_pNode_Primar
 // Methods
 // -----------------------------------------------------------------------
 
-bool             SCENE::Reload         (bool bReset)                      { return m_pImpl->Reload       (bReset); }
 bool             SCENE::Url            (const std::string& sUrl)          { return m_pImpl->Url          (sUrl); }
 
 // -----------------------------------------------------------------------

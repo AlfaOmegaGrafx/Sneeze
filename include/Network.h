@@ -183,7 +183,7 @@ namespace SNEEZE
       explicit NETWORK (CONTEXT* pContext);
       ~NETWORK ();
 
-      bool Initialize ();
+      bool Initialize (bool bReset = false);
 
       // --- Primary API ---
 

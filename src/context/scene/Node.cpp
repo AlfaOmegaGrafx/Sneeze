@@ -109,7 +109,14 @@ public:
       if (m_pMap_Object  &&  m_pMap_Object->m_Resource.sReference[0] != '\0')
       {
          if (m_pMap_Object->m_Type.bSubtype == 255)
-            Fabric_Open (m_pMap_Object->m_Resource.sReference);
+         {
+            std::string sUrl = m_pMap_Object->m_Resource.sReference;
+            
+            if (!sUrl.empty())
+            {
+               m_pFabric->Scene ()->Fabric_Spawn (m_pNode, sUrl);
+            }
+         }
          else
             Texture_Request ();
       }
@@ -122,30 +129,17 @@ public:
       while (!m_apNode.empty ())
          m_pFabric->Scene ()->Node_Close (m_apNode.back ()->ObjectIx ());
 
-      Fabric_Close ();
+      if (m_pFabric_Attachment)
+      {
+         m_pFabric->Scene()->Fabric_Close(m_pFabric_Attachment);
+         m_pFabric_Attachment = nullptr;
+      }
 
       Texture_Release ();
 
       if (m_pNode_Parent)
          m_pNode_Parent->Node_Remove (m_pNode);
       else m_pFabric->Node_Root (nullptr);
-   }
-
-   void Fabric_Open (const std::string& sUrl)
-   {
-      if (!sUrl.empty ())
-      {
-         m_pFabric->Scene ()->Fabric_Spawn (m_pNode, sUrl);
-      }
-   }
-
-   void Fabric_Close ()
-   {
-      if (m_pFabric_Attachment)
-      {
-         m_pFabric->Scene ()->Fabric_Close (m_pFabric_Attachment);
-         m_pFabric_Attachment = nullptr;
-      }
    }
 
 // -----------------------------------------------------------------------

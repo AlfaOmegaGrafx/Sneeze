@@ -37,7 +37,7 @@ public:
    {
    }
 
-   bool Initialize (const std::string& sUrl)
+   bool Initialize (const std::string& sUrl, bool bReset)
    {
       bool bResult = false;
 
@@ -47,7 +47,7 @@ public:
       {
          m_pNetwork = new NETWORK (m_pContext);
 
-         if (m_pNetwork->Initialize ())
+         if (m_pNetwork->Initialize (bReset))
          {
             m_pStorage = new STORAGE (m_pContext);
 
@@ -106,16 +106,50 @@ public:
       m_pConsole = nullptr;
    }
 
-   void Url (const std::string& sUrl)
+   bool Reload (bool bReset)
    {
-      // URL change (tab navigation). Not yet implemented.
-      // Known architectural flaw must be resolved first.
-      // When implemented: deactivate viewport, destroy scene (cascades
-      // through all fabrics/nodes/containers), recreate scene with new URL,
-      // reactivate viewport.
-
+      bool bResult = false;
+      
       if (m_pScene)
-         m_pScene->Url (sUrl);
+      {
+         std::string sUrl = m_pScene->Fabric_Root ()->Url (); // a copy of the url must be saved because the pabric will be destroyed before we use this again.
+
+         bResult = Url (sUrl, bReset);
+      }
+
+      return bResult;
+   }
+
+   bool Url (const std::string& sUrl, bool bReset)
+   {
+      bool bResult = false;
+      
+      if (m_pScene)
+      {
+         IVIEWPORT* pHost = m_pViewport->Host ();
+
+         m_pViewport->Deactivate ();
+
+         delete m_pScene;
+         m_pScene = nullptr;
+   
+//         for (auto& pair : m_umpContainer)
+//            delete pair.second;
+//         m_umpContainer.clear ();
+      
+         if (bReset)
+         {
+            // reset the cache
+         }
+   
+         m_pScene = new SCENE (m_pContext);
+
+         bResult = m_pScene->Initialize (sUrl);
+
+         m_pViewport->Activate (pHost);
+      }
+
+      return bResult;
    }
 
    void Logout ()
@@ -215,9 +249,9 @@ SNEEZE::CONTEXT::CONTEXT (ENGINE* pEngine, ICONTEXT* pHost, eSESSION kSession, c
 {
 }
 
-bool SNEEZE::CONTEXT::Initialize (const std::string& sUrl)
+bool SNEEZE::CONTEXT::Initialize (const std::string& sUrl, bool bReset)
 {
-   return m_pImpl->Initialize (sUrl);
+   return m_pImpl->Initialize (sUrl, bReset);
 }
 
 SNEEZE::CONTEXT::~CONTEXT ()
@@ -244,7 +278,8 @@ const std::string&          SNEEZE::CONTEXT::Path_Temporary () const { return m_
 // Methods
 // ---------------------------------------------------------------------------
 
-void                        SNEEZE::CONTEXT::Url             (const std::string& sUrl)                {        m_pImpl->Url (sUrl); }
+bool                        SNEEZE::CONTEXT::Reload          (bool bReset)                            { return m_pImpl->Reload (bReset); }
+bool                        SNEEZE::CONTEXT::Url             (const std::string& sUrl, bool bReset)   { return m_pImpl->Url    (sUrl, bReset); }
 void                        SNEEZE::CONTEXT::Logout          ()                                       {        m_pImpl->Logout (); }
 
 // ---------------------------------------------------------------------------

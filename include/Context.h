@@ -53,9 +53,11 @@ namespace SNEEZE
       CONTEXT             (CONTEXT       && other) = delete;
       ~CONTEXT            ();
 
-      bool Initialize (const std::string& sUrl);
-      void Url (const std::string& sUrl);
-      void Logout ();
+      bool Initialize (const std::string& sUrl, bool bReset = false);
+
+      bool               Reload           (bool bReset = false);
+      bool               Url              (const std::string& sUrl, bool bReset = false);
+      void               Logout           ();
 
       // Accessors
       ICONTEXT*           Host            () const;

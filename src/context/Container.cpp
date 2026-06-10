@@ -108,8 +108,7 @@ public:
 
       if (--m_nCount_Open == 0)
       {
-         // Containers never go away in the inspector.
-         // m_pContext->Host ()->OnContainerDeleted (m_pContainer);
+         m_pContext->Host ()->OnContainerDeleted (m_pContainer);
 
          if (m_pWasm_Store)
          {
