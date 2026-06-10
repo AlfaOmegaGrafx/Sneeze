@@ -13,10 +13,8 @@
 // limitations under the License.
 
 #include <Sneeze.h>
-#include <Scene.h>
 
 #include "wasm/Wasm.h"
-#include "scene/MapObject.h"
 
 using namespace SNEEZE;
 
@@ -56,8 +54,7 @@ public:
       m_nCount_Open       (0),
       m_pStream           (nullptr),
       m_pSilo             (nullptr),
-      m_pWasm_Store       (nullptr),
-      m_twObjectIx_Next   (0)
+      m_pWasm_Store       (nullptr)
    {
    }
 
@@ -65,10 +62,6 @@ public:
    {
       if (m_nCount_Open > 0)
          m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "CONTAINER", "Destroyed with refcount " + std::to_string (m_nCount_Open) + " — " + m_CID.DisplayName ());
-
-      for (auto* pMapObj : m_apMap_Object)
-         delete pMapObj;
-      m_apMap_Object.clear ();
    }
 
    // -----------------------------------------------------------------------
@@ -115,7 +108,8 @@ public:
 
       if (--m_nCount_Open == 0)
       {
-         m_pContext->Host ()->OnContainerDeleted (m_pContainer);
+         // Containers never go away in the inspector.
+         // m_pContext->Host ()->OnContainerDeleted (m_pContainer);
 
          if (m_pWasm_Store)
          {
@@ -156,141 +150,6 @@ public:
    }
 
    // -----------------------------------------------------------------------
-   // Scene Node Handle Table
-   //
-   // REVISIT: Fabrics will operate in one of two mutually exclusive modes:
-   // (a) WASM-managed — the WASM code builds the scene graph via Node_Root
-   //     and Node_Open, or
-   // (b) Map-managed — the WASM code delegates to a map service, and the
-   //     browser manages the root node on the fabric's behalf.
-   //
-   // When the same MSF is loaded into multiple fabrics under the same
-   // container, WASM-managed mode requires unique node indices per fabric
-   // (the current per-container map cannot hold duplicate template indices).
-   // See Scene.md "Fabric Ownership Modes" for the full discussion.
-   // -----------------------------------------------------------------------
-
-   uint64_t Node_Root (uint64_t twFabricIx, const RMCOBJECT* pRMCObject)
-   {
-      std::lock_guard<std::recursive_mutex> guard (m_mxContainer);
-
-      uint64_t twResult = OBJECTIX_ERROR;
-
-      if (pRMCObject)
-      {
-         FABRIC* pFabric = m_pContext->Scene ()->Fabric_Find (twFabricIx);
-
-         if (pFabric  &&  pFabric->Node_Root () == nullptr  &&  pFabric->Container () == m_pContainer)
-            twResult = Node_Create (pFabric, nullptr, pRMCObject);
-      }
-
-      return twResult;
-   }
-
-   uint64_t Node_Open (uint64_t twParentIx, const RMCOBJECT* pRMCObject)
-   {
-      std::lock_guard<std::recursive_mutex> guard (m_mxContainer);
-
-      uint64_t twResult = OBJECTIX_ERROR;
-
-      if (pRMCObject)
-      {
-         NODE* pParent = Node_Find_Internal (twParentIx);
-
-         if (pParent)
-            twResult = Node_Create (pParent->Fabric (), pParent, pRMCObject);
-      }
-
-      return twResult;
-   }
-
-   uint64_t Node_Create (FABRIC* pFabric, NODE* pParent, const RMCOBJECT* pRMCObject)
-   {
-      uint64_t twResult   = OBJECTIX_ERROR;
-      uint64_t twObjectIx = pRMCObject->Head.Self.ObjectIx ();
-
-      if (twObjectIx == OBJECTIX_IDENTITY)
-      {
-         if (m_twObjectIx_Next < OBJECTIX_MAX)
-            twObjectIx = ++m_twObjectIx_Next;
-      }
-      else if (twObjectIx > OBJECTIX_NULL  &&  twObjectIx <= OBJECTIX_MAX)
-      {
-         if (m_umpNode.find (twObjectIx) == m_umpNode.end ())
-         {
-            if (m_twObjectIx_Next < twObjectIx)
-               m_twObjectIx_Next = twObjectIx;
-         }
-         else twObjectIx = OBJECTIX_NULL;
-      }
-
-      if (twObjectIx > OBJECTIX_NULL  &&  twObjectIx <= OBJECTIX_MAX)
-      {
-         auto* pMapObj = new MAP_OBJECT_CELESTIAL ();
-
-         memcpy (&pMapObj->m_Name, &pRMCObject->Name, sizeof (MAP_OBJECT_NAME));
-         memcpy (&pMapObj->m_Type, &pRMCObject->Type, sizeof (MAP_OBJECT_TYPE));
-         memcpy (&pMapObj->m_Resource, &pRMCObject->Resource, sizeof (MAP_OBJECT_RESOURCE));
-         memcpy (&pMapObj->m_Transform, &pRMCObject->Transform, sizeof (MAP_OBJECT_TRANSFORM));
-         memcpy (&pMapObj->m_Orbit, &pRMCObject->Orbit, sizeof (MAP_OBJECT_ORBIT));
-         memcpy (&pMapObj->m_Bound, &pRMCObject->Bound, sizeof (MAP_OBJECT_BOUND));
-         memcpy (&pMapObj->m_Properties, &pRMCObject->Properties, sizeof (MAP_OBJECT_PROPERTIES));
-
-         auto* pNode = new NODE (pFabric, pParent);
-         pNode->Initialize (pMapObj);
-         pNode->ObjectIx (twObjectIx);
-
-         m_umpNode[twObjectIx] = pNode;
-         m_apMap_Object.push_back (pMapObj);
-
-         twResult = twObjectIx;
-      }
-
-      return twResult;
-   }
-
-   bool Node_Close (uint64_t twObjectIx)
-   {
-      std::lock_guard<std::recursive_mutex> guard (m_mxContainer);
-
-      bool  bResult = false;
-      NODE* pNode   = Node_Find_Internal (twObjectIx);
-
-      if (pNode)
-      {
-         MAP_OBJECT* pMapObj = pNode->MapObject ();
-
-         m_umpNode.erase (twObjectIx);
-
-         delete pNode;
-
-         if (pMapObj)
-         {
-            auto it = std::find (m_apMap_Object.begin (), m_apMap_Object.end (), pMapObj);
-            if (it != m_apMap_Object.end ())
-               m_apMap_Object.erase (it);
-
-            delete pMapObj;
-         }
-
-         bResult = true;
-      }
-
-      return bResult;
-   }
-
-   NODE* Node_Find_Internal (uint64_t twObjectIx) const
-   {
-      NODE* pNode = nullptr;
-
-      auto it = m_umpNode.find (twObjectIx);
-      if (it != m_umpNode.end ())
-         pNode = it->second;
-
-      return pNode;
-   }
-
-   // -----------------------------------------------------------------------
    // Members
    // -----------------------------------------------------------------------
 
@@ -305,10 +164,6 @@ public:
    STREAM*                                m_pStream;
    SILO*                                  m_pSilo;
    DEP::WASM_STORE*                       m_pWasm_Store;
-
-   uint64_t                               m_twObjectIx_Next;
-   std::unordered_map<uint64_t, NODE*>    m_umpNode;
-   std::vector<MAP_OBJECT*>               m_apMap_Object;
 };
 
 
@@ -326,13 +181,8 @@ CONTAINER::~CONTAINER ()
    delete m_pImpl;
 }
 
-bool                  CONTAINER::Open       ()                                                 { return m_pImpl->Open  (); }
-size_t                CONTAINER::Close      ()                                                 { return m_pImpl->Close (); }
-
-uint64_t              CONTAINER::Node_Root  (uint64_t twFabricIx, const RMCOBJECT* pRMCObject) { return m_pImpl->Node_Root          (twFabricIx, pRMCObject); }
-uint64_t              CONTAINER::Node_Open  (uint64_t twParentIx, const RMCOBJECT* pRMCObject) { return m_pImpl->Node_Open          (twParentIx, pRMCObject); }
-bool                  CONTAINER::Node_Close (uint64_t twObjectIx)                              { return m_pImpl->Node_Close         (twObjectIx); }
-NODE*                 CONTAINER::Node_Find  (uint64_t twObjectIx) const                        { return m_pImpl->Node_Find_Internal (twObjectIx); }
+bool                  CONTAINER::Open       ()                                                 { return  m_pImpl->Open  (); }
+size_t                CONTAINER::Close      ()                                                 { return  m_pImpl->Close (); }
 
 SNEEZE::CONTEXT*      CONTAINER::Context    () const                                           { return  m_pImpl->m_pContext; }
 const CONTAINER::CID* CONTAINER::Identity   () const                                           { return &m_pImpl->m_CID; }

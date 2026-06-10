@@ -25,6 +25,7 @@ namespace SNEEZE
    class MAP_OBJECT;
    class SCENE;
    class FABRIC;
+   struct RMCOBJECT;
 
    // ---------------------------------------------------------------------------
    // RMAP Object Index constants
@@ -53,7 +54,7 @@ namespace SNEEZE
    class NODE
    {
    public:
-      NODE  (FABRIC* pFabric, NODE* pNode_Parent);
+      NODE  (FABRIC* pFabric, NODE* pNode_Parent, uint64_t twObjectIx);
       ~NODE ();
 
       bool               Initialize        (MAP_OBJECT* pMapObject);
@@ -69,7 +70,6 @@ namespace SNEEZE
       bool               IsPrivate         () const;
 
       // Mutators
-      void               ObjectIx          (uint64_t twObjectIx);
       void               Private           (bool bPrivate);
       void               Fabric_Add        (FABRIC* pFabric_Child);
       void               Fabric_Remove     (FABRIC* pFabric_Child);
@@ -96,9 +96,9 @@ namespace SNEEZE
    {
    public:
       FABRIC  (SCENE* pScene, CONTAINER* pContainer, uint64_t twFabricIx, NODE* pNode_Attach, MSF* pMsf);
-      virtual ~FABRIC ();
+      ~FABRIC ();
 
-      bool               Initialize     (const std::string& sUrl);
+      bool       Initialize     (const std::string& sUrl);
 
       // Accessors
       SCENE*             Scene          () const;
@@ -125,28 +125,6 @@ namespace SNEEZE
    };
 
    // ---------------------------------------------------------------------------
-   // FABRIC_ROOT -- the structural root fabric.
-   //
-   // Derived from FABRIC. Creates the root node tree with named attachment
-   // points for the primary fabric and (future) overlay fabrics. Has no URL,
-   // no MSF, no container.
-   // ---------------------------------------------------------------------------
-
-   class FABRIC_ROOT : public FABRIC
-   {
-   public:
-      FABRIC_ROOT (SCENE* pScene, CONTAINER* pContainer, uint64_t twFabricIx);
-
-      bool               Initialize    (const std::string& sUrl);
-
-      // Accessors
-      NODE*              Node_Primary  () const;
-
-   private:
-      NODE*              m_pNode_Primary;
-   };
-
-   // ---------------------------------------------------------------------------
    // SCENE -- root container for the scene object model.
    //
    // Owned by CONTEXT. Every FABRIC in the scene holds a back-pointer to
@@ -166,7 +144,7 @@ namespace SNEEZE
       ENGINE*            Engine          () const;
       CONTEXT*           Context         () const;
       NETWORK*           Network         () const;
-      FABRIC_ROOT*       Fabric_Root     () const;
+      FABRIC*            Fabric_Root     () const;
       FABRIC*            Fabric_Primary  () const;
 
       // Mutators
@@ -174,9 +152,15 @@ namespace SNEEZE
       bool               Url             (const std::string& sUrl);
 
       // Internal functions
-      void               Fabric_Open     (NODE* pNode_Attach, const std::string& sUrl);
-      void               Fabric_Close    (FABRIC* pFabric);
+      void               Fabric_Spawn    (NODE* pNode_Attach, const std::string& sUrl);
+      FABRIC*            Fabric_Open     (NODE* pNode_Attach, MSF* pMsf, const std::string& sUrl);
+      FABRIC*            Fabric_Close    (FABRIC* pFabric);
       FABRIC*            Fabric_Find     (uint64_t twFabricIx) const;
+
+      uint64_t           Node_Root       (uint64_t twFabricIx, const RMCOBJECT* pRMCObject);
+      uint64_t           Node_Open       (uint64_t twParentIx, const RMCOBJECT* pRMCObject);
+      bool               Node_Close      (uint64_t twObjectIx);
+      NODE*              Node_Find       (uint64_t twObjectIx) const;
 
       // Internal callbacks (used by file-local MSF_FETCH)
       void               OnMsfReady      (NODE* pNode_Attach, FILE* pFile);

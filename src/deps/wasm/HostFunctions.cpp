@@ -135,6 +135,13 @@ static CONTAINER* Container (void* pEnv)
    return pContainer;
 }
 
+static SCENE* Scene (void* pEnv)
+{
+   CONTAINER* pContainer = Container (pEnv);
+
+   return pContainer ? pContainer->Context ()->Scene () : nullptr;
+}
+
 static STREAM* Stream (void* pEnv)
 {
    CONTAINER* pContainer = Container (pEnv);
@@ -502,12 +509,12 @@ wasm_trap_t* Scene_Node_Root (void* pEnv, wasmtime_caller_t* pCaller, const wasm
 
          if (pBytes)
          {
-            auto* pContainer = Container (pEnv);
+            auto* pScene = Scene (pEnv);
 
-            if (pContainer)
+            if (pScene)
             {
                const auto* pObject = reinterpret_cast<const RMCOBJECT*> (pBytes);
-                twResult = pContainer->Node_Root (twFabricIx, pObject);
+               twResult = pScene->Node_Root (twFabricIx, pObject);
             }
          }
       }
@@ -538,12 +545,12 @@ wasm_trap_t* Scene_Node_Open (void* pEnv, wasmtime_caller_t* pCaller, const wasm
 
          if (pBytes)
          {
-            auto* pContainer = Container (pEnv);
+            auto* pScene = Scene (pEnv);
 
-            if (pContainer)
+            if (pScene)
             {
                const auto* pObject = reinterpret_cast<const RMCOBJECT*> (pBytes);
-               twResult = pContainer->Node_Open (twParentIx, pObject);
+               twResult = pScene->Node_Open (twParentIx, pObject);
             }
          }
       }
@@ -567,9 +574,10 @@ wasm_trap_t* Scene_Node_Close (void* pEnv, wasmtime_caller_t* pCaller, const was
    if (nArgs >= 1)
    {
       uint64_t twObjectIx = static_cast<uint64_t> (pArgs[0].of.i64);
-      auto* pContainer = Container (pEnv);
+      
+      auto* pScene = Scene (pEnv);
 
-      if (pContainer  &&  pContainer->Node_Close (twObjectIx))
+      if (pScene  &&  pScene->Node_Close (twObjectIx))
          nResult = 1;
    }
 
@@ -585,11 +593,11 @@ wasm_trap_t* Scene_Node_Position (void* pEnv, wasmtime_caller_t* pCaller, const 
    if (nArgs >= 4)
    {
       uint64_t twObjectIx = static_cast<uint64_t> (pArgs[0].of.i64);
-      auto* pContainer = Container (pEnv);
+      auto* pScene = Scene (pEnv);
 
-      if (pContainer)
+      if (pScene)
       {
-         NODE* pNode = pContainer->Node_Find (twObjectIx);
+         NODE* pNode = pScene->Node_Find (twObjectIx);
          MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
 
          if (pObj)
@@ -611,11 +619,11 @@ wasm_trap_t* Scene_Node_Scale (void* pEnv, wasmtime_caller_t* pCaller, const was
    if (nArgs >= 2)
    {
       uint64_t twObjectIx = static_cast<uint64_t> (pArgs[0].of.i64);
-      auto* pContainer = Container (pEnv);
+      auto* pScene = Scene (pEnv);
 
-      if (pContainer)
+      if (pScene)
       {
-         NODE* pNode = pContainer->Node_Find (twObjectIx);
+         NODE* pNode = pScene->Node_Find (twObjectIx);
          MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
 
          if (pObj)
@@ -633,11 +641,11 @@ wasm_trap_t* Scene_Node_Bound (void* pEnv, wasmtime_caller_t* pCaller, const was
    if (nArgs >= 2)
    {
       uint64_t twObjectIx = static_cast<uint64_t> (pArgs[0].of.i64);
-      auto* pContainer = Container (pEnv);
+      auto* pScene = Scene (pEnv);
 
-      if (pContainer)
+      if (pScene)
       {
-         NODE* pNode = pContainer->Node_Find (twObjectIx);
+         NODE* pNode = pScene->Node_Find (twObjectIx);
          MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
 
          if (pObj)
@@ -659,11 +667,11 @@ wasm_trap_t* Scene_Node_Color (void* pEnv, wasmtime_caller_t* pCaller, const was
    if (nArgs >= 2)
    {
       uint64_t twObjectIx = static_cast<uint64_t> (pArgs[0].of.i64);
-      auto* pContainer = Container (pEnv);
+      auto* pScene = Scene (pEnv);
 
-      if (pContainer)
+      if (pScene)
       {
-         NODE* pNode = pContainer->Node_Find (twObjectIx);
+         NODE* pNode = pScene->Node_Find (twObjectIx);
          MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
 
          if (pObj)
@@ -684,11 +692,11 @@ wasm_trap_t* Scene_Node_Name (void* pEnv, wasmtime_caller_t* pCaller, const wasm
    if (nArgs >= 3)
    {
       uint64_t twObjectIx = static_cast<uint64_t> (pArgs[0].of.i64);
-      auto* pContainer = Container (pEnv);
+      auto* pScene = Scene (pEnv);
 
-      if (pContainer)
+      if (pScene)
       {
-         NODE* pNode = pContainer->Node_Find (twObjectIx);
+         NODE* pNode = pScene->Node_Find (twObjectIx);
          MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
 
          if (pObj)
@@ -713,11 +721,11 @@ wasm_trap_t* Scene_Node_Radius (void* pEnv, wasmtime_caller_t* pCaller, const wa
    if (nArgs >= 2)
    {
       uint64_t twObjectIx = static_cast<uint64_t> (pArgs[0].of.i64);
-      auto* pContainer = Container (pEnv);
+      auto* pScene = Scene (pEnv);
 
-      if (pContainer)
+      if (pScene)
       {
-         NODE* pNode = pContainer->Node_Find (twObjectIx);
+         NODE* pNode = pScene->Node_Find (twObjectIx);
          MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
 
          if (pObj)
@@ -739,11 +747,11 @@ wasm_trap_t* Scene_Node_Texture (void* pEnv, wasmtime_caller_t* pCaller, const w
    if (nArgs >= 3)
    {
       uint64_t twObjectIx = static_cast<uint64_t> (pArgs[0].of.i64);
-      auto* pContainer = Container (pEnv);
+      auto* pScene = Scene (pEnv);
 
-      if (pContainer)
+      if (pScene)
       {
-         NODE* pNode = pContainer->Node_Find (twObjectIx);
+         NODE* pNode = pScene->Node_Find (twObjectIx);
          MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
 
          if (pObj)

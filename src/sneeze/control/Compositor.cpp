@@ -452,7 +452,7 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
       std::vector<CURVE_DATA>  aCurves;
 
       SCENE* pScene = pViewport->Scene ();
-      FABRIC_ROOT* pFabric_Root = pScene ? pScene->Fabric_Root () : nullptr;
+      FABRIC* pFabric_Root = pScene ? pScene->Fabric_Root () : nullptr;
       NODE* pSomRoot = pFabric_Root ? pFabric_Root->Node_Root () : nullptr;
 
       if (pSomRoot)

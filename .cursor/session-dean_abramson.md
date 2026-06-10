@@ -226,3 +226,16 @@
 - Fixed ANARI renderer retaining old geometry: `BuildScene()` now unsets the world `"instance"` parameter when there are no instances (empty-scene transition clears the screen)
 - Added explicit scene-invalidation path for non-structural scene swaps: `RENDERER::InvalidateScene()` (dirty flag → full rebuild in `EndFrame()`), `VIEWPORT::Scene_Invalidate()/Scene_Invalidate_Consume()` (atomic, cross-thread), compositor consumes it in `Execute_Render`, `SCENE::Url()` triggers it
 - Updated docs: Wasm.md (Console→STREAM / Storage→SILO forwarding, storage ABI, WriteWasmString), Viewport.md (empty-scene clear + invalidation), Scene.md (Url/Reload navigation), Console.md and Sneeze.md (container lifecycle callbacks)
+
+## June 9, 2026 — Dean Abramson (late night)
+
+**FABRIC_ROOT removal, node handle table moved to SCENE, review pass**
+
+- Removed the `FABRIC_ROOT` class entirely; SCENE now owns a plain root FABRIC plus `m_pNode_Primary` directly, building the root node and primary attachment node in `Fabric_Root_Create`
+- Moved the scene node handle table (`Node_Root` / `Node_Open` / `Node_Close` / `Node_Find` and members `m_umpNode` / `m_apMap_Object` / `m_twObjectIx_Next`) from CONTAINER to SCENE — node indices are now scene-global; updated Container.h/.cpp and Scene.h/.cpp
+- Dropped the `pFabric->Container() == m_pContainer` ownership check in `Node_Root` (no longer a per-container table); read/write enforcement moves up to the WASM host-function layer
+- Reviewed Scene.cpp/Fabric.cpp/Node.cpp/Context.cpp/Container.cpp for lurking issues — the node-destruction cascade is clean (no dangling map handles, no double-free)
+- Fixed a dangling `const&` in `Reload`: it passed `m_pFabric_Root->Url()` (a reference into the fabric) to `Url()`, which then destroys that fabric before reading the string — now copies the URL into a local first
+- Confirmed deferred (logged in Scene.md "Known Limitations"): async MSF-fetch cancellation, compositor-traversal safety during `Url()`/`Reload()` teardown, and a future scene-revision-counter to unify rebuild-detection with traversal safety
+- Confirmed intentional/temporary: the `CID.eTrust = kTRUST_EXPIRED` override in `Container_Open` (no trusted cert yet)
+- Updated Scene.md to current state (node table on SCENE, scene-global indices, access-check responsibility, Known Limitations)

@@ -11,13 +11,15 @@ state, independent of whether a viewport is active.
 
 ```
 SCENE (owned by CONTEXT)
- ├── FABRIC_ROOT (structural root, owns root container)
- │    └── root NODE
+ ├── root FABRIC (structural root — root container, no MSF)
+ │    └── root NODE (in the root container)
  │         └── primary attach NODE ──► primary FABRIC
  │                                      └── root NODE
  │                                           ├── child NODEs (from MSF/WASM)
  │                                           └── ...
- └── m_umpFabric (scene-global fabric map, keyed by twFabricIx)
+ ├── m_pNode_Primary  (primary attachment node — owned by SCENE)
+ ├── m_umpFabric      (scene-global fabric map, keyed by twFabricIx)
+ └── m_umpNode        (scene-global node handle table, keyed by twObjectIx)
 ```
 
 FABRICs own trees of NODEs. NODEs are structural — all 3D properties
@@ -28,7 +30,7 @@ FABRICs own trees of NODEs. NODEs are structural — all 3D properties
 SCENE orchestrates the full lifecycle of fabric creation:
 
 1. A NODE recognizes it's an attachment point (bSubtype == 255) and calls
-   `SCENE::Fabric_Open(pNode, sUrl)`.
+   `SCENE::Fabric_Spawn(pNode, sUrl)`, which starts the async MSF fetch.
 2. SCENE fetches the MSF file via the root container's network cache
    (all MSF fetches share a single cache — deduplication is automatic).
 3. On success, SCENE parses the MSF, verifies signature and chain.
@@ -50,18 +52,19 @@ Symmetric teardown (reverse of creation order):
 ## SCENE
 
 Root container for the SOM. Owned by CONTEXT. Uses pimpl pattern.
-`Initialize(sUrl)` opens the root container via `Container_Open(nullptr)`,
-creates FABRIC_ROOT, and initializes it.
+`Initialize(sUrl)` creates the structural root fabric (a plain FABRIC with the
+synthetic root container and no MSF), then builds its root node and the primary
+attachment node directly. SCENE holds the primary node as `m_pNode_Primary`.
 
 ```cpp
 SCENE* pScene = pContext->Scene ();
-FABRIC_ROOT* pRoot = pScene->Fabric_Root ();
+FABRIC* pRoot = pScene->Fabric_Root ();
 FABRIC* pPrimary = pScene->Fabric_Primary ();
 ENGINE* pEngine = pScene->Engine ();
 NETWORK* pNetwork = pScene->Network ();
 
 // Fabric management
-pScene->Fabric_Open (pNode, sUrl);       // async — triggers MSF fetch
+pScene->Fabric_Spawn (pNode, sUrl);      // async — triggers MSF fetch
 pScene->Fabric_Close (pFabric);          // sync — deletes fabric + closes container
 FABRIC* pF = pScene->Fabric_Find (42);   // lookup by scene-global index
 
@@ -72,12 +75,31 @@ const std::string& sUrl = pScene->Fabric_Root ()->Url (); // current URL
 ```
 
 `Url(sUrl)` tears down the existing root fabric, resets the scene-global fabric
-index, and rebuilds FABRIC_ROOT from the new URL. `Reload(bReset)` re-issues
+index, and rebuilds the root fabric from the new URL. `Reload(bReset)` re-issues
 `Url()` with the root fabric's current URL (`bReset` requests a cache reset).
 Because a scene swap replaces all geometry, `Url()` calls
 `VIEWPORT::Scene_Invalidate()` so the renderer rebuilds rather than updating
 stale objects (see `Viewport.md`). The scene's URL is not stored on SCENE — it
 is read from the root FABRIC, which records its URL at `Initialize()`.
+
+### Scene Node Handle Table
+
+SCENE owns the scene-global node handle table (`m_umpNode`, keyed by
+`twObjectIx`) and the map-object backing store (`m_apMap_Object`). The handle
+indices are allocated scene-wide from `m_twObjectIx_Next`, or honored as
+supplied when an RMCOBJECT carries an explicit non-identity index.
+
+| Method | Description |
+|--------|-------------|
+| `Node_Root(twFabricIx, pRMCObject)` | Create a fabric's root node (fabric must not already have one) |
+| `Node_Open(twParentIx, pRMCObject)` | Add a child node under an existing node |
+| `Node_Close(twObjectIx)` | Remove a node, cascading to its children and map object |
+| `Node_Find(twObjectIx)` | Resolve a handle to a `NODE*` |
+
+These are the entry points the WASM host functions call to build a fabric's
+branch in WASM-managed mode. The table does not itself enforce container
+ownership — the host-function layer is responsible for the access check (see
+Access Control below).
 
 ## FABRIC
 
@@ -102,12 +124,10 @@ management, node tree ownership, and child fabric linkage.
 | `Url()` | Source URL |
 | `FabricIx()` | Scene-global fabric index |
 
-## FABRIC_ROOT
-
-Structural root fabric. Derives from FABRIC. Constructor takes `SCENE*` and
-`CONTAINER*` (root container, opened by SCENE). Creates the root node tree
-with a named primary attachment point. `Node_Primary()` returns the primary
-attachment node.
+The root fabric is an ordinary FABRIC, distinguished only by having no MSF and
+the synthetic root container. SCENE (not the fabric) builds and owns its root
+node and primary attachment node; `SCENE::Fabric_Primary()` reaches the primary
+fabric through the primary node's `Fabric_Attachment()`.
 
 ## NODE
 
@@ -230,12 +250,12 @@ no map service involved.
 
 When the same MSF is loaded into two fabrics that share the same container
 (same organizational identity), both fabrics run the same WASM modules.
-In WASM-managed mode, the node handle table (`m_umpNode`) lives on the
-container and is shared by both fabrics.
+In WASM-managed mode, the node handle table (`m_umpNode`) is scene-global
+(owned by SCENE) and shared across every fabric.
 
 If the MSF describes a template — say a poker table with 8 seats — each
 fabric instantiates that template. The WASM module sends the same objects
-with the same template indices both times. But the container's handle map
+with the same template indices both times. But the scene's handle map
 cannot hold two different nodes under the same key.
 
 In map-managed mode, this problem does not arise: the browser controls
@@ -257,15 +277,38 @@ the WASM code is the driver.
 
 ## Threading
 
-SCENE uses `m_mxScene` (recursive_mutex) to protect `m_umpFabric` and
-`m_twFabricIx_Next`. The guard is held during `Fabric_Close`, `Fabric_Find`,
-and the fabric-creation block in `OnMsfReady` (assign index, create FABRIC,
-insert into map).
+SCENE uses `m_mxScene` (recursive_mutex) to protect both the fabric map
+(`m_umpFabric` / `m_twFabricIx_Next`) and the node handle table (`m_umpNode` /
+`m_apMap_Object` / `m_twObjectIx_Next`). The guard is held during `Fabric_Open`,
+`Fabric_Close`, `Fabric_Find`, the fabric-creation block in `OnMsfReady`, and
+the `Node_Root` / `Node_Open` / `Node_Close` operations.
 
 MSF fetches route through the NETWORK fetch pool. The lock ordering contract
 between `m_mxNetwork` and `m_mxAsset` (documented in `Network.md`) governs
 all fetch completion callbacks, including those triggered by SCENE's
 `MSF_FETCH` listener.
+
+## Known Limitations
+
+These bound when `Url()` / `Reload()` are safe to call:
+
+- **In-flight MSF fetches are not cancelled.** A `MSF_FETCH` started by an
+  attachment node holds a raw pointer to that node. A spawning node does not
+  own or cancel its `MSF_FETCH` the way it owns its texture fetch, so if the
+  node is destroyed before the fetch completes — which `Url()` / `Reload()` do,
+  since they tear down the whole tree — the completion callback runs against a
+  freed node. `Url()` / `Reload()` are therefore unsafe while a fabric MSF is
+  still loading.
+- **Teardown is not synchronized with compositor traversal.** `Url()` /
+  `Reload()` wipe the fabric/node tree on the calling thread while the
+  compositor may be traversing it on its agent thread. There is no shared read
+  guard yet, so navigating during active rendering can crash.
+- **Renderer rebuild is coarse.** `VIEWPORT::Scene_Invalidate()` forces a full
+  renderer rebuild and is called only on navigation. Structural changes the
+  renderer cannot self-detect (same object counts, different content) are not
+  signalled incrementally. The intended design is a scene revision counter the
+  compositor reads under the same read guard that fixes traversal safety, so
+  rebuild-detection and traversal-safety become one mechanism.
 
 ## Access Control
 
@@ -274,11 +317,16 @@ functions. Browser internals pass `nullptr` as owner and bypass all checks.
 Write operations require `pFabric->Container() == pContainer` — the caller
 must own the fabric to modify it. Read operations are unrestricted.
 
+The SCENE node handle table (`Node_Root` / `Node_Open` / `Node_Close`) does not
+enforce ownership on its own. The WASM host-function layer must call
+`CanWrite()` before mutating a fabric's branch — the scene methods trust their
+caller.
+
 ## Files
 
 | File | Contents |
 |------|----------|
-| `Scene.cpp` | SCENE + Impl (pimpl, fabric map, MSF_FETCH, Fabric_Open/Close/Find) |
+| `Scene.cpp` | SCENE + Impl (pimpl, fabric map, root fabric + primary node, node handle table Node_Root/Open/Close/Find, MSF_FETCH, Fabric_Spawn/Open/Close/Find, Url/Reload) |
 | `Fabric.cpp` | FABRIC + Impl (WASM module lifecycle, node linkage, child fabrics) |
 | `Node.cpp` | NODE + Impl (tree ops, texture loading via IFILE, delegates fabric ops to SCENE) |
 | `MapObject.h` | MAP_OBJECT hierarchy, ORBIT_POSITION struct, type/subtype enums |

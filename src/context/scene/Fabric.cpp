@@ -14,7 +14,6 @@
 
 #include <Sneeze.h>
 
-#include "MapObject.h"
 #include <algorithm>
 
 using namespace SNEEZE;
@@ -125,7 +124,7 @@ public:
 
       if (m_pNode_Root)
       {
-         delete m_pNode_Root;
+         m_pScene->Node_Close (m_pNode_Root->ObjectIx ());
          m_pNode_Root = nullptr;
       }
 
@@ -296,39 +295,3 @@ void               FABRIC::Fabric_Remove  (FABRIC* pFabric_Child)         {     
 
 void               FABRIC::OnWasmReady   (SNEEZE::FILE* pFile, const std::string& sUrl, const std::string& sHash)   { m_pImpl->OnWasmReady  (pFile, sUrl, sHash); }
 void               FABRIC::OnWasmFailed  (SNEEZE::FILE* pFile, const std::string& sUrl)                             { m_pImpl->OnWasmFailed (pFile, sUrl); } 
-
-// ===========================================================================
-// FABRIC_ROOT
-// ===========================================================================
-
-
-FABRIC_ROOT::FABRIC_ROOT (SCENE* pScene, CONTAINER* pContainer, uint64_t twFabricIx) :
-   FABRIC (pScene, pContainer, twFabricIx, nullptr, nullptr),
-   m_pNode_Primary (nullptr)
-{
-}
-
-bool FABRIC_ROOT::Initialize (const std::string& sUrl)
-{
-   bool bResult = false;
-
-   m_pImpl->m_sUrl = sUrl;
-
-   NODE* pNode_Root = new NODE (this, nullptr);
-
-   if (pNode_Root->Initialize (nullptr))
-   {
-      auto* pMap_Object  = new MAP_OBJECT_ROOT ();
-
-      pMap_Object->m_Type.bSubtype = 255;
-      strncpy (pMap_Object->m_Resource.sReference, sUrl.c_str (), sizeof (pMap_Object->m_Resource.sReference) - 1);
-
-      m_pNode_Primary = new NODE (this, pNode_Root);
-
-      bResult = m_pNode_Primary->Initialize (pMap_Object);
-   }
-
-   return bResult;
-}
-
-NODE* FABRIC_ROOT::Node_Primary () const { return m_pNode_Primary; }

@@ -85,14 +85,14 @@ void SEQLOCK::EndWrite ()
 class NODE::Impl : public IFILE
 {
 public:
-   Impl (NODE* pNode, FABRIC* pFabric, NODE* pNode_Parent) :
+   Impl (NODE* pNode, FABRIC* pFabric, NODE* pNode_Parent, uint64_t twObjectIx) :
       m_pNode              (pNode),
       m_pFabric            (pFabric),
       m_pNode_Parent       (pNode_Parent),
+      m_twObjectIx         (twObjectIx),
       m_pMap_Object        (nullptr),
       m_pFabric_Attachment (nullptr),
       m_pFile              (nullptr),
-      m_twObjectIx         (0),
       m_bPrivate           (false)
    {
       if (m_pNode_Parent)
@@ -120,7 +120,7 @@ public:
    ~Impl ()
    {
       while (!m_apNode.empty ())
-         delete m_apNode.back ();
+         m_pFabric->Scene ()->Node_Close (m_apNode.back ()->ObjectIx ());
 
       Fabric_Close ();
 
@@ -135,7 +135,7 @@ public:
    {
       if (!sUrl.empty ())
       {
-         m_pFabric->Scene ()->Fabric_Open (m_pNode, sUrl);
+         m_pFabric->Scene ()->Fabric_Spawn (m_pNode, sUrl);
       }
    }
 
@@ -269,7 +269,7 @@ public:
    NODE*                               m_pNode_Parent;
    MAP_OBJECT*                         m_pMap_Object;
    FABRIC*                             m_pFabric_Attachment;
-   FILE*                      m_pFile;
+   FILE*                               m_pFile;
    SEQLOCK                             m_Seqlock;
 
    uint64_t                            m_twObjectIx;
@@ -283,8 +283,8 @@ public:
 // NODE
 // ---------------------------------------------------------------------------
 
-NODE::NODE (FABRIC* pFabric, NODE* pNode_Parent) :
-   m_pImpl (new Impl (this, pFabric, pNode_Parent))
+NODE::NODE (FABRIC* pFabric, NODE* pNode_Parent, uint64_t twObjectIx) :
+   m_pImpl (new Impl (this, pFabric, pNode_Parent, twObjectIx))
 {
 }
 
@@ -319,7 +319,6 @@ int         NODE::Node_Count        ()                    const { return m_pImpl
 // -----------------------------------------------------------------------
 
 void        NODE::Private           (bool bPrivate)             {        m_pImpl->m_bPrivate   = bPrivate; }
-void        NODE::ObjectIx          (uint64_t twObjectIx)       {        m_pImpl->m_twObjectIx = twObjectIx; }
 
 // -----------------------------------------------------------------------
 // Called internally from child nodes
