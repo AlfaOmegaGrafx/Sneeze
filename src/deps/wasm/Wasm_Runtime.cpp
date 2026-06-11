@@ -28,17 +28,7 @@ bool WASM_RUNTIME::Initialize (SNEEZE::ENGINE* pEngine)
 
    bool bResult = false;
 
-   wasm_config_t* pConfig = wasm_config_new ();
-
-   // Disable native unwind info (.eh_frame) generation. Wasmtime emits it only
-   // for third-party stack tools (profilers) — it is not needed for correctness
-   // or for Wasm trap backtraces. This build links LLVM's libunwind, whose
-   // __register_frame expects a single FDE, while wasmtime registers the whole
-   // .eh_frame table (libgcc convention). The mismatch spams stderr with
-   // "bad fde: FDE is really a CIE" on every module load.
-   wasmtime_config_native_unwind_info_set (pConfig, false);
-
-   m_pWsam_Engine = wasm_engine_new_with_config (pConfig);
+   m_pWsam_Engine = wasm_engine_new ();
 
    if (m_pWsam_Engine)
    {
