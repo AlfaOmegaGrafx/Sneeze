@@ -74,7 +74,7 @@ public:
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxFile);
 
-         if (m_pAsset = m_pINetwork_Impl->Asset_Open (m_pFile))
+         if ((m_pAsset = m_pINetwork_Impl->Asset_Open (m_pFile)) != nullptr)
          {
             m_pListener = pListener;
 

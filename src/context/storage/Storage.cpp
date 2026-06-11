@@ -105,7 +105,7 @@ public:
    // ISTORAGE_IMPL
    // ---------------------------------------------------------------------------
 
-   UNIT* Unit_Open (eSILO_SCOPE eScope, const std::string& sPathname)
+   UNIT* Unit_Open (eSILO_SCOPE eScope, const std::string& sPathname) override
    {
       UNIT* pUnit = nullptr;
 
@@ -122,7 +122,7 @@ public:
       return pUnit;
    }
 
-   void Unit_Close (UNIT* pUnit)
+   void Unit_Close (UNIT* pUnit) override
    {
       if (pUnit && pUnit->Close () == 0)
       {

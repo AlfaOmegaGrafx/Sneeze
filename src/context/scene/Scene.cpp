@@ -96,7 +96,7 @@ public:
    {
       bool bResult = false;
 
-      if (m_pFabric_Root = Fabric_Open (nullptr, nullptr, sUrl))
+      if ((m_pFabric_Root = Fabric_Open (nullptr, nullptr, sUrl)) != nullptr)
       {
          RMCOBJECT RMCObject;
          uint64_t twObjectIx;
@@ -192,7 +192,7 @@ public:
             pMsf->VerifySignature ();
             pMsf->VerifyChain ();
 
-            if (pFabric = Fabric_Open (pNode_Attach, pMsf, sUrl))
+            if ((pFabric = Fabric_Open (pNode_Attach, pMsf, sUrl)) != nullptr)
             {
                std::string sMsg = "Loaded MSF: " + pFabric->Container ()->Identity ()->DisplayName () + " (trust: " + std::to_string (pFabric->Container ()->Identity ()->eTrust) + ")";
                m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "SCENE", sMsg);
@@ -244,7 +244,7 @@ public:
       CONTAINER* pContainer;
       uint64_t   twFabricIx;
 
-      if (pContainer = m_pContext->Container_Open (pMsf))
+      if ((pContainer = m_pContext->Container_Open (pMsf)) != nullptr)
       {
          {
             std::lock_guard<std::recursive_mutex> guard (m_mxScene);

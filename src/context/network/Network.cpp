@@ -217,7 +217,7 @@ public:
       }
    }
 
-   bool Rules_Stale (ASSET* pAsset) const
+   bool Rules_Stale (ASSET* pAsset) const override
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxNetwork);
 
@@ -345,7 +345,7 @@ public:
    // Timing helpers
    // ---------------------------------------------------------------------------
 
-   double SecondsSinceEpoch () const
+   double SecondsSinceEpoch () const override
    {
       auto tpNow = std::chrono::steady_clock::now ();
 
