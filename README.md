@@ -17,6 +17,29 @@ Dependency builds are **stamp-cached** — once a dep builds successfully, the s
 
 ---
 
+## Documentation
+
+The full reference manual for Sneeze lives in [`docs/`](docs/Home.md) — a navigable wiki
+written for newcomers, integrators, and contributors. Start at [`docs/Home.md`](docs/Home.md).
+It is organized into five tiers:
+
+- **Overview** — what the Open Metaverse Browser is, the core vocabulary, and the open standards Sneeze builds on.
+- **Architecture** — the engine/host split, lifecycle, fabric loading, threading, trust and isolation, and coding conventions.
+- **Systems** — a page per subsystem (scene, network, storage, console, viewport, MSF, and the rest), explaining purpose and design.
+- **API** — per-class reference, organized one folder per public header.
+- **Guides** — embedding Sneeze in a host, building, and contributing.
+
+This README covers building; the wiki covers everything else.
+
+> **The docs are maintained as code, primarily by AI coding agents, with the source tree as
+> the single source of truth.** Each page declares the code files it documents (`sources`)
+> and the commit it was last checked against (`verified`) in its front matter. The drift
+> detector at [`tools/DocDrift/`](tools/DocDrift/README.md) reports any page whose sources
+> changed since it was verified. The authoring contract is [`docs/STYLE.md`](docs/STYLE.md);
+> the full maintenance loop is in [`docs/guides/contributing.md`](docs/guides/contributing.md).
+
+---
+
 ## Prerequisites
 
 You need the following installed before building. Open a terminal and check each one:
