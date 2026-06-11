@@ -1,0 +1,7 @@
+{
+   "wiki_prefix": "Sneeze",
+   "docs_root": "docs",
+   "home": "Home.md",
+   "repo_url": "https://github.com/MetaversalCorp/Sneeze",
+   "default_api": "https://omb.wiki/w/api.php"
+}
