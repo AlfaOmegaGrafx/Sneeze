@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # Copyright 2026 Metaversal Corporation. All rights reserved.
 #
-# Publish docs/**/*.md to a MediaWiki site (omb.wiki/Sneeze/...).
-# Source of truth is the git tree; the wiki is a mirror.
+# Publish docs/**/*.md to omb.wiki (Wiki.js) under /sneeze/...
+# Home.md replaces the existing /sneeze landing page.
 #
 # Usage:
 #   python scripts/publish-wiki.py --dry-run
@@ -10,9 +10,8 @@
 #   python scripts/publish-wiki.py --page docs/systems/scene.md
 #
 # Environment (live publish only):
-#   MEDIAWIKI_API       e.g. https://omb.wiki/w/api.php
-#   MEDIAWIKI_USER      e.g. MainAccount@SneezeDocs
-#   MEDIAWIKI_PASSWORD  bot password from Special:BotPasswords
+#   WIKIJS_GRAPHQL_URL  e.g. https://omb.wiki/graphql
+#   WIKIJS_API_TOKEN    bearer token from Wiki.js Administration > API Access
 
 from __future__ import annotations
 
@@ -22,21 +21,48 @@ import os
 import re
 import subprocess
 import sys
-import urllib.parse
+import urllib.error
 import urllib.request
-from http.cookiejar import CookieJar
 from pathlib import Path
-
-TIER_MAP = {
-   "overview": "Overview",
-   "architecture": "Architecture",
-   "systems": "Systems",
-   "api": "API",
-   "guides": "Guides",
-}
 
 LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 FRONT_MATTER_RE = re.compile(r"\A---\r?\n.*?\r?\n---\r?\n", re.DOTALL)
+TITLE_RE = re.compile(r"^title:\s*(.+?)\s*$", re.MULTILINE)
+VERIFIED_RE = re.compile(r"^verified:\s*([0-9a-f]+)\s*$", re.MULTILINE)
+
+CREATE_MUTATION = """
+mutation PublishCreate($content: String!, $description: String!, $editor: String!, $isPublished: Boolean!, $isPrivate: Boolean!, $locale: String!, $path: String!, $tags: [String]!, $title: String!) {
+   pages {
+      create(content: $content, description: $description, editor: $editor, isPublished: $isPublished, isPrivate: $isPrivate, locale: $locale, path: $path, tags: $tags, title: $title) {
+         responseResult { succeeded errorCode slug message }
+         page { id path }
+      }
+   }
+}
+"""
+
+UPDATE_MUTATION = """
+mutation PublishUpdate($id: Int!, $content: String!, $description: String!, $editor: String!, $isPublished: Boolean!, $isPrivate: Boolean!, $locale: String!, $path: String!, $tags: [String]!, $title: String!) {
+   pages {
+      update(id: $id, content: $content, description: $description, editor: $editor, isPublished: $isPublished, isPrivate: $isPrivate, locale: $locale, path: $path, tags: $tags, title: $title) {
+         responseResult { succeeded errorCode slug message }
+         page { id path }
+      }
+   }
+}
+"""
+
+PAGE_BY_PATH_QUERY = """
+query PageByPath($path: String!, $locale: String!) {
+   pages {
+      singleByPath(path: $path, locale: $locale) {
+         id
+         path
+         title
+      }
+   }
+}
+"""
 
 
 def find_repo_root(start: Path) -> Path:
@@ -73,24 +99,20 @@ def doc_rel_path(docs_root: Path, path: Path) -> str:
    return path.relative_to(docs_root).as_posix()
 
 
-def doc_relpath_to_wiki_title(rel: str, prefix: str, home: str) -> str:
+def doc_relpath_to_wiki_path(rel: str, path_prefix: str, home: str) -> str:
    rel = rel.replace("\\", "/")
-   if rel == home or rel == Path(home).stem:
+   prefix = path_prefix.rstrip("/")
+   if rel == home:
       return prefix
-   stem = rel
-   if stem.endswith(".md"):
-      stem = stem[:-3]
-   parts = stem.split("/")
-   if parts and parts[0].lower() in TIER_MAP:
-      parts[0] = TIER_MAP[parts[0].lower()]
-   return f"{prefix}/{'/'.join(parts)}"
+   stem = rel[:-3] if rel.endswith(".md") else rel
+   return f"{prefix}/{stem}"
 
 
-def build_title_map(docs_root: Path, prefix: str, home: str) -> dict[str, str]:
+def build_path_map(docs_root: Path, path_prefix: str, home: str) -> dict[str, str]:
    mapping: dict[str, str] = {}
    for path in list_doc_pages(docs_root):
       rel = doc_rel_path(docs_root, path)
-      mapping[rel] = doc_relpath_to_wiki_title(rel, prefix, home)
+      mapping[rel] = doc_relpath_to_wiki_path(rel, path_prefix, home)
       mapping[Path(rel).stem + ".md"] = mapping[rel]
    return mapping
 
@@ -120,7 +142,7 @@ def resolve_link(from_doc: Path, docs_root: Path, target: str) -> str | None:
    return rel + (f"#{anchor}" if anchor else "")
 
 
-def rewrite_links(body: str, from_doc: Path, docs_root: Path, title_map: dict[str, str], prefix: str, home: str) -> str:
+def rewrite_links(body: str, from_doc: Path, docs_root: Path, path_map: dict[str, str], path_prefix: str, home: str) -> str:
    def replace(match: re.Match[str]) -> str:
       label = match.group(1)
       raw = match.group(2)
@@ -131,15 +153,11 @@ def rewrite_links(body: str, from_doc: Path, docs_root: Path, title_map: dict[st
       path = resolved
       if "#" in resolved:
          path, anchor = resolved.split("#", 1)
-      wiki_title = title_map.get(path)
-      if not wiki_title:
-         rel_try = path
-         wiki_title = doc_relpath_to_wiki_title(rel_try, prefix, home)
-      if anchor:
-         return f"[[{wiki_title}#{anchor}|{label}]]"
-      if label and label != wiki_title.split("/")[-1]:
-         return f"[[{wiki_title}|{label}]]"
-      return f"[[{wiki_title}]]"
+      wiki_path = path_map.get(path)
+      if not wiki_path:
+         wiki_path = doc_relpath_to_wiki_path(path, path_prefix, home)
+      href = f"{wiki_path}#{anchor}" if anchor else wiki_path
+      return f"[{label}]({href})"
 
    return LINK_RE.sub(replace, body)
 
@@ -148,85 +166,103 @@ def strip_front_matter(text: str) -> str:
    return FRONT_MATTER_RE.sub("", text, count=1)
 
 
-def markdown_to_wikitext(markdown: str) -> str:
-   proc = subprocess.run(
-      ["pandoc", "-f", "markdown", "-t", "mediawiki", "--wrap=none"],
-      input=markdown,
-      capture_output=True,
-      text=True,
-      check=False,
-   )
-   if proc.returncode != 0:
-      print(proc.stderr, file=sys.stderr)
-      raise RuntimeError("pandoc failed")
-   return proc.stdout.strip() + "\n"
-
-
-def append_source_footer(wikitext: str, rel: str, verified: str | None, repo_url: str, sha: str) -> str:
-   source_url = f"{repo_url}/blob/{sha}/docs/{rel}"
-   footer = f"\n----\n''Source:'' [{rel}]({source_url})"
-   if verified:
-      footer += f" · ''Verified:'' `{verified}`"
-   return wikitext + footer
+def parse_title(text: str, rel: str) -> str:
+   match = TITLE_RE.search(text)
+   if match:
+      return match.group(1).strip().strip('"').strip("'")
+   stem = Path(rel).stem
+   if stem == "Home":
+      return "Sneeze Documentation"
+   return stem.replace("-", " ").replace("_", " ")
 
 
 def parse_verified(text: str) -> str | None:
-   m = re.search(r"^verified:\s*([0-9a-f]+)\s*$", text, re.MULTILINE)
-   return m.group(1) if m else None
+   match = VERIFIED_RE.search(text)
+   return match.group(1) if match else None
 
 
-class MediaWikiClient:
-   def __init__(self, api_url: str, username: str, password: str) -> None:
-      self.api_url = api_url
-      self.username = username
-      self.password = password
-      self.cj = CookieJar()
-      self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(self.cj))
-      self.token: str | None = None
+def append_source_footer(markdown: str, rel: str, verified: str | None, repo_url: str, sha: str) -> str:
+   source_url = f"{repo_url}/blob/{sha}/docs/{rel}"
+   footer = f"\n\n---\n\n*Source:* [{rel}]({source_url})"
+   if verified:
+      footer += f" · *Verified:* `{verified}`"
+   return markdown.rstrip() + footer
 
-   def _post(self, data: dict[str, str]) -> dict:
-      body = urllib.parse.urlencode(data).encode("utf-8")
-      req = urllib.request.Request(self.api_url, data=body, method="POST")
-      with self.opener.open(req, timeout=120) as resp:
-         payload = json.loads(resp.read().decode("utf-8"))
-      if "error" in payload:
-         raise RuntimeError(payload["error"].get("info", str(payload["error"])))
-      return payload
 
-   def login(self) -> None:
-      token = self._post({"action": "query", "meta": "tokens", "type": "login", "format": "json"})["query"]["tokens"]["logintoken"]
-      self._post({
-         "action": "login",
-         "lgname": self.username,
-         "lgpassword": self.password,
-         "lgtoken": token,
-         "format": "json",
-      })
-      self.token = self._post({"action": "query", "meta": "tokens", "type": "csrf", "format": "json"})["query"]["tokens"]["csrftoken"]
+class WikiJsClient:
+   def __init__(self, graphql_url: str, token: str) -> None:
+      self.graphql_url = graphql_url
+      self.token = token
 
-   def edit(self, title: str, text: str, summary: str) -> None:
-      if not self.token:
-         raise RuntimeError("Not logged in")
-      self._post({
-         "action": "edit",
+   def graphql(self, query: str, variables: dict | None = None) -> dict:
+      payload = json.dumps({"query": query, "variables": variables or {}}).encode("utf-8")
+      req = urllib.request.Request(
+         self.graphql_url,
+         data=payload,
+         method="POST",
+         headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.token}",
+         },
+      )
+      try:
+         with urllib.request.urlopen(req, timeout=120) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+      except urllib.error.HTTPError as exc:
+         detail = exc.read().decode("utf-8", errors="replace")
+         raise RuntimeError(f"HTTP {exc.code}: {detail}") from exc
+      if body.get("errors"):
+         raise RuntimeError(json.dumps(body["errors"], indent=2))
+      return body.get("data") or {}
+
+   def page_id_for_path(self, path: str, locale: str) -> int | None:
+      data = self.graphql(PAGE_BY_PATH_QUERY, {"path": path, "locale": locale})
+      page = (((data.get("pages") or {}).get("singleByPath")) or None)
+      if not page:
+         return None
+      return int(page["id"])
+
+   def upsert(self, path: str, title: str, content: str, description: str, locale: str, tags: list[str]) -> None:
+      page_id = self.page_id_for_path(path, locale)
+      variables = {
+         "content": content,
+         "description": description,
+         "editor": "markdown",
+         "isPublished": True,
+         "isPrivate": False,
+         "locale": locale,
+         "path": path,
+         "tags": tags,
          "title": title,
-         "text": text,
-         "summary": summary,
-         "token": self.token,
-         "format": "json",
-      })
+      }
+      if page_id is None:
+         data = self.graphql(CREATE_MUTATION, variables)
+         result = (((data.get("pages") or {}).get("create") or {}).get("responseResult")) or {}
+         if result.get("succeeded"):
+            return
+         if result.get("errorCode") == 6002:
+            page_id = self.page_id_for_path(path, locale)
+         else:
+            raise RuntimeError(result.get("message") or json.dumps(result))
+      if page_id is None:
+         raise RuntimeError("page exists but could not be resolved for update")
+      variables["id"] = page_id
+      data = self.graphql(UPDATE_MUTATION, variables)
+      result = (((data.get("pages") or {}).get("update") or {}).get("responseResult")) or {}
+      if not result.get("succeeded"):
+         raise RuntimeError(result.get("message") or json.dumps(result))
 
 
-def prepare_page(path: Path, docs_root: Path, config: dict, title_map: dict[str, str], sha: str) -> tuple[str, str, str]:
+def prepare_page(path: Path, docs_root: Path, config: dict, path_map: dict[str, str], sha: str) -> tuple[str, str, str, str]:
    rel = doc_rel_path(docs_root, path)
    raw = path.read_text(encoding="utf-8")
    verified = parse_verified(raw)
+   title = parse_title(raw, rel)
    body = strip_front_matter(raw)
-   body = rewrite_links(body, path, docs_root, title_map, config["wiki_prefix"], config["home"])
-   wikitext = markdown_to_wikitext(body)
-   wikitext = append_source_footer(wikitext, rel, verified, config["repo_url"], sha)
-   title = doc_relpath_to_wiki_title(rel, config["wiki_prefix"], config["home"])
-   return title, wikitext, rel
+   body = rewrite_links(body, path, docs_root, path_map, config["path_prefix"], config["home"])
+   body = append_source_footer(body, rel, verified, config["repo_url"], sha)
+   wiki_path = doc_relpath_to_wiki_path(rel, config["path_prefix"], config["home"])
+   return wiki_path, title, body, rel
 
 
 def git_head(repo_root: Path) -> str:
@@ -241,7 +277,7 @@ def git_head(repo_root: Path) -> str:
 
 
 def main() -> int:
-   parser = argparse.ArgumentParser(description="Publish Sneeze docs/ to MediaWiki")
+   parser = argparse.ArgumentParser(description="Publish Sneeze docs/ to omb.wiki (Wiki.js)")
    parser.add_argument("--dry-run", action="store_true", help="Transform only; do not call the API")
    parser.add_argument("--all", action="store_true", help="Publish every docs/**/*.md page")
    parser.add_argument("--page", action="append", default=[], help="Publish one repo-relative docs path")
@@ -274,34 +310,33 @@ def main() -> int:
             return 2
          pages.append(path)
 
-   title_map = build_title_map(docs_root, config["wiki_prefix"], config["home"])
+   path_map = build_path_map(docs_root, config["path_prefix"], config["home"])
    sha = git_head(repo_root)
-   summary = f"Sync from MetaversalCorp/Sneeze@{sha[:12]}"
+   locale = config.get("locale", "en")
+   description = f"Synced from MetaversalCorp/Sneeze@{sha[:12]}"
 
-   api_url = os.environ.get("MEDIAWIKI_API", config.get("default_api", "")).strip()
-   user = os.environ.get("MEDIAWIKI_USER", "").strip()
-   password = os.environ.get("MEDIAWIKI_PASSWORD", "").strip()
+   graphql_url = os.environ.get("WIKIJS_GRAPHQL_URL", config.get("graphql_url", "")).strip()
+   token = os.environ.get("WIKIJS_API_TOKEN", "").strip()
 
    if args.dry_run:
       print(f"publish-wiki: dry-run | pages={len(pages)} | HEAD={sha}")
       for path in pages:
-         title, wikitext, rel = prepare_page(path, docs_root, config, title_map, sha)
-         print(f"  {rel} -> {title} ({len(wikitext)} bytes wikitext)")
+         wiki_path, title, markdown, rel = prepare_page(path, docs_root, config, path_map, sha)
+         print(f"  {rel} -> {wiki_path} ({title}, {len(markdown)} bytes markdown)")
       return 0
 
-   if not api_url or not user or not password:
-      print("::notice::MEDIAWIKI_API / MEDIAWIKI_USER / MEDIAWIKI_PASSWORD not set; skipping live publish.")
+   if not graphql_url or not token:
+      print("::notice::WIKIJS_GRAPHQL_URL / WIKIJS_API_TOKEN not set; skipping live publish.")
       print("::notice::Run with --dry-run to validate transforms until wiki API access is configured.")
       return 0
 
-   client = MediaWikiClient(api_url, user, password)
-   client.login()
-   print(f"publish-wiki: publishing {len(pages)} page(s) to {api_url}")
+   client = WikiJsClient(graphql_url, token)
+   print(f"publish-wiki: publishing {len(pages)} page(s) to {graphql_url}")
 
    for path in pages:
-      title, wikitext, rel = prepare_page(path, docs_root, config, title_map, sha)
-      print(f"  edit {title} <- {rel}")
-      client.edit(title, wikitext, summary)
+      wiki_path, title, markdown, rel = prepare_page(path, docs_root, config, path_map, sha)
+      print(f"  upsert {wiki_path} <- {rel}")
+      client.upsert(wiki_path, title, markdown, description, locale, ["sneeze", "docs"])
 
    print(f"publish-wiki: done ({len(pages)} page(s))")
    return 0

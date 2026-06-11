@@ -7,21 +7,23 @@ Each platform builds all 11 deps in parallel tiers, then Sneeze itself.
 
 - **`build.yml`** — orchestrator, one job per platform, calls the reusable workflow
 - **`build-platform.yml`** — reusable workflow called per platform; runs the tiered dep build
-- **`docs.yml`** — documentation drift check and MediaWiki publish for `docs/`
+- **`docs.yml`** — documentation drift check and Wiki.js publish for `docs/`
 
 ## Documentation (`docs.yml`)
 
-Publishes the curated wiki under `docs/` to **omb.wiki** (`Sneeze/...` pages). Source
-files stay in this repo; the wiki is a mirror.
+Publishes the curated wiki under `docs/` to **omb.wiki** (Wiki.js, `/sneeze/...` paths).
+`docs/Home.md` replaces the existing `/sneeze` landing page. Source files stay in this
+repo; the wiki is a mirror.
 
 | Job | When | What |
 |-----|------|------|
 | `docdrift` | PR + push + dispatch | `tools/DocDrift/docdrift.py` (warn-only) |
 | `wiki-transform` | PR + push + dispatch | `scripts/publish-wiki.py --dry-run --all` |
-| `wiki-publish` | push to `main` + `workflow_dispatch` | Live API publish (no-op until secrets exist) |
+| `wiki-publish` | push to `main` + `workflow_dispatch` | Live Wiki.js upsert (no-op until secrets exist) |
 
-**Secrets** (Settings → Actions): `MEDIAWIKI_API`, `MEDIAWIKI_USER`, `MEDIAWIKI_PASSWORD`.
-Until the wiki owner provides a bot password, `wiki-publish` exits successfully with a
+**Secrets** (Settings → Actions): `WIKIJS_GRAPHQL_URL` (default `https://omb.wiki/graphql`),
+`WIKIJS_API_TOKEN` (bearer token from Wiki.js Administration → API Access, scopes:
+`write:pages` + `read:pages`). Until configured, `wiki-publish` exits successfully with a
 notice and changes nothing on omb.wiki.
 
 Config: `docs/wiki/publish.json`. Script: `scripts/publish-wiki.py`.
