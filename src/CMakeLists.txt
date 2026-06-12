@@ -757,7 +757,6 @@ target_link_libraries (Sneeze PUBLIC
    ${RMLUI_CORE_LIB}
    ${RMLUI_DEBUGGER_LIB}
    ${FREETYPE_LIB}
-   ${BORINGSSL_SSL_LIB}
    ${BORINGSSL_CRYPTO_LIB}
    vox::vox
 )
@@ -788,7 +787,10 @@ elseif (APPLE)
       ${SECURITY_FW} ${COREFOUNDATION_FW} ${SYSTEMCONFIGURATION_FW}
    )
 elseif (ANDROID)
-   target_link_libraries (Sneeze PUBLIC log android)
+   # Android curl uses BoringSSL for TLS, so its SSL layer must be linked here.
+   # Other platforms use native TLS (Schannel/SecureTransport/system OpenSSL),
+   # so linking BoringSSL's SSL symbols there clashes with the system stack.
+   target_link_libraries (Sneeze PUBLIC log android ${BORINGSSL_SSL_LIB})
 else ()
    target_link_libraries (Sneeze PUBLIC pthread dl m)
 endif ()
