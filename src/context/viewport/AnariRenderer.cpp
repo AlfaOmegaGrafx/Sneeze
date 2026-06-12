@@ -169,43 +169,58 @@ RENDERER::ANARI::ANARI (ENGINE* pEngine, const std::string& sLibrary)
 
 RENDERER::ANARI::~ANARI ()
 {
-   if (m_pDevice)
+   // Filament (halogen's backend) can throw utils::PostconditionPanic during
+   // Vulkan teardown on some drivers (e.g. llvmpipe / WSL software Vulkan):
+   // "enumerate size error". The throw happens on the compositor thread inside
+   // a destructor, so letting it escape std::terminates the process on exit.
+   // Swallow teardown panics so shutdown stays graceful (the process is going
+   // away regardless, so any leaked GPU resources are reclaimed by the OS).
+   try
    {
-      ReleaseScene ();
+      if (m_pDevice)
+      {
+         ReleaseScene ();
 
-      if (m_pFrame)
-      {
-         anariRelease (m_pDevice, m_pFrame);
-         m_pFrame = nullptr;
+         if (m_pFrame)
+         {
+            anariRelease (m_pDevice, m_pFrame);
+            m_pFrame = nullptr;
+         }
+         if (m_pNativeSurface)
+         {
+            anariRelease (m_pDevice, reinterpret_cast<ANARIObject> (m_pNativeSurface));
+            m_pNativeSurface = nullptr;
+         }
+         if (m_pRenderer)
+         {
+            anariRelease (m_pDevice, m_pRenderer);
+            m_pRenderer = nullptr;
+         }
+         if (m_pCamera)
+         {
+            anariRelease (m_pDevice, m_pCamera);
+            m_pCamera = nullptr;
+         }
+         if (m_pWorld)
+         {
+            anariRelease (m_pDevice, m_pWorld);
+            m_pWorld = nullptr;
+         }
+         anariRelease (m_pDevice, m_pDevice);
+         m_pDevice = nullptr;
       }
-      if (m_pNativeSurface)
+      if (m_pLibrary)
       {
-         anariRelease (m_pDevice, reinterpret_cast<ANARIObject> (m_pNativeSurface));
-         m_pNativeSurface = nullptr;
+         anariUnloadLibrary (m_pLibrary);
+         m_pLibrary = nullptr;
       }
-      if (m_pRenderer)
-      {
-         anariRelease (m_pDevice, m_pRenderer);
-         m_pRenderer = nullptr;
-      }
-      if (m_pCamera)
-      {
-         anariRelease (m_pDevice, m_pCamera);
-         m_pCamera = nullptr;
-      }
-      if (m_pWorld)
-      {
-         anariRelease (m_pDevice, m_pWorld);
-         m_pWorld = nullptr;
-      }
-      anariRelease (m_pDevice, m_pDevice);
-      m_pDevice = nullptr;
    }
-   if (m_pLibrary)
+   catch (...)
    {
-      anariUnloadLibrary (m_pLibrary);
-      m_pLibrary = nullptr;
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "ANARI",
+         "exception during renderer teardown (ignored)");
    }
+
    delete m_pSceneState;
    m_pSceneState = nullptr;
    m_bNativeSurface = false;
