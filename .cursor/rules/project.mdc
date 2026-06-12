@@ -16,6 +16,55 @@ All `*.md` files (this one and per-module docs) describe **what the system is ri
 - **No revision history.** Do not record what was deleted, what used to exist, what was refactored, or the history of decisions. The doc describes the current state only.
 - **Watch for the drift pattern.** The natural tendency is to append context after each change until the doc becomes an archaeological record. Resist this. After making code changes, re-read the `.md` and ask: "Does every line describe something that exists right now?" Delete everything that doesn't.
 
+### The `docs/` wiki (the public reference manual)
+
+`docs/` is a **separate body of documentation** from the per-module `src/**/*.md` files described above. It is a cohesive, navigable reference manual written for newcomers — evaluators, integrators, and contributors coming in cold — and is intended to be **published to the project wiki**. Do not confuse the two:
+
+- **`src/**/*.md`** — terse, per-module reference notes living beside the code. Treated as *unverified hints* (see below).
+- **`docs/**/*.md`** — the curated wiki. Prose-first, organized into five tiers, written from the code itself.
+
+**Authoring is AI-maintained, source-of-truth is the code.** These pages are written and kept current primarily by AI coding agents working directly from the source tree. The **single source of truth is the code** (`include/*.h` + the current `src/` implementation). The `src/**/*.md` notes, `OMB_Architecture_*.md`, and this `project.mdc` are *unverified hints* — when a hint and the code disagree, the code is right. Every page is written by reading the code, not by paraphrasing other docs.
+
+**Structure.** Five tiers, each a folder under `docs/` with an `index.md`:
+- **Overview** — what the OMB is, core vocabulary, the open standards Sneeze builds on.
+- **Architecture** — engine/host split, lifecycle, fabric loading, threading, trust & isolation, coding conventions.
+- **Systems** — one page per subsystem (engine, control, context, container, scene, network, storage, console, viewport, msf, persona, wasm, spirv, compute, xr, ui).
+- **API** — one folder per public header in `include/`, one page per class.
+- **Guides** — embedding, building, contributing.
+
+`docs/Home.md` is the landing page. `docs/STYLE.md` is the **authoring contract** (tiers, page template, front-matter schema, voice, the rule that the wiki never names a specific browser product or any application that embeds Sneeze — "the engine" / "a host application" only). Read `STYLE.md` before writing or editing any wiki page.
+
+**Front matter links each page to the code.** Every page begins with YAML front matter; two fields make the doc-to-code dependency explicit and checkable:
+
+```yaml
+sources:
+  - include/Scene.h
+  - src/context/scene/Scene.cpp
+verified: <commit-sha>
+```
+
+- **`sources`** — the repo-relative code files the page documents (hand-maintained).
+- **`verified`** — the commit the page was last checked against. Set this to the current `HEAD` when you write or re-verify a page.
+
+**Drift detection — `tools/DocDrift/`.** `tools/DocDrift/docdrift.py` (Python 3 stdlib only, read-only) is the mechanical half of the maintenance loop. For each page it runs `git log <verified>..HEAD -- <sources>` and flags any page whose listed sources changed since it was verified (or whose source was deleted). It never edits docs. Flags: `--strict` (exit non-zero on drift; default is warn-only), `--quiet`, `--docs DIR`. See `tools/DocDrift/README.md`.
+
+**The maintenance loop:** (1) run DocDrift; (2) open each flagged page and compare against current code — code wins; (3) fix the page and bump its `verified` to the current `HEAD`.
+
+**Known limitation:** `sources` is hand-maintained, so DocDrift catches changes to files a page *lists*, not coverage a page *forgot* to list. When you add a source file to a subsystem, add it to the relevant page's `sources`.
+
+**Automation / CI (the next step — for whoever owns publishing).** Two pieces are meant to live in CI:
+1. **Drift check** — run `python tools/DocDrift/docdrift.py` as a **warn-only** check (no `--strict`) so drift is surfaced on a pull request without blocking the merge. Promote to `--strict` later if the team wants a hard gate.
+2. **Wiki publish** — on merge to the main branch, a CI job syncs `docs/**/*.md` to the wiki. `docs/` in this repo stays the editable source; the wiki is a publish *target*. `docs/Home.md` is the landing page.
+
+   **Open decision (for Jim): which backend, which determines the transform.** The docs are deliberately nested (`docs/overview/...`, `docs/api/scene/SCENE.md`) with relative links between pages and per-page nav footers. How that maps depends on the wiki backend:
+   - **GitHub/GitLab repo wiki** (a separate `<repo>.wiki.git` repo) — pages are effectively *flat* and links use page names, not file paths. Publishing needs a **transform step**: flatten filenames (e.g. `api/scene/SCENE.md` → `API-Scene-SCENE`) and rewrite relative links to match, plus generate a `_Sidebar.md` for navigation. A CI job clones the wiki remote, runs the transform over `docs/`, and pushes.
+   - **Static-site generator** (MkDocs / Docusaurus / similar) deployed to Pages — maps the nested structure and relative links **~1:1**, no flattening, and adds search + a real nav tree. Usually the nicer result if the "wiki" can be a docs *site*. This is the recommended route if the team is open to it.
+   - **Confluence / other hosted wiki** — needs an API-based push (convert + upload per page) rather than a git push.
+
+   The pages were authored to stay portable across all of these (relative links, nav footers, `Home.md`), so the choice is open. **Next action when this is picked up:** confirm the backend, then build the merge-to-main workflow plus the matching transform/sidebar script (or SSG config). No transform is needed for the SSG route; the flatten+rewrite script is the deliverable for a repo-wiki route.
+
+**On the first commit of `docs/`:** every page currently carries `verified:` set to the commit that was `HEAD` while the wiki was authored, so DocDrift reports everything as current at that point. That commit becomes the baseline; once later commits land, re-running DocDrift tracks drift normally. No manual re-baselining is needed after the initial commit.
+
 ## Overview
 
 **OMBI** (Open Metaverse Browser Initiative) is an organizational unit under the Metaverse Standards Forum. Its mission is to define and build a reference implementation of the Open Metaverse Browser (OMB).
