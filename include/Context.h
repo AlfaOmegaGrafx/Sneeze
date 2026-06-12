@@ -55,8 +55,6 @@ namespace SNEEZE
 
       bool Initialize (const std::string& sUrl, bool bReset = false);
 
-      bool               Reload           (bool bReset = false);
-      bool               Url              (const std::string& sUrl, bool bReset = false);
       void               Logout           ();
 
       // Accessors
