@@ -76,8 +76,6 @@ namespace SNEEZE
    // layout — C++ uses #pragma pack(push, 1), Rust uses #[repr(C, packed)].
    // ---------------------------------------------------------------------------
 
-#pragma pack(push, 1)
-
    struct OBJECTIX
    {
       uint64_t              qwComposed;
@@ -161,8 +159,6 @@ namespace SNEEZE
       MAP_OBJECT_BOUND      Bound;
       MAP_OBJECT_PROPERTIES Properties;
    };
-
-#pragma pack(pop)
 
    static_assert (sizeof (RMCOBJECT) == 432, "RMCOBJECT must be exactly 432 bytes");
 

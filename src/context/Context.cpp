@@ -278,8 +278,6 @@ const std::string&          SNEEZE::CONTEXT::Path_Temporary () const { return m_
 // Methods
 // ---------------------------------------------------------------------------
 
-bool                        SNEEZE::CONTEXT::Reload          (bool bReset)                            { return m_pImpl->Reload (bReset); }
-bool                        SNEEZE::CONTEXT::Url             (const std::string& sUrl, bool bReset)   { return m_pImpl->Url    (sUrl, bReset); }
 void                        SNEEZE::CONTEXT::Logout          ()                                       {        m_pImpl->Logout (); }
 
 // ---------------------------------------------------------------------------
