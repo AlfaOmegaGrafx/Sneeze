@@ -102,7 +102,7 @@ namespace SNEEZE
    struct MAP_OBJECT_TYPE
    {
       uint8_t               bType;
-      uint8_t               bSubtype__;
+      uint8_t               bSubtype;
       uint8_t               bFiction;
       uint8_t               abReserved[5];
    };

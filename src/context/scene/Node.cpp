@@ -108,7 +108,7 @@ public:
 
       if (m_pMap_Object  &&  m_pMap_Object->m_Resource.sReference[0] != '\0')
       {
-         if (m_pMap_Object->m_Type.bType == 255)
+         if (m_pMap_Object->m_Type.bSubtype == 255)
          {
             std::string sUrl = m_pMap_Object->m_Resource.sReference;
             
@@ -127,7 +127,7 @@ public:
    ~Impl ()
    {
       while (!m_apNode.empty ())
-         m_pFabric->Scene ()->Node_Close (m_apNode.back ()->ObjectIx ());
+         m_pFabric->Container ()->Node_Close (m_apNode.back ()->ObjectIx ());
 
       if (m_pFabric_Attachment)
       {

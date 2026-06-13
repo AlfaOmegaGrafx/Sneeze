@@ -15,6 +15,7 @@
 #include <Sneeze.h>
 
 #include "wasm/Wasm.h"
+#include "scene/MapObject.h"
 
 using namespace SNEEZE;
 
@@ -54,7 +55,8 @@ public:
       m_nCount_Open       (0),
       m_pStream           (nullptr),
       m_pSilo             (nullptr),
-      m_pWasm_Store       (nullptr)
+      m_pWasm_Store       (nullptr),
+      m_twObjectIx_Next   (0)
    {
    }
 
@@ -62,7 +64,11 @@ public:
    {
       if (m_nCount_Open > 0)
          m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "CONTAINER", "Destroyed with refcount " + std::to_string (m_nCount_Open) + " — " + m_CID.DisplayName ());
-   }
+
+      for (auto* pMapObj : m_apMap_Object)
+         delete pMapObj;
+      m_apMap_Object.clear();
+  }
 
    // -----------------------------------------------------------------------
    // Lifecycle
@@ -149,20 +155,177 @@ public:
    }
 
    // -----------------------------------------------------------------------
+   // Internal Node management
+   // -----------------------------------------------------------------------
+
+   // -----------------------------------------------------------------------
+   // Scene Node Handle Table
+   //
+   // REVISIT: Fabrics will operate in one of two mutually exclusive modes:
+   // (a) WASM-managed — the WASM code builds the scene graph via Node_Root
+   //     and Node_Open, or
+   // (b) Map-managed — the WASM code delegates to a map service, and the
+   //     browser manages the root node on the fabric's behalf.
+   //
+   // When the same MSF is loaded into multiple fabrics under the same
+   // container, WASM-managed mode requires unique node indices per fabric
+   // (the current per-container map cannot hold duplicate template indices).
+   // See Scene.md "Fabric Ownership Modes" for the full discussion.
+   // -----------------------------------------------------------------------
+
+   uint64_t Node_Root (uint64_t twFabricIx, const RMCOBJECT* pRMCObject)
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mxContainer);
+
+      uint64_t twObjectIx = OBJECTIX_ERROR;
+
+      if (pRMCObject)
+      {
+         FABRIC* pFabric = m_pContext->Scene ()->Fabric_Find (twFabricIx);
+
+         if (pFabric  &&  pFabric->Node_Root () == nullptr)
+            twObjectIx = Node_Create (pFabric, nullptr, pRMCObject);
+      }
+
+      return twObjectIx;
+   }
+
+   uint64_t Node_Open (uint64_t twParentIx, const RMCOBJECT* pRMCObject)
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mxContainer);
+
+      uint64_t twObjectIx = OBJECTIX_ERROR;
+
+      if (pRMCObject)
+      {
+         NODE* pNode_Parent = Node_Find (twParentIx);
+
+         if (pNode_Parent)
+            twObjectIx = Node_Create (pNode_Parent->Fabric (), pNode_Parent, pRMCObject);
+      }
+
+      return twObjectIx;
+   }
+
+   uint64_t Node_Create (FABRIC* pFabric, NODE* pNode_Parent, const RMCOBJECT* pRMCObject)
+   {
+      OBJECT_HEAD      Head       = pRMCObject->Head;
+      MAP_OBJECT_CLASS eClass     = pRMCObject->Head.Self.Class ();
+      uint64_t         twObjectIx = pRMCObject->Head.Self.ObjectIx ();
+
+      if (twObjectIx == OBJECTIX_IDENTITY)
+      {
+         if (m_twObjectIx_Next < OBJECTIX_MAX)
+            twObjectIx = ++m_twObjectIx_Next;
+      }
+      else if (twObjectIx > OBJECTIX_NULL  &&  twObjectIx <= OBJECTIX_MAX)
+      {
+         if (m_umpNode.find (Head.Self.qwComposed) == m_umpNode.end ())
+         {
+            if (m_twObjectIx_Next < twObjectIx)
+               m_twObjectIx_Next = twObjectIx;
+         }
+         else twObjectIx = OBJECTIX_NULL;
+      }
+
+      if (twObjectIx > OBJECTIX_NULL  &&  twObjectIx <= OBJECTIX_MAX)
+      {
+         Head.Self.qwComposed = OBJECTIX_COMPOSE (eClass, twObjectIx);
+
+         MAP_OBJECT* pMapObj = nullptr;
+
+         switch (eClass)
+         {
+            case MAP_OBJECT_CLASS_ROOT:        pMapObj = new MAP_OBJECT_ROOT        (Head);  break;
+            case MAP_OBJECT_CLASS_CELESTIAL:   pMapObj = new MAP_OBJECT_CELESTIAL   (Head);  break;
+            case MAP_OBJECT_CLASS_TERRESTRIAL: pMapObj = new MAP_OBJECT_TERRESTRIAL (Head);  break;
+            case MAP_OBJECT_CLASS_PHYSICAL:    pMapObj = new MAP_OBJECT_PHYSICAL    (Head);  break;
+         }
+
+         if (pMapObj)
+         {
+            memcpy (&pMapObj->m_Name,       &pRMCObject->Name,       sizeof (MAP_OBJECT_NAME));
+            memcpy (&pMapObj->m_Type,       &pRMCObject->Type,       sizeof (MAP_OBJECT_TYPE));
+            memcpy (&pMapObj->m_Resource,   &pRMCObject->Resource,   sizeof (MAP_OBJECT_RESOURCE));
+            memcpy (&pMapObj->m_Transform,  &pRMCObject->Transform,  sizeof (MAP_OBJECT_TRANSFORM));
+            memcpy (&pMapObj->m_Orbit,      &pRMCObject->Orbit,      sizeof (MAP_OBJECT_ORBIT));
+            memcpy (&pMapObj->m_Bound,      &pRMCObject->Bound,      sizeof (MAP_OBJECT_BOUND));
+            memcpy (&pMapObj->m_Properties, &pRMCObject->Properties, sizeof (MAP_OBJECT_PROPERTIES));
+
+            auto* pNode = new NODE (pFabric, pNode_Parent, Head.Self.qwComposed);
+
+            pNode->Initialize (pMapObj);
+
+            m_umpNode[Head.Self.qwComposed] = pNode;
+            m_apMap_Object.push_back (pMapObj);
+         }
+         else Head.Self.qwComposed = OBJECTIX_ERROR;
+      }
+      else Head.Self.qwComposed = OBJECTIX_ERROR;
+
+      return Head.Self.qwComposed;
+   }
+
+   bool Node_Close (uint64_t twObjectIx)
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mxContainer);
+
+      bool  bResult = false;
+      NODE* pNode   = Node_Find (twObjectIx);
+
+      if (pNode)
+      {
+         MAP_OBJECT* pMapObj = pNode->MapObject ();
+
+         m_umpNode.erase (twObjectIx);
+
+         delete pNode;
+
+         if (pMapObj)
+         {
+            auto it = std::find (m_apMap_Object.begin (), m_apMap_Object.end (), pMapObj);
+            if (it != m_apMap_Object.end ())
+               m_apMap_Object.erase (it);
+
+            delete pMapObj;
+         }
+
+         bResult = true;
+      }
+
+      return bResult;
+   }
+
+   NODE* Node_Find (uint64_t twObjectIx) const
+   {
+      NODE* pNode = nullptr;
+
+      auto it = m_umpNode.find (twObjectIx);
+      if (it != m_umpNode.end ())
+         pNode = it->second;
+
+      return pNode;
+   }
+   
+   // -----------------------------------------------------------------------
    // Members
    // -----------------------------------------------------------------------
 
-   CONTAINER*                             m_pContainer;
-   CONTEXT*                               m_pContext;
-   CID                                    m_CID;
-   std::string                            m_sKey;
+   CONTAINER*                            m_pContainer;
+   CONTEXT*                              m_pContext;
+   CID                                   m_CID;
+   std::string                           m_sKey;
 
-   uint32_t                               m_nCount_Open;
-   std::recursive_mutex                   m_mxContainer;
+   uint32_t                              m_nCount_Open;
+   std::recursive_mutex                  m_mxContainer;
 
-   STREAM*                                m_pStream;
-   SILO*                                  m_pSilo;
-   DEP::WASM_STORE*                       m_pWasm_Store;
+   STREAM*                               m_pStream;
+   SILO*                                 m_pSilo;
+   DEP::WASM_STORE*                      m_pWasm_Store;
+
+   uint64_t                              m_twObjectIx_Next;
+   std::unordered_map<uint64_t, NODE*>   m_umpNode;
+   std::vector<MAP_OBJECT*>              m_apMap_Object;
 };
 
 
@@ -199,3 +362,7 @@ void CONTAINER::Instance_Close (uint64_t twFabricIx, const std::string& sUrl, co
    m_pImpl->Instance_Close (twFabricIx, sUrl, sHash);
 }
 
+uint64_t CONTAINER::Node_Root  (uint64_t twFabricIx, const RMCOBJECT* pRMCObject) { return m_pImpl->Node_Root  (twFabricIx, pRMCObject); }
+uint64_t CONTAINER::Node_Open  (uint64_t twParentIx, const RMCOBJECT* pRMCObject) { return m_pImpl->Node_Open  (twParentIx, pRMCObject); }
+bool     CONTAINER::Node_Close (uint64_t twObjectIx)                              { return m_pImpl->Node_Close (twObjectIx); }
+NODE*    CONTAINER::Node_Find  (uint64_t twObjectIx) const                        { return m_pImpl->Node_Find  (twObjectIx); }

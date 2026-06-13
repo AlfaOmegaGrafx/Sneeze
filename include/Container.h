@@ -18,9 +18,11 @@
 namespace SNEEZE
 {
    class CONTEXT;
-   class FABRIC;
    class STREAM;
    class SILO;
+   class FABRIC;
+   class NODE;
+   struct RMCOBJECT;
 
    enum eTRUST
    {
@@ -65,6 +67,11 @@ namespace SNEEZE
 
       bool     Instance_Open  (uint64_t twFabricIx, const std::string& sUrl, const std::string& sHash, const std::vector<uint8_t>& aWasmBytes);
       void     Instance_Close (uint64_t twFabricIx, const std::string& sUrl, const std::string& sHash);
+
+      uint64_t Node_Root      (uint64_t twFabricIx, const RMCOBJECT* pRMCObject);
+      uint64_t Node_Open      (uint64_t twParentIx, const RMCOBJECT* pRMCObject);
+      bool     Node_Close     (uint64_t twObjectIx);
+      NODE*    Node_Find      (uint64_t twObjectIx) const;
 
       CONTEXT*           Context  () const;
       const CID*         Identity () const;

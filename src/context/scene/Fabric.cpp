@@ -124,7 +124,7 @@ public:
 
       if (m_pNode_Root)
       {
-         m_pScene->Node_Close (m_pNode_Root->ObjectIx ());
+         m_pContainer->Node_Close (m_pNode_Root->ObjectIx ());
          m_pNode_Root = nullptr;
       }
 

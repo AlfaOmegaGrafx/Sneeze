@@ -56,6 +56,7 @@ namespace SNEEZE
 
    // --- Scene host functions (module: "Scene") ---
 
+   WASM_HOST_FN Scene_Node_Map;
    WASM_HOST_FN Scene_Node_Root;
    WASM_HOST_FN Scene_Node_Open;
    WASM_HOST_FN Scene_Node_Close;

@@ -50,6 +50,7 @@ namespace SNEEZE
       void Resize (int nWidth, int nHeight) override;
 
       void SetCamera (const CAMERA_DATA& pCamera) override;
+      void SetLights (const std::vector<LIGHT_DATA>& aLight) override;
       void BeginFrame () override;
       void SubmitSpheres (const std::vector<SPHERE_DATA>& aSpheres) override;
       void SubmitCurves (const std::vector<CURVE_DATA>& aCurves) override;
@@ -94,6 +95,8 @@ namespace SNEEZE
       SCENE_STATE* m_pSceneState;
 
       bool m_bSceneDirty;
+
+      std::vector<LIGHT_DATA> m_aLight;
 
       void ReleaseScene ();
       void BuildScene (const std::vector<SPHERE_DATA>& aSpheres, const std::vector<CURVE_DATA>& aCurves);

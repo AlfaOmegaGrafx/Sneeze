@@ -44,6 +44,7 @@ Declared in `Viewport.h` (private header). Virtual interface for all backends.
 
 ```
 SetCamera (CAMERA_DATA)
+SetLights (vector<LIGHT_DATA>)
 BeginFrame ()
 SubmitSpheres (vector<SPHERE_DATA>)
 SubmitCurves (vector<CURVE_DATA>)
@@ -66,7 +67,22 @@ framebuffer publish path is skipped entirely.
 | `CURVE_POINT` | Vertex with position and radius |
 | `CURVE_DATA` | Polyline (vector of CURVE_POINTs) with color |
 | `CAMERA_DATA` | Eye, look direction, up, FOV, aspect, near/far |
+| `LIGHT_DATA` | World position of one star-driven point light |
 | `UV_SPHERE` | Generated mesh: positions, normals, texcoords, indices |
+
+### Lighting
+
+`SetLights(vector<LIGHT_DATA>)` supplies the frame's lights. The compositor
+collects one `LIGHT_DATA` per `STAR` node it traverses (at the star's world
+position) and pushes the vector each frame. In `BuildScene` the ANARI backend
+creates one `"point"` light per entry; when the vector is empty (a scene with no
+star — e.g. a planetary system loaded as the primary fabric, with its sun in a
+parent fabric) it falls back to a single `"ambient"` light. The scene rebuilds
+when the light **count** changes (`m_bSceneDirty` is set in `SetLights`).
+
+Note: Halogen may not honor the ANARI `"ambient"` light (or its `"radiance"`
+parameter). When that happens the starless scene is lit by Halogen/Filament's
+default light rather than the ambient one — an unresolved, deferred item.
 
 ## RENDERER::ANARI
 
@@ -106,7 +122,10 @@ VIEWPORT::VIEW& view = pViewport->View ();
 | Scroll wheel | Zoom (adjust distance) |
 
 Spherical-to-Cartesian conversion from `dTheta`, `dPhi`, `dDistance` looking
-at `(dTargetX, dTargetY, dTargetZ)`.
+at `(dTargetX, dTargetY, dTargetZ)`. Zoom distance is clamped to
+`[MIN_DISTANCE, MAX_DISTANCE]` = `[0.0001, 1e14]` AU. `MIN_DISTANCE` was lowered
+from `0.1` so the camera can approach a body's surface (the world renders in AU
+and the Earth's rendered radius is ~0.002 AU); the camera near plane is `0.0001`.
 
 ## INPUT
 

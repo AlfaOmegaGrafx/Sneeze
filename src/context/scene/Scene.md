@@ -18,9 +18,19 @@ SCENE (owned by CONTEXT)
  │                                           ├── child NODEs (from MSF/WASM)
  │                                           └── ...
  ├── m_pNode_Primary  (primary attachment node — owned by SCENE)
- ├── m_umpFabric      (scene-global fabric map, keyed by twFabricIx)
- └── m_umpNode        (scene-global node handle table, keyed by composed OBJECTIX qwComposed)
+ └── m_umpFabric      (scene-global fabric map, keyed by twFabricIx)
+
+CONTAINER (one per MSF identity)
+ └── m_umpNode        (per-container node handle table, keyed by composed OBJECTIX qwComposed)
+     m_apMap_Object   (per-container map-object backing store)
+     m_twObjectIx_Next (per-container index allocator)
 ```
+
+**Node identity is per-container, not scene-global.** The node handle table
+lives on CONTAINER (not SCENE), because the same MSF loaded into multiple
+fabrics under one container shares one node namespace, and different containers
+must not collide. A fabric reaches its node operations through
+`pFabric->Container()`.
 
 FABRICs own trees of NODEs. NODEs are structural — all 3D properties
 (position, scale, color, bounding volume) live on the referenced MAP_OBJECT.
@@ -29,7 +39,7 @@ FABRICs own trees of NODEs. NODEs are structural — all 3D properties
 
 SCENE orchestrates the full lifecycle of fabric creation:
 
-1. A NODE recognizes it's an attachment point (bType == 255) and calls
+1. A NODE recognizes it's an attachment point (bSubtype == 255) and calls
    `SCENE::Fabric_Spawn(pNode, sUrl)`, which starts the async MSF fetch.
 2. SCENE fetches the MSF file via the root container's network cache
    (all MSF fetches share a single cache — deduplication is automatic).
@@ -95,34 +105,38 @@ rather than writing opaque 64-bit literals.
 knows both its own class+index and its parent's. An object's class lives only in
 `Self.Class()`; it is never stored anywhere else (see MAP_OBJECT below).
 
-### Scene Node Handle Table
+### Node Handle Table (owned by CONTAINER)
 
-SCENE owns the scene-global node handle table (`m_umpNode`) and the map-object
+**CONTAINER** owns the node handle table (`m_umpNode`) and the map-object
 backing store (`m_apMap_Object`). **The table is keyed by the full composed
 `OBJECTIX` (`qwComposed` — class + index), not the bare index.** Parent lookups
 therefore carry the class as well. The 48-bit index portion is allocated
-scene-wide from `m_twObjectIx_Next`, or honored as supplied when an RMCOBJECT
+per-container from `m_twObjectIx_Next`, or honored as supplied when an RMCOBJECT
 carries an explicit non-identity index; the class is taken from the RMCOBJECT's
 `Head.Self.Class()` and re-composed with the assigned index for the key.
 
+The four node operations are public methods on **CONTAINER**:
+
 | Method | Description |
 |--------|-------------|
-| `Node_Root(twFabricIx, pRMCObject)` | Create a fabric's root node (fabric must not already have one). Returns the composed handle. |
+| `Node_Root(twFabricIx, pRMCObject)` | Create a fabric's root node (fabric must not already have one). Resolves the fabric via `Context()->Scene()->Fabric_Find`. Returns the composed handle. |
 | `Node_Open(twParentIx, pRMCObject)` | Add a child node under the node whose composed handle is `twParentIx`. Returns the composed handle. |
 | `Node_Close(twObjectIx)` | Remove the node with composed handle `twObjectIx`, cascading to its children and map object |
 | `Node_Find(twObjectIx)` | Resolve a composed handle to a `NODE*` |
 
-`Node_Create` reads `Head.Self.Class()`, `switch`es on it to construct the
-matching derived `MAP_OBJECT` (ROOT / CELESTIAL / TERRESTRIAL / PHYSICAL),
-re-stamps `Head.Self` with the composed handle, and stores the node under that
-key. The handle it returns (and that `NODE::ObjectIx()` later reports) is the
-composed value, so callers round-trip it unchanged through `Node_Find` /
+`Node_Create` (private to CONTAINER) reads `Head.Self.Class()`, `switch`es on it
+to construct the matching derived `MAP_OBJECT` (ROOT / CELESTIAL / TERRESTRIAL /
+PHYSICAL), re-stamps `Head.Self` with the composed handle, and stores the node
+under that key. The handle it returns (and that `NODE::ObjectIx()` later reports)
+is the composed value, so callers round-trip it unchanged through `Node_Find` /
 `Node_Close`.
 
 These are the entry points the WASM host functions call to build a fabric's
-branch in WASM-managed mode. The table does not itself enforce container
-ownership — the host-function layer is responsible for the access check (see
-Access Control below).
+branch in WASM-managed mode; the host obtains the CONTAINER from the WASM
+environment (`Container(pEnv)`) and calls `pContainer->Node_*`. The table does
+not itself enforce container ownership — the host-function layer is responsible
+for the access check (see Access Control below). SCENE's `Fabric_Root_Create`
+also drives the root fabric's nodes through `m_pFabric_Root->Container()`.
 
 ## FABRIC
 
@@ -158,9 +172,17 @@ Structural graph element. Constructor takes `FABRIC*` + `NODE*` parent. pImpl
 pattern. Two-step construction: constructor links into tree, `Initialize(MAP_OBJECT*)`
 assigns the 3D payload.
 
-When a MAP_OBJECT with bType == 255 (attachment point) is initialized, NODE
-delegates to `SCENE::Fabric_Open()` to begin the async fabric loading process.
-On destruction, NODE calls `SCENE::Fabric_Close()` for any attached fabric.
+When a MAP_OBJECT with bSubtype == 255 (attachment point) is initialized, NODE
+delegates to `SCENE::Fabric_Spawn()` to begin the async fabric loading process.
+On destruction, NODE closes its child nodes through its owning fabric's
+CONTAINER (`m_pFabric->Container()->Node_Close(...)`) and calls
+`SCENE::Fabric_Close()` for any attached fabric.
+
+An attachment point uses `bSubtype == 255` (not `bType`) precisely so the node
+can still carry a meaningful celestial `bType` (e.g. `PLANETSYSTEM`) — the
+attachment point holds the orbit data and renders an orbit trail, while also
+spawning the child fabric. This lets the same system be either an attachment
+(orbiting its parent) or a standalone primary fabric (at the origin).
 
 When a MAP_OBJECT with a non-empty texture URL is assigned, NODE::Impl
 (which inherits `SNEEZE::IFILE`) automatically requests the texture from
@@ -195,6 +217,9 @@ for (int i = 0; i < pParent->Node_Count (); ++i)
 CONTAINER is the runtime identity of an MSF provider. `Open()` and `Close()`
 take no arguments and manage the refcount for console stream, storage silo,
 and WASM store lifecycle. Fabric indexing is scene-global, owned by SCENE.
+The **node handle table is owned by CONTAINER** (see "Node Handle Table" above):
+`Node_Root` / `Node_Open` / `Node_Close` / `Node_Find` are public CONTAINER
+methods, backed by `m_umpNode`, `m_apMap_Object`, and `m_twObjectIx_Next`.
 
 `CONTEXT::Container_Open(MSF*)` derives the CID from the MSF (or creates a
 synthetic root CID when MSF is null). `CONTEXT::Container_Close(CONTAINER*)`
@@ -215,8 +240,10 @@ sub-structs — e.g. `Position()`/`Rotation()` from `m_Transform` and `m_Orbit`,
 `Radius()` from `m_Bound`, and the `ColorToU32()` family from `m_Properties`.
 
 `MAP_OBJECT_TYPE` is the 8-byte wire sub-struct: `bType` (the celestial type —
-see below), `bSubtype__` (poisoned reserved byte, always 0, never read),
-`bFiction`, and 5 reserved bytes. `bType == 255` marks an MSF attachment point.
+see below), `bSubtype` (the object subtype), `bFiction`, and 5 reserved bytes.
+`bSubtype == 255` marks an MSF attachment point, leaving `bType` free to carry
+the node's celestial type (so an attachment point can also be a `PLANETSYSTEM`
+with orbit data).
 
 ### Derived Types
 
@@ -286,13 +313,17 @@ no map service involved.
 
 When the same MSF is loaded into two fabrics that share the same container
 (same organizational identity), both fabrics run the same WASM modules.
-In WASM-managed mode, the node handle table (`m_umpNode`) is scene-global
-(owned by SCENE) and shared across every fabric.
+In WASM-managed mode, the node handle table (`m_umpNode`) is per-container
+and shared across every fabric in that container.
 
 If the MSF describes a template — say a poker table with 8 seats — each
 fabric instantiates that template. The WASM module sends the same objects
-with the same template indices both times. But the scene's handle map
+with the same template indices both times. But the container's handle map
 cannot hold two different nodes under the same key.
+
+Moving the table from scene-global to per-container narrowed the collision
+scope (two unrelated containers no longer collide) but did not eliminate it
+for the same-MSF-twice-in-one-container case.
 
 In map-managed mode, this problem does not arise: the browser controls
 the indexing and assigns unique handles per fabric. In WASM-managed mode,
@@ -313,11 +344,13 @@ the WASM code is the driver.
 
 ## Threading
 
-SCENE uses `m_mxScene` (recursive_mutex) to protect both the fabric map
-(`m_umpFabric` / `m_twFabricIx_Next`) and the node handle table (`m_umpNode` /
-`m_apMap_Object` / `m_twObjectIx_Next`). The guard is held during `Fabric_Open`,
-`Fabric_Close`, `Fabric_Find`, the fabric-creation block in `OnMsfReady`, and
-the `Node_Root` / `Node_Open` / `Node_Close` operations.
+SCENE uses `m_mxScene` (recursive_mutex) to protect the fabric map
+(`m_umpFabric` / `m_twFabricIx_Next`). The guard is held during `Fabric_Open`,
+`Fabric_Close`, `Fabric_Find`, and the fabric-creation block in `OnMsfReady`.
+
+CONTAINER uses `m_mxContainer` (recursive_mutex) to protect its node handle
+table (`m_umpNode` / `m_apMap_Object` / `m_twObjectIx_Next`). The guard is held
+during the `Node_Root` / `Node_Open` / `Node_Close` operations.
 
 MSF fetches route through the NETWORK fetch pool. The lock ordering contract
 between `m_mxNetwork` and `m_mxAsset` (documented in `Network.md`) governs
@@ -353,18 +386,19 @@ functions. Browser internals pass `nullptr` as owner and bypass all checks.
 Write operations require `pFabric->Container() == pContainer` — the caller
 must own the fabric to modify it. Read operations are unrestricted.
 
-The SCENE node handle table (`Node_Root` / `Node_Open` / `Node_Close`) does not
-enforce ownership on its own. The WASM host-function layer must call
-`CanWrite()` before mutating a fabric's branch — the scene methods trust their
-caller.
+The CONTAINER node handle table (`Node_Root` / `Node_Open` / `Node_Close`) does
+not enforce ownership on its own. The WASM host-function layer must call
+`CanWrite()` before mutating a fabric's branch — the container methods trust
+their caller.
 
 ## Files
 
 | File | Contents |
 |------|----------|
-| `Scene.cpp` | SCENE + Impl (pimpl, fabric map, root fabric + primary node, node handle table Node_Root/Open/Close/Find, MSF_FETCH, Fabric_Spawn/Open/Close/Find, Url/Reload) |
-| `Fabric.cpp` | FABRIC + Impl (WASM module lifecycle, node linkage, child fabrics) |
-| `Node.cpp` | NODE + Impl (tree ops, texture loading via IFILE, delegates fabric ops to SCENE) |
+| `Scene.cpp` | SCENE + Impl (pimpl, fabric map, root fabric + primary node, MSF_FETCH, Fabric_Spawn/Open/Close/Find, Url/Reload). `Fabric_Root_Create` drives the root node/primary attach node through `m_pFabric_Root->Container()`. |
+| `Fabric.cpp` | FABRIC + Impl (WASM module lifecycle, node linkage, child fabrics; closes its root node via `Container()->Node_Close`) |
+| `Node.cpp` | NODE + Impl (tree ops, texture loading via IFILE, delegates fabric ops to SCENE; closes child nodes via `Container()->Node_Close`) |
+| `../Container.cpp` | CONTAINER + Impl — owns the per-container node handle table and the `Node_Root/Open/Close/Find` + private `Node_Create` operations |
 | `MapObject.h` | MAP_OBJECT hierarchy, ORBIT_POSITION struct, MAP_OBJECT_CLASS enum, celestial type enum, OBJECTIX (+ OBJECTIX_COMPOSE), RMCOBJECT wire structs |
 | `MapObject.cpp` | MAP_OBJECT methods, SolveKepler, QuatMultiply, RotateByQuat |
 | `AccessControl.h/cpp` | CanRead/CanWrite enforcement |

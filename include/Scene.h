@@ -157,11 +157,6 @@ namespace SNEEZE
       FABRIC*            Fabric_Close    (FABRIC* pFabric);
       FABRIC*            Fabric_Find     (uint64_t twFabricIx) const;
 
-      uint64_t           Node_Root       (uint64_t twFabricIx, const RMCOBJECT* pRMCObject);
-      uint64_t           Node_Open       (uint64_t twParentIx, const RMCOBJECT* pRMCObject);
-      bool               Node_Close      (uint64_t twObjectIx);
-      NODE*              Node_Find       (uint64_t twObjectIx) const;
-
       // Internal callbacks (used by file-local MSF_FETCH)
       void               OnMsfReady      (NODE* pNode_Attach, FILE* pFile);
       void               OnMsfFailed     (NODE* pNode_Attach, FILE* pFile);

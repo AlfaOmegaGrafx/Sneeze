@@ -66,6 +66,13 @@ namespace SNEEZE
       float dFar;
    };
 
+   struct LIGHT_DATA
+   {
+      float x = 0.0f;                 // world position of a star-driven point light
+      float y = 0.0f;
+      float z = 0.0f;
+   };
+
    class VIEWPORT::RENDERER
    {
    public:
@@ -80,6 +87,7 @@ namespace SNEEZE
       virtual void Resize (int nWidth, int nHeight) = 0;
 
       virtual void SetCamera (const CAMERA_DATA& pCamera) = 0;
+      virtual void SetLights (const std::vector<LIGHT_DATA>& aLight) { (void) aLight; }
       virtual void BeginFrame () = 0;
       virtual void SubmitSpheres (const std::vector<SPHERE_DATA>& aSpheres) = 0;
       virtual void SubmitCurves (const std::vector<CURVE_DATA>& aCurves) = 0;

@@ -463,7 +463,7 @@ std::string CHAIN::HashString (const std::string& sInput)
 
       std::ostringstream oss;
       oss << std::hex << std::setfill ('0');
-      for (int i = 0; i < 6; ++i)
+      for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i)
          oss << std::setw (2) << (int) aDigest[i];
 
       sResult = oss.str ();

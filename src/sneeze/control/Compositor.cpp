@@ -272,7 +272,7 @@ struct WORLD_FRAME
    bool   bStar   = false;
 };
 
-static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, std::vector<SPHERE_DATA>& aSpheres, std::vector<CURVE_DATA>& aCurves)
+static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, std::vector<SPHERE_DATA>& aSpheres, std::vector<CURVE_DATA>& aCurves, std::vector<LIGHT_DATA>& aLight)
 {
    MAP_OBJECT* pObj = pNode->MapObject ();
    WORLD_FRAME childFrame = frame;
@@ -345,6 +345,15 @@ static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, 
          childFrame.dRadius = pCelestial->Radius ();
          childFrame.fColor  = pCelestial->m_Properties.fColor;
          childFrame.bStar   = (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_STAR);
+
+         if (childFrame.bStar)
+         {
+            LIGHT_DATA light;
+            light.x = static_cast<float> (childFrame.dPosX);
+            light.y = static_cast<float> (childFrame.dPosY);
+            light.z = static_cast<float> (childFrame.dPosZ);
+            aLight.push_back (light);
+         }
       }
       else if (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_SURFACE)
       {
@@ -376,14 +385,14 @@ static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, 
    {
       NODE* pChild = pNode->Child (i);
       if (pChild)
-      {
-         TraverseNode (pChild, childFrame, tmNow, aSpheres, aCurves);
-
-         FABRIC* pAttached = pChild->Fabric_Attachment ();
-         if (pAttached  &&  pAttached->Node_Root ())
-            TraverseNode (pAttached->Node_Root (), childFrame, tmNow, aSpheres, aCurves);
-      }
+         TraverseNode (pChild, childFrame, tmNow, aSpheres, aCurves, aLight);
    }
+
+   // An attachment point spawns a child fabric; traverse it in this node's own
+   // accumulated frame so the secondary fabric inherits this node's position.
+   FABRIC* pAttached = pNode->Fabric_Attachment ();
+   if (pAttached  &&  pAttached->Node_Root ())
+      TraverseNode (pAttached->Node_Root (), childFrame, tmNow, aSpheres, aCurves, aLight);
 }
 
 void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
@@ -453,11 +462,15 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
       FABRIC* pFabric_Root = pScene ? pScene->Fabric_Root () : nullptr;
       NODE* pSomRoot = pFabric_Root ? pFabric_Root->Node_Root () : nullptr;
 
+      std::vector<LIGHT_DATA> aLight;
+
       if (pSomRoot)
       {
          WORLD_FRAME rootFrame;
-         TraverseNode (pSomRoot, rootFrame, tmNow, aSpheres, aCurves);
+         TraverseNode (pSomRoot, rootFrame, tmNow, aSpheres, aCurves, aLight);
       }
+
+      pRenderer->SetLights (aLight);
 
       pViewport->Accumulate (VIEWPORT::kACCUMULATE_SCENE, tpSceneStart);
 

@@ -20,7 +20,7 @@ using namespace SNEEZE;
 
 static constexpr float MOUSE_SENSITIVITY = 0.005f;
 static constexpr float SCROLL_FACTOR = 1.1f;
-static constexpr float MIN_DISTANCE = 0.1f;
+static constexpr float MIN_DISTANCE = 0.001f;
 static constexpr float MAX_DISTANCE = 1e14f;
 static constexpr float PI_F = 3.14159265358979f;
 

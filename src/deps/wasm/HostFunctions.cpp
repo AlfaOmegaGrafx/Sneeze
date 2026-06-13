@@ -15,10 +15,7 @@
 #include "HostFunctions.h"
 #include "Wasm.h"
 
-#include <Container.h>
-#include <Console.h>
-#include <Storage.h>
-#include <Scene.h>
+#include <Sneeze.h>
 
 #include "scene/MapObject.h"
 
@@ -478,6 +475,11 @@ wasm_trap_t* Storage_SetJson (void* pEnv, wasmtime_caller_t* pCaller, const wasm
 // ---------------------------------------------------------------------------
 // Scene host functions
 //
+// Node_Map:   (i64 twFabricIx) -> i64 twRootIx
+//   Map-managed mode: reads the MSF "data" node tree for twFabricIx and builds
+//   the whole fabric graph host-side (no per-node WASM calls). Simulates a map
+//   service injecting nodes. Mutually exclusive with WASM-managed Node_Root.
+//
 // Node_Root:  (i32 twFabricIx, i32 ptr, i32 len) -> i64 twObjectIx
 //   Creates a root node on the fabric identified by twFabricIx.
 //   Reads an RMCOBJECT (432 bytes) from WASM linear memory at [ptr..ptr+len).
@@ -492,6 +494,181 @@ wasm_trap_t* Storage_SetJson (void* pEnv, wasmtime_caller_t* pCaller, const wasm
 // Mutators:   (i64 twObjectIx, ...) -> void
 //   Modify properties on the MAP_OBJECT through the handle table.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// RmcObject_FromJson — inverse of RmcObject_ToJson. Fills a wire RMCOBJECT
+// from one node object of the MSF "data" tree (the "Children" array is the
+// caller's responsibility — it is not part of the flat wire object).
+// ---------------------------------------------------------------------------
+
+static void RmcObject_FromJson (const nlohmann::json& j, RMCOBJECT* pObject)
+{
+   *pObject = RMCOBJECT {};
+
+   auto Vec = [] (const nlohmann::json& a, double* pd, int n)
+   {
+      if (a.is_array ())
+      {
+         for (int i = 0; i < n  &&  i < static_cast<int> (a.size ()); i++)
+            pd[i] = a[i].get<double> ();
+      }
+   };
+
+   auto Str = [] (const nlohmann::json& v, char* pDst, size_t nMax)
+   {
+      if (v.is_string ())
+      {
+         std::string s = v.get<std::string> ();
+         size_t nLen = s.size () < nMax - 1 ? s.size () : nMax - 1;
+         memcpy (pDst, s.data (), nLen);
+      }
+   };
+
+   if (j.contains ("Head"))
+   {
+      const auto& h = j["Head"];
+      pObject->Head.Parent.qwComposed = h.value ("Parent", static_cast<uint64_t> (0));
+      pObject->Head.Self.qwComposed   = h.value ("Self",   static_cast<uint64_t> (0));
+      pObject->Head.qwEvent           = h.value ("Event",  static_cast<uint64_t> (0));
+   }
+
+   if (j.contains ("Name")  &&  j["Name"].is_string ())
+   {
+      std::string s = j["Name"].get<std::string> ();
+      int i = 0;
+      for (unsigned char c : s)
+      {
+         if (i >= 48)
+            break;
+         pObject->Name.wsName[i++] = static_cast<uint16_t> (c);
+      }
+   }
+
+   if (j.contains ("Type"))
+   {
+      const auto& t = j["Type"];
+      pObject->Type.bType    = static_cast<uint8_t> (t.value ("bType",    0));
+      pObject->Type.bSubtype = static_cast<uint8_t> (t.value ("bSubtype", 0));
+      pObject->Type.bFiction = static_cast<uint8_t> (t.value ("bFiction", 0));
+   }
+
+   pObject->Owner.twOwner = j.value ("Owner", static_cast<uint64_t> (0));
+
+   if (j.contains ("Resource"))
+   {
+      const auto& r = j["Resource"];
+      pObject->Resource.qwResource = r.value ("qwResource", static_cast<uint64_t> (0));
+      if (r.contains ("sName"))      Str (r["sName"],      pObject->Resource.sName,      sizeof (pObject->Resource.sName));
+      if (r.contains ("sReference")) Str (r["sReference"], pObject->Resource.sReference, sizeof (pObject->Resource.sReference));
+   }
+
+   if (j.contains ("Transform"))
+   {
+      const auto& tr = j["Transform"];
+      if (tr.contains ("Position")) Vec (tr["Position"], pObject->Transform.d3Position, 3);
+      if (tr.contains ("Rotation")) Vec (tr["Rotation"], pObject->Transform.d4Rotation, 4);
+      if (tr.contains ("Scale"))    Vec (tr["Scale"],    pObject->Transform.d3Scale,    3);
+   }
+
+   if (j.contains ("Orbit"))
+   {
+      const auto& o = j["Orbit"];
+      pObject->Orbit.tmPeriod = o.value ("tmPeriod", static_cast<int64_t> (0));
+      pObject->Orbit.tmOrigin = o.value ("tmOrigin", static_cast<int64_t> (0));
+      pObject->Orbit.dA       = o.value ("dA", 0.0);
+      pObject->Orbit.dB       = o.value ("dB", 0.0);
+   }
+
+   if (j.contains ("Bound")  &&  j["Bound"].contains ("Max"))
+      Vec (j["Bound"]["Max"], pObject->Bound.d3Max, 3);
+
+   if (j.contains ("Properties"))
+   {
+      const auto& p = j["Properties"];
+      pObject->Properties.fMass         = p.value ("fMass",         0.0f);
+      pObject->Properties.fGravity      = p.value ("fGravity",      0.0f);
+      pObject->Properties.fColor        = p.value ("fColor",        0.0f);
+      pObject->Properties.fBrightness   = p.value ("fBrightness",   0.0f);
+      pObject->Properties.fReflectivity = p.value ("fReflectivity", 0.0f);
+   }
+}
+
+// ---------------------------------------------------------------------------
+// Map_Open_Children — recursively opens each child of a JSON node under the
+// already-created parent, returning the number of nodes created.
+// ---------------------------------------------------------------------------
+
+static uint32_t Map_Open_Children (CONTAINER* pContainer, uint64_t twParentIx, const nlohmann::json& jParent)
+{
+   uint32_t nCount = 0;
+
+   if (jParent.contains ("Children")  &&  jParent["Children"].is_array ())
+   {
+      for (const auto& jChild : jParent["Children"])
+      {
+         RMCOBJECT RMCObject;
+         RmcObject_FromJson (jChild, &RMCObject);
+
+         uint64_t twChildIx = pContainer->Node_Open (twParentIx, &RMCObject);
+
+         if (twChildIx != OBJECTIX_ERROR)
+         {
+            nCount += 1 + Map_Open_Children (pContainer, twChildIx, jChild);
+         }
+      }
+   }
+
+   return nCount;
+}
+
+wasm_trap_t* Scene_Node_Map (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults)
+{
+   (void) pCaller;
+
+   uint64_t twResult = OBJECTIX_ERROR;
+
+   if (nArgs >= 1)
+   {
+      uint64_t twFabricIx = static_cast<uint64_t> (pArgs[0].of.i64);
+
+      CONTAINER* pContainer = Container (pEnv);
+      SCENE*     pScene     = pContainer ? pContainer->Context ()->Scene () : nullptr;
+      FABRIC*    pFabric    = pScene     ? pScene->Fabric_Find (twFabricIx) : nullptr;
+      MSF*       pMsf       = pFabric    ? pFabric->Msf ()                  : nullptr;
+
+      if (pMsf)
+      {
+         nlohmann::json jPayload = pMsf->Payload ();
+
+         if (jPayload.is_object ()  &&  jPayload.contains ("data")  &&  jPayload["data"].is_object ())
+         {
+            const nlohmann::json& jRoot = jPayload["data"];
+
+            RMCOBJECT RMCObject;
+            RmcObject_FromJson (jRoot, &RMCObject);
+
+            uint64_t twRootIx = pContainer->Node_Root (twFabricIx, &RMCObject);
+
+            if (twRootIx != OBJECTIX_ERROR)
+            {
+               uint32_t nCount = 1 + Map_Open_Children (pContainer, twRootIx, jRoot);
+
+               pScene->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "MAP", "Injected " + std::to_string (nCount) + " nodes from MSF data block");
+
+               twResult = twRootIx;
+            }
+         }
+      }
+   }
+
+   if (nResults > 0)
+   {
+      pResults[0].kind   = WASMTIME_I64;
+      pResults[0].of.i64 = static_cast<int64_t> (twResult);
+   }
+
+   return nullptr;
+}
 
 wasm_trap_t* Scene_Node_Root (void* pEnv, wasmtime_caller_t* pCaller, const wasmtime_val_t* pArgs, size_t nArgs, wasmtime_val_t* pResults, size_t nResults)
 {
@@ -509,12 +686,12 @@ wasm_trap_t* Scene_Node_Root (void* pEnv, wasmtime_caller_t* pCaller, const wasm
 
          if (pBytes)
          {
-            auto* pScene = Scene (pEnv);
+            auto* pContainer = Container (pEnv);
 
-            if (pScene)
+            if (pContainer)
             {
                const auto* pObject = reinterpret_cast<const RMCOBJECT*> (pBytes);
-               twResult = pScene->Node_Root (twFabricIx, pObject);
+               twResult = pContainer->Node_Root (twFabricIx, pObject);
             }
          }
       }
@@ -545,12 +722,12 @@ wasm_trap_t* Scene_Node_Open (void* pEnv, wasmtime_caller_t* pCaller, const wasm
 
          if (pBytes)
          {
-            auto* pScene = Scene (pEnv);
+            auto* pContainer = Container (pEnv);
 
-            if (pScene)
+            if (pContainer)
             {
                const auto* pObject = reinterpret_cast<const RMCOBJECT*> (pBytes);
-               twResult = pScene->Node_Open (twParentIx, pObject);
+               twResult = pContainer->Node_Open (twParentIx, pObject);
             }
          }
       }
@@ -575,9 +752,9 @@ wasm_trap_t* Scene_Node_Close (void* pEnv, wasmtime_caller_t* pCaller, const was
    {
       uint64_t twObjectIx = static_cast<uint64_t> (pArgs[0].of.i64);
       
-      auto* pScene = Scene (pEnv);
+      auto* pContainer = Container (pEnv);
 
-      if (pScene  &&  pScene->Node_Close (twObjectIx))
+      if (pContainer  &&  pContainer->Node_Close (twObjectIx))
          nResult = 1;
    }
 
@@ -593,11 +770,11 @@ wasm_trap_t* Scene_Node_Position (void* pEnv, wasmtime_caller_t* pCaller, const 
    if (nArgs >= 4)
    {
       uint64_t twObjectIx = static_cast<uint64_t> (pArgs[0].of.i64);
-      auto* pScene = Scene (pEnv);
+      auto* pContainer = Container (pEnv);
 
-      if (pScene)
+      if (pContainer)
       {
-         NODE* pNode = pScene->Node_Find (twObjectIx);
+         NODE* pNode = pContainer->Node_Find (twObjectIx);
          MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
 
          if (pObj)
@@ -619,11 +796,11 @@ wasm_trap_t* Scene_Node_Scale (void* pEnv, wasmtime_caller_t* pCaller, const was
    if (nArgs >= 2)
    {
       uint64_t twObjectIx = static_cast<uint64_t> (pArgs[0].of.i64);
-      auto* pScene = Scene (pEnv);
+      auto* pContainer = Container (pEnv);
 
-      if (pScene)
+      if (pContainer)
       {
-         NODE* pNode = pScene->Node_Find (twObjectIx);
+         NODE* pNode = pContainer->Node_Find (twObjectIx);
          MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
 
          if (pObj)
@@ -641,11 +818,11 @@ wasm_trap_t* Scene_Node_Bound (void* pEnv, wasmtime_caller_t* pCaller, const was
    if (nArgs >= 2)
    {
       uint64_t twObjectIx = static_cast<uint64_t> (pArgs[0].of.i64);
-      auto* pScene = Scene (pEnv);
+      auto* pContainer = Container (pEnv);
 
-      if (pScene)
+      if (pContainer)
       {
-         NODE* pNode = pScene->Node_Find (twObjectIx);
+         NODE* pNode = pContainer->Node_Find (twObjectIx);
          MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
 
          if (pObj)
@@ -667,11 +844,11 @@ wasm_trap_t* Scene_Node_Color (void* pEnv, wasmtime_caller_t* pCaller, const was
    if (nArgs >= 2)
    {
       uint64_t twObjectIx = static_cast<uint64_t> (pArgs[0].of.i64);
-      auto* pScene = Scene (pEnv);
+      auto* pContainer = Container (pEnv);
 
-      if (pScene)
+      if (pContainer)
       {
-         NODE* pNode = pScene->Node_Find (twObjectIx);
+         NODE* pNode = pContainer->Node_Find (twObjectIx);
          MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
 
          if (pObj)
@@ -692,11 +869,11 @@ wasm_trap_t* Scene_Node_Name (void* pEnv, wasmtime_caller_t* pCaller, const wasm
    if (nArgs >= 3)
    {
       uint64_t twObjectIx = static_cast<uint64_t> (pArgs[0].of.i64);
-      auto* pScene = Scene (pEnv);
+      auto* pContainer = Container (pEnv);
 
-      if (pScene)
+      if (pContainer)
       {
-         NODE* pNode = pScene->Node_Find (twObjectIx);
+         NODE* pNode = pContainer->Node_Find (twObjectIx);
          MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
 
          if (pObj)
@@ -721,11 +898,11 @@ wasm_trap_t* Scene_Node_Radius (void* pEnv, wasmtime_caller_t* pCaller, const wa
    if (nArgs >= 2)
    {
       uint64_t twObjectIx = static_cast<uint64_t> (pArgs[0].of.i64);
-      auto* pScene = Scene (pEnv);
+      auto* pContainer = Container (pEnv);
 
-      if (pScene)
+      if (pContainer)
       {
-         NODE* pNode = pScene->Node_Find (twObjectIx);
+         NODE* pNode = pContainer->Node_Find (twObjectIx);
          MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
 
          if (pObj)
@@ -747,11 +924,11 @@ wasm_trap_t* Scene_Node_Texture (void* pEnv, wasmtime_caller_t* pCaller, const w
    if (nArgs >= 3)
    {
       uint64_t twObjectIx = static_cast<uint64_t> (pArgs[0].of.i64);
-      auto* pScene = Scene (pEnv);
+      auto* pContainer = Container (pEnv);
 
-      if (pScene)
+      if (pContainer)
       {
-         NODE* pNode = pScene->Node_Find (twObjectIx);
+         NODE* pNode = pContainer->Node_Find (twObjectIx);
          MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
 
          if (pObj)

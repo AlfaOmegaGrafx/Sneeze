@@ -63,7 +63,17 @@ bool MSF::Parse (const std::string& sJws, const std::string& sUrl)
 
    if (!sJws.empty ())
    {
-      bool bIsJws = (sJws.find ('.') != std::string::npos);
+      // A plain JSON document starts with '{' or '[' (after an optional BOM
+      // and whitespace); a JWS is dot-separated base64url with no leading
+      // brace. Detect JSON first so float and URL dots inside a plain JSON
+      // payload are not mistaken for JWS segment separators.
+      size_t nStart = 0;
+      if (sJws.size () >= 3  &&  static_cast<unsigned char> (sJws[0]) == 0xEF  &&  static_cast<unsigned char> (sJws[1]) == 0xBB  &&  static_cast<unsigned char> (sJws[2]) == 0xBF)
+         nStart = 3;
+
+      size_t nFirst  = sJws.find_first_not_of (" \t\r\n", nStart);
+      bool   bIsJson = (nFirst != std::string::npos)  &&  (sJws[nFirst] == '{'  ||  sJws[nFirst] == '[');
+      bool   bIsJws  = !bIsJson  &&  (sJws.find ('.') != std::string::npos);
 
       if (bIsJws)
       {

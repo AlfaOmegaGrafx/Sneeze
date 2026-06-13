@@ -111,8 +111,8 @@ struct RENDERER::ANARI::SCENE_STATE
    ANARIArray1D  pSharedNrmArr = nullptr;
    ANARIArray1D  pSharedIdxArr = nullptr;
 
-   ANARILight    pLight        = nullptr;
-   ANARIArray1D  pLightArr     = nullptr;
+   std::vector<ANARILight> aLight;
+   ANARIArray1D            pLightArr     = nullptr;
 
    ANARIGroup    pSurfaceGroup = nullptr;
    ANARIInstance pSurfaceInst  = nullptr;
@@ -438,6 +438,14 @@ void RENDERER::ANARI::SetCamera (const CAMERA_DATA& pCamera)
    anariCommitParameters (m_pDevice, m_pCamera);
 }
 
+void RENDERER::ANARI::SetLights (const std::vector<LIGHT_DATA>& aLight)
+{
+   if (aLight.size () != m_aLight.size ())
+      m_bSceneDirty = true;
+
+   m_aLight = aLight;
+}
+
 void RENDERER::ANARI::BeginFrame ()
 {
    m_aSpheres.clear ();
@@ -599,7 +607,8 @@ void RENDERER::ANARI::ReleaseScene ()
    if (S.pSurfaceInst)  { anariRelease (m_pDevice, S.pSurfaceInst);  S.pSurfaceInst  = nullptr; }
    if (S.pSurfaceGroup) { anariRelease (m_pDevice, S.pSurfaceGroup); S.pSurfaceGroup = nullptr; }
    if (S.pLightArr)     { anariRelease (m_pDevice, S.pLightArr);     S.pLightArr     = nullptr; }
-   if (S.pLight)        { anariRelease (m_pDevice, S.pLight);        S.pLight        = nullptr; }
+   for (auto pLight : S.aLight)  anariRelease (m_pDevice, pLight);
+   S.aLight.clear ();
    if (S.pSharedIdxArr) { anariRelease (m_pDevice, S.pSharedIdxArr); S.pSharedIdxArr = nullptr; }
    if (S.pSharedNrmArr) { anariRelease (m_pDevice, S.pSharedNrmArr); S.pSharedNrmArr = nullptr; }
    if (S.pSharedPosArr) { anariRelease (m_pDevice, S.pSharedPosArr); S.pSharedPosArr = nullptr; }
@@ -826,18 +835,40 @@ void RENDERER::ANARI::BuildScene (const std::vector<SPHERE_DATA>& aSpheres,
       anariUnsetParameter (m_pDevice, m_pWorld, "instance");
    }
 
-   // --- Point light at origin ---
+   // --- Scene lights ---
+   //
+   // Each star contributes a point light at its world position. When the scene
+   // has no star (e.g. a planetary system loaded as the primary fabric, with
+   // its sun in a parent fabric), fall back to a single ambient light so
+   // nothing is lit from the scene origin.
 
-   S.pLight = anariNewLight (m_pDevice, "point");
-   float lightPos[3] = { 0.0f, 0.0f, 0.0f };
-   float lightColor[3] = { 1.0f, 1.0f, 0.95f };
-   float lightIntensity = 25.0f;
-   anariSetParameter (m_pDevice, S.pLight, "position", ANARI_FLOAT32_VEC3, lightPos);
-   anariSetParameter (m_pDevice, S.pLight, "color", ANARI_FLOAT32_VEC3, lightColor);
-   anariSetParameter (m_pDevice, S.pLight, "intensity", ANARI_FLOAT32, &lightIntensity);
-   anariCommitParameters (m_pDevice, S.pLight);
+   if (!m_aLight.empty ())
+   {
+      for (const auto& Light : m_aLight)
+      {
+         ANARILight pLight = anariNewLight (m_pDevice, "point");
+         float lightPos[3]    = { Light.x, Light.y, Light.z };
+         float lightColor[3]  = { 1.0f, 1.0f, 0.95f };
+         float lightIntensity = 25.0f;
+         anariSetParameter (m_pDevice, pLight, "position", ANARI_FLOAT32_VEC3, lightPos);
+         anariSetParameter (m_pDevice, pLight, "color", ANARI_FLOAT32_VEC3, lightColor);
+         anariSetParameter (m_pDevice, pLight, "intensity", ANARI_FLOAT32, &lightIntensity);
+         anariCommitParameters (m_pDevice, pLight);
+         S.aLight.push_back (pLight);
+      }
+   }
+   else
+   {
+      ANARILight pLight = anariNewLight (m_pDevice, "ambient");
+      float lightColor[3] = { 1.0f, 1.0f, 1.0f };
+      float lightRadiance = 1.0f;            // ambient brightness when no star is present
+      anariSetParameter (m_pDevice, pLight, "color", ANARI_FLOAT32_VEC3, lightColor);
+      anariSetParameter (m_pDevice, pLight, "radiance", ANARI_FLOAT32, &lightRadiance);
+      anariCommitParameters (m_pDevice, pLight);
+      S.aLight.push_back (pLight);
+   }
 
-   S.pLightArr = anariNewArray1D (m_pDevice, &S.pLight, nullptr, nullptr, ANARI_LIGHT, 1);
+   S.pLightArr = anariNewArray1D (m_pDevice, S.aLight.data (), nullptr, nullptr, ANARI_LIGHT, S.aLight.size ());
    anariSetParameter (m_pDevice, m_pWorld, "light", ANARI_ARRAY1D, &S.pLightArr);
 
    S.bBuilt = true;

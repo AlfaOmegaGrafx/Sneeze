@@ -89,7 +89,7 @@ struct RMCOBJECT
 
    // MAP_OBJECT_TYPE (8 bytes)
    bType:                   u8,
-   bSubtype__:              u8,
+   bSubtype:                u8,
    bFiction:                u8,
    abReserved_Type:         [u8; 5],
 
@@ -180,7 +180,9 @@ fn Submit_System (nParent: u64, nSelf: u64, sName: &str, bType: u8, dA: f64, dB:
    obj.qwObjectIx_Parent = OBJECTIX_COMPOSE (MAP_OBJECT_CLASS_CELESTIAL, nParent);
    obj.qwObjectIx_Self   = OBJECTIX_COMPOSE (MAP_OBJECT_CLASS_CELESTIAL, nSelf);
    obj.bType             = bType;
-   obj.bSubtype__        = 0;
+   obj.bSubtype          = 0;
+   obj.d3Position        = [precX, precY, precZ];
+   obj.d4Rotation        = [qx, qy, qz, qw];
    obj.d3Scale           = [1.0, 1.0, 1.0];
    obj.d3Max             = [dBound, dBound, dBound];
    obj.fMass             = fMass;
@@ -189,8 +191,6 @@ fn Submit_System (nParent: u64, nSelf: u64, sName: &str, bType: u8, dA: f64, dB:
    obj.dB                = dB;
    obj.tmPeriod          = tmPeriod;
    obj.tmOrigin          = tmOrigin;
-   obj.d4Rotation        = [qx, qy, qz, qw];
-   obj.d3Position        = [precX, precY, precZ];
    obj.Name_Set (sName);
    Submit_Node (&obj);
 }
@@ -202,13 +202,13 @@ fn Submit_Body (nParent: u64, nSelf: u64, sName: &str, bType: u8, dRadius: f64, 
    obj.qwObjectIx_Parent = OBJECTIX_COMPOSE (MAP_OBJECT_CLASS_CELESTIAL, nParent);
    obj.qwObjectIx_Self   = OBJECTIX_COMPOSE (MAP_OBJECT_CLASS_CELESTIAL, nSelf);
    obj.bType             = bType;
-   obj.bSubtype__        = 0;
+   obj.bSubtype          = 0;
+   obj.d3Position        = [precX, precY, precZ];
+   obj.d4Rotation        = [qx, qy, qz, qw];
    obj.d3Scale           = [1.0, 1.0, 1.0];
    obj.d3Max             = [dRadius, dRadius, dRadius];
    obj.fMass             = fMass;
    obj.fColor            = f32::from_bits (nColor);
-   obj.d4Rotation        = [qx, qy, qz, qw];
-   obj.d3Position        = [precX, precY, precZ];
    obj.Name_Set (sName);
    Submit_Node (&obj);
 }
@@ -219,7 +219,8 @@ fn Submit_Surface (nParent: u64, nSelf: u64, sName: &str, sTexture: &str, dW0Rad
    obj.qwObjectIx_Parent = OBJECTIX_COMPOSE (MAP_OBJECT_CLASS_CELESTIAL, nParent);
    obj.qwObjectIx_Self   = OBJECTIX_COMPOSE (MAP_OBJECT_CLASS_CELESTIAL, nSelf);
    obj.bType             = MAP_OBJECT_TYPE_TYPE_CELESTIAL_SURFACE;
-   obj.bSubtype__        = 0;
+   obj.bSubtype          = 0;
+   obj.d4Rotation        = [0.0, 0.0, 0.0, 1.0];
    obj.d3Scale           = [1.0, 1.0, 1.0];
    obj.dA                = dW0Rad;
    obj.tmPeriod          = tmSpinPeriod;
@@ -252,7 +253,7 @@ pub extern "C" fn Open (twFabricIx: u64, _dwOffset: u32, _dwLength: u32)
    objRoot.qwObjectIx_Parent = OBJECTIX_COMPOSE (MAP_OBJECT_CLASS_ROOT,      0);
    objRoot.qwObjectIx_Self   = OBJECTIX_COMPOSE (MAP_OBJECT_CLASS_CELESTIAL, 2);
    objRoot.bType             = MAP_OBJECT_TYPE_TYPE_CELESTIAL_STARSYSTEM;
-   objRoot.bSubtype__        = 0;
+   objRoot.bSubtype          = 0;
    objRoot.d3Scale           = [1.0, 1.0, 1.0];
    objRoot.d4Rotation        = [0.0, 0.0, 0.0, 1.0];
    objRoot.fColor            = f32::from_bits (0x00888888);
