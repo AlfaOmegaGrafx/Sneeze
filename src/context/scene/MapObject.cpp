@@ -64,9 +64,9 @@ static double SolveKepler (double dM_rad, double dEcc)
 // MAP_OBJECT
 // ---------------------------------------------------------------------------
 
-MAP_OBJECT::MAP_OBJECT (MAP_OBJECT_TYPE_TYPE bType)
+MAP_OBJECT::MAP_OBJECT (OBJECT_HEAD Head)
 {
-   m_Type.bType = bType;
+   m_Head = Head;
 }
 
 void MAP_OBJECT::Position (int64_t tmNow, double& dX, double& dY, double& dZ) const
@@ -128,7 +128,7 @@ uint32_t MAP_OBJECT::ColorBrightToU32 () const
 // MAP_OBJECT_ROOT
 // ---------------------------------------------------------------------------
 
-MAP_OBJECT_ROOT::MAP_OBJECT_ROOT () : MAP_OBJECT (MAP_OBJECT_TYPE_TYPE_ROOT)
+MAP_OBJECT_ROOT::MAP_OBJECT_ROOT (OBJECT_HEAD Head) : MAP_OBJECT (Head)
 {
 }
 
@@ -136,7 +136,7 @@ MAP_OBJECT_ROOT::MAP_OBJECT_ROOT () : MAP_OBJECT (MAP_OBJECT_TYPE_TYPE_ROOT)
 // MAP_OBJECT_CELESTIAL
 // ---------------------------------------------------------------------------
 
-MAP_OBJECT_CELESTIAL::MAP_OBJECT_CELESTIAL () : MAP_OBJECT (MAP_OBJECT_TYPE_TYPE_CELESTIAL)
+MAP_OBJECT_CELESTIAL::MAP_OBJECT_CELESTIAL (OBJECT_HEAD Head) : MAP_OBJECT (Head)
 {
 }
 
@@ -165,12 +165,12 @@ void MAP_OBJECT_CELESTIAL::Position (int64_t tmNow, double& dX, double& dY, doub
 
 void MAP_OBJECT_CELESTIAL::Rotation (int64_t tmNow, double& dQx, double& dQy, double& dQz, double& dQw) const
 {
-   uint8_t bSub = m_Type.bSubtype;
+   uint8_t bType = m_Type.bType;
 
-   if (bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_STAR        ||
-       bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_PLANET      ||
-       bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_MOON        ||
-       bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_DEBRIS)
+   if (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_STAR
+   ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_PLANET
+   ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOON
+   ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_DEBRIS)
    {
       double eX = m_Transform.d4Rotation[0];
       double eY = m_Transform.d4Rotation[1];
@@ -208,7 +208,7 @@ void MAP_OBJECT_CELESTIAL::Rotation (int64_t tmNow, double& dQx, double& dQy, do
          }
       }
    }
-   else if (bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_SURFACE)
+   else if (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_SURFACE)
    {
       int64_t tmSpinPeriod = m_Orbit.tmPeriod;
 
@@ -332,7 +332,7 @@ VEC3 MAP_OBJECT_CELESTIAL::OrbitTrailPoint (double dE, int64_t tmElapsed) const
 // MAP_OBJECT_TERRESTRIAL
 // ---------------------------------------------------------------------------
 
-MAP_OBJECT_TERRESTRIAL::MAP_OBJECT_TERRESTRIAL () : MAP_OBJECT (MAP_OBJECT_TYPE_TYPE_TERRESTRIAL)
+MAP_OBJECT_TERRESTRIAL::MAP_OBJECT_TERRESTRIAL (OBJECT_HEAD Head) : MAP_OBJECT (Head)
 {
 }
 
@@ -340,6 +340,6 @@ MAP_OBJECT_TERRESTRIAL::MAP_OBJECT_TERRESTRIAL () : MAP_OBJECT (MAP_OBJECT_TYPE_
 // MAP_OBJECT_PHYSICAL
 // ---------------------------------------------------------------------------
 
-MAP_OBJECT_PHYSICAL::MAP_OBJECT_PHYSICAL () : MAP_OBJECT (MAP_OBJECT_TYPE_TYPE_PHYSICAL)
+MAP_OBJECT_PHYSICAL::MAP_OBJECT_PHYSICAL (OBJECT_HEAD Head) : MAP_OBJECT (Head)
 {
 }

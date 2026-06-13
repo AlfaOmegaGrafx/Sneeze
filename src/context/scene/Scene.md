@@ -19,7 +19,7 @@ SCENE (owned by CONTEXT)
  │                                           └── ...
  ├── m_pNode_Primary  (primary attachment node — owned by SCENE)
  ├── m_umpFabric      (scene-global fabric map, keyed by twFabricIx)
- └── m_umpNode        (scene-global node handle table, keyed by twObjectIx)
+ └── m_umpNode        (scene-global node handle table, keyed by composed OBJECTIX qwComposed)
 ```
 
 FABRICs own trees of NODEs. NODEs are structural — all 3D properties
@@ -29,7 +29,7 @@ FABRICs own trees of NODEs. NODEs are structural — all 3D properties
 
 SCENE orchestrates the full lifecycle of fabric creation:
 
-1. A NODE recognizes it's an attachment point (bSubtype == 255) and calls
+1. A NODE recognizes it's an attachment point (bType == 255) and calls
    `SCENE::Fabric_Spawn(pNode, sUrl)`, which starts the async MSF fetch.
 2. SCENE fetches the MSF file via the root container's network cache
    (all MSF fetches share a single cache — deduplication is automatic).
@@ -82,19 +82,42 @@ Because a scene swap replaces all geometry, `Url()` calls
 stale objects (see `Viewport.md`). The scene's URL is not stored on SCENE — it
 is read from the root FABRIC, which records its URL at `Initialize()`.
 
+### Object Identity — OBJECTIX
+
+An object handle is an `OBJECTIX`: a single `uint64_t` (`qwComposed`) that packs
+two fields. The upper 16 bits are a `MAP_OBJECT_CLASS` discriminator; the low 48
+bits are the object index. Two accessors split it: `ObjectIx()` returns the low
+48 bits, `Class()` returns the upper 16 cast to `MAP_OBJECT_CLASS`. Compose the
+two with the `OBJECTIX_COMPOSE(eClass, twObjectIx)` macro (in `MapObject.h`)
+rather than writing opaque 64-bit literals.
+
+`OBJECT_HEAD` carries two OBJECTIX values — `Self` and `Parent` — so every node
+knows both its own class+index and its parent's. An object's class lives only in
+`Self.Class()`; it is never stored anywhere else (see MAP_OBJECT below).
+
 ### Scene Node Handle Table
 
-SCENE owns the scene-global node handle table (`m_umpNode`, keyed by
-`twObjectIx`) and the map-object backing store (`m_apMap_Object`). The handle
-indices are allocated scene-wide from `m_twObjectIx_Next`, or honored as
-supplied when an RMCOBJECT carries an explicit non-identity index.
+SCENE owns the scene-global node handle table (`m_umpNode`) and the map-object
+backing store (`m_apMap_Object`). **The table is keyed by the full composed
+`OBJECTIX` (`qwComposed` — class + index), not the bare index.** Parent lookups
+therefore carry the class as well. The 48-bit index portion is allocated
+scene-wide from `m_twObjectIx_Next`, or honored as supplied when an RMCOBJECT
+carries an explicit non-identity index; the class is taken from the RMCOBJECT's
+`Head.Self.Class()` and re-composed with the assigned index for the key.
 
 | Method | Description |
 |--------|-------------|
-| `Node_Root(twFabricIx, pRMCObject)` | Create a fabric's root node (fabric must not already have one) |
-| `Node_Open(twParentIx, pRMCObject)` | Add a child node under an existing node |
-| `Node_Close(twObjectIx)` | Remove a node, cascading to its children and map object |
-| `Node_Find(twObjectIx)` | Resolve a handle to a `NODE*` |
+| `Node_Root(twFabricIx, pRMCObject)` | Create a fabric's root node (fabric must not already have one). Returns the composed handle. |
+| `Node_Open(twParentIx, pRMCObject)` | Add a child node under the node whose composed handle is `twParentIx`. Returns the composed handle. |
+| `Node_Close(twObjectIx)` | Remove the node with composed handle `twObjectIx`, cascading to its children and map object |
+| `Node_Find(twObjectIx)` | Resolve a composed handle to a `NODE*` |
+
+`Node_Create` reads `Head.Self.Class()`, `switch`es on it to construct the
+matching derived `MAP_OBJECT` (ROOT / CELESTIAL / TERRESTRIAL / PHYSICAL),
+re-stamps `Head.Self` with the composed handle, and stores the node under that
+key. The handle it returns (and that `NODE::ObjectIx()` later reports) is the
+composed value, so callers round-trip it unchanged through `Node_Find` /
+`Node_Close`.
 
 These are the entry points the WASM host functions call to build a fabric's
 branch in WASM-managed mode. The table does not itself enforce container
@@ -135,7 +158,7 @@ Structural graph element. Constructor takes `FABRIC*` + `NODE*` parent. pImpl
 pattern. Two-step construction: constructor links into tree, `Initialize(MAP_OBJECT*)`
 assigns the 3D payload.
 
-When a MAP_OBJECT with bSubtype == 255 (attachment point) is initialized, NODE
+When a MAP_OBJECT with bType == 255 (attachment point) is initialized, NODE
 delegates to `SCENE::Fabric_Open()` to begin the async fabric loading process.
 On destruction, NODE calls `SCENE::Fabric_Close()` for any attached fabric.
 
@@ -144,8 +167,7 @@ When a MAP_OBJECT with a non-empty texture URL is assigned, NODE::Impl
 the network and decodes it via stb_image on completion.
 
 ```cpp
-NODE* pNode = new NODE (pFabric, pParentNode);
-pNode->ObjectIx (42);
+NODE* pNode = new NODE (pFabric, pParentNode, qwComposed);
 pNode->Initialize (pMapObject);
 
 // Iteration
@@ -157,7 +179,7 @@ for (int i = 0; i < pParent->Node_Count (); ++i)
 
 | Accessor | Description |
 |----------|-------------|
-| `ObjectIx()` | 48-bit object index |
+| `ObjectIx()` | Composed object handle (class in upper 16 bits, 48-bit index in low bits) |
 | `MapObject()` | Associated MAP_OBJECT |
 | `Fabric()` | Owning FABRIC |
 | `Parent()` | Parent NODE |
@@ -180,33 +202,47 @@ decrements the refcount and deletes the container when it reaches zero.
 
 ## MAP_OBJECT
 
-Base class for 3D domain objects. All spatial properties live here:
+Base class for 3D domain objects. Constructed from an `OBJECT_HEAD`, which it
+stores in `m_Head`; the rest of the wire payload (`m_Name`, `m_Type`,
+`m_Resource`, `m_Transform`, `m_Orbit`, `m_Bound`, `m_Properties`) is copied in
+by `Node_Create` after construction. These members mirror the RMCOBJECT
+wire-format sub-structs byte-for-byte.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `m_dPosX/Y/Z` | `double` | World-space position |
-| `m_dScale` | `double` | Uniform scale |
-| `m_dBound` | `double` | Bounding sphere radius |
-| `m_nColor` | `uint32_t` | Packed RGBA color |
+The object's **class is derived, never stored as its own field**:
+`MAP_OBJECT::Class()` returns `m_Head.Self.Class()` (the upper 16 bits of the
+self OBJECTIX). Spatial properties are read through accessors that consult the
+sub-structs — e.g. `Position()`/`Rotation()` from `m_Transform` and `m_Orbit`,
+`Radius()` from `m_Bound`, and the `ColorToU32()` family from `m_Properties`.
+
+`MAP_OBJECT_TYPE` is the 8-byte wire sub-struct: `bType` (the celestial type —
+see below), `bSubtype__` (poisoned reserved byte, always 0, never read),
+`bFiction`, and 5 reserved bytes. `bType == 255` marks an MSF attachment point.
 
 ### Derived Types
 
-| Type | Additional Fields |
-|------|-------------------|
-| `MAP_OBJECT_ROOT` | — |
-| `MAP_OBJECT_CELESTIAL` | `m_dRadius`, `m_eSubtype`, `m_sName`, orbital data, colors |
-| `MAP_OBJECT_TERRESTRIAL` | — |
-| `MAP_OBJECT_PHYSICAL` | — |
+The derived class is chosen by `Node_Create` switching on `Head.Self.Class()`,
+and must agree with the class packed into the handle:
+
+| Type | Class | Notes |
+|------|-------|-------|
+| `MAP_OBJECT_ROOT` | `MAP_OBJECT_CLASS_ROOT` (70) | Used by the scene's built-in root fabric (its root and primary nodes) |
+| `MAP_OBJECT_CELESTIAL` | `MAP_OBJECT_CLASS_CELESTIAL` (71) | Orbital bodies and frames |
+| `MAP_OBJECT_TERRESTRIAL` | `MAP_OBJECT_CLASS_TERRESTRIAL` (72) | — |
+| `MAP_OBJECT_PHYSICAL` | `MAP_OBJECT_CLASS_PHYSICAL` (73) | — |
+
+Every derived constructor takes an `OBJECT_HEAD` and forwards it to the base.
 
 ### MAP_OBJECT_CELESTIAL
 
 Contains orbital mechanics data via the `ORBIT_POSITION` struct (defined in
 `MapObject.h`). File-local static functions `SolveKepler`, `QuatMultiply`, and
-`RotateByQuat` in `MapObject.cpp` compute orbital positions from the embedded
-orbital elements. The compositor calls `PositionAtTick()` for animation.
+`RotateByQuat` in `MapObject.cpp` compute orbital positions from `m_Orbit` and
+`m_Transform`. The compositor calls `PositionAtTick()` for animation.
 
-Subtypes: Star, Planet, Moon, DwarfPlanet, SmallBody, Surface, StarSystem,
-PlanetSystem.
+The celestial type is stored in `m_Type.bType`, valued from the
+`MAP_OBJECT_TYPE_TYPE_CELESTIAL_*` enum (NONE, UNIVERSE, ... STARSYSTEM=9,
+STAR=10, PLANETSYSTEM=11, PLANET=12, MOON=13, DEBRIS=14, SURFACE=17, etc.). The
+compositor and `Rotation()` branch on this value.
 
 ## Fabric Ownership Modes
 
@@ -329,6 +365,6 @@ caller.
 | `Scene.cpp` | SCENE + Impl (pimpl, fabric map, root fabric + primary node, node handle table Node_Root/Open/Close/Find, MSF_FETCH, Fabric_Spawn/Open/Close/Find, Url/Reload) |
 | `Fabric.cpp` | FABRIC + Impl (WASM module lifecycle, node linkage, child fabrics) |
 | `Node.cpp` | NODE + Impl (tree ops, texture loading via IFILE, delegates fabric ops to SCENE) |
-| `MapObject.h` | MAP_OBJECT hierarchy, ORBIT_POSITION struct, type/subtype enums |
+| `MapObject.h` | MAP_OBJECT hierarchy, ORBIT_POSITION struct, MAP_OBJECT_CLASS enum, celestial type enum, OBJECTIX (+ OBJECTIX_COMPOSE), RMCOBJECT wire structs |
 | `MapObject.cpp` | MAP_OBJECT methods, SolveKepler, QuatMultiply, RotateByQuat |
 | `AccessControl.h/cpp` | CanRead/CanWrite enforcement |

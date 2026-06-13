@@ -239,3 +239,16 @@
 - Confirmed deferred (logged in Scene.md "Known Limitations"): async MSF-fetch cancellation, compositor-traversal safety during `Url()`/`Reload()` teardown, and a future scene-revision-counter to unify rebuild-detection with traversal safety
 - Confirmed intentional/temporary: the `CID.eTrust = kTRUST_EXPIRED` override in `Container_Open` (no trusted cert yet)
 - Updated Scene.md to current state (node table on SCENE, scene-global indices, access-check responsibility, Known Limitations)
+
+## June 12, 2026 — Dean Abramson (night)
+
+**Object class moved into OBJECTIX; celestial type moved into bType; node handle table keyed by composed value**
+
+- Class (root/celestial/terrestrial/physical) no longer lives in `MAP_OBJECT_TYPE` — it now lives in the upper 16 bits of the `OBJECTIX` (`qwComposed`) on `Head.Self`/`Head.Parent`. `OBJECTIX::Class()` reads it; `OBJECTIX::ObjectIx()` is the low 48 bits. Added `OBJECTIX_COMPOSE(eClass, twObjectIx)` macro in MapObject.h
+- Deleted the old `MAP_OBJECT_TYPE_TYPE__` enum; `MAP_OBJECT::Class()` derives class from `m_Head.Self.Class()`. Derived ctors (ROOT/CELESTIAL/TERRESTRIAL/PHYSICAL) now take an `OBJECT_HEAD` and forward it to the base
+- `SCENE::Node_Create` switches on `Head.Self.Class()` to build the matching derived MAP_OBJECT; `m_umpNode` is now keyed by the full composed `qwComposed` (class + index), so parent lookups carry class; `NODE::ObjectIx()` returns the composed handle. (Dean refactored Node_Create to carry the result in `Head.Self.qwComposed` rather than a separate local)
+- The scene's two built-in root-fabric nodes are now class `MAP_OBJECT_CLASS_ROOT`
+- Second change same session: the values formerly in `bSubtype` (celestial type) moved into `bType`; `bSubtype__` is now the poisoned reserved byte. Renamed enum to `MAP_OBJECT_TYPE_TYPE_CELESTIAL_*`. Updated all reads (MapObject.cpp, Compositor.cpp) and the `== 255` attachment marker (Node.cpp, Scene.cpp)
+- Rust producer (solar_system): removed the redundant index-1 ROOT node; "Solar System" (index 2, STARSYSTEM, CELESTIAL) is now created via `Node_Root` as the fabric root (star.rs line 5 commented out by Dean, count 3→2). Added `objectix_compose` helper + `MAP_OBJECT_CLASS_CELESTIAL`/celestial type consts (u8); pack class into Self/Parent; write type into `bType`, zero `bSubtype__`. wasm rebuilds clean; fresh `solar_system.wasm` ready for CDN
+- C++ builds (Dean confirmed); produced an Artemis hand-off note covering composed handles, the class enum, and the poisoned bytes
+- Updated internal Scene.md (OBJECTIX/compose, composed-key handle table, Node_Create class switch, MAP_OBJECT class-derived model, bType celestial type). Wiki pages (docs/) deferred at Dean's request

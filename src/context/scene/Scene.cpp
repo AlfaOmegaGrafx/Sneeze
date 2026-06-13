@@ -102,13 +102,13 @@ public:
          uint64_t twObjectIx;
 
          memset (&RMCObject, 0, sizeof (RMCOBJECT));
-         RMCObject.Head.Self.qwComposed = OBJECTIX_IDENTITY;
+         RMCObject.Head.Self.qwComposed = OBJECTIX_COMPOSE (MAP_OBJECT_CLASS_ROOT, OBJECTIX_IDENTITY);
 
          if ((twObjectIx = Node_Root (m_pFabric_Root->FabricIx (), &RMCObject)) != OBJECTIX_ERROR)
          {
             memset (&RMCObject, 0, sizeof (RMCOBJECT));
-            RMCObject.Head.Self.qwComposed = OBJECTIX_IDENTITY;
-            RMCObject.Type.bSubtype = 255;
+            RMCObject.Head.Self.qwComposed = OBJECTIX_COMPOSE (MAP_OBJECT_CLASS_ROOT, OBJECTIX_IDENTITY);
+            RMCObject.Type.bType = 255;
             strncpy (RMCObject.Resource.sReference, sUrl.c_str (), sizeof (RMCObject.Resource.sReference) - 1);
 
             if ((twObjectIx = Node_Open (twObjectIx, &RMCObject)) != OBJECTIX_ERROR)
@@ -357,7 +357,9 @@ public:
 
    uint64_t Node_Create (FABRIC* pFabric, NODE* pNode_Parent, const RMCOBJECT* pRMCObject)
    {
-      uint64_t twObjectIx = pRMCObject->Head.Self.ObjectIx ();
+      OBJECT_HEAD      Head       = pRMCObject->Head;
+      MAP_OBJECT_CLASS eClass     = pRMCObject->Head.Self.Class ();
+      uint64_t         twObjectIx = pRMCObject->Head.Self.ObjectIx ();
 
       if (twObjectIx == OBJECTIX_IDENTITY)
       {
@@ -366,7 +368,7 @@ public:
       }
       else if (twObjectIx > OBJECTIX_NULL  &&  twObjectIx <= OBJECTIX_MAX)
       {
-         if (m_umpNode.find (twObjectIx) == m_umpNode.end ())
+         if (m_umpNode.find (Head.Self.qwComposed) == m_umpNode.end ())
          {
             if (m_twObjectIx_Next < twObjectIx)
                m_twObjectIx_Next = twObjectIx;
@@ -376,26 +378,40 @@ public:
 
       if (twObjectIx > OBJECTIX_NULL  &&  twObjectIx <= OBJECTIX_MAX)
       {
-         auto* pMapObj = new MAP_OBJECT_CELESTIAL ();
+         Head.Self.qwComposed = OBJECTIX_COMPOSE (eClass, twObjectIx);
 
-         memcpy (&pMapObj->m_Name,       &pRMCObject->Name,       sizeof (MAP_OBJECT_NAME));
-         memcpy (&pMapObj->m_Type,       &pRMCObject->Type,       sizeof (MAP_OBJECT_TYPE));
-         memcpy (&pMapObj->m_Resource,   &pRMCObject->Resource,   sizeof (MAP_OBJECT_RESOURCE));
-         memcpy (&pMapObj->m_Transform,  &pRMCObject->Transform,  sizeof (MAP_OBJECT_TRANSFORM));
-         memcpy (&pMapObj->m_Orbit,      &pRMCObject->Orbit,      sizeof (MAP_OBJECT_ORBIT));
-         memcpy (&pMapObj->m_Bound,      &pRMCObject->Bound,      sizeof (MAP_OBJECT_BOUND));
-         memcpy (&pMapObj->m_Properties, &pRMCObject->Properties, sizeof (MAP_OBJECT_PROPERTIES));
+         MAP_OBJECT* pMapObj = nullptr;
 
-         auto* pNode = new NODE (pFabric, pNode_Parent, twObjectIx);
+         switch (eClass)
+         {
+            case MAP_OBJECT_CLASS_ROOT:        pMapObj = new MAP_OBJECT_ROOT        (Head);  break;
+            case MAP_OBJECT_CLASS_CELESTIAL:   pMapObj = new MAP_OBJECT_CELESTIAL   (Head);  break;
+            case MAP_OBJECT_CLASS_TERRESTRIAL: pMapObj = new MAP_OBJECT_TERRESTRIAL (Head);  break;
+            case MAP_OBJECT_CLASS_PHYSICAL:    pMapObj = new MAP_OBJECT_PHYSICAL    (Head);  break;
+         }
 
-         pNode->Initialize (pMapObj);
+         if (pMapObj)
+         {
+            memcpy (&pMapObj->m_Name,       &pRMCObject->Name,       sizeof (MAP_OBJECT_NAME));
+            memcpy (&pMapObj->m_Type,       &pRMCObject->Type,       sizeof (MAP_OBJECT_TYPE));
+            memcpy (&pMapObj->m_Resource,   &pRMCObject->Resource,   sizeof (MAP_OBJECT_RESOURCE));
+            memcpy (&pMapObj->m_Transform,  &pRMCObject->Transform,  sizeof (MAP_OBJECT_TRANSFORM));
+            memcpy (&pMapObj->m_Orbit,      &pRMCObject->Orbit,      sizeof (MAP_OBJECT_ORBIT));
+            memcpy (&pMapObj->m_Bound,      &pRMCObject->Bound,      sizeof (MAP_OBJECT_BOUND));
+            memcpy (&pMapObj->m_Properties, &pRMCObject->Properties, sizeof (MAP_OBJECT_PROPERTIES));
 
-         m_umpNode[twObjectIx] = pNode;
-         m_apMap_Object.push_back (pMapObj);
+            auto* pNode = new NODE (pFabric, pNode_Parent, Head.Self.qwComposed);
+
+            pNode->Initialize (pMapObj);
+
+            m_umpNode[Head.Self.qwComposed] = pNode;
+            m_apMap_Object.push_back (pMapObj);
+         }
+         else Head.Self.qwComposed = OBJECTIX_ERROR;
       }
-      else twObjectIx = OBJECTIX_ERROR;
+      else Head.Self.qwComposed = OBJECTIX_ERROR;
 
-      return twObjectIx;
+      return Head.Self.qwComposed;
    }
 
    bool Node_Close (uint64_t twObjectIx)

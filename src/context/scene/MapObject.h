@@ -28,43 +28,43 @@ namespace SNEEZE
    };
 
    // ---------------------------------------------------------------------------
-   // Map object type identifiers
+   // Map object class identifiers
    // ---------------------------------------------------------------------------
 
-   enum MAP_OBJECT_TYPE_TYPE : uint8_t
+   enum MAP_OBJECT_CLASS : uint16_t
    {
-      MAP_OBJECT_TYPE_TYPE_ROOT        = 0,
-      MAP_OBJECT_TYPE_TYPE_CELESTIAL   = 1,
-      MAP_OBJECT_TYPE_TYPE_TERRESTRIAL = 2,
-      MAP_OBJECT_TYPE_TYPE_PHYSICAL    = 3,
+      MAP_OBJECT_CLASS_ROOT        = 70,
+      MAP_OBJECT_CLASS_CELESTIAL   = 71,
+      MAP_OBJECT_CLASS_TERRESTRIAL = 72,
+      MAP_OBJECT_CLASS_PHYSICAL    = 73,
    };
 
    // ---------------------------------------------------------------------------
    // Celestial body type identifiers
    // ---------------------------------------------------------------------------
 
-   enum MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL
+   enum MAP_OBJECT_TYPE_TYPE_CELESTIAL
    {
-      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_NONE           = 0,
-      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_UNIVERSE       = 1,
-      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_SUPERCLUSTER   = 2,
-      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_GALAXYCLUSTER  = 3,
-      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_GALAXY         = 4,
-      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_SECTOR         = 5,
-      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_NEBULA         = 6,
-      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_STARCLUSTER    = 7,
-      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_BLACKHOLE      = 8,
-      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_STARSYSTEM     = 9,
-      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_STAR           = 10,
-      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_PLANETSYSTEM   = 11,
-      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_PLANET         = 12,
-      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_MOONSYSTEM     = 125,
-      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_MOON           = 13,
-      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_DEBRISSYSTEM   = 135,
-      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_DEBRIS         = 14,
-      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_SATELLITE      = 15,
-      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_TRANSPORT      = 16,
-      MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_SURFACE        = 17,
+      MAP_OBJECT_TYPE_TYPE_CELESTIAL_NONE           = 0,
+      MAP_OBJECT_TYPE_TYPE_CELESTIAL_UNIVERSE       = 1,
+      MAP_OBJECT_TYPE_TYPE_CELESTIAL_SUPERCLUSTER   = 2,
+      MAP_OBJECT_TYPE_TYPE_CELESTIAL_GALAXYCLUSTER  = 3,
+      MAP_OBJECT_TYPE_TYPE_CELESTIAL_GALAXY         = 4,
+      MAP_OBJECT_TYPE_TYPE_CELESTIAL_SECTOR         = 5,
+      MAP_OBJECT_TYPE_TYPE_CELESTIAL_NEBULA         = 6,
+      MAP_OBJECT_TYPE_TYPE_CELESTIAL_STARCLUSTER    = 7,
+      MAP_OBJECT_TYPE_TYPE_CELESTIAL_BLACKHOLE      = 8,
+      MAP_OBJECT_TYPE_TYPE_CELESTIAL_STARSYSTEM     = 9,
+      MAP_OBJECT_TYPE_TYPE_CELESTIAL_STAR           = 10,
+      MAP_OBJECT_TYPE_TYPE_CELESTIAL_PLANETSYSTEM   = 11,
+      MAP_OBJECT_TYPE_TYPE_CELESTIAL_PLANET         = 12,
+      MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOONSYSTEM     = 125,
+      MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOON           = 13,
+      MAP_OBJECT_TYPE_TYPE_CELESTIAL_DEBRISSYSTEM   = 135,
+      MAP_OBJECT_TYPE_TYPE_CELESTIAL_DEBRIS         = 14,
+      MAP_OBJECT_TYPE_TYPE_CELESTIAL_SATELLITE      = 15,
+      MAP_OBJECT_TYPE_TYPE_CELESTIAL_TRANSPORT      = 16,
+      MAP_OBJECT_TYPE_TYPE_CELESTIAL_SURFACE        = 17,
    };
 
    // ---------------------------------------------------------------------------
@@ -81,8 +81,11 @@ namespace SNEEZE
       uint64_t              qwComposed;
 
       uint64_t              ObjectIx () const   { return qwComposed & 0x0000FFFFFFFFFFFFull; }
-      uint16_t              Class    () const   { return static_cast<uint16_t> (qwComposed >> 48); }
+      MAP_OBJECT_CLASS      Class    () const   { return static_cast<MAP_OBJECT_CLASS> (qwComposed >> 48); }
    };
+
+   // Compose a class discriminator and a 48-bit object index into one OBJECTIX value. Use this instead of hardcoding opaque 64-bit literals.
+   #define OBJECTIX_COMPOSE(eClass, twObjectIx)      ((static_cast<uint64_t> (eClass) << 48)  |  (static_cast<uint64_t> (twObjectIx) & 0x0000FFFFFFFFFFFFull))
 
    struct OBJECT_HEAD
    {
@@ -98,8 +101,8 @@ namespace SNEEZE
 
    struct MAP_OBJECT_TYPE
    {
-      MAP_OBJECT_TYPE_TYPE  bType;
-      uint8_t               bSubtype;
+      uint8_t               bType;
+      uint8_t               bSubtype__;
       uint8_t               bFiction;
       uint8_t               abReserved[5];
    };
@@ -171,9 +174,10 @@ namespace SNEEZE
    class MAP_OBJECT
    {
    public:
-      explicit MAP_OBJECT (MAP_OBJECT_TYPE_TYPE bType);
+      explicit MAP_OBJECT (OBJECT_HEAD Head);
       virtual ~MAP_OBJECT () = default;
 
+      OBJECT_HEAD                   m_Head             = {};
       MAP_OBJECT_NAME               m_Name             = {};
       MAP_OBJECT_TYPE               m_Type             = {};
       MAP_OBJECT_OWNER              m_Owner            = {};
@@ -191,7 +195,7 @@ namespace SNEEZE
       std::atomic<bool>             m_bTextureReady      {false};
       mutable std::mutex            m_textureMutex;
 
-      MAP_OBJECT_TYPE_TYPE GetType       () const { return m_Type.bType; }
+      MAP_OBJECT_CLASS   Class       () const { return m_Head.Self.Class (); }
 
       virtual void Position (int64_t tmNow, double& dX, double& dY, double& dZ) const;
       virtual void Rotation (int64_t tmNow, double& dQx, double& dQy, double& dQz, double& dQw) const;
@@ -213,13 +217,13 @@ namespace SNEEZE
    class MAP_OBJECT_ROOT : public MAP_OBJECT
    {
    public:
-      MAP_OBJECT_ROOT ();
+      explicit MAP_OBJECT_ROOT (OBJECT_HEAD Head);
    };
 
    class MAP_OBJECT_CELESTIAL : public MAP_OBJECT
    {
    public:
-      MAP_OBJECT_CELESTIAL ();
+      explicit MAP_OBJECT_CELESTIAL (OBJECT_HEAD Head);
 
       bool HasOrbit () const;
 
@@ -233,13 +237,13 @@ namespace SNEEZE
    class MAP_OBJECT_TERRESTRIAL : public MAP_OBJECT
    {
    public:
-      MAP_OBJECT_TERRESTRIAL ();
+      explicit MAP_OBJECT_TERRESTRIAL (OBJECT_HEAD Head);
    };
 
    class MAP_OBJECT_PHYSICAL : public MAP_OBJECT
    {
    public:
-      MAP_OBJECT_PHYSICAL ();
+      explicit MAP_OBJECT_PHYSICAL (OBJECT_HEAD Head);
    };
 }
 #endif // SNEEZE_SOM_MAPOBJECT_H

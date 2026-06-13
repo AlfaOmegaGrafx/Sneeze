@@ -39,8 +39,36 @@ fn LogMsg (sMsg: &str)
    }
 }
 
-const TYPE_ROOT:      u8 = 0;
-const TYPE_CELESTIAL: u8 = 1;
+const MAP_OBJECT_CLASS_ROOT                         : u16 = 70;
+const MAP_OBJECT_CLASS_CELESTIAL                    : u16 = 71;
+const MAP_OBJECT_CLASS_TERRESTRIAL                  : u16 = 72;
+const MAP_OBJECT_CLASS_PHYSICAL                     : u16 = 73;
+
+const MAP_OBJECT_TYPE_TYPE_CELESTIAL_NONE           : u8 = 0;
+const MAP_OBJECT_TYPE_TYPE_CELESTIAL_UNIVERSE       : u8 = 1;
+const MAP_OBJECT_TYPE_TYPE_CELESTIAL_SUPERCLUSTER   : u8 = 2;
+const MAP_OBJECT_TYPE_TYPE_CELESTIAL_GALAXYCLUSTER  : u8 = 3;
+const MAP_OBJECT_TYPE_TYPE_CELESTIAL_GALAXY         : u8 = 4;
+const MAP_OBJECT_TYPE_TYPE_CELESTIAL_SECTOR         : u8 = 5;
+const MAP_OBJECT_TYPE_TYPE_CELESTIAL_NEBULA         : u8 = 6;
+const MAP_OBJECT_TYPE_TYPE_CELESTIAL_STARCLUSTER    : u8 = 7;
+const MAP_OBJECT_TYPE_TYPE_CELESTIAL_BLACKHOLE      : u8 = 8;
+const MAP_OBJECT_TYPE_TYPE_CELESTIAL_STARSYSTEM     : u8 = 9;
+const MAP_OBJECT_TYPE_TYPE_CELESTIAL_STAR           : u8 = 10;
+const MAP_OBJECT_TYPE_TYPE_CELESTIAL_PLANETSYSTEM   : u8 = 11;
+const MAP_OBJECT_TYPE_TYPE_CELESTIAL_PLANET         : u8 = 12;
+const MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOONSYSTEM     : u8 = 125;
+const MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOON           : u8 = 13;
+const MAP_OBJECT_TYPE_TYPE_CELESTIAL_DEBRISSYSTEM   : u8 = 135;
+const MAP_OBJECT_TYPE_TYPE_CELESTIAL_DEBRIS         : u8 = 14;
+const MAP_OBJECT_TYPE_TYPE_CELESTIAL_SATELLITE      : u8 = 15;
+const MAP_OBJECT_TYPE_TYPE_CELESTIAL_TRANSPORT      : u8 = 16;
+const MAP_OBJECT_TYPE_TYPE_CELESTIAL_SURFACE        : u8 = 17;
+
+const fn OBJECTIX_COMPOSE (wClass: u16, twObjectIx: u64) -> u64
+{
+   ((wClass as u64) << 48)  |  (twObjectIx & 0x0000_FFFF_FFFF_FFFF)
+}
 
 const TEX_BASE: &str = "https://cdn.rp1.com/res/texture/celestial/";
 
@@ -61,7 +89,7 @@ struct RMCOBJECT
 
    // MAP_OBJECT_TYPE (8 bytes)
    bType:                   u8,
-   bSubtype:                u8,
+   bSubtype__:              u8,
    bFiction:                u8,
    abReserved_Type:         [u8; 5],
 
@@ -146,13 +174,13 @@ fn Submit_Node (obj: &RMCOBJECT)
 }
 
 #[allow(clippy::too_many_arguments)]
-fn Submit_System (nParent: u64, nSelf: u64, sName: &str, bSubtype: u8, dA: f64, dB: f64, tmPeriod: i64, tmOrigin: i64, qx: f64, qy: f64, qz: f64, qw: f64, precX: f64, precY: f64, precZ: f64, dBound: f64, fMass: f32, nColor: u32)
+fn Submit_System (nParent: u64, nSelf: u64, sName: &str, bType: u8, dA: f64, dB: f64, tmPeriod: i64, tmOrigin: i64, qx: f64, qy: f64, qz: f64, qw: f64, precX: f64, precY: f64, precZ: f64, dBound: f64, fMass: f32, nColor: u32)
 {
    let mut obj = RMCOBJECT::New ();
-   obj.qwObjectIx_Parent = nParent;
-   obj.qwObjectIx_Self   = nSelf;
-   obj.bType             = TYPE_CELESTIAL;
-   obj.bSubtype          = bSubtype;
+   obj.qwObjectIx_Parent = OBJECTIX_COMPOSE (MAP_OBJECT_CLASS_CELESTIAL, nParent);
+   obj.qwObjectIx_Self   = OBJECTIX_COMPOSE (MAP_OBJECT_CLASS_CELESTIAL, nSelf);
+   obj.bType             = bType;
+   obj.bSubtype__        = 0;
    obj.d3Scale           = [1.0, 1.0, 1.0];
    obj.d3Max             = [dBound, dBound, dBound];
    obj.fMass             = fMass;
@@ -168,13 +196,13 @@ fn Submit_System (nParent: u64, nSelf: u64, sName: &str, bSubtype: u8, dA: f64, 
 }
 
 #[allow(clippy::too_many_arguments)]
-fn Submit_Body (nParent: u64, nSelf: u64, sName: &str, bSubtype: u8, dRadius: f64, fMass: f32, nColor: u32, qx: f64, qy: f64, qz: f64, qw: f64, precX: f64, precY: f64, precZ: f64)
+fn Submit_Body (nParent: u64, nSelf: u64, sName: &str, bType: u8, dRadius: f64, fMass: f32, nColor: u32, qx: f64, qy: f64, qz: f64, qw: f64, precX: f64, precY: f64, precZ: f64)
 {
    let mut obj = RMCOBJECT::New ();
-   obj.qwObjectIx_Parent = nParent;
-   obj.qwObjectIx_Self   = nSelf;
-   obj.bType             = TYPE_CELESTIAL;
-   obj.bSubtype          = bSubtype;
+   obj.qwObjectIx_Parent = OBJECTIX_COMPOSE (MAP_OBJECT_CLASS_CELESTIAL, nParent);
+   obj.qwObjectIx_Self   = OBJECTIX_COMPOSE (MAP_OBJECT_CLASS_CELESTIAL, nSelf);
+   obj.bType             = bType;
+   obj.bSubtype__        = 0;
    obj.d3Scale           = [1.0, 1.0, 1.0];
    obj.d3Max             = [dRadius, dRadius, dRadius];
    obj.fMass             = fMass;
@@ -188,10 +216,10 @@ fn Submit_Body (nParent: u64, nSelf: u64, sName: &str, bSubtype: u8, dRadius: f6
 fn Submit_Surface (nParent: u64, nSelf: u64, sName: &str, sTexture: &str, dW0Rad: f64, tmSpinPeriod: i64)
 {
    let mut obj = RMCOBJECT::New ();
-   obj.qwObjectIx_Parent = nParent;
-   obj.qwObjectIx_Self   = nSelf;
-   obj.bType             = TYPE_CELESTIAL;
-   obj.bSubtype          = 17;
+   obj.qwObjectIx_Parent = OBJECTIX_COMPOSE (MAP_OBJECT_CLASS_CELESTIAL, nParent);
+   obj.qwObjectIx_Self   = OBJECTIX_COMPOSE (MAP_OBJECT_CLASS_CELESTIAL, nSelf);
+   obj.bType             = MAP_OBJECT_TYPE_TYPE_CELESTIAL_SURFACE;
+   obj.bSubtype__        = 0;
    obj.d3Scale           = [1.0, 1.0, 1.0];
    obj.dA                = dW0Rad;
    obj.tmPeriod          = tmSpinPeriod;
@@ -219,11 +247,15 @@ pub extern "C" fn Open (twFabricIx: u64, _dwOffset: u32, _dwLength: u32)
 {
    LogMsg (&format! ("Solar System WASM: Open (twFabricIx={})", twFabricIx));
 
-   // Create root node (index 1 — OBJECTIX_NULL is 0, so index must be > 0)
+   // The "Solar System" frame (index 2, STARSYSTEM) is the fabric's root node.
    let mut objRoot = RMCOBJECT::New ();
-   objRoot.qwObjectIx_Self = 1;
-   objRoot.bType           = TYPE_ROOT;
-   objRoot.d3Scale         = [1.0, 1.0, 1.0];
+   objRoot.qwObjectIx_Parent = OBJECTIX_COMPOSE (MAP_OBJECT_CLASS_ROOT,      0);
+   objRoot.qwObjectIx_Self   = OBJECTIX_COMPOSE (MAP_OBJECT_CLASS_CELESTIAL, 2);
+   objRoot.bType             = MAP_OBJECT_TYPE_TYPE_CELESTIAL_STARSYSTEM;
+   objRoot.bSubtype__        = 0;
+   objRoot.d3Scale           = [1.0, 1.0, 1.0];
+   objRoot.d4Rotation        = [0.0, 0.0, 0.0, 1.0];
+   objRoot.fColor            = f32::from_bits (0x00888888);
    objRoot.Name_Set ("Solar System");
    let dwOffset = &objRoot as *const RMCOBJECT as u32;
    let dwLength = core::mem::size_of::<RMCOBJECT> () as u32;

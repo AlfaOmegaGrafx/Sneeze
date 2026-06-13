@@ -277,15 +277,15 @@ static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, 
    MAP_OBJECT* pObj = pNode->MapObject ();
    WORLD_FRAME childFrame = frame;
 
-   if (pObj  &&  pObj->GetType () == MAP_OBJECT_TYPE_TYPE_CELESTIAL)
+   if (pObj  &&  pObj->Class () == MAP_OBJECT_CLASS_CELESTIAL)
    {
       auto* pCelestial = static_cast<MAP_OBJECT_CELESTIAL*> (pObj);
-      uint8_t bSub = pCelestial->m_Type.bSubtype;
+      uint8_t bType = pCelestial->m_Type.bType;
 
-      if (bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_STARSYSTEM    ||
-          bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_PLANETSYSTEM   ||
-          bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_MOONSYSTEM     ||
-          bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_DEBRISSYSTEM)
+      if (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_STARSYSTEM
+      ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_PLANETSYSTEM
+      ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOONSYSTEM
+      ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_DEBRISSYSTEM)
       {
          double dPosX, dPosY, dPosZ;
          pCelestial->Position (tmNow, dPosX, dPosY, dPosZ);
@@ -296,9 +296,7 @@ static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, 
 
          if (pCelestial->HasOrbit ())
          {
-            float dTrailRadius = (bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_MOONSYSTEM
-                               || bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_DEBRISSYSTEM)
-                               ? TRAIL_RADIUS_MOON : TRAIL_RADIUS_PLANET;
+            float dTrailRadius = (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOONSYSTEM  || bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_DEBRISSYSTEM) ? TRAIL_RADIUS_MOON : TRAIL_RADIUS_PLANET;
 
             CURVE_DATA curve;
             ColorFromPropertyFloat (pCelestial->m_Properties.fColor, curve.r, curve.g, curve.b);
@@ -339,16 +337,16 @@ static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, 
             aCurves.push_back (std::move (curve));
          }
       }
-      else if (bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_STAR
-           ||  bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_PLANET
-           ||  bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_MOON
-           ||  bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_DEBRIS)
+      else if (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_STAR
+           ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_PLANET
+           ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOON
+           ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_DEBRIS)
       {
          childFrame.dRadius = pCelestial->Radius ();
          childFrame.fColor  = pCelestial->m_Properties.fColor;
-         childFrame.bStar   = (bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_STAR);
+         childFrame.bStar   = (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_STAR);
       }
-      else if (bSub == MAP_OBJECT_TYPE_SUBTYPE_CELESTIAL_SURFACE)
+      else if (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_SURFACE)
       {
          float dRadius = SPHERE_SCALE * std::sqrt (static_cast<float> (childFrame.dRadius * METERS_TO_AU));
          if (dRadius < MIN_SPHERE_RADIUS) dRadius = MIN_SPHERE_RADIUS;

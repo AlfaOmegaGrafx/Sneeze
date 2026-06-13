@@ -108,7 +108,7 @@ public:
 
       if (m_pMap_Object  &&  m_pMap_Object->m_Resource.sReference[0] != '\0')
       {
-         if (m_pMap_Object->m_Type.bSubtype == 255)
+         if (m_pMap_Object->m_Type.bType == 255)
          {
             std::string sUrl = m_pMap_Object->m_Resource.sReference;
             
