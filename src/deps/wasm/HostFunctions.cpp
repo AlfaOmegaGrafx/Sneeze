@@ -19,6 +19,8 @@
 
 #include "scene/MapObject.h"
 
+#include <cstdlib>
+
 namespace SNEEZE
 {
 namespace DEP
@@ -501,9 +503,41 @@ wasm_trap_t* Storage_SetJson (void* pEnv, wasmtime_caller_t* pCaller, const wasm
 // caller's responsibility — it is not part of the flat wire object).
 // ---------------------------------------------------------------------------
 
+// ComposeFromId — turn a human "<class>-<index>" id (e.g. "P-5039") into a
+// composed OBJECTIX. Class letters: R root, C celestial, T terrestrial,
+// P physical.
+static uint64_t ComposeFromId (const std::string& sId)
+{
+   uint64_t twResult = 0;
+   size_t   nDash    = sId.find ('-');
+
+   if (nDash != std::string::npos)
+   {
+      char     cClass = sId[0];
+      uint64_t nIndex = strtoull (sId.c_str () + nDash + 1, nullptr, 10);
+
+      MAP_OBJECT_CLASS eClass = MAP_OBJECT_CLASS_PHYSICAL;
+      if      (cClass == 'R') eClass = MAP_OBJECT_CLASS_ROOT;
+      else if (cClass == 'C') eClass = MAP_OBJECT_CLASS_CELESTIAL;
+      else if (cClass == 'T') eClass = MAP_OBJECT_CLASS_TERRESTRIAL;
+      else if (cClass == 'P') eClass = MAP_OBJECT_CLASS_PHYSICAL;
+
+      twResult = OBJECTIX_COMPOSE (eClass, nIndex);
+   }
+
+   return twResult;
+}
+
 static void RmcObject_FromJson (const nlohmann::json& j, RMCOBJECT* pObject)
 {
    *pObject = RMCOBJECT {};
+
+   // Sensible decode defaults for omitted transform fields: identity orientation and unit scale 
+   // (a zero quaternion / zero scale would be degenerate). Present fields below overwrite these.
+   pObject->Transform.d4Rotation[3] = 1.0;
+   pObject->Transform.d3Scale[0]    = 1.0;
+   pObject->Transform.d3Scale[1]    = 1.0;
+   pObject->Transform.d3Scale[2]    = 1.0;
 
    auto Vec = [] (const nlohmann::json& a, double* pd, int n)
    {
@@ -527,9 +561,19 @@ static void RmcObject_FromJson (const nlohmann::json& j, RMCOBJECT* pObject)
    if (j.contains ("Head"))
    {
       const auto& h = j["Head"];
-      pObject->Head.Parent.qwComposed = h.value ("Parent", static_cast<uint64_t> (0));
-      pObject->Head.Self.qwComposed   = h.value ("Self",   static_cast<uint64_t> (0));
-      pObject->Head.qwEvent           = h.value ("Event",  static_cast<uint64_t> (0));
+
+      // Self accepts the human "class:index" id (preferred) or a raw composed
+      // integer. Parent is never read (parentage comes from the node tree), so
+      // it is ignored when absent.
+      if (h.contains ("Self"))
+      {
+         if (h["Self"].is_string ())
+            pObject->Head.Self.qwComposed = ComposeFromId (h["Self"].get<std::string> ());
+         else
+            pObject->Head.Self.qwComposed = h["Self"].get<uint64_t> ();
+      }
+
+      pObject->Head.qwEvent = h.value ("Event", static_cast<uint64_t> (0));
    }
 
    if (j.contains ("Name")  &&  j["Name"].is_string ())
