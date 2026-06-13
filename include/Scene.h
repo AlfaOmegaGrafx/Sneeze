@@ -61,6 +61,7 @@ namespace SNEEZE
 
       // Accessors
       uint64_t           ObjectIx          () const;
+      std::string        Name              () const;
       MAP_OBJECT*        MapObject         () const;
       FABRIC*            Fabric            () const;
       FABRIC*            Fabric_Attachment () const;

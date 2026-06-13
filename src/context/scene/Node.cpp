@@ -298,6 +298,42 @@ NODE::~NODE ()
 // -----------------------------------------------------------------------
 
 uint64_t    NODE::ObjectIx          ()                    const { return m_pImpl->m_twObjectIx; }
+
+std::string NODE::Name () const
+{
+   std::string sResult;
+
+   if (m_pImpl->m_pMap_Object)
+   {
+      // m_Name.wsName is a fixed-size UTF-16 buffer (BMP only for names).
+      const uint16_t* pwName = m_pImpl->m_pMap_Object->m_Name.wsName;
+      const int       nMax   = static_cast<int> (sizeof (m_pImpl->m_pMap_Object->m_Name.wsName) / sizeof (uint16_t));
+
+      for (int i = 0; i < nMax  &&  pwName[i] != 0; i++)
+      {
+         uint32_t cp = pwName[i];
+
+         if (cp < 0x80)
+         {
+            sResult += static_cast<char> (cp);
+         }
+         else if (cp < 0x800)
+         {
+            sResult += static_cast<char> (0xC0 | (cp >> 6));
+            sResult += static_cast<char> (0x80 | (cp & 0x3F));
+         }
+         else
+         {
+            sResult += static_cast<char> (0xE0 | (cp >> 12));
+            sResult += static_cast<char> (0x80 | ((cp >> 6) & 0x3F));
+            sResult += static_cast<char> (0x80 | (cp & 0x3F));
+         }
+      }
+   }
+
+   return sResult;
+}
+
 FABRIC*     NODE::Fabric            ()                    const { return m_pImpl->m_pFabric; }
 FABRIC*     NODE::Fabric_Attachment ()                    const { return m_pImpl->m_pFabric_Attachment; }
 
