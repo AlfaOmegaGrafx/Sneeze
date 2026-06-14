@@ -73,7 +73,7 @@ const fn OBJECTIX_COMPOSE (wClass: u16, twObjectIx: u64) -> u64
 const TEX_BASE: &str = "https://cdn.rp1.com/res/texture/celestial/";
 
 // ---------------------------------------------------------------------------
-// RMCOBJECT layout (432 bytes, packed)
+// RMCOBJECT layout (528 bytes, packed)
 // ---------------------------------------------------------------------------
 
 #[repr(C, packed)]
@@ -96,10 +96,10 @@ struct RMCOBJECT
    // MAP_OBJECT_OWNER (8 bytes)
    twOwner:                 u64,
 
-   // MAP_OBJECT_RESOURCE (104 bytes)
+   // MAP_OBJECT_RESOURCE (200 bytes)
    qwResource:              u64,
-   sName_Resource:          [u8; 32],
-   sReference:              [u8; 64],
+   sName_Resource:          [u8; 64],
+   sReference:              [u8; 128],
 
    // MAP_OBJECT_TRANSFORM (80 bytes)
    d3Position:              [f64; 3],
@@ -125,7 +125,7 @@ struct RMCOBJECT
    abReserved_Properties:   [u8; 12],
 }
 
-const _: () = assert!(core::mem::size_of::<RMCOBJECT> () == 432);
+const _: () = assert!(core::mem::size_of::<RMCOBJECT> () == 528);
 
 impl RMCOBJECT
 {
@@ -152,7 +152,7 @@ impl RMCOBJECT
    fn Reference_Set (&mut self, sRef: &str)
    {
       let abRef = sRef.as_bytes ();
-      let nLen  = if abRef.len () < 63 { abRef.len () } else { 63 };
+      let nLen  = if abRef.len () < 127 { abRef.len () } else { 127 };
       self.sReference[..nLen].copy_from_slice (&abRef[..nLen]);
    }
 }

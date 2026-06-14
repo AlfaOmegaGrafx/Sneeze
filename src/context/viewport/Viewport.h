@@ -29,6 +29,11 @@ void GenerateUVSphere (UV_SPHERE& sphere, float dRadius,
                        int nStacks, int nSlices,
                        float dCenterX, float dCenterY, float dCenterZ);
 
+// Centered unit cube spanning [-0.5, 0.5] on each axis, with per-face normals.
+// Callers supply a world transform that maps this canonical cube to the target
+// oriented box (dimensions and pivot are baked into that transform).
+void GenerateUnitBox (UV_SPHERE& box);
+
 namespace SNEEZE
 {
    struct SPHERE_DATA
@@ -52,6 +57,12 @@ namespace SNEEZE
    struct CURVE_DATA
    {
       std::vector<CURVE_POINT> aPoints;
+      float r, g, b;
+   };
+
+   struct BOX_DATA
+   {
+      float m16[16];               // column-major world transform (render space)
       float r, g, b;
    };
 
@@ -91,6 +102,7 @@ namespace SNEEZE
       virtual void BeginFrame () = 0;
       virtual void SubmitSpheres (const std::vector<SPHERE_DATA>& aSpheres) = 0;
       virtual void SubmitCurves (const std::vector<CURVE_DATA>& aCurves) = 0;
+      virtual void SubmitBoxes (const std::vector<BOX_DATA>& aBoxes) { (void) aBoxes; }
       virtual void EndFrame () = 0;
 
       // Forces a full scene rebuild on the next frame (e.g. after a scene swap).

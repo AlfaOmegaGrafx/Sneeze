@@ -41,6 +41,7 @@
 #include "context/viewport/Viewport.h"
 #include "scene/MapObject.h"
 #include <cmath>
+#include <cstring>
 #include <functional>
 
 using namespace SNEEZE;
@@ -54,7 +55,8 @@ JOB_COMPOSITOR::JOB_COMPOSITOR (VIEWPORT* pViewport) :
    m_eState       (kSTATE_CREATE),
    m_bBusy        (false),
    m_bCancelled   (false),
-   m_nLastFrame   (0)
+   m_nLastFrame   (0),
+   m_dRenderScale (0.0f)
 {
 }
 
@@ -150,13 +152,25 @@ void JOB_COMPOSITOR::Complete_Deliver ()
 // AGENT::COMPOSITOR
 // ===========================================================================
 
-static constexpr float METERS_TO_AU     = 1.0f / 149597870700.0f;
-static constexpr float MIN_SPHERE_RADIUS = 0.001f;
-static constexpr float SPHERE_SCALE      = 0.3f;
+static constexpr float MIN_SPHERE_RADIUS = 0.0f;
+
+// Bodies are far too small to see at honest scene scale, so a body's VISUAL
+// radius is a compressed magnification of its true radius (already in render
+// space): BODY_MAG * (radius_render ^ BODY_EXP). BODY_EXP < 1 squashes the huge
+// range of real radii; raise it toward 1.0 for more size variation between
+// bodies. These are the only "art" knobs -- positions stay 1:1 (scaled).
+static constexpr double BODY_MAG = 1.25;
+static constexpr double BODY_EXP = 0.7;
+
+// The one celestial kludge (moons only): a moon orbits farther out so it clears
+// its magnified planet, and renders smaller than the planet magnification.
+static constexpr double MOON_ORBIT_BOOST = 5.0;
+static constexpr double MOON_SIZE_FACTOR = 1.0;
+
 static constexpr int    TRAIL_SEGMENTS   = 128;
 static constexpr double TRAIL_FRACTION   = 0.75;
-static constexpr float  TRAIL_RADIUS_PLANET = 0.0015f;
-static constexpr float  TRAIL_RADIUS_MOON   = 0.000075f;
+static constexpr float  TRAIL_RADIUS_PLANET = 0.0002f;
+static constexpr float  TRAIL_RADIUS_MOON   = 0.00005f;
 
 static void ColorFromU32 (uint32_t nColor, float& r, float& g, float& b)
 {
@@ -171,6 +185,86 @@ static void ColorFromPropertyFloat (float fColor, float& r, float& g, float& b)
    memcpy (&nColor, &fColor, 4);
    ColorFromU32 (nColor & 0x00FFFFFF, r, g, b);
 }
+
+// Stable per-object color so adjacent boxes are visually distinct.
+static void ColorFromIndex (uint64_t nIx, float& r, float& g, float& b)
+{
+   uint32_t h = static_cast<uint32_t> (nIx * 2654435761ull);
+   r = 0.45f + 0.45f * (static_cast<float> ( h        & 0xFF) / 255.0f);
+   g = 0.45f + 0.45f * (static_cast<float> ((h >> 8)  & 0xFF) / 255.0f);
+   b = 0.45f + 0.45f * (static_cast<float> ((h >> 16) & 0xFF) / 255.0f);
+}
+
+// --- Double-precision 4x4 transforms (column-major, translation in d[12..14]) ---
+
+static MAT4 Mat4_Identity ()
+{
+   MAT4 m = {};
+   m.d[0] = m.d[5] = m.d[10] = m.d[15] = 1.0;
+   return m;
+}
+
+static MAT4 Mat4_Multiply (const MAT4& a, const MAT4& b)
+{
+   MAT4 c = {};
+
+   for (int j = 0; j < 4; j++)
+   {
+      for (int i = 0; i < 4; i++)
+      {
+         double dSum = 0.0;
+         for (int k = 0; k < 4; k++)
+            dSum += a.d[k * 4 + i] * b.d[j * 4 + k];
+         c.d[j * 4 + i] = dSum;
+      }
+   }
+
+   return c;
+}
+
+static MAT4 Mat4_FromTRS (double tx, double ty, double tz,
+                          double qx, double qy, double qz, double qw,
+                          double sx, double sy, double sz)
+{
+   double r00 = 1.0 - 2.0 * (qy * qy + qz * qz);
+   double r01 =       2.0 * (qx * qy - qw * qz);
+   double r02 =       2.0 * (qx * qz + qw * qy);
+   double r10 =       2.0 * (qx * qy + qw * qz);
+   double r11 = 1.0 - 2.0 * (qx * qx + qz * qz);
+   double r12 =       2.0 * (qy * qz - qw * qx);
+   double r20 =       2.0 * (qx * qz - qw * qy);
+   double r21 =       2.0 * (qy * qz + qw * qx);
+   double r22 = 1.0 - 2.0 * (qx * qx + qy * qy);
+
+   MAT4 m = {};
+   m.d[0]  = r00 * sx;  m.d[1]  = r10 * sx;  m.d[2]  = r20 * sx;  m.d[3]  = 0.0;
+   m.d[4]  = r01 * sy;  m.d[5]  = r11 * sy;  m.d[6]  = r21 * sy;  m.d[7]  = 0.0;
+   m.d[8]  = r02 * sz;  m.d[9]  = r12 * sz;  m.d[10] = r22 * sz;  m.d[11] = 0.0;
+   m.d[12] = tx;        m.d[13] = ty;        m.d[14] = tz;        m.d[15] = 1.0;
+   return m;
+}
+
+// Transform a point (w = 1) by a column-major MAT4.
+static void Mat4_Point (const MAT4& m, double x, double y, double z, double& ox, double& oy, double& oz)
+{
+   ox = m.d[0] * x + m.d[4] * y + m.d[8]  * z + m.d[12];
+   oy = m.d[1] * x + m.d[5] * y + m.d[9]  * z + m.d[13];
+   oz = m.d[2] * x + m.d[6] * y + m.d[10] * z + m.d[14];
+}
+
+// A body's visible radius from its true radius (metres) and the scene scale.
+static float MagnifyRadius (double dRadiusM, double dScale, bool bMoon)
+{
+   double dRender = BODY_MAG * std::pow (dRadiusM * dScale, BODY_EXP);
+   if (bMoon) dRender *= MOON_SIZE_FACTOR;
+   if (dRender < MIN_SPHERE_RADIUS) dRender = MIN_SPHERE_RADIUS;
+   return static_cast<float> (dRender);
+}
+
+// Scene is sized so its root-anchored bounding sphere maps to this many render
+// units, keeping coordinates float-friendly and framed by the default camera.
+static constexpr double TARGET_EXTENT = 5.0;
+static constexpr double MIN_REACH     = 1e-6;
 
 static int64_t s_nGlobalFrameSeq = 0;
 
@@ -262,122 +356,238 @@ void AGENT::COMPOSITOR::Execute_Destroy (JOB_COMPOSITOR* pJob_Compositor)
    else pJob_Compositor->Return (JOB_COMPOSITOR::kSTATE_DESTROY);
 }
 
+// Carried parent->child during traversal. mWorld is the accumulated world
+// transform in SI metres (double); the render scale is applied later, at the
+// single flatten seam, so the SOM stays meters end to end. dRadius/fColor/bStar
+// hand celestial body appearance from a system/body node down to its surface.
 struct WORLD_FRAME
 {
-   double dPosX   = 0.0;
-   double dPosY   = 0.0;
-   double dPosZ   = 0.0;
+   MAT4   mWorld  = { { 1.0, 0.0, 0.0, 0.0,  0.0, 1.0, 0.0, 0.0,  0.0, 0.0, 1.0, 0.0,  0.0, 0.0, 0.0, 1.0 } };
    double dRadius = 0.0;
    float  fColor  = 0.0f;
    bool   bStar   = false;
+   bool   bMoon   = false;
 };
 
-static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, std::vector<SPHERE_DATA>& aSpheres, std::vector<CURVE_DATA>& aCurves, std::vector<LIGHT_DATA>& aLight)
+// Everything is gathered during traversal in SI metres (double); the single
+// per-scene render scale is applied once, at the flatten seam, when these are
+// turned into the renderer's float structures. No AU, no per-emit scaling.
+struct BOX_BUILD
+{
+   MAT4  mWorld;                 // metres
+   float r, g, b;
+};
+
+struct SPHERE_BUILD
+{
+   double dx, dy, dz;            // metres
+   double dRadiusM;             // true body radius, metres
+   bool   bMoon;
+   bool   bEmissive;
+   float  r, g, b;
+   const uint8_t* pTex = nullptr;
+   int    nTexW = 0;
+   int    nTexH = 0;
+};
+
+struct CURVE_BUILD
+{
+   std::vector<CURVE_POINT> aPoints;   // x/y/z metres; dRadius is render-space
+   float r, g, b;
+};
+
+struct LIGHT_BUILD
+{
+   double dx, dy, dz;            // metres
+};
+
+static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, std::vector<SPHERE_BUILD>& aSphere, std::vector<CURVE_BUILD>& aCurve, std::vector<LIGHT_BUILD>& aLight, std::vector<BOX_BUILD>& aBox, double& dMaxReach)
 {
    MAP_OBJECT* pObj = pNode->MapObject ();
    WORLD_FRAME childFrame = frame;
 
-   if (pObj  &&  pObj->Class () == MAP_OBJECT_CLASS_CELESTIAL)
+   if (pObj)
    {
-      auto* pCelestial = static_cast<MAP_OBJECT_CELESTIAL*> (pObj);
-      uint8_t bType = pCelestial->m_Type.bType;
+      // Universal TRS: every node, root to leaf, composes its local
+      // translation/rotation/scale onto its parent's world transform. No class
+      // is exempt -- celestial, terrestrial and physical all inherit identically.
+      double dPosX, dPosY, dPosZ;
+      double dQx, dQy, dQz, dQw;
+      double dSx, dSy, dSz;
+      pObj->Position (tmNow, dPosX, dPosY, dPosZ);
+      pObj->Rotation (tmNow, dQx, dQy, dQz, dQw);
+      pObj->Scale (dSx, dSy, dSz);
 
-      if (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_STARSYSTEM
-      ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_PLANETSYSTEM
-      ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOONSYSTEM
-      ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_DEBRISSYSTEM)
+      // The one celestial kludge: a moon system's orbit is pushed outward so the
+      // moon clears its magnified planet. Everything else stays 1:1 (metres).
+      bool bMoonSystem = (pObj->Class () == MAP_OBJECT_CLASS_CELESTIAL
+                       &&  static_cast<MAP_OBJECT_CELESTIAL*> (pObj)->m_Type.bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOONSYSTEM);
+      if (bMoonSystem)
       {
-         double dPosX, dPosY, dPosZ;
-         pCelestial->Position (tmNow, dPosX, dPosY, dPosZ);
+         dPosX *= MOON_ORBIT_BOOST;
+         dPosY *= MOON_ORBIT_BOOST;
+         dPosZ *= MOON_ORBIT_BOOST;
+      }
 
-         childFrame.dPosX = frame.dPosX + dPosX * METERS_TO_AU;
-         childFrame.dPosY = frame.dPosY + dPosY * METERS_TO_AU;
-         childFrame.dPosZ = frame.dPosZ + dPosZ * METERS_TO_AU;
+      MAT4 mLocal = Mat4_FromTRS (dPosX, dPosY, dPosZ, dQx, dQy, dQz, dQw, dSx, dSy, dSz);
+      childFrame.mWorld = Mat4_Multiply (frame.mWorld, mLocal);
 
-         if (pCelestial->HasOrbit ())
+      double dWx = childFrame.mWorld.d[12];
+      double dWy = childFrame.mWorld.d[13];
+      double dWz = childFrame.mWorld.d[14];
+
+      // Every node's world position contributes to the scene's metre extent, so
+      // the single render scale frames the whole thing.
+      double dReach = std::sqrt (dWx * dWx + dWy * dWy + dWz * dWz);
+      if (dReach > dMaxReach) dMaxReach = dReach;
+
+      if (pObj->Class () == MAP_OBJECT_CLASS_CELESTIAL)
+      {
+         auto* pCelestial = static_cast<MAP_OBJECT_CELESTIAL*> (pObj);
+         uint8_t bType = pCelestial->m_Type.bType;
+
+         if (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_STARSYSTEM
+         ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_PLANETSYSTEM
+         ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOONSYSTEM
+         ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_DEBRISSYSTEM)
          {
-            float dTrailRadius = (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOONSYSTEM  || bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_DEBRISSYSTEM) ? TRAIL_RADIUS_MOON : TRAIL_RADIUS_PLANET;
-
-            CURVE_DATA curve;
-            ColorFromPropertyFloat (pCelestial->m_Properties.fColor, curve.r, curve.g, curve.b);
-            curve.r *= 0.4f;
-            curve.g *= 0.4f;
-            curve.b *= 0.4f;
-
-            int nTrailPoints = static_cast<int> (TRAIL_SEGMENTS * TRAIL_FRACTION);
-
-            CURVE_POINT cpHead;
-            cpHead.x       = static_cast<float> (childFrame.dPosX);
-            cpHead.y       = static_cast<float> (childFrame.dPosY);
-            cpHead.z       = static_cast<float> (childFrame.dPosZ);
-            cpHead.dRadius = dTrailRadius;
-            curve.aPoints.push_back (cpHead);
-
-            ORBIT_POSITION pos;
-            ORBIT_POSITION* pPos = pCelestial->PositionAtTick (tmNow, pos);
-            if (pPos)
+            if (pCelestial->HasOrbit ())
             {
-               double dE_planet = pPos->dE;
-               for (int i = 1; i <= nTrailPoints; i++)
+               float dTrailRadius = (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOONSYSTEM  || bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_DEBRISSYSTEM) ? TRAIL_RADIUS_MOON : TRAIL_RADIUS_PLANET;
+
+               CURVE_BUILD curve;
+               ColorFromPropertyFloat (pCelestial->m_Properties.fColor, curve.r, curve.g, curve.b);
+               curve.r *= 0.4f;
+               curve.g *= 0.4f;
+               curve.b *= 0.4f;
+
+               int nTrailPoints = static_cast<int> (TRAIL_SEGMENTS * TRAIL_FRACTION);
+
+               CURVE_POINT cpHead;
+               cpHead.x       = static_cast<float> (dWx);
+               cpHead.y       = static_cast<float> (dWy);
+               cpHead.z       = static_cast<float> (dWz);
+               cpHead.dRadius = dTrailRadius;
+               curve.aPoints.push_back (cpHead);
+
+               ORBIT_POSITION pos;
+               ORBIT_POSITION* pPos = pCelestial->PositionAtTick (tmNow, pos);
+               if (pPos)
                {
-                  double dE = dE_planet - (static_cast<double> (i) / TRAIL_SEGMENTS) * TWO_PI;
-                  VEC3 vPt = pCelestial->OrbitTrailPoint (dE, tmNow);
+                  double dE_planet = pPos->dE;
+                  for (int i = 1; i <= nTrailPoints; i++)
+                  {
+                     double dE = dE_planet - (static_cast<double> (i) / TRAIL_SEGMENTS) * TWO_PI;
+                     VEC3 vPt = pCelestial->OrbitTrailPoint (dE, tmNow);
 
-                  float dTaper = 1.0f - static_cast<float> (i) / static_cast<float> (nTrailPoints);
+                     if (bMoonSystem)
+                     {
+                        vPt.x *= MOON_ORBIT_BOOST;
+                        vPt.y *= MOON_ORBIT_BOOST;
+                        vPt.z *= MOON_ORBIT_BOOST;
+                     }
 
-                  CURVE_POINT cp;
-                  cp.x       = static_cast<float> (frame.dPosX + vPt.x * METERS_TO_AU);
-                  cp.y       = static_cast<float> (frame.dPosY + vPt.y * METERS_TO_AU);
-                  cp.z       = static_cast<float> (frame.dPosZ + vPt.z * METERS_TO_AU);
-                  cp.dRadius = dTrailRadius * dTaper;
-                  curve.aPoints.push_back (cp);
+                     // The trail lives in the parent frame; carry it through the
+                     // parent's full world transform, same basis the node inherits.
+                     double dTx, dTy, dTz;
+                     Mat4_Point (frame.mWorld, vPt.x, vPt.y, vPt.z, dTx, dTy, dTz);
+
+                     float dTaper = 1.0f - static_cast<float> (i) / static_cast<float> (nTrailPoints);
+
+                     CURVE_POINT cp;
+                     cp.x       = static_cast<float> (dTx);
+                     cp.y       = static_cast<float> (dTy);
+                     cp.z       = static_cast<float> (dTz);
+                     cp.dRadius = dTrailRadius * dTaper;
+                     curve.aPoints.push_back (cp);
+                  }
                }
+
+               aCurve.push_back (std::move (curve));
+            }
+         }
+         else if (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_STAR
+              ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_PLANET
+              ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOON
+              ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_DEBRIS)
+         {
+            childFrame.dRadius = pCelestial->Radius ();
+            childFrame.fColor  = pCelestial->m_Properties.fColor;
+            childFrame.bStar   = (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_STAR);
+            childFrame.bMoon   = (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOON);
+
+            // A body's own radius extends the scene's reach, so a single body
+            // centred at the origin still yields a sane scale (no divide-by-zero
+            // fallback to 1.0 that would render it at near-true metres).
+            double dBodyReach = std::sqrt (dWx * dWx + dWy * dWy + dWz * dWz) + childFrame.dRadius;
+            if (dBodyReach > dMaxReach) dMaxReach = dBodyReach;
+
+            if (childFrame.bStar)
+            {
+               LIGHT_BUILD light;
+               light.dx = dWx;
+               light.dy = dWy;
+               light.dz = dWz;
+               aLight.push_back (light);
+            }
+         }
+         else if (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_SURFACE)
+         {
+            SPHERE_BUILD sphere;
+            sphere.dx        = dWx;
+            sphere.dy        = dWy;
+            sphere.dz        = dWz;
+            sphere.dRadiusM  = childFrame.dRadius;
+            sphere.bMoon     = childFrame.bMoon;
+            sphere.bEmissive = childFrame.bStar;
+            ColorFromPropertyFloat (childFrame.fColor, sphere.r, sphere.g, sphere.b);
+
+            if (pCelestial->m_bTextureReady.load ())
+            {
+               pCelestial->LockTexture ();
+               sphere.pTex  = pCelestial->m_aTexturePixels.data ();
+               sphere.nTexW = pCelestial->m_nTextureWidth;
+               sphere.nTexH = pCelestial->m_nTextureHeight;
+               pCelestial->UnlockTexture ();
             }
 
-            aCurves.push_back (std::move (curve));
+            aSphere.push_back (sphere);
          }
       }
-      else if (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_STAR
-           ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_PLANET
-           ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOON
-           ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_DEBRIS)
+      else if (pObj->Class () == MAP_OBJECT_CLASS_PHYSICAL
+           &&  std::strncmp (pObj->m_Resource.sReference, "action:", 7) != 0)
       {
-         childFrame.dRadius = pCelestial->Radius ();
-         childFrame.fColor  = pCelestial->m_Properties.fColor;
-         childFrame.bStar   = (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_STAR);
+         // Physical nodes manifest as a grounded box from their bound. Nodes whose
+         // resource is an "action://" reference (e.g. colliders) are invisible
+         // logic volumes, not geometry, so they never render.
+         double dW = pObj->m_Bound.d3Max[0];
+         double dH = pObj->m_Bound.d3Max[1];
+         double dD = pObj->m_Bound.d3Max[2];
 
-         if (childFrame.bStar)
+         if (dW > 0.0  ||  dH > 0.0  ||  dD > 0.0)
          {
-            LIGHT_DATA light;
-            light.x = static_cast<float> (childFrame.dPosX);
-            light.y = static_cast<float> (childFrame.dPosY);
-            light.z = static_cast<float> (childFrame.dPosZ);
-            aLight.push_back (light);
+            // Map the centered unit cube to a grounded box (base at y=0, rises by dH).
+            MAT4 mBound = Mat4_Identity ();
+            mBound.d[0]  = dW;
+            mBound.d[5]  = dH;
+            mBound.d[10] = dD;
+            mBound.d[13] = dH * 0.5;
+
+            BOX_BUILD box;
+            box.mWorld = Mat4_Multiply (childFrame.mWorld, mBound);
+            ColorFromIndex (pObj->m_Head.Self.ObjectIx (), box.r, box.g, box.b);
+            aBox.push_back (box);
+
+            double dCenterX = box.mWorld.d[12];
+            double dCenterY = box.mWorld.d[13];
+            double dCenterZ = box.mWorld.d[14];
+            double dCol0 = std::sqrt (box.mWorld.d[0]  * box.mWorld.d[0]  + box.mWorld.d[1]  * box.mWorld.d[1]  + box.mWorld.d[2]  * box.mWorld.d[2]);
+            double dCol1 = std::sqrt (box.mWorld.d[4]  * box.mWorld.d[4]  + box.mWorld.d[5]  * box.mWorld.d[5]  + box.mWorld.d[6]  * box.mWorld.d[6]);
+            double dCol2 = std::sqrt (box.mWorld.d[8]  * box.mWorld.d[8]  + box.mWorld.d[9]  * box.mWorld.d[9]  + box.mWorld.d[10] * box.mWorld.d[10]);
+            double dHalf = 0.5 * (dCol0 + dCol1 + dCol2);
+            double dBoxReach = std::sqrt (dCenterX * dCenterX + dCenterY * dCenterY + dCenterZ * dCenterZ) + dHalf;
+            if (dBoxReach > dMaxReach) dMaxReach = dBoxReach;
          }
-      }
-      else if (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_SURFACE)
-      {
-         float dRadius = SPHERE_SCALE * std::sqrt (static_cast<float> (childFrame.dRadius * METERS_TO_AU));
-         if (dRadius < MIN_SPHERE_RADIUS) dRadius = MIN_SPHERE_RADIUS;
-
-         SPHERE_DATA sphere;
-         sphere.x         = static_cast<float> (childFrame.dPosX);
-         sphere.y         = static_cast<float> (childFrame.dPosY);
-         sphere.z         = static_cast<float> (childFrame.dPosZ);
-         sphere.dRadius   = dRadius;
-         sphere.bEmissive = childFrame.bStar;
-         ColorFromPropertyFloat (childFrame.fColor, sphere.r, sphere.g, sphere.b);
-
-         if (pCelestial->m_bTextureReady.load ())
-         {
-            pCelestial->LockTexture ();
-            sphere.pTexturePixels  = pCelestial->m_aTexturePixels.data ();
-            sphere.nTextureWidth   = pCelestial->m_nTextureWidth;
-            sphere.nTextureHeight  = pCelestial->m_nTextureHeight;
-            pCelestial->UnlockTexture ();
-         }
-
-         aSpheres.push_back (sphere);
       }
    }
 
@@ -385,14 +595,14 @@ static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, 
    {
       NODE* pChild = pNode->Child (i);
       if (pChild)
-         TraverseNode (pChild, childFrame, tmNow, aSpheres, aCurves, aLight);
+         TraverseNode (pChild, childFrame, tmNow, aSphere, aCurve, aLight, aBox, dMaxReach);
    }
 
    // An attachment point spawns a child fabric; traverse it in this node's own
-   // accumulated frame so the secondary fabric inherits this node's position.
+   // accumulated frame so the secondary fabric inherits this node's transform.
    FABRIC* pAttached = pNode->Fabric_Attachment ();
    if (pAttached  &&  pAttached->Node_Root ())
-      TraverseNode (pAttached->Node_Root (), childFrame, tmNow, aSpheres, aCurves, aLight);
+      TraverseNode (pAttached->Node_Root (), childFrame, tmNow, aSphere, aCurve, aLight, aBox, dMaxReach);
 }
 
 void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
@@ -455,19 +665,97 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
 
       auto tpSceneStart = std::chrono::steady_clock::now ();
 
-      std::vector<SPHERE_DATA> aSpheres;
-      std::vector<CURVE_DATA>  aCurves;
+      std::vector<SPHERE_BUILD> aSphereBuild;
+      std::vector<CURVE_BUILD>  aCurveBuild;
+      std::vector<BOX_BUILD>    aBoxBuild;
+      std::vector<LIGHT_BUILD>  aLightBuild;
 
       SCENE* pScene = pViewport->Scene ();
       FABRIC* pFabric_Root = pScene ? pScene->Fabric_Root () : nullptr;
       NODE* pSomRoot = pFabric_Root ? pFabric_Root->Node_Root () : nullptr;
 
-      std::vector<LIGHT_DATA> aLight;
+      double dMaxReach = 0.0;
 
       if (pSomRoot)
       {
          WORLD_FRAME rootFrame;
-         TraverseNode (pSomRoot, rootFrame, tmNow, aSpheres, aCurves, aLight);
+         TraverseNode (pSomRoot, rootFrame, tmNow, aSphereBuild, aCurveBuild, aLightBuild, aBoxBuild, dMaxReach);
+      }
+
+      // One uniform per-scene render scale, applied at this single flatten seam:
+      // metres (double) -> render units (float). Sized so the root-anchored
+      // bounding sphere fills TARGET_EXTENT and the default camera frames it.
+      // Every renderable -- celestial and physical alike -- rides this one scale.
+      double dRenderScale = (dMaxReach > MIN_REACH) ? (TARGET_EXTENT / dMaxReach) : 1.0;
+      pJob_Compositor->m_dRenderScale = static_cast<float> (dRenderScale);
+
+      std::vector<SPHERE_DATA> aSpheres;
+      aSpheres.reserve (aSphereBuild.size ());
+      for (const auto& sb : aSphereBuild)
+      {
+         SPHERE_DATA sphere;
+         sphere.x         = static_cast<float> (sb.dx * dRenderScale);
+         sphere.y         = static_cast<float> (sb.dy * dRenderScale);
+         sphere.z         = static_cast<float> (sb.dz * dRenderScale);
+         sphere.dRadius   = MagnifyRadius (sb.dRadiusM, dRenderScale, sb.bMoon);
+         sphere.bEmissive = sb.bEmissive;
+         sphere.r = sb.r;
+         sphere.g = sb.g;
+         sphere.b = sb.b;
+         sphere.pTexturePixels = sb.pTex;
+         sphere.nTextureWidth  = sb.nTexW;
+         sphere.nTextureHeight = sb.nTexH;
+         aSpheres.push_back (sphere);
+      }
+
+      std::vector<CURVE_DATA> aCurves;
+      aCurves.reserve (aCurveBuild.size ());
+      for (const auto& cb : aCurveBuild)
+      {
+         CURVE_DATA curve;
+         curve.r = cb.r;
+         curve.g = cb.g;
+         curve.b = cb.b;
+         curve.aPoints.reserve (cb.aPoints.size ());
+         for (const auto& p : cb.aPoints)
+         {
+            CURVE_POINT cp;
+            cp.x       = static_cast<float> (p.x * dRenderScale);
+            cp.y       = static_cast<float> (p.y * dRenderScale);
+            cp.z       = static_cast<float> (p.z * dRenderScale);
+            cp.dRadius = p.dRadius;
+            curve.aPoints.push_back (cp);
+         }
+         aCurves.push_back (std::move (curve));
+      }
+
+      std::vector<LIGHT_DATA> aLight;
+      aLight.reserve (aLightBuild.size ());
+      for (const auto& lb : aLightBuild)
+      {
+         LIGHT_DATA light;
+         light.x = static_cast<float> (lb.dx * dRenderScale);
+         light.y = static_cast<float> (lb.dy * dRenderScale);
+         light.z = static_cast<float> (lb.dz * dRenderScale);
+         aLight.push_back (light);
+      }
+
+      std::vector<BOX_DATA> aBoxes;
+      aBoxes.reserve (aBoxBuild.size ());
+      for (const auto& bb : aBoxBuild)
+      {
+         BOX_DATA box;
+         for (int j = 0; j < 4; j++)
+         {
+            box.m16[j * 4 + 0] = static_cast<float> (bb.mWorld.d[j * 4 + 0] * dRenderScale);
+            box.m16[j * 4 + 1] = static_cast<float> (bb.mWorld.d[j * 4 + 1] * dRenderScale);
+            box.m16[j * 4 + 2] = static_cast<float> (bb.mWorld.d[j * 4 + 2] * dRenderScale);
+            box.m16[j * 4 + 3] = static_cast<float> (bb.mWorld.d[j * 4 + 3]);
+         }
+         box.r = bb.r;
+         box.g = bb.g;
+         box.b = bb.b;
+         aBoxes.push_back (box);
       }
 
       pRenderer->SetLights (aLight);
@@ -480,6 +768,7 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
       pRenderer->BeginFrame ();
       pRenderer->SubmitSpheres (aSpheres);
       pRenderer->SubmitCurves (aCurves);
+      pRenderer->SubmitBoxes (aBoxes);
       pRenderer->EndFrame ();
 
       pViewport->Accumulate (VIEWPORT::kACCUMULATE_SUBMIT, pRenderer->GetLastSubmitSeconds ());

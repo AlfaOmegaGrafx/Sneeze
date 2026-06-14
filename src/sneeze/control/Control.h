@@ -165,6 +165,7 @@ namespace SNEEZE
       void Complete () override;
 
       int64_t                                   m_nLastFrame;
+      float                                     m_dRenderScale;
 
    protected:
       void Complete_Deliver () override;

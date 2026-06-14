@@ -21,6 +21,19 @@
 
 using namespace SNEEZE;
 
+// Zero-clears an RMCOBJECT and seeds an identity transform (unit scale, identity
+// quaternion). A plain zero-fill leaves a degenerate transform, and under
+// universal TRS a zero-scale ancestor collapses every descendant to the origin,
+// so synthetic nodes start from identity just like the JSON decoder does.
+static void RmcObject_Init (RMCOBJECT& RMCObject)
+{
+   memset (&RMCObject, 0, sizeof (RMCOBJECT));
+   RMCObject.Transform.d4Rotation[3] = 1.0;
+   RMCObject.Transform.d3Scale[0]    = 1.0;
+   RMCObject.Transform.d3Scale[1]    = 1.0;
+   RMCObject.Transform.d3Scale[2]    = 1.0;
+}
+
 // ---------------------------------------------------------------------------
 // MSF_FETCH — file-local helper that handles the async MSF file fetch.
 // Delegates to SCENE::Impl's callback methods.
@@ -102,12 +115,12 @@ public:
       {
          CONTAINER* pContainer = m_pFabric_Root->Container ();
 
-         memset (&RMCObject, 0, sizeof (RMCOBJECT));
+         RmcObject_Init (RMCObject);
          RMCObject.Head.Self.qwComposed = OBJECTIX_COMPOSE (MAP_OBJECT_CLASS_ROOT, OBJECTIX_IDENTITY);
 
          if ((twObjectIx = pContainer->Node_Root (m_pFabric_Root->FabricIx (), &RMCObject)) != OBJECTIX_ERROR)
          {
-            memset (&RMCObject, 0, sizeof (RMCOBJECT));
+            RmcObject_Init (RMCObject);
             RMCObject.Head.Self.qwComposed = OBJECTIX_COMPOSE (MAP_OBJECT_CLASS_ROOT, OBJECTIX_IDENTITY);
             RMCObject.Type.bSubtype = 255;
             strncpy (RMCObject.Resource.sReference, sUrl.c_str (), sizeof (RMCObject.Resource.sReference) - 1);

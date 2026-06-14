@@ -54,6 +54,7 @@ namespace SNEEZE
       void BeginFrame () override;
       void SubmitSpheres (const std::vector<SPHERE_DATA>& aSpheres) override;
       void SubmitCurves (const std::vector<CURVE_DATA>& aCurves) override;
+      void SubmitBoxes (const std::vector<BOX_DATA>& aBoxes) override;
       void EndFrame () override;
 
       void InvalidateScene () override;
@@ -86,9 +87,13 @@ namespace SNEEZE
 
       std::vector<SPHERE_DATA> m_aSpheres;
       std::vector<CURVE_DATA>  m_aCurves;
+      std::vector<BOX_DATA>    m_aBoxes;
 
       UV_SPHERE m_pUnitSphere;
       bool      m_bUnitSphereReady;
+
+      UV_SPHERE m_pUnitBox;
+      bool      m_bUnitBoxReady;
       std::unordered_map<const uint8_t*, std::vector<float>> m_pColorCache;
 
       struct SCENE_STATE;
@@ -99,9 +104,9 @@ namespace SNEEZE
       std::vector<LIGHT_DATA> m_aLight;
 
       void ReleaseScene ();
-      void BuildScene (const std::vector<SPHERE_DATA>& aSpheres, const std::vector<CURVE_DATA>& aCurves);
-      void UpdateScene (const std::vector<SPHERE_DATA>& aSpheres, const std::vector<CURVE_DATA>& aCurves);
-      bool SceneNeedsRebuild (const std::vector<SPHERE_DATA>& aSpheres, const std::vector<CURVE_DATA>& aCurves) const;
+      void BuildScene (const std::vector<SPHERE_DATA>& aSpheres, const std::vector<CURVE_DATA>& aCurves, const std::vector<BOX_DATA>& aBoxes);
+      void UpdateScene (const std::vector<SPHERE_DATA>& aSpheres, const std::vector<CURVE_DATA>& aCurves, const std::vector<BOX_DATA>& aBoxes);
+      bool SceneNeedsRebuild (const std::vector<SPHERE_DATA>& aSpheres, const std::vector<CURVE_DATA>& aCurves, const std::vector<BOX_DATA>& aBoxes) const;
 
       double m_dLastSubmitSeconds;
       double m_dLastRenderSeconds;

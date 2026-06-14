@@ -110,6 +110,69 @@ JOB_COMPOSITOR and dispatches by state:
   runs `Diagnostics()`
 - **Execute_Destroy** (agent 0 only) — calls `Viewport::Renderer_Shutdown()`
 
+### Rendering pipeline / scaling (Compositor.cpp)
+
+`Execute_Render` walks the scene graph (`TraverseNode`, recursive) to build
+metre-space draw lists, then flattens them to render space in a single seam.
+
+**Universal TRS.** Every node — from the synthetic `ROOT` down to the
+bottom-most `PHYSICAL` node, celestial bodies included, with no exceptions —
+composes a full Translation·Rotation·Scale transform and inherits its parent's
+composed transform (`WORLD_FRAME` carries a `MAT4`, double, column-major; see
+`Types.h`). There is no class-specific shortcut: orbital position, axial tilt,
+and scale all nest the same way for stars, planets, moons, buildings, and
+colliders. Synthetic root nodes (created in `Scene::Fabric_Root_Create`, not
+parsed from JSON) are seeded with an identity transform by `RmcObject_Init` —
+otherwise their zeroed `scale=(0,0,0)` collapses every descendant to the origin
+(this was the "moon inside the Earth" bug).
+
+**No AU.** The old `METERS_TO_AU` celestial path is gone. All geometry is
+accumulated in metres, and `dMaxReach` tracks the scene's extent as a
+root-anchored bounding sphere radius (`|world_pos| + body_radius` per node, so a
+single-body scene still gets a sane reach).
+
+**Per-scene render scale.** After traversal, `dRenderScale = TARGET_EXTENT /
+dMaxReach` (`TARGET_EXTENT = 5.0`; falls back to `1.0` below `MIN_REACH`). It is
+computed once per build and multiplied into every sphere centre, curve point,
+light position, and box matrix at the flatten seam. This is the interim
+fixed-precision solution: each scene picks one uniform factor so its whole extent
+fits the render volume and the default camera frames it. (A superior technique is
+patented and planned but not implemented; the global factor is the deliberate
+stopgap.)
+
+**Body magnification.** Visual radii do not use the raw scaled metre radius (the
+Moon would be sub-pixel from afar). `MagnifyRadius` applies a power law:
+`BODY_MAG * (radius_render ^ BODY_EXP)`, currently `BODY_MAG = 1.25`,
+`BODY_EXP = 0.7`. `BODY_EXP < 1` compresses the huge range so small bodies grow
+faster than large ones (Earth vs. Jupiter stay visibly different without the Sun
+ballooning). `MIN_SPHERE_RADIUS = 0.0` (no clamp).
+
+**Moon kludge.** Moons need to clear their magnified planet and read as small,
+distinct bodies. `MOON_ORBIT_BOOST = 5.0` multiplies the local position of
+`MOONSYSTEM` nodes (and the points of their orbit trails) so the orbit sits
+farther out; `MOON_SIZE_FACTOR = 1.0` (currently no extra shrink). This is an
+intentional, moon-only special case, valid while the data has at most a handful
+of moons; it is not physically faithful.
+
+**Orbit trails.** Curve (tube) geometry per orbit. `TRAIL_RADIUS_PLANET =
+0.0002`, `TRAIL_RADIUS_MOON = 0.00005` (moon/debris systems use the thinner
+radius). Both were cut to roughly a tenth of earlier values so trails don't
+overpower the scaled bodies.
+
+**Boxes (terrestrial/physical).** Each terrestrial/physical node emits an
+oriented, grounded box (unit-cube mesh + per-box `MAT4` instance, mirroring the
+textured-sphere instancing). GLB files are **not** parsed in the compositor —
+physical nodes render as boxes for now; handing whole GLBs to Filament via
+Halogen is deferred. Physical nodes whose resource reference begins with
+`"action:"` (e.g. `action://collider`) are **skipped** — they are invisible
+helpers. Skipping them also keeps a giant collider (e.g. DFW's multi-km "Sector
+Floor Collider") from dominating `dMaxReach` and shrinking every real building to
+sub-pixel size (the "DFW is one flat sheet" bug).
+
+**Lighting.** `TraverseNode` collects one light per `STAR` node at its world
+position; positions are scaled by `dRenderScale` at the seam. See Viewport.md
+"Lighting" for the ANARI-side point/ambient+directional fallback.
+
 ### AGENT::FETCH
 
 Checks `IsFetch()`: if true, performs blocking curl download with SRI hash

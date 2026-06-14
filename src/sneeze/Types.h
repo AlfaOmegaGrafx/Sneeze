@@ -30,6 +30,12 @@ struct QUAT
    double dW;
 };
 
+// Column-major 4x4 (translation in d[12..14]), matching ANARI_FLOAT32_MAT4 layout.
+struct MAT4
+{
+   double d[16];
+};
+
 constexpr double PI         = 3.14159265358979323846;
 constexpr double TWO_PI     = 2.0 * PI;
 constexpr double DEG_TO_RAD = PI / 180.0;

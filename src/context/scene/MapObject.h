@@ -68,7 +68,7 @@ namespace SNEEZE
    };
 
    // ---------------------------------------------------------------------------
-   // RMAP wire-format structures (RMCOBJECT, 432 bytes)
+   // RMAP wire-format structures (RMCOBJECT, 528 bytes)
    //
    // These structs mirror the RMAP binary layout byte-for-byte. They are the
    // contract between WASM modules (which write them into linear memory) and
@@ -115,8 +115,8 @@ namespace SNEEZE
    struct MAP_OBJECT_RESOURCE
    {
       uint64_t              qwResource;
-      char                  sName[32];
-      char                  sReference[64];
+      char                  sName[64];
+      char                  sReference[128];
    };
 
    struct MAP_OBJECT_TRANSFORM
@@ -163,7 +163,7 @@ namespace SNEEZE
       MAP_OBJECT_PROPERTIES Properties;
    };
 
-   static_assert (sizeof (RMCOBJECT) == 432, "RMCOBJECT must be exactly 432 bytes");
+   static_assert (sizeof (RMCOBJECT) == 528, "RMCOBJECT must be exactly 528 bytes");
 
    // ---------------------------------------------------------------------------
    // MAP_OBJECT — base class for all 3D objects referenced by SOM::NODEs.

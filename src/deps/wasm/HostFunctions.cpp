@@ -484,11 +484,11 @@ wasm_trap_t* Storage_SetJson (void* pEnv, wasmtime_caller_t* pCaller, const wasm
 //
 // Node_Root:  (i32 twFabricIx, i32 ptr, i32 len) -> i64 twObjectIx
 //   Creates a root node on the fabric identified by twFabricIx.
-//   Reads an RMCOBJECT (432 bytes) from WASM linear memory at [ptr..ptr+len).
+//   Reads an RMCOBJECT (528 bytes) from WASM linear memory at [ptr..ptr+len).
 //
 // Node_Open:  (i64 twParentIx, i32 ptr, i32 len) -> i64 twObjectIx
 //   Creates a child node under twParentIx (fabric inherited from parent).
-//   Reads an RMCOBJECT (432 bytes) from WASM linear memory at [ptr..ptr+len).
+//   Reads an RMCOBJECT (528 bytes) from WASM linear memory at [ptr..ptr+len).
 //
 // Node_Close: (i64 twObjectIx) -> i32 success
 //   Removes and deletes the node identified by twObjectIx.

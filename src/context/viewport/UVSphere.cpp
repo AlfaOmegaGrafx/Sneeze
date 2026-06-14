@@ -73,3 +73,63 @@ void GenerateUVSphere (UV_SPHERE& sphere, float dRadius,
    }
 }
 
+void GenerateUnitBox (UV_SPHERE& box)
+{
+   box.aPositions.clear ();
+   box.aNormals.clear ();
+   box.aTexCoords.clear ();
+   box.aIndices.clear ();
+
+   // Six faces, each with four corners and one outward normal. Separate
+   // vertices per face so normals are flat (no shared-vertex averaging).
+   static const float aFaceNormal[6][3] =
+   {
+      {  0.0f,  0.0f,  1.0f },        // +Z
+      {  0.0f,  0.0f, -1.0f },        // -Z
+      {  1.0f,  0.0f,  0.0f },        // +X
+      { -1.0f,  0.0f,  0.0f },        // -X
+      {  0.0f,  1.0f,  0.0f },        // +Y
+      {  0.0f, -1.0f,  0.0f },        // -Y
+   };
+
+   // Corner offsets per face, ordered CCW when viewed from outside.
+   static const float aFaceCorner[6][4][3] =
+   {
+      { { -0.5f, -0.5f,  0.5f }, {  0.5f, -0.5f,  0.5f }, {  0.5f,  0.5f,  0.5f }, { -0.5f,  0.5f,  0.5f } },
+      { {  0.5f, -0.5f, -0.5f }, { -0.5f, -0.5f, -0.5f }, { -0.5f,  0.5f, -0.5f }, {  0.5f,  0.5f, -0.5f } },
+      { {  0.5f, -0.5f,  0.5f }, {  0.5f, -0.5f, -0.5f }, {  0.5f,  0.5f, -0.5f }, {  0.5f,  0.5f,  0.5f } },
+      { { -0.5f, -0.5f, -0.5f }, { -0.5f, -0.5f,  0.5f }, { -0.5f,  0.5f,  0.5f }, { -0.5f,  0.5f, -0.5f } },
+      { { -0.5f,  0.5f,  0.5f }, {  0.5f,  0.5f,  0.5f }, {  0.5f,  0.5f, -0.5f }, { -0.5f,  0.5f, -0.5f } },
+      { { -0.5f, -0.5f, -0.5f }, {  0.5f, -0.5f, -0.5f }, {  0.5f, -0.5f,  0.5f }, { -0.5f, -0.5f,  0.5f } },
+   };
+
+   static const float aCornerUV[4][2] = { { 0.0f, 0.0f }, { 1.0f, 0.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f } };
+
+   for (int nFace = 0; nFace < 6; nFace++)
+   {
+      uint32_t nBase = static_cast<uint32_t> (box.aPositions.size () / 3);
+
+      for (int nCorner = 0; nCorner < 4; nCorner++)
+      {
+         box.aPositions.push_back (aFaceCorner[nFace][nCorner][0]);
+         box.aPositions.push_back (aFaceCorner[nFace][nCorner][1]);
+         box.aPositions.push_back (aFaceCorner[nFace][nCorner][2]);
+
+         box.aNormals.push_back (aFaceNormal[nFace][0]);
+         box.aNormals.push_back (aFaceNormal[nFace][1]);
+         box.aNormals.push_back (aFaceNormal[nFace][2]);
+
+         box.aTexCoords.push_back (aCornerUV[nCorner][0]);
+         box.aTexCoords.push_back (aCornerUV[nCorner][1]);
+      }
+
+      box.aIndices.push_back (nBase);
+      box.aIndices.push_back (nBase + 1);
+      box.aIndices.push_back (nBase + 2);
+
+      box.aIndices.push_back (nBase);
+      box.aIndices.push_back (nBase + 2);
+      box.aIndices.push_back (nBase + 3);
+   }
+}
+
