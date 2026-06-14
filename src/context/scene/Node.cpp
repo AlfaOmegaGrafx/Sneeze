@@ -334,6 +334,79 @@ std::string NODE::Name () const
    return sResult;
 }
 
+static const char* ClassName_Lookup (MAP_OBJECT_CLASS eClass)
+{
+   switch (eClass)
+   {
+      case MAP_OBJECT_CLASS_ROOT:        return "root";
+      case MAP_OBJECT_CLASS_CELESTIAL:   return "celestial";
+      case MAP_OBJECT_CLASS_TERRESTRIAL: return "terrestrial";
+      case MAP_OBJECT_CLASS_PHYSICAL:    return "physical";
+      default:                           return "";
+   }
+}
+
+static const char* CelestialTypeName_Lookup (uint8_t bType)
+{
+   switch (bType)
+   {
+      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_NONE:          return "none";
+      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_UNIVERSE:      return "universe";
+      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_SUPERCLUSTER:  return "supercluster";
+      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_GALAXYCLUSTER: return "galaxycluster";
+      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_GALAXY:        return "galaxy";
+      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_SECTOR:        return "sector";
+      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_NEBULA:        return "nebula";
+      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_STARCLUSTER:   return "starcluster";
+      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_BLACKHOLE:     return "blackhole";
+      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_STARSYSTEM:    return "starsystem";
+      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_STAR:          return "star";
+      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_PLANETSYSTEM:  return "planetsystem";
+      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_PLANET:        return "planet";
+      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOONSYSTEM:    return "moonsystem";
+      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOON:          return "moon";
+      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_DEBRISSYSTEM:  return "debrissystem";
+      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_DEBRIS:        return "debris";
+      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_SATELLITE:     return "satellite";
+      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_TRANSPORT:     return "transport";
+      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_SURFACE:       return "surface";
+      default:                                           return "";
+   }
+}
+
+std::string NODE::ClassName () const
+{
+   if (m_pImpl->m_pMap_Object)
+      return ClassName_Lookup (m_pImpl->m_pMap_Object->Class ());
+
+   return std::string ();
+}
+
+std::string NODE::TypeName () const
+{
+   std::string sResult;
+
+   if (m_pImpl->m_pMap_Object)
+   {
+      uint8_t bType = m_pImpl->m_pMap_Object->m_Type.bType;
+
+      // Type identifiers are class-specific; only celestial bodies have named
+      // types today. Other classes fall back to the raw numeric type.
+      if (m_pImpl->m_pMap_Object->Class () == MAP_OBJECT_CLASS_CELESTIAL)
+         sResult = CelestialTypeName_Lookup (bType);
+
+      if (sResult.empty ())
+         sResult = "type" + std::to_string (static_cast<int> (bType));
+   }
+
+   return sResult;
+}
+
+int NODE::Subtype () const
+{
+   return m_pImpl->m_pMap_Object ? static_cast<int> (m_pImpl->m_pMap_Object->m_Type.bSubtype) : 0;
+}
+
 FABRIC*     NODE::Fabric            ()                    const { return m_pImpl->m_pFabric; }
 FABRIC*     NODE::Fabric_Attachment ()                    const { return m_pImpl->m_pFabric_Attachment; }
 

@@ -62,6 +62,9 @@ namespace SNEEZE
       // Accessors
       uint64_t           ObjectIx          () const;
       std::string        Name              () const;
+      std::string        ClassName         () const;  // "celestial", "terrestrial", ...
+      std::string        TypeName          () const;  // "starsystem", "star", ... (class-specific)
+      int                Subtype           () const;  // raw subtype discriminator
       MAP_OBJECT*        MapObject         () const;
       FABRIC*            Fabric            () const;
       FABRIC*            Fabric_Attachment () const;
