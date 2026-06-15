@@ -29,7 +29,7 @@ class CONSOLE::Impl : public ICONSOLE_IMPL
 public:
    Impl (CONTEXT* pContext) :
       m_pContext          (pContext),
-      m_sPath_Temporary   ((std::filesystem::path (pContext->Path_Temporary ()) / "Console").string ()),
+      m_sPath_Temporary   ((std::filesystem::path (pContext->Path_Temporary ()) / "Console").generic_string ()),
       m_nIndex_Entry      (0),
       m_nEntries_Cache    (16384),
       m_nEntries_Block    (4096),

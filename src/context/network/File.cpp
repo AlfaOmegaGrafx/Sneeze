@@ -235,7 +235,7 @@ public:
    std::string Path () const
    {
       const CONTAINER::CID* pCID = m_pContainer->Identity ();
-      return (std::filesystem::path (m_pINetwork_Impl->Path_Permanent ()) / pCID->sPersonaHash / pCID->sFingerprint.substr (0, 2) / pCID->sFingerprint.substr (2, 22) / pCID->sContainer / m_sDiskKey.substr (0, 2)).string ();
+      return (std::filesystem::path (m_pINetwork_Impl->Path_Permanent ()) / pCID->sPersonaHash / pCID->sFingerprint.substr (0, 2) / pCID->sFingerprint.substr (2, 22) / pCID->sContainer / m_sDiskKey.substr (0, 2)).generic_string ();
    }
 
    std::string Filename (const std::string& sExt) const
@@ -250,7 +250,7 @@ public:
 
    std::string Pathname (const std::string& sExt) const
    {
-      return (std::filesystem::path (Path ()) / Filename (sExt)).string ();
+      return (std::filesystem::path (Path ()) / Filename (sExt)).generic_string ();
    }
 
 public:

@@ -64,7 +64,7 @@ public:
       const std::string& sBasePath = m_pIConsole_Impl->Path_Temporary ();
 
       const CONTAINER::CID* pCID = m_pContainer->Identity ();
-      return (std::filesystem::path (sBasePath) / pCID->sPersonaHash / pCID->sFingerprint.substr (0, 2) / pCID->sFingerprint.substr (2, 22)).string ();
+      return (std::filesystem::path (sBasePath) / pCID->sPersonaHash / pCID->sFingerprint.substr (0, 2) / pCID->sFingerprint.substr (2, 22)).generic_string ();
    }
 
    std::string Filename (uint32_t nBlock, const std::string& sExt = "") const
@@ -82,12 +82,12 @@ public:
 
    std::string Pathname (uint32_t nBlock, const std::string& sExt = "") const
    {
-      return (std::filesystem::path (Path (nBlock)) / Filename (nBlock, sExt)).string ();
+      return (std::filesystem::path (Path (nBlock)) / Filename (nBlock, sExt)).generic_string ();
    }
 
    std::string Pathname_Meta () const
    {
-      return (std::filesystem::path (Path (0)) / (m_pContainer->Identity ()->sContainer + ".meta")).string ();
+      return (std::filesystem::path (Path (0)) / (m_pContainer->Identity ()->sContainer + ".meta")).generic_string ();
    }
 
    // ---------------------------------------------------------------------------

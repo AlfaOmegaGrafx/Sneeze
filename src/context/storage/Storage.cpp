@@ -25,8 +25,8 @@ public:
    Impl (STORAGE* pStorage, CONTEXT* pContext) :
       m_pStorage (pStorage),
       m_pContext (pContext),
-      m_sPath_Permanent ((std::filesystem::path (pContext->Path_Permanent ()) / "Storage").string ()),
-      m_sPath_Temporary ((std::filesystem::path (pContext->Path_Temporary ()) / "Storage").string ())
+      m_sPath_Permanent ((std::filesystem::path (pContext->Path_Permanent ()) / "Storage").generic_string ()),
+      m_sPath_Temporary ((std::filesystem::path (pContext->Path_Temporary ()) / "Storage").generic_string ())
    {
    }
 

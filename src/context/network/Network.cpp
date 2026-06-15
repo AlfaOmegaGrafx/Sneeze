@@ -37,7 +37,7 @@ public:
       INETWORK_IMPL     (),
       m_pNetwork        (pNetwork),
       m_pContext        (pContext),
-      m_sPath_Permanent ((std::filesystem::path (pContext->Path_Permanent ()) / "Network").string ()),
+      m_sPath_Permanent ((std::filesystem::path (pContext->Path_Permanent ()) / "Network").generic_string ()),
       m_bCacheEnabled   (true),
       m_nNextAssetIx    (1),
       m_nNextFileIx     (1),
@@ -145,7 +145,7 @@ public:
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxNetwork);
 
-      std::string sRulesPath = (std::filesystem::path (m_sCachePath) / "rules.json").string ();
+      std::string sRulesPath = (std::filesystem::path (m_sCachePath) / "rules.json").generic_string ();
       std::ifstream file (sRulesPath);
       if (file.is_open ())
       {
@@ -203,8 +203,8 @@ public:
       }
       jDoc["rules"] = jRules;
 
-      std::string sRulesPath = (std::filesystem::path (m_sCachePath) / "rules.json").string ();
-      std::string sTmpPath = (std::filesystem::path (m_sCachePath) / "rules.json.temp").string ();
+      std::string sRulesPath = (std::filesystem::path (m_sCachePath) / "rules.json").generic_string ();
+      std::string sTmpPath = (std::filesystem::path (m_sCachePath) / "rules.json.temp").generic_string ();
 
       std::ofstream file (sTmpPath, std::ios::trunc);
       if (file.is_open ())

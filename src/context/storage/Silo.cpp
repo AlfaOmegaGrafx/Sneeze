@@ -66,7 +66,7 @@ public:
       const std::string& sBasePath = (eScope == kSILO_SCOPE_TEMPORARY_ORG || eScope == kSILO_SCOPE_TEMPORARY_COMPANY) ? m_pIStorage_Impl->Path_Temporary () : m_pIStorage_Impl->Path_Permanent ();
 
       const CONTAINER::CID* pCID = m_pContainer->Identity ();
-      return (std::filesystem::path (sBasePath) / pCID->sPersonaHash / pCID->sFingerprint.substr (0, 2) / pCID->sFingerprint.substr (2, 22)).string ();
+      return (std::filesystem::path (sBasePath) / pCID->sPersonaHash / pCID->sFingerprint.substr (0, 2) / pCID->sFingerprint.substr (2, 22)).generic_string ();
    }
 
    std::string Filename (eSILO_SCOPE eScope, const std::string& sExt = "") const
@@ -81,7 +81,7 @@ public:
 
    std::string Pathname (eSILO_SCOPE eScope, const std::string& sExt = "") const
    {
-      return (std::filesystem::path (Path (eScope)) / Filename (eScope, sExt)).string ();
+      return (std::filesystem::path (Path (eScope)) / Filename (eScope, sExt)).generic_string ();
    }
 
    // ---------------------------------------------------------------------------
