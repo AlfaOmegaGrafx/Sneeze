@@ -1,0 +1,55 @@
+# Deploy Wiki — manual push of docs/ to a Wiki.js server via its GraphQL API.
+#
+# Source of truth: docs/**/*.md in this repo. Reuses scripts/publish-wiki.py
+# (Home.md -> path prefix, all other pages nested beneath it).
+#
+# Trigger: Actions -> Deploy Wiki -> Run workflow.
+#   - target:  Wiki.js GraphQL endpoint (default: test server wiki.rp1.com)
+#   - dry_run: transform only, no API writes (good for a first check)
+#
+# Secret required for a live push: WIKIJS_API_TOKEN
+#   (Wiki.js Administration -> API Access; scopes: read:pages + write:pages)
+#
+name: Deploy Wiki
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Wiki.js GraphQL endpoint
+        required: true
+        default: https://wiki.rp1.com/graphql
+      dry_run:
+        description: Transform only (no API writes)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-wiki
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Publish docs/ to Wiki.js
+        env:
+          WIKIJS_GRAPHQL_URL: ${{ inputs.target }}
+          WIKIJS_API_TOKEN: ${{ secrets.WIKIJS_API_TOKEN }}
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            python scripts/publish-wiki.py --dry-run --all
+          else
+            python scripts/publish-wiki.py --all
+          fi
