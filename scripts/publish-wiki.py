@@ -64,6 +64,16 @@ query PageByPath($path: String!, $locale: String!) {
 }
 """
 
+RENDER_MUTATION = """
+mutation RenderPage($id: Int!) {
+   pages {
+      render(id: $id) {
+         responseResult { succeeded message }
+      }
+   }
+}
+"""
+
 
 def find_repo_root(start: Path) -> Path:
    p = start.resolve()
@@ -93,6 +103,14 @@ def list_doc_pages(docs_root: Path) -> list[Path]:
          continue
       pages.append(path)
    return pages
+
+
+def order_publish_pages(pages: list[Path], docs_root: Path, home: str) -> list[Path]:
+   home_path = (docs_root / home).resolve()
+   rest = sorted([p for p in pages if p.resolve() != home_path], key=lambda p: doc_rel_path(docs_root, p))
+   if any(p.resolve() == home_path for p in pages):
+      rest.append(docs_root / home)
+   return rest
 
 
 def doc_rel_path(docs_root: Path, path: Path) -> str:
@@ -263,6 +281,12 @@ class WikiJsClient:
       if not result.get("succeeded"):
          raise RuntimeError(result.get("message") or json.dumps(result))
 
+   def render(self, page_id: int) -> None:
+      data = self.graphql(RENDER_MUTATION, {"id": page_id})
+      result = (((data.get("pages") or {}).get("render") or {}).get("responseResult")) or {}
+      if not result.get("succeeded"):
+         raise RuntimeError(result.get("message") or json.dumps(result))
+
 
 def prepare_page(path: Path, docs_root: Path, config: dict, path_map: dict[str, str], sha: str) -> tuple[str, str, str, str]:
    rel = doc_rel_path(docs_root, path)
@@ -342,14 +366,24 @@ def main() -> int:
       return 0
 
    client = WikiJsClient(graphql_url, token)
-   print(f"publish-wiki: publishing {len(pages)} page(s) to {graphql_url}")
+   publish_order = order_publish_pages(pages, docs_root, config["home"])
+   print(f"publish-wiki: publishing {len(publish_order)} page(s) to {graphql_url}")
 
-   for path in pages:
+   published_paths: list[str] = []
+   for path in publish_order:
       wiki_path, title, markdown, rel = prepare_page(path, docs_root, config, path_map, sha)
       print(f"  upsert {wiki_path} <- {rel}")
       client.upsert(wiki_path, title, markdown, description, locale, ["sneeze", "docs"])
+      published_paths.append(wiki_path)
 
-   print(f"publish-wiki: done ({len(pages)} page(s))")
+   print(f"publish-wiki: re-rendering {len(published_paths)} page(s) to refresh internal links")
+   for wiki_path in published_paths:
+      page_id = client.page_id_for_path(wiki_path, locale)
+      if page_id is not None:
+         print(f"  render {wiki_path}")
+         client.render(page_id)
+
+   print(f"publish-wiki: done ({len(published_paths)} page(s))")
    return 0
 
 
