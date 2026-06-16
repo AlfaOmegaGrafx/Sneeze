@@ -194,7 +194,7 @@ class WikiJsClient:
       self.graphql_url = graphql_url
       self.token = token
 
-   def graphql(self, query: str, variables: dict | None = None) -> dict:
+   def graphql(self, query: str, variables: dict | None = None, ignore_codes: set[int] | None = None) -> dict:
       payload = json.dumps({"query": query, "variables": variables or {}}).encode("utf-8")
       req = urllib.request.Request(
          self.graphql_url,
@@ -212,11 +212,22 @@ class WikiJsClient:
          detail = exc.read().decode("utf-8", errors="replace")
          raise RuntimeError(f"HTTP {exc.code}: {detail}") from exc
       if body.get("errors"):
+         if ignore_codes and self._errors_only_codes(body["errors"], ignore_codes):
+            return body.get("data") or {}
          raise RuntimeError(json.dumps(body["errors"], indent=2))
       return body.get("data") or {}
 
+   @staticmethod
+   def _errors_only_codes(errors: list, allowed: set[int]) -> bool:
+      codes: set[int] = set()
+      for err in errors:
+         exc = (err.get("extensions") or {}).get("exception") or {}
+         if "code" in exc:
+            codes.add(int(exc["code"]))
+      return bool(codes) and codes <= allowed
+
    def page_id_for_path(self, path: str, locale: str) -> int | None:
-      data = self.graphql(PAGE_BY_PATH_QUERY, {"path": path, "locale": locale})
+      data = self.graphql(PAGE_BY_PATH_QUERY, {"path": path, "locale": locale}, ignore_codes={6003})
       page = (((data.get("pages") or {}).get("singleByPath")) or None)
       if not page:
          return None
