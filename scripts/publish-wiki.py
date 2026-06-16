@@ -101,7 +101,7 @@ def doc_rel_path(docs_root: Path, path: Path) -> str:
 
 def doc_relpath_to_wiki_path(rel: str, path_prefix: str, home: str) -> str:
    rel = rel.replace("\\", "/")
-   prefix = path_prefix.rstrip("/")
+   prefix = path_prefix.strip("/")
    if rel == home:
       return prefix
    stem = rel[:-3] if rel.endswith(".md") else rel
@@ -156,7 +156,7 @@ def rewrite_links(body: str, from_doc: Path, docs_root: Path, path_map: dict[str
       wiki_path = path_map.get(path)
       if not wiki_path:
          wiki_path = doc_relpath_to_wiki_path(path, path_prefix, home)
-      href = f"{wiki_path}#{anchor}" if anchor else wiki_path
+      href = f"/{wiki_path}#{anchor}" if anchor else f"/{wiki_path}"
       return f"[{label}]({href})"
 
    return LINK_RE.sub(replace, body)

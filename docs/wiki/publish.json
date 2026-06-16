@@ -1,5 +1,5 @@
 {
-   "path_prefix": "/sneeze",
+   "path_prefix": "sneeze",
    "docs_root": "docs",
    "home": "Home.md",
    "locale": "en",
