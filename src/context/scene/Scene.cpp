@@ -111,7 +111,7 @@ public:
       RMCOBJECT RMCObject;
       uint64_t twObjectIx;
 
-      if (m_pFabric_Root = Fabric_Open (nullptr, nullptr, sUrl))
+      if ((m_pFabric_Root = Fabric_Open (nullptr, nullptr, sUrl)) != nullptr)
       {
          CONTAINER* pContainer = m_pFabric_Root->Container ();
 
