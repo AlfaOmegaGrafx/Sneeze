@@ -4,7 +4,7 @@
 # (Home.md -> path prefix, all other pages nested beneath it).
 #
 # Trigger: Actions -> Deploy Wiki -> Run workflow.
-#   - target:  Wiki.js GraphQL endpoint (default: test server wiki.rp1.com)
+#   - target:  Wiki.js GraphQL endpoint (default: omb.wiki)
 #   - dry_run: transform only, no API writes (good for a first check)
 #
 # Secret required for a live push: WIKIJS_API_TOKEN
@@ -18,7 +18,7 @@ on:
       target:
         description: Wiki.js GraphQL endpoint
         required: true
-        default: https://wiki.rp1.com/graphql
+        default: https://omb.wiki/graphql
       dry_run:
         description: Transform only (no API writes)
         type: boolean
