@@ -418,7 +418,7 @@ The scripts in `scripts/` are the only glue between the two. In `-All` / `--all`
 - **`scripts/build-*.{sh,ps1}`** — the glue. Default mode: `cmake --build <sneeze-tree>`. `-Deps` mode: `cmake -S deps` + per-dep stamped loop. `-All` mode: deps flow, then `cmake -S src` configure + build. The scripts compute per-config directories and pass them explicitly.
 - **`scripts/build-deps.sh`** — shared bash helper used by Linux/macOS scripts. Runs `cmake -S deps` and the per-dep build loop with stamp caching.
 - **`cmake/toolchain-*.cmake`** — optional CMake toolchain files for cross-compilation (e.g. AArch64 Linux, Linux clang). The platform scripts pass these to both `cmake -S deps` and `cmake -S src` when applicable.
-- **`.github/workflows/build-platform.yml`** — CI orchestration. Each dependency gets its own job in a tier (tier0: no deps, tier1: depends on tier0, etc.) for parallelism. CI uses `cmake -S deps -DDEP=<name>` for single-dep builds and `cmake -S src` for the Sneeze build, exactly the same entry points as the scripts.
+- **`.github/workflows/build-platform.yml`** — CI orchestration Each dependency gets its own job in a tier (tier0: no deps, tier1: depends on tier0, etc.) for parallelism. CI uses `cmake -S deps -DDEP=<name>` for single-dep builds and `cmake -S src` for the Sneeze build, exactly the same entry points as the scripts.
 
 ### Adding a new dependency
 
