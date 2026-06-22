@@ -12,6 +12,7 @@
 # Environment (live publish only):
 #   WIKIJS_GRAPHQL_URL  e.g. https://omb.wiki/graphql
 #   WIKIJS_API_TOKEN    bearer token from Wiki.js Administration > API Access
+#   CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET  optional Cloudflare Access service token
 
 from __future__ import annotations
 
@@ -73,6 +74,11 @@ mutation RenderPage($id: Int!) {
    }
 }
 """
+
+USER_AGENT = (
+   "Sneeze-Docs-Publisher/1.0 "
+   "(+https://github.com/MetaversalCorp/Sneeze/actions/workflows/docs.yml)"
+)
 
 
 def find_repo_root(start: Path) -> Path:
@@ -212,23 +218,47 @@ class WikiJsClient:
       self.graphql_url = graphql_url
       self.token = token
 
+   def _request_headers(self) -> dict[str, str]:
+      headers = {
+         "Content-Type": "application/json",
+         "Authorization": f"Bearer {self.token}",
+         "User-Agent": USER_AGENT,
+         "Accept": "application/json",
+      }
+      cf_id = os.environ.get("CF_ACCESS_CLIENT_ID", "").strip()
+      cf_secret = os.environ.get("CF_ACCESS_CLIENT_SECRET", "").strip()
+      if cf_id and cf_secret:
+         headers["CF-Access-Client-Id"] = cf_id
+         headers["CF-Access-Client-Secret"] = cf_secret
+      return headers
+
+   @staticmethod
+   def _http_error_message(code: int, detail: str) -> str:
+      if code == 403 and "1010" in detail:
+         return (
+            f"HTTP 403 (Cloudflare error 1010): {detail}\n"
+            "Cloudflare blocked this request before it reached Wiki.js. GitHub Actions "
+            "runners are often blocked by Bot Fight Mode or browser-integrity checks.\n"
+            "Ask the omb.wiki admin to add a WAF skip rule for POST /graphql (or allow "
+            "this User-Agent), or configure CF_ACCESS_CLIENT_ID + CF_ACCESS_CLIENT_SECRET "
+            "repository secrets if the site uses Cloudflare Access."
+         )
+      return f"HTTP {code}: {detail}"
+
    def graphql(self, query: str, variables: dict | None = None, ignore_codes: set[int] | None = None) -> dict:
       payload = json.dumps({"query": query, "variables": variables or {}}).encode("utf-8")
       req = urllib.request.Request(
          self.graphql_url,
          data=payload,
          method="POST",
-         headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.token}",
-         },
+         headers=self._request_headers(),
       )
       try:
          with urllib.request.urlopen(req, timeout=120) as resp:
             body = json.loads(resp.read().decode("utf-8"))
       except urllib.error.HTTPError as exc:
          detail = exc.read().decode("utf-8", errors="replace")
-         raise RuntimeError(f"HTTP {exc.code}: {detail}") from exc
+         raise RuntimeError(self._http_error_message(exc.code, detail)) from exc
       if body.get("errors"):
          if ignore_codes and self._errors_only_codes(body["errors"], ignore_codes):
             return body.get("data") or {}

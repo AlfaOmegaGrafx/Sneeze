@@ -23,8 +23,14 @@ repo; the wiki is a mirror.
 
 **Secrets** (Settings → Actions): `WIKIJS_GRAPHQL_URL` (default `https://omb.wiki/graphql`),
 `WIKIJS_API_TOKEN` (bearer token from Wiki.js Administration → API Access, scopes:
-`write:pages` + `read:pages`). Until configured, `wiki-publish` exits successfully with a
-notice and changes nothing on omb.wiki.
+`write:pages` + `read:pages`). Optional: `CF_ACCESS_CLIENT_ID` and
+`CF_ACCESS_CLIENT_SECRET` if omb.wiki sits behind Cloudflare Access. Until configured,
+`wiki-publish` exits successfully with a notice and changes nothing on omb.wiki.
+
+**Cloudflare 403 / error 1010:** If publish fails with `HTTP 403: error code: 1010`, Cloudflare
+is blocking GitHub Actions before Wiki.js sees the request. The wiki admin must add a WAF rule
+to skip bot checks for `POST /graphql`, or issue a Cloudflare Access service token and store it
+in the optional secrets above. This is not a Wiki.js token permissions problem.
 
 Config: `docs/wiki/publish.json`. Script: `scripts/publish-wiki.py`.
 
