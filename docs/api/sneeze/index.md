@@ -12,13 +12,7 @@ nav:
 
 # Engine API
 
-`include/Sneeze.h` is the engine's front door — the single header a host application
-includes to embed the engine. It declares one concrete class, [`ENGINE`](ENGINE.md), and
-three interfaces the host implements to plug itself in. For the *architecture* — what the
-engine owns, how it boots and shuts down, how it manages sessions and the on-disk cache —
-read the [Engine system](../../systems/engine.md) page. This section is the precise
-per-class reference: one page each, documenting every member's purpose, parameters,
-return value, and the pitfalls (lifetime, threading, contract) to watch for.
+`include/Sneeze.h` is the engine's front door — the single header a host application includes to embed the engine. It declares one concrete class, [`ENGINE`](ENGINE.md), and three interfaces the host implements to plug itself in. For the *architecture* — what the engine owns, how it boots and shuts down, how it manages sessions and the on-disk cache — read the [Engine system](../../systems/engine.md) page. This section is the precise per-class reference: one page each, documenting every member's purpose, parameters, return value, and the pitfalls (lifetime, threading, contract) to watch for.
 
 ```cpp
 #include <Sneeze.h>      // pulls in Context.h, Container.h, Msf.h, Console.h,
@@ -28,8 +22,7 @@ namespace SNEEZE { ... }
 
 ## How the pieces fit together
 
-Embedding the engine is a matter of implementing three small interfaces and driving one
-object. The host supplies behavior; the engine supplies everything else.
+Embedding the engine is a matter of implementing three small interfaces and driving one object. The host supplies behavior; the engine supplies everything else.
 
 | Class | Page | Direction | Role |
 |---|---|---|---|
@@ -40,24 +33,13 @@ object. The host supplies behavior; the engine supplies everything else.
 
 The relationship is a layered hand-off:
 
-- A host **implements `IENGINE`** and constructs an `ENGINE` with it. The engine reads its
-  data path and renderer name and routes all log output back through it.
-- The host **opens a context** with `ENGINE::Context_Open`, passing an `ICONTEXT`
-  implementation. The engine calls that interface's `On…` methods as containers, files,
-  storage silos, and console entries come and go inside the session.
-- The host **activates a viewport** on the context, passing an `IVIEWPORT` implementation
-  (via `VIEWPORT::Activate`, documented under the [Viewport API](../viewport/index.md)).
-  The compositor calls that interface to learn the window and frame size and to deliver
-  each finished frame.
+- A host **implements `IENGINE`** and constructs an `ENGINE` with it. The engine reads its data path and renderer name and routes all log output back through it.
+- The host **opens a context** with `ENGINE::Context_Open`, passing an `ICONTEXT` implementation. The engine calls that interface's `On…` methods as containers, files, storage silos, and console entries come and go inside the session.
+- The host **activates a viewport** on the context, passing an `IVIEWPORT` implementation (via `VIEWPORT::Activate`, documented under the [Viewport API](../viewport/index.md)). The compositor calls that interface to learn the window and frame size and to deliver each finished frame.
 
-`ENGINE` is the only class here a host instantiates. The three interfaces are pure
-abstract — the host derives from them. `ENGINE` itself uses the pimpl idiom: it is a thin
-handle over a private implementation.
+`ENGINE` is the only class here a host instantiates. The three interfaces are pure abstract — the host derives from them. `ENGINE` itself uses the pimpl idiom: it is a thin handle over a private implementation.
 
-> **Who calls this.** `ENGINE` and `IENGINE` are the engine/host boundary every embedder
-> touches. `ICONTEXT` and `IVIEWPORT` are also implemented by the host, but their methods
-> are *called by the engine*, often from background threads — read each page's threading
-> notes before doing real work inside a callback.
+> **Who calls this.** `ENGINE` and `IENGINE` are the engine/host boundary every embedder > touches. `ICONTEXT` and `IVIEWPORT` are also implemented by the host, but their methods > are *called by the engine*, often from background threads — read each page's threading > notes before doing real work inside a callback.
 
 ---
 

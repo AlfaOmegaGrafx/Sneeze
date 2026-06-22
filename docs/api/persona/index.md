@@ -12,12 +12,7 @@ nav:
 
 # Persona API
 
-The persona subsystem's public surface is declared in `include/Persona.h`. It is a
-single class, `PERSONA`, in the **`SNEEZE::persona`** namespace (note the lowercase
-sub-namespace). For the *architecture* — what a persona is, why it exists as a
-temporary stub, and how its hash scopes persistent storage — read the
-[Persona system](../../systems/persona.md) page. This section is the precise class
-reference.
+The persona subsystem's public surface is declared in `include/Persona.h`. It is a single class, `PERSONA`, in the **`SNEEZE::persona`** namespace (note the lowercase sub-namespace). For the *architecture* — what a persona is, why it exists as a temporary stub, and how its hash scopes persistent storage — read the [Persona system](../../systems/persona.md) page. This section is the precise class reference.
 
 ```cpp
 #include <Persona.h>   // brought in transitively via <Sneeze.h>
@@ -30,11 +25,7 @@ namespace SNEEZE { namespace persona { ... } }
 |---|---|---|
 | `PERSONA` | [PERSONA](PERSONA.md) | A temporary local identity proxy: a name and a SHA-256 hash used to scope stores and storage. |
 
-> **Who calls this.** One `PERSONA` exists per [`ENGINE`](../../systems/engine.md),
-> reachable as `ENGINE::Persona()`. A host application sets the active persona; the
-> [storage](../../systems/storage.md) and [container](../container/index.md) layers read
-> its hash to isolate per-user state. It is a testing stub, **not** an authentication
-> mechanism.
+> **Who calls this.** One `PERSONA` exists per [`ENGINE`](../../systems/engine.md), > reachable as `ENGINE::Persona()`. A host application sets the active persona; the > [storage](../../systems/storage.md) and [container](../container/index.md) layers read > its hash to isolate per-user state. It is a testing stub, **not** an authentication > mechanism.
 
 ---
 

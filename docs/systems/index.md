@@ -7,9 +7,7 @@ verified: 92fdc1c
 
 # Systems
 
-One page per subsystem. Each explains the subsystem's job, the problem it solves,
-its internal design, and how it behaves at runtime. Each links across to its
-matching [API](../api/index.md) page for exact class and method signatures.
+One page per subsystem. Each explains the subsystem's job, the problem it solves, its internal design, and how it behaves at runtime. Each links across to its matching [API](../api/index.md) page for exact class and method signatures.
 
 ## Engine core
 - [Engine](engine.md) — the single entry point; owns module lifecycle and contexts.

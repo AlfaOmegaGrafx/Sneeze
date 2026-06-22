@@ -14,15 +14,7 @@ nav:
 
 # `VIEWPORT`
 
-The engine's rendering surface and orbit camera. One `VIEWPORT` exists per
-[`CONTEXT`](../context/index.md) (per browsing session). It owns the renderer
-once created, the accumulated input state, the readback framebuffer, the camera,
-and per-frame timing counters — but it only renders while a host (an `IVIEWPORT`)
-is attached. The [scene](../scene/index.md) it draws is owned by the context and
-reached through `Scene()`, not owned by the viewport. For the conceptual picture
-— deferred renderer creation, the compositor frame loop, the two paths to the
-screen — see the [Viewport system](../../systems/viewport.md); this page is the
-exact behavior of every public member.
+The engine's rendering surface and orbit camera. One `VIEWPORT` exists per [`CONTEXT`](../context/index.md) (per browsing session). It owns the renderer once created, the accumulated input state, the readback framebuffer, the camera, and per-frame timing counters — but it only renders while a host (an `IVIEWPORT`) is attached. The [scene](../scene/index.md) it draws is owned by the context and reached through `Scene()`, not owned by the viewport. For the conceptual picture — deferred renderer creation, the compositor frame loop, the two paths to the screen — see the [Viewport system](../../systems/viewport.md); this page is the exact behavior of every public member.
 
 ```cpp
 class VIEWPORT
@@ -46,74 +38,41 @@ private:
 ## Role and ownership
 
 - **Owned by** a `CONTEXT`, constructed with a back-pointer to it.
-- **Owns** the [`RENDERER`](RENDERER.md) (once built on the compositor thread), the
-  `INPUT` accumulator, the readback framebuffer, and the `VIEW` camera.
-- **Delegates** the scene: it does not own a `SCENE`; `Scene()` resolves the
-  context's scene.
-- **Drives rendering** indirectly — `Activate` posts a `JOB_COMPOSITOR` to the
-  engine's compositor pool, which runs the actual frame loop.
+- **Owns** the [`RENDERER`](RENDERER.md) (once built on the compositor thread), the `INPUT` accumulator, the readback framebuffer, and the `VIEW` camera.
+- **Delegates** the scene: it does not own a `SCENE`; `Scene()` resolves the context's scene.
+- **Drives rendering** indirectly — `Activate` posts a `JOB_COMPOSITOR` to the engine's compositor pool, which runs the actual frame loop.
 
-The owner chain is `VIEWPORT → CONTEXT → ENGINE`. The viewport reaches engine
-services through the context, never through a cached pointer.
+The owner chain is `VIEWPORT → CONTEXT → ENGINE`. The viewport reaches engine services through the context, never through a cached pointer.
 
 ---
 
 ## Lifecycle
 
-A viewport is brought up in stages that deliberately defer the renderer onto the
-correct thread:
+A viewport is brought up in stages that deliberately defer the renderer onto the correct thread:
 
-1. **Construct + Initialize.** `VIEWPORT(pContext)` then `Initialize()` do almost
-   nothing — no renderer is created, because the constructing thread is not the
-   rendering thread.
-2. **Activate.** `Activate(pHost)` records the host and posts a compositor job.
-   On the compositor's lifecycle thread (agent 0) the job calls
-   `Renderer_Initialize()`, which builds the concrete renderer. After that the job
-   cycles render/present continuously.
-3. **Deactivate.** `Deactivate()` cancels the job and blocks until the renderer is
-   destroyed on agent 0 (`Renderer_Shutdown()`), then clears the host.
+1. **Construct + Initialize.** `VIEWPORT(pContext)` then `Initialize()` do almost nothing — no renderer is created, because the constructing thread is not the rendering thread.
+2. **Activate.** `Activate(pHost)` records the host and posts a compositor job. On the compositor's lifecycle thread (agent 0) the job calls `Renderer_Initialize()`, which builds the concrete renderer. After that the job cycles render/present continuously.
+3. **Deactivate.** `Deactivate()` cancels the job and blocks until the renderer is destroyed on agent 0 (`Renderer_Shutdown()`), then clears the host.
 
-`Renderer_Initialize` / `Renderer_Shutdown` are public but are intended to be
-called **only** from the compositor's agent 0 (the system does this for you);
-they exist on the public surface because the compositor job invokes them across
-the module boundary.
+`Renderer_Initialize` / `Renderer_Shutdown` are public but are intended to be called **only** from the compositor's agent 0 (the system does this for you); they exist on the public surface because the compositor job invokes them across the module boundary.
 
 ---
 
 ## Threading and pitfalls
 
-This is the part to read before calling anything. The viewport bridges the host's
-threads and the engine's compositor pool, and its members have real concurrency
-contracts.
+This is the part to read before calling anything. The viewport bridges the host's threads and the engine's compositor pool, and its members have real concurrency contracts.
 
-**The renderer is single-thread-affine.** It must be created, used, and destroyed
-on one thread; the engine pins all of that to compositor agent 0. Never call
-`Renderer_Initialize` / `Renderer_Shutdown` yourself from an arbitrary thread, and
-never touch the [`RENDERER`](RENDERER.md) returned by `Renderer()` off the
-compositor thread.
+**The renderer is single-thread-affine.** It must be created, used, and destroyed on one thread; the engine pins all of that to compositor agent 0. Never call `Renderer_Initialize` / `Renderer_Shutdown` yourself from an arbitrary thread, and never touch the [`RENDERER`](RENDERER.md) returned by `Renderer()` off the compositor thread.
 
-**`Activate` / `Deactivate` are guarded** by a viewport mutex and are
-idempotent-safe (activating an already-active viewport, or deactivating an
-inactive one, is a no-op). **`Deactivate` blocks** until the compositor confirms
-the renderer has been destroyed — so no frame can still be in flight against a
-freed renderer when it returns.
+**`Activate` / `Deactivate` are guarded** by a viewport mutex and are idempotent-safe (activating an already-active viewport, or deactivating an inactive one, is a no-op). **`Deactivate` blocks** until the compositor confirms the renderer has been destroyed — so no frame can still be in flight against a freed renderer when it returns.
 
-**Input is a producer/consumer.** `Input_Mouse` / `Input_Key` (host thread)
-accumulate under an input mutex; `Input_Consume` (compositor) reads and resets the
-deltas under the same mutex.
+**Input is a producer/consumer.** `Input_Mouse` / `Input_Key` (host thread) accumulate under an input mutex; `Input_Consume` (compositor) reads and resets the deltas under the same mutex.
 
-**The framebuffer handoff is a lock pair.** `FrameBuffer_Capture` *acquires* the
-framebuffer mutex and returns the pixel pointer; `FrameBuffer_Release` *releases*
-it. You must call them as a pair around your read and must not retain the pointer
-past the release. Forgetting `FrameBuffer_Release` deadlocks the next write.
+**The framebuffer handoff is a lock pair.** `FrameBuffer_Capture` *acquires* the framebuffer mutex and returns the pixel pointer; `FrameBuffer_Release` *releases* it. You must call them as a pair around your read and must not retain the pointer past the release. Forgetting `FrameBuffer_Release` deadlocks the next write.
 
-**Scene invalidation is lock-free**, carried by a single atomic boolean
-(`Scene_Invalidate` sets it from any thread; `Scene_Invalidate_Consume`
-test-and-clears it on the compositor).
+**Scene invalidation is lock-free**, carried by a single atomic boolean (`Scene_Invalidate` sets it from any thread; `Scene_Invalidate_Consume` test-and-clears it on the compositor).
 
-**The timing members are public and unsynchronized.** They are written by the
-compositor; reading them from another thread is racy but harmless (diagnostics
-only).
+**The timing members are public and unsynchronized.** They are written by the compositor; reading them from another thread is racy but harmless (diagnostics only).
 
 ---
 
@@ -126,16 +85,13 @@ bool Initialize ();
 ```
 
 ### `VIEWPORT(pContext)`
-- **Purpose.** Construct a viewport owned by `pContext`. No renderer is created.
-  `pContext` must outlive the viewport.
+- **Purpose.** Construct a viewport owned by `pContext`. No renderer is created. `pContext` must outlive the viewport.
 
 ### `~VIEWPORT()`
-- **Purpose.** Destroy the viewport. Deactivates first (cancelling the compositor
-  job and tearing the renderer down) if still active.
+- **Purpose.** Destroy the viewport. Deactivates first (cancelling the compositor job and tearing the renderer down) if still active.
 
 ### `bool Initialize ()`
-- **Purpose.** Prepare the viewport. Currently a no-op that returns `true`; the
-  real setup happens at `Activate`.
+- **Purpose.** Prepare the viewport. Currently a no-op that returns `true`; the real setup happens at `Activate`.
 - **Returns.** `true`.
 
 ---
@@ -150,30 +106,20 @@ void Renderer_Shutdown ();
 ```
 
 ### `void Activate (IVIEWPORT* pHost)`
-- **Purpose.** Attach the host and begin rendering: records `pHost` and posts a
-  `JOB_COMPOSITOR` to the engine's compositor pool, which creates the renderer on
-  its lifecycle thread and then drives the frame loop.
-- **Parameters.** `pHost` — the host surface (window handle, frame size, frame
-  delivery). Must be non-null and outlive the active period.
+- **Purpose.** Attach the host and begin rendering: records `pHost` and posts a `JOB_COMPOSITOR` to the engine's compositor pool, which creates the renderer on its lifecycle thread and then drives the frame loop.
+- **Parameters.** `pHost` — the host surface (window handle, frame size, frame delivery). Must be non-null and outlive the active period.
 - **Returns.** Nothing.
-- **Pitfalls.** No-op if already active or if `pHost` is null. The renderer is not
-  ready when `Activate` returns — creation happens asynchronously on the
-  compositor.
+- **Pitfalls.** No-op if already active or if `pHost` is null. The renderer is not ready when `Activate` returns — creation happens asynchronously on the compositor.
 
 ### `void Deactivate ()`
-- **Purpose.** Stop rendering: cancel the compositor job, **block** until the
-  renderer is destroyed on agent 0, then clear the host.
+- **Purpose.** Stop rendering: cancel the compositor job, **block** until the renderer is destroyed on agent 0, then clear the host.
 - **Returns.** Nothing.
 - **Pitfalls.** Blocking by design. No-op if not active.
 
 ### `bool Renderer_Initialize ()`
-- **Purpose.** Build the concrete renderer: read the renderer-library name from the
-  engine host, construct the ANARI renderer, pass it the host's native window if
-  any, and initialize it at the current size.
+- **Purpose.** Build the concrete renderer: read the renderer-library name from the engine host, construct the ANARI renderer, pass it the host's native window if any, and initialize it at the current size.
 - **Returns.** `true` if the renderer is now live (or was already).
-- **Pitfalls.** **Compositor agent 0 only.** Called by the compositor's create
-  step; do not call directly. No-op if a renderer already exists or no host is
-  attached.
+- **Pitfalls.** **Compositor agent 0 only.** Called by the compositor's create step; do not call directly. No-op if a renderer already exists or no host is attached.
 
 ### `void Renderer_Shutdown ()`
 - **Purpose.** Destroy the renderer.
@@ -214,11 +160,8 @@ INPUT Input_Consume ();
 ```
 
 ### `void Input_Mouse (nDX, nDY, dScrollY, bMouseLeft, bMouseRight)`
-- **Purpose.** Accumulate one mouse event into the pending input. Deltas
-  (`nDX`, `nDY`, `dScrollY`) are summed; button states are latched to the latest
-  values.
-- **Parameters.** Mouse movement deltas, scroll delta, and current left/right
-  button states.
+- **Purpose.** Accumulate one mouse event into the pending input. Deltas (`nDX`, `nDY`, `dScrollY`) are summed; button states are latched to the latest values.
+- **Parameters.** Mouse movement deltas, scroll delta, and current left/right button states.
 - **Returns.** Nothing. Thread-safe (input mutex).
 
 ### `void Input_Key (bKeySpace, bKeyPlus, bKeyMinus)`
@@ -226,11 +169,9 @@ INPUT Input_Consume ();
 - **Returns.** Nothing. Thread-safe (input mutex).
 
 ### `INPUT Input_Consume ()`
-- **Purpose.** Snapshot the accumulated input and reset the *deltas* (mouse
-  movement and scroll) to zero, leaving button/key states latched.
+- **Purpose.** Snapshot the accumulated input and reset the *deltas* (mouse movement and scroll) to zero, leaving button/key states latched.
 - **Returns.** A copy of the `INPUT` struct.
-- **Pitfalls.** Called by the compositor once per frame; the reset is why two
-  consumers would each get only part of the motion.
+- **Pitfalls.** Called by the compositor once per frame; the reset is why two consumers would each get only part of the motion.
 
 ---
 
@@ -242,24 +183,18 @@ const uint32_t* FrameBuffer_Capture (int& nWidth, int& nHeight);
 void            FrameBuffer_Release ();
 ```
 
-These implement the readback handoff between the renderer (producer) and the host
-(consumer). They are unused on the native-surface path.
+These implement the readback handoff between the renderer (producer) and the host (consumer). They are unused on the native-surface path.
 
 ### `void FrameBuffer_Write (pPixels, nWidth, nHeight)`
-- **Purpose.** Copy a finished frame's pixels into the viewport's internal buffer
-  (resizing it to `nWidth × nHeight`).
-- **Parameters.** `pPixels` — source RGBA pixels; `nWidth`, `nHeight` —
-  dimensions.
+- **Purpose.** Copy a finished frame's pixels into the viewport's internal buffer (resizing it to `nWidth × nHeight`).
+- **Parameters.** `pPixels` — source RGBA pixels; `nWidth`, `nHeight` — dimensions.
 - **Returns.** Nothing. Takes the framebuffer mutex for the copy.
 
 ### `const uint32_t* FrameBuffer_Capture (int& nWidth, int& nHeight)`
-- **Purpose.** Begin a read of the current frame: **acquire** the framebuffer
-  mutex and return a pointer to the pixels plus their dimensions.
-- **Parameters.** `nWidth`, `nHeight` — out-parameters set to the buffer
-  dimensions.
+- **Purpose.** Begin a read of the current frame: **acquire** the framebuffer mutex and return a pointer to the pixels plus their dimensions.
+- **Parameters.** `nWidth`, `nHeight` — out-parameters set to the buffer dimensions.
 - **Returns.** The pixel pointer, or null if no frame has been written.
-- **Pitfalls.** Leaves the mutex **held**. You must call `FrameBuffer_Release`
-  when done, and must not use the pointer afterward.
+- **Pitfalls.** Leaves the mutex **held**. You must call `FrameBuffer_Release` when done, and must not use the pointer afterward.
 
 ### `void FrameBuffer_Release ()`
 - **Purpose.** Release the framebuffer mutex acquired by `FrameBuffer_Capture`.
@@ -278,8 +213,7 @@ void Resize (int  nWidth, int  nHeight);
 - **Purpose.** Read the viewport's current logical size into the out-parameters.
 
 ### `void Resize (int nWidth, int nHeight)`
-- **Purpose.** Set the viewport's logical size. The compositor calls this when the
-  host reports a size change and forwards the new size to the renderer.
+- **Purpose.** Set the viewport's logical size. The compositor calls this when the host reports a size change and forwards the new size to the renderer.
 
 ---
 
@@ -291,16 +225,13 @@ bool Scene_Invalidate_Consume ();
 ```
 
 ### `void Scene_Invalidate ()`
-- **Purpose.** Request that the renderer rebuild its retained scene from scratch on
-  the next frame. Set from any thread (typically the scene after a navigation
-  swap) by storing an atomic flag.
+- **Purpose.** Request that the renderer rebuild its retained scene from scratch on the next frame. Set from any thread (typically the scene after a navigation swap) by storing an atomic flag.
 - **Returns.** Nothing.
 
 ### `bool Scene_Invalidate_Consume ()`
 - **Purpose.** Atomically test-and-clear the invalidation flag.
 - **Returns.** `true` if a rebuild was requested since the last consume.
-- **Pitfalls.** Called by the compositor before each frame; consuming clears the
-  request.
+- **Pitfalls.** Called by the compositor before each frame; consuming clears the request.
 
 ---
 
@@ -322,24 +253,18 @@ void Diagnostics ();
 ```
 
 ### `void Accumulate (eACCUMULATE eType, ...)`
-- **Purpose.** Add a duration to one of the per-phase accumulators. The
-  time-point overload adds the elapsed time since `tpStart`; the `double` overload
-  adds a precomputed number of seconds.
-- **Parameters.** `eType` — which phase (input, scene traversal, submit, render, or
-  publish); `tpStart` or `dSeconds` — the duration source.
+- **Purpose.** Add a duration to one of the per-phase accumulators. The time-point overload adds the elapsed time since `tpStart`; the `double` overload adds a precomputed number of seconds.
+- **Parameters.** `eType` — which phase (input, scene traversal, submit, render, or publish); `tpStart` or `dSeconds` — the duration source.
 - **Returns.** Nothing.
 
 ### `void Diagnostics ()`
-- **Purpose.** Advance the frame counter and, once per accumulated second, log an
-  averaged per-phase breakdown (frame / input / scene / submit / render / publish
-  milliseconds) to the engine log at trace level, then reset the accumulators.
+- **Purpose.** Advance the frame counter and, once per accumulated second, log an averaged per-phase breakdown (frame / input / scene / submit / render / publish milliseconds) to the engine log at trace level, then reset the accumulators.
 - **Returns.** Nothing.
 - **Notes.** Called by the compositor at the end of each present step.
 
 ### Public timing members
 
-These are written by the compositor each frame and exposed directly (no
-accessors). They are diagnostics; reading them off-thread is racy but harmless.
+These are written by the compositor each frame and exposed directly (no accessors). They are diagnostics; reading them off-thread is racy but harmless.
 
 | Member | Meaning |
 |---|---|
@@ -357,8 +282,7 @@ accessors). They are diagnostics; reading them off-thread is racy but harmless.
 
 ## VIEW — orbit camera
 
-`VIEWPORT::VIEW` holds the spherical orbit-camera state; each viewport owns one,
-reached by reference through `View()`.
+`VIEWPORT::VIEW` holds the spherical orbit-camera state; each viewport owns one, reached by reference through `View()`.
 
 ```cpp
 class VIEW
@@ -376,22 +300,16 @@ public:
 ```
 
 ### `void Update (nDX, nDY, dScrollY, bMouseLeft, bMouseRight)`
-- **Purpose.** Fold one frame of input into the camera. Left-drag adjusts azimuth
-  and elevation (elevation clamped to just under ±90°); scroll multiplies the
-  distance (clamped to a sane range).
-- **Parameters.** Mouse deltas, scroll delta, and button states (from
-  `Input_Consume`).
+- **Purpose.** Fold one frame of input into the camera. Left-drag adjusts azimuth and elevation (elevation clamped to just under ±90°); scroll multiplies the distance (clamped to a sane range).
+- **Parameters.** Mouse deltas, scroll delta, and button states (from `Input_Consume`).
 - **Returns.** Nothing.
-- **Notes.** The compositor converts `(theta, phi, distance, target)` to a
-  Cartesian camera each frame. The right-button case is reserved for panning; the
-  current `Update` acts on left-drag and scroll.
+- **Notes.** The compositor converts `(theta, phi, distance, target)` to a Cartesian camera each frame. The right-button case is reserved for panning; the current `Update` acts on left-drag and scroll.
 
 ---
 
 ## INPUT — accumulated input
 
-`VIEWPORT::INPUT` is a plain struct of pending input, written by the host and
-drained by the compositor.
+`VIEWPORT::INPUT` is a plain struct of pending input, written by the host and drained by the compositor.
 
 ```cpp
 struct INPUT
@@ -408,8 +326,7 @@ struct INPUT
 };
 ```
 
-Mouse and scroll fields are *deltas* accumulated since the last `Input_Consume`
-(and zeroed by it); button and key fields are latched current state.
+Mouse and scroll fields are *deltas* accumulated since the last `Input_Consume` (and zeroed by it); button and key fields are latched current state.
 
 ---
 

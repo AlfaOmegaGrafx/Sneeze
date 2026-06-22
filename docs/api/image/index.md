@@ -12,11 +12,7 @@ nav:
 
 # Image API
 
-The image subsystem's public surface is declared in `include/Image.h`. It is not a
-class — it is a single free function, `SNEEZE::IMAGE::Decode`, that turns encoded image
-bytes (PNG, JPEG, BMP, GIF, …) into raw RGBA pixels. It is the smallest public surface
-in the engine, and intentionally so: image decoding is a leaf utility with no state and
-no lifecycle.
+The image subsystem's public surface is declared in `include/Image.h`. It is not a class — it is a single free function, `SNEEZE::IMAGE::Decode`, that turns encoded image bytes (PNG, JPEG, BMP, GIF, …) into raw RGBA pixels. It is the smallest public surface in the engine, and intentionally so: image decoding is a leaf utility with no state and no lifecycle.
 
 ```cpp
 #include <Image.h>   // brought in transitively via <Sneeze.h>
@@ -29,10 +25,7 @@ namespace SNEEZE { namespace IMAGE { ... } }
 |---|---|---|
 | `IMAGE::Decode` | [IMAGE](IMAGE.md) | Free function: decode encoded image bytes into 8-bit RGBA pixels. |
 
-> **Who calls this.** The [scene](../scene/index.md) layer uses it to decode a texture
-> after the [network](../network/index.md) layer fetches it, before handing the pixels to
-> the [viewport](../viewport/index.md) for upload. Any code holding encoded image bytes can
-> call it directly.
+> **Who calls this.** The [scene](../scene/index.md) layer uses it to decode a texture > after the [network](../network/index.md) layer fetches it, before handing the pixels to > the [viewport](../viewport/index.md) for upload. Any code holding encoded image bytes can > call it directly.
 
 ---
 

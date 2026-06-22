@@ -7,8 +7,7 @@ verified: 92fdc1c
 
 # Guides
 
-Task-oriented walkthroughs for the two things people most want to do with Sneeze —
-embed it and build it — plus how to contribute to the engine and its documentation.
+Task-oriented walkthroughs for the two things people most want to do with Sneeze — embed it and build it — plus how to contribute to the engine and its documentation.
 
 - [Embedding Sneeze](embedding-sneeze.md) — write a minimal host: implement the host interfaces, create the engine, open a context, drive a frame, present pixels.
 - [Building Sneeze](building.md) — the two-tree build model, in brief, with pointers to the full build guide.

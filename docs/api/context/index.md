@@ -12,13 +12,7 @@ nav:
 
 # Context API
 
-The context subsystem's public surface is declared in `include/Context.h`. It is a
-single class, `CONTEXT`, representing one browsing session — the engine's equivalent of
-a browser tab. For the *architecture* — what a context owns, the order it builds and
-tears down its subsystems, how it pools containers — read the
-[Context system](../../systems/context.md) page. This section is the precise per-class
-reference: every public method's purpose, parameters, return value, and the pitfalls
-(locking, lifetime, reentrancy) to watch for when calling it.
+The context subsystem's public surface is declared in `include/Context.h`. It is a single class, `CONTEXT`, representing one browsing session — the engine's equivalent of a browser tab. For the *architecture* — what a context owns, the order it builds and tears down its subsystems, how it pools containers — read the [Context system](../../systems/context.md) page. This section is the precise per-class reference: every public method's purpose, parameters, return value, and the pitfalls (locking, lifetime, reentrancy) to watch for when calling it.
 
 ```cpp
 #include <Context.h>   // brought in transitively via <Sneeze.h>
@@ -33,12 +27,7 @@ namespace SNEEZE { ... }
 
 `CONTEXT` uses the pimpl idiom — it is a thin handle over a private implementation.
 
-> **Who calls this.** A host application does not construct a `CONTEXT` directly. It
-> opens one via [`ENGINE::Context_Open`](../sneeze/index.md) and closes it via
-> `ENGINE::Context_Close`. Once it has the pointer, the host drives navigation
-> (`Url`, `Reload`, `Logout`) and reads the owned subsystems (`Scene()`, `Viewport()`,
-> …). The `Container_Open` / `Container_Close` pair is engine-internal — the scene
-> calls it during fabric loading.
+> **Who calls this.** A host application does not construct a `CONTEXT` directly. It > opens one via [`ENGINE::Context_Open`](../sneeze/index.md) and closes it via > `ENGINE::Context_Close`. Once it has the pointer, the host drives navigation > (`Url`, `Reload`, `Logout`) and reads the owned subsystems (`Scene()`, `Viewport()`, > …). The `Container_Open` / `Container_Close` pair is engine-internal — the scene > calls it during fabric loading.
 
 ## The `eSESSION` enum
 
