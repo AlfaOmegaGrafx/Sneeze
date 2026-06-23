@@ -205,11 +205,11 @@ MAP_OBJECT::MAP_OBJECT_CLASS MAP_OBJECT::Class () const
    return Head.Self.Class (); 
 }
 
-const char* MAP_OBJECT::ClassName () const
+const char* MAP_OBJECT::ClassName (MAP_OBJECT_CLASS eType)
 {
    const char* pcszResult;
 
-   switch (Head.Self.Class ())
+   switch (eType)
    {
    case MAP_OBJECT::MAP_OBJECT_CLASS_ROOT:         pcszResult = "root";         break;
    case MAP_OBJECT::MAP_OBJECT_CLASS_CELESTIAL:    pcszResult = "celestial";    break;

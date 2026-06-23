@@ -139,7 +139,8 @@ namespace SNEEZE
       virtual ~MAP_OBJECT ();
 
       MAP_OBJECT_CLASS   Class ()      const;
-      const char*        ClassName ()  const;
+
+      static const char* ClassName (MAP_OBJECT_CLASS eType);
 
       void        Scale            (double& dX, double& dY, double& dZ)   const;
       double      Radius           ()                                     const;
