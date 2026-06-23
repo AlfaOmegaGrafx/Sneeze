@@ -39,7 +39,6 @@
 #include "Control.h"
 #include "Types.h"
 #include "context/viewport/Viewport.h"
-#include "scene/MapObject.h"
 #include <cmath>
 #include <cstring>
 #include <functional>
@@ -420,8 +419,8 @@ static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, 
 
       // The one celestial kludge: a moon system's orbit is pushed outward so the
       // moon clears its magnified planet. Everything else stays 1:1 (metres).
-      bool bMoonSystem = (pObj->Class () == MAP_OBJECT_CLASS_CELESTIAL
-                       &&  static_cast<MAP_OBJECT_CELESTIAL*> (pObj)->m_Type.bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOONSYSTEM);
+      bool bMoonSystem = (pObj->Class () == MAP_OBJECT_CELESTIAL::MAP_OBJECT_CLASS_CELESTIAL
+                       &&  static_cast<MAP_OBJECT_CELESTIAL*> (pObj)->Type.bType == MAP_OBJECT_CELESTIAL::MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOONSYSTEM);
       if (bMoonSystem)
       {
          dPosX *= MOON_ORBIT_BOOST;
@@ -441,22 +440,22 @@ static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, 
       double dReach = std::sqrt (dWx * dWx + dWy * dWy + dWz * dWz);
       if (dReach > dMaxReach) dMaxReach = dReach;
 
-      if (pObj->Class () == MAP_OBJECT_CLASS_CELESTIAL)
+      if (pObj->Class () == MAP_OBJECT_CELESTIAL::MAP_OBJECT_CLASS_CELESTIAL)
       {
          auto* pCelestial = static_cast<MAP_OBJECT_CELESTIAL*> (pObj);
-         uint8_t bType = pCelestial->m_Type.bType;
+         uint8_t bType = pCelestial->Type.bType;
 
-         if (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_STARSYSTEM
-         ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_PLANETSYSTEM
-         ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOONSYSTEM
-         ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_DEBRISSYSTEM)
+         if (bType == MAP_OBJECT_CELESTIAL::MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_STARSYSTEM
+         ||  bType == MAP_OBJECT_CELESTIAL::MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_PLANETSYSTEM
+         ||  bType == MAP_OBJECT_CELESTIAL::MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOONSYSTEM
+         ||  bType == MAP_OBJECT_CELESTIAL::MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_DEBRISSYSTEM)
          {
             if (pCelestial->HasOrbit ())
             {
-               float dTrailRadius = (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOONSYSTEM  || bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_DEBRISSYSTEM) ? TRAIL_RADIUS_MOON : TRAIL_RADIUS_PLANET;
+               float dTrailRadius = (bType == MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOONSYSTEM  || bType == MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_DEBRISSYSTEM) ? TRAIL_RADIUS_MOON : TRAIL_RADIUS_PLANET;
 
                CURVE_BUILD curve;
-               ColorFromPropertyFloat (pCelestial->m_Properties.fColor, curve.r, curve.g, curve.b);
+               ColorFromPropertyFloat (pCelestial->Properties.fColor, curve.r, curve.g, curve.b);
                curve.r *= 0.4f;
                curve.g *= 0.4f;
                curve.b *= 0.4f;
@@ -470,11 +469,11 @@ static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, 
                cpHead.dRadius = dTrailRadius;
                curve.aPoints.push_back (cpHead);
 
-               ORBIT_POSITION pos;
-               ORBIT_POSITION* pPos = pCelestial->PositionAtTick (tmNow, pos);
-               if (pPos)
+               MAP_OBJECT_CELESTIAL::ORBIT_POSITION pos;
+
+               if (pCelestial->PositionAtTick (tmNow, pos))
                {
-                  double dE_planet = pPos->dE;
+                  double dE_planet = pos.dE;
                   for (int i = 1; i <= nTrailPoints; i++)
                   {
                      double dE = dE_planet - (static_cast<double> (i) / TRAIL_SEGMENTS) * TWO_PI;
@@ -506,15 +505,15 @@ static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, 
                aCurve.push_back (std::move (curve));
             }
          }
-         else if (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_STAR
-              ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_PLANET
-              ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOON
-              ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_DEBRIS)
+         else if (bType == MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_STAR
+              ||  bType == MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_PLANET
+              ||  bType == MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOON
+              ||  bType == MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_DEBRIS)
          {
             childFrame.dRadius = pCelestial->Radius ();
-            childFrame.fColor  = pCelestial->m_Properties.fColor;
-            childFrame.bStar   = (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_STAR);
-            childFrame.bMoon   = (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOON);
+            childFrame.fColor  = pCelestial->Properties.fColor;
+            childFrame.bStar   = (bType == MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_STAR);
+            childFrame.bMoon   = (bType == MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOON);
 
             // A body's own radius extends the scene's reach, so a single body
             // centred at the origin still yields a sane scale (no divide-by-zero
@@ -531,7 +530,7 @@ static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, 
                aLight.push_back (light);
             }
          }
-         else if (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_SURFACE)
+         else if (bType == MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_SURFACE)
          {
             SPHERE_BUILD sphere;
             sphere.dx        = dWx;
@@ -542,27 +541,20 @@ static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, 
             sphere.bEmissive = childFrame.bStar;
             ColorFromPropertyFloat (childFrame.fColor, sphere.r, sphere.g, sphere.b);
 
-            if (pCelestial->m_bTextureReady.load ())
-            {
-               pCelestial->LockTexture ();
-               sphere.pTex  = pCelestial->m_aTexturePixels.data ();
-               sphere.nTexW = pCelestial->m_nTextureWidth;
-               sphere.nTexH = pCelestial->m_nTextureHeight;
-               pCelestial->UnlockTexture ();
-            }
+            pCelestial->GetTexture (sphere.pTex, sphere.nTexW, sphere.nTexH);
 
             aSphere.push_back (sphere);
          }
       }
-      else if (pObj->Class () == MAP_OBJECT_CLASS_PHYSICAL
-           &&  std::strncmp (pObj->m_Resource.sReference, "action:", 7) != 0)
+      else if (pObj->Class () == MAP_OBJECT::MAP_OBJECT_CLASS_PHYSICAL
+           &&  std::strncmp (pObj->Resource.sReference, "action:", 7) != 0)
       {
          // Physical nodes manifest as a grounded box from their bound. Nodes whose
          // resource is an "action://" reference (e.g. colliders) are invisible
          // logic volumes, not geometry, so they never render.
-         double dW = pObj->m_Bound.d3Max[0];
-         double dH = pObj->m_Bound.d3Max[1];
-         double dD = pObj->m_Bound.d3Max[2];
+         double dW = pObj->Bound.d3Max[0];
+         double dH = pObj->Bound.d3Max[1];
+         double dD = pObj->Bound.d3Max[2];
 
          if (dW > 0.0  ||  dH > 0.0  ||  dD > 0.0)
          {
@@ -575,7 +567,7 @@ static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, 
 
             BOX_BUILD box;
             box.mWorld = Mat4_Multiply (childFrame.mWorld, mBound);
-            ColorFromIndex (pObj->m_Head.Self.ObjectIx (), box.r, box.g, box.b);
+            ColorFromIndex (pObj->Head.Self.ObjectIx (), box.r, box.g, box.b);
             aBox.push_back (box);
 
             double dCenterX = box.mWorld.d[12];

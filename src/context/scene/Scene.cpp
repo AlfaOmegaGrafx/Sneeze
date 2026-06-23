@@ -25,9 +25,9 @@ using namespace SNEEZE;
 // quaternion). A plain zero-fill leaves a degenerate transform, and under
 // universal TRS a zero-scale ancestor collapses every descendant to the origin,
 // so synthetic nodes start from identity just like the JSON decoder does.
-static void RmcObject_Init (RMCOBJECT& RMCObject)
+static void RmcObject_Init (MAP_OBJECT::RMCOBJECT& RMCObject)
 {
-   memset (&RMCObject, 0, sizeof (RMCOBJECT));
+   memset (&RMCObject, 0, sizeof (MAP_OBJECT::RMCOBJECT));
    RMCObject.Transform.d4Rotation[3] = 1.0;
    RMCObject.Transform.d3Scale[0]    = 1.0;
    RMCObject.Transform.d3Scale[1]    = 1.0;
@@ -108,7 +108,7 @@ public:
    {
       bool bResult = false;
 
-      RMCOBJECT RMCObject;
+      MAP_OBJECT::RMCOBJECT RMCObject;
       uint64_t twObjectIx;
 
       if ((m_pFabric_Root = Fabric_Open (nullptr, nullptr, sUrl)) != nullptr)
@@ -116,12 +116,12 @@ public:
          CONTAINER* pContainer = m_pFabric_Root->Container ();
 
          RmcObject_Init (RMCObject);
-         RMCObject.Head.Self.qwComposed = OBJECTIX_COMPOSE (MAP_OBJECT_CLASS_ROOT, OBJECTIX_IDENTITY);
+         RMCObject.Head.Self.qwComposed = OBJECTIX_COMPOSE (MAP_OBJECT::MAP_OBJECT_CLASS_ROOT, OBJECTIX_IDENTITY);
 
          if ((twObjectIx = pContainer->Node_Root (m_pFabric_Root->FabricIx (), &RMCObject)) != OBJECTIX_ERROR)
          {
             RmcObject_Init (RMCObject);
-            RMCObject.Head.Self.qwComposed = OBJECTIX_COMPOSE (MAP_OBJECT_CLASS_ROOT, OBJECTIX_IDENTITY);
+            RMCObject.Head.Self.qwComposed = OBJECTIX_COMPOSE (MAP_OBJECT::MAP_OBJECT_CLASS_ROOT, OBJECTIX_IDENTITY);
             RMCObject.Type.bSubtype = 255;
             strncpy (RMCObject.Resource.sReference, sUrl.c_str (), sizeof (RMCObject.Resource.sReference) - 1);
 

@@ -17,8 +17,6 @@
 
 #include <Sneeze.h>
 
-#include "scene/MapObject.h"
-
 #include <cstdlib>
 
 namespace SNEEZE
@@ -516,11 +514,11 @@ static uint64_t ComposeFromId (const std::string& sId)
       char     cClass = sId[0];
       uint64_t nIndex = strtoull (sId.c_str () + nDash + 1, nullptr, 10);
 
-      MAP_OBJECT_CLASS eClass = MAP_OBJECT_CLASS_PHYSICAL;
-      if      (cClass == 'R') eClass = MAP_OBJECT_CLASS_ROOT;
-      else if (cClass == 'C') eClass = MAP_OBJECT_CLASS_CELESTIAL;
-      else if (cClass == 'T') eClass = MAP_OBJECT_CLASS_TERRESTRIAL;
-      else if (cClass == 'P') eClass = MAP_OBJECT_CLASS_PHYSICAL;
+      MAP_OBJECT::MAP_OBJECT_CLASS eClass = MAP_OBJECT::MAP_OBJECT_CLASS_PHYSICAL;
+      if      (cClass == 'R') eClass = MAP_OBJECT::MAP_OBJECT_CLASS_ROOT;
+      else if (cClass == 'C') eClass = MAP_OBJECT::MAP_OBJECT_CLASS_CELESTIAL;
+      else if (cClass == 'T') eClass = MAP_OBJECT::MAP_OBJECT_CLASS_TERRESTRIAL;
+      else if (cClass == 'P') eClass = MAP_OBJECT::MAP_OBJECT_CLASS_PHYSICAL;
 
       twResult = OBJECTIX_COMPOSE (eClass, nIndex);
    }
@@ -528,9 +526,9 @@ static uint64_t ComposeFromId (const std::string& sId)
    return twResult;
 }
 
-static void RmcObject_FromJson (const nlohmann::json& j, RMCOBJECT* pObject)
+static void RmcObject_FromJson (const nlohmann::json& j, MAP_OBJECT::RMCOBJECT* pObject)
 {
-   *pObject = RMCOBJECT {};
+   *pObject = MAP_OBJECT::RMCOBJECT {};
 
    // Sensible decode defaults for omitted transform fields: identity orientation and unit scale 
    // (a zero quaternion / zero scale would be degenerate). Present fields below overwrite these.
@@ -650,7 +648,7 @@ static uint32_t Map_Open_Children (CONTAINER* pContainer, uint64_t twParentIx, c
    {
       for (const auto& jChild : jParent["Children"])
       {
-         RMCOBJECT RMCObject;
+         MAP_OBJECT::RMCOBJECT RMCObject;
          RmcObject_FromJson (jChild, &RMCObject);
 
          uint64_t twChildIx = pContainer->Node_Open (twParentIx, &RMCObject);
@@ -688,7 +686,7 @@ wasm_trap_t* Scene_Node_Map (void* pEnv, wasmtime_caller_t* pCaller, const wasmt
          {
             const nlohmann::json& jRoot = jPayload["data"];
 
-            RMCOBJECT RMCObject;
+            MAP_OBJECT::RMCOBJECT RMCObject;
             RmcObject_FromJson (jRoot, &RMCObject);
 
             uint64_t twRootIx = pContainer->Node_Root (twFabricIx, &RMCObject);
@@ -724,7 +722,7 @@ wasm_trap_t* Scene_Node_Root (void* pEnv, wasmtime_caller_t* pCaller, const wasm
       int32_t  nPtr       = pArgs[1].of.i32;
       int32_t  nLen       = pArgs[2].of.i32;
 
-      if (nLen >= static_cast<int32_t> (sizeof (RMCOBJECT)))
+      if (nLen >= static_cast<int32_t> (sizeof (MAP_OBJECT::RMCOBJECT)))
       {
          const uint8_t* pBytes = ReadWasmBytes (pCaller, nPtr, nLen);
 
@@ -734,7 +732,7 @@ wasm_trap_t* Scene_Node_Root (void* pEnv, wasmtime_caller_t* pCaller, const wasm
 
             if (pContainer)
             {
-               const auto* pObject = reinterpret_cast<const RMCOBJECT*> (pBytes);
+               const auto* pObject = reinterpret_cast<const MAP_OBJECT::RMCOBJECT*> (pBytes);
                twResult = pContainer->Node_Root (twFabricIx, pObject);
             }
          }
@@ -760,7 +758,7 @@ wasm_trap_t* Scene_Node_Open (void* pEnv, wasmtime_caller_t* pCaller, const wasm
       int32_t  nPtr       = pArgs[1].of.i32;
       int32_t  nLen       = pArgs[2].of.i32;
 
-      if (nLen >= static_cast<int32_t> (sizeof (RMCOBJECT)))
+      if (nLen >= static_cast<int32_t> (sizeof (MAP_OBJECT::RMCOBJECT)))
       {
          const uint8_t* pBytes = ReadWasmBytes (pCaller, nPtr, nLen);
 
@@ -770,7 +768,7 @@ wasm_trap_t* Scene_Node_Open (void* pEnv, wasmtime_caller_t* pCaller, const wasm
 
             if (pContainer)
             {
-               const auto* pObject = reinterpret_cast<const RMCOBJECT*> (pBytes);
+               const auto* pObject = reinterpret_cast<const MAP_OBJECT::RMCOBJECT*> (pBytes);
                twResult = pContainer->Node_Open (twParentIx, pObject);
             }
          }
@@ -823,9 +821,9 @@ wasm_trap_t* Scene_Node_Position (void* pEnv, wasmtime_caller_t* pCaller, const 
 
          if (pObj)
          {
-            pObj->m_Transform.d3Position[0] = pArgs[1].of.f64;
-            pObj->m_Transform.d3Position[1] = pArgs[2].of.f64;
-            pObj->m_Transform.d3Position[2] = pArgs[3].of.f64;
+            pObj->Transform.d3Position[0] = pArgs[1].of.f64;
+            pObj->Transform.d3Position[1] = pArgs[2].of.f64;
+            pObj->Transform.d3Position[2] = pArgs[3].of.f64;
          }
       }
    }
@@ -848,7 +846,7 @@ wasm_trap_t* Scene_Node_Scale (void* pEnv, wasmtime_caller_t* pCaller, const was
          MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
 
          if (pObj)
-            pObj->m_Transform.d3Scale[0] = pArgs[1].of.f64;
+            pObj->Transform.d3Scale[0] = pArgs[1].of.f64;
       }
    }
 
@@ -871,9 +869,9 @@ wasm_trap_t* Scene_Node_Bound (void* pEnv, wasmtime_caller_t* pCaller, const was
 
          if (pObj)
          {
-            pObj->m_Bound.d3Max[0] = pArgs[1].of.f64;
-            pObj->m_Bound.d3Max[1] = pArgs[1].of.f64;
-            pObj->m_Bound.d3Max[2] = pArgs[1].of.f64;
+            pObj->Bound.d3Max[0] = pArgs[1].of.f64;
+            pObj->Bound.d3Max[1] = pArgs[1].of.f64;
+            pObj->Bound.d3Max[2] = pArgs[1].of.f64;
          }
       }
    }
@@ -898,7 +896,7 @@ wasm_trap_t* Scene_Node_Color (void* pEnv, wasmtime_caller_t* pCaller, const was
          if (pObj)
          {
             uint32_t nColor = static_cast<uint32_t> (pArgs[1].of.i32);
-            memcpy (&pObj->m_Properties.fColor, &nColor, 4);
+            memcpy (&pObj->Properties.fColor, &nColor, 4);
          }
       }
    }
@@ -923,11 +921,12 @@ wasm_trap_t* Scene_Node_Name (void* pEnv, wasmtime_caller_t* pCaller, const wasm
          if (pObj)
          {
             std::string sName = ReadWasmString (pCaller, pArgs[1].of.i32, pArgs[2].of.i32);
-            memset (&pObj->m_Name, 0, sizeof (MAP_OBJECT_NAME));
-            int nLen = static_cast<int> (sName.size ());
-            if (nLen > 47) nLen = 47;
+
+            memset (&pObj->Name, 0, sizeof (MAP_OBJECT::MAP_OBJECT_NAME));
+            size_t nLen = std::min<size_t> (sName.size (), 47);
+
             for (int i = 0; i < nLen; i++)
-               pObj->m_Name.wsName[i] = static_cast<uint16_t> (static_cast<uint8_t> (sName[i]));
+               pObj->Name.wsName[i] = static_cast<uint16_t> (static_cast<uint8_t> (sName[i]));
          }
       }
    }
@@ -951,9 +950,9 @@ wasm_trap_t* Scene_Node_Radius (void* pEnv, wasmtime_caller_t* pCaller, const wa
 
          if (pObj)
          {
-            pObj->m_Bound.d3Max[0] = pArgs[1].of.f64;
-            pObj->m_Bound.d3Max[1] = pArgs[1].of.f64;
-            pObj->m_Bound.d3Max[2] = pArgs[1].of.f64;
+            pObj->Bound.d3Max[0] = pArgs[1].of.f64;
+            pObj->Bound.d3Max[1] = pArgs[1].of.f64;
+            pObj->Bound.d3Max[2] = pArgs[1].of.f64;
          }
       }
    }
@@ -978,8 +977,8 @@ wasm_trap_t* Scene_Node_Texture (void* pEnv, wasmtime_caller_t* pCaller, const w
          if (pObj)
          {
             std::string sUrl = ReadWasmString (pCaller, pArgs[1].of.i32, pArgs[2].of.i32);
-            strncpy (pObj->m_Resource.sReference, sUrl.c_str (), sizeof (pObj->m_Resource.sReference) - 1);
-            pObj->m_Resource.sReference[sizeof (pObj->m_Resource.sReference) - 1] = '\0';
+            strncpy (pObj->Resource.sReference, sUrl.c_str (), sizeof (pObj->Resource.sReference) - 1);
+            pObj->Resource.sReference[sizeof (pObj->Resource.sReference) - 1] = '\0';
          }
       }
    }

@@ -12,13 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <Sneeze.h>
-
 #include "wasm/Wasm.h"
-#include "scene/MapObject.h"
 
 using namespace SNEEZE;
-
 
 // ============================================================================
 // CONTAINER::CID
@@ -173,7 +169,7 @@ public:
    // See Scene.md "Fabric Ownership Modes" for the full discussion.
    // -----------------------------------------------------------------------
 
-   uint64_t Node_Root (uint64_t twFabricIx, const RMCOBJECT* pRMCObject)
+   uint64_t Node_Root (uint64_t twFabricIx, const MAP_OBJECT::RMCOBJECT* pRMCObject)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxContainer);
 
@@ -190,7 +186,7 @@ public:
       return twObjectIx;
    }
 
-   uint64_t Node_Open (uint64_t twParentIx, const RMCOBJECT* pRMCObject)
+   uint64_t Node_Open (uint64_t twParentIx, const MAP_OBJECT::RMCOBJECT* pRMCObject)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxContainer);
 
@@ -207,10 +203,10 @@ public:
       return twObjectIx;
    }
 
-   uint64_t Node_Create (FABRIC* pFabric, NODE* pNode_Parent, const RMCOBJECT* pRMCObject)
+   uint64_t Node_Create (FABRIC* pFabric, NODE* pNode_Parent, const MAP_OBJECT::RMCOBJECT* pRMCObject)
    {
-      OBJECT_HEAD      Head       = pRMCObject->Head;
-      MAP_OBJECT_CLASS eClass     = pRMCObject->Head.Self.Class ();
+      MAP_OBJECT::OBJECT_HEAD      Head       = pRMCObject->Head;
+      MAP_OBJECT::MAP_OBJECT_CLASS eClass     = pRMCObject->Head.Self.Class ();
       uint64_t         twObjectIx = pRMCObject->Head.Self.ObjectIx ();
 
       if (twObjectIx == OBJECTIX_IDENTITY)
@@ -236,21 +232,21 @@ public:
 
          switch (eClass)
          {
-            case MAP_OBJECT_CLASS_ROOT:        pMapObj = new MAP_OBJECT_ROOT        (Head);  break;
-            case MAP_OBJECT_CLASS_CELESTIAL:   pMapObj = new MAP_OBJECT_CELESTIAL   (Head);  break;
-            case MAP_OBJECT_CLASS_TERRESTRIAL: pMapObj = new MAP_OBJECT_TERRESTRIAL (Head);  break;
-            case MAP_OBJECT_CLASS_PHYSICAL:    pMapObj = new MAP_OBJECT_PHYSICAL    (Head);  break;
+            case MAP_OBJECT::MAP_OBJECT_CLASS_ROOT:        pMapObj = new MAP_OBJECT_ROOT        (Head);  break;
+            case MAP_OBJECT::MAP_OBJECT_CLASS_CELESTIAL:   pMapObj = new MAP_OBJECT_CELESTIAL   (Head);  break;
+            case MAP_OBJECT::MAP_OBJECT_CLASS_TERRESTRIAL: pMapObj = new MAP_OBJECT_TERRESTRIAL (Head);  break;
+            case MAP_OBJECT::MAP_OBJECT_CLASS_PHYSICAL:    pMapObj = new MAP_OBJECT_PHYSICAL    (Head);  break;
          }
 
          if (pMapObj)
          {
-            memcpy (&pMapObj->m_Name,       &pRMCObject->Name,       sizeof (MAP_OBJECT_NAME));
-            memcpy (&pMapObj->m_Type,       &pRMCObject->Type,       sizeof (MAP_OBJECT_TYPE));
-            memcpy (&pMapObj->m_Resource,   &pRMCObject->Resource,   sizeof (MAP_OBJECT_RESOURCE));
-            memcpy (&pMapObj->m_Transform,  &pRMCObject->Transform,  sizeof (MAP_OBJECT_TRANSFORM));
-            memcpy (&pMapObj->m_Orbit,      &pRMCObject->Orbit,      sizeof (MAP_OBJECT_ORBIT));
-            memcpy (&pMapObj->m_Bound,      &pRMCObject->Bound,      sizeof (MAP_OBJECT_BOUND));
-            memcpy (&pMapObj->m_Properties, &pRMCObject->Properties, sizeof (MAP_OBJECT_PROPERTIES));
+            pMapObj->Name       = pRMCObject->Name;
+            pMapObj->Type       = pRMCObject->Type;
+            pMapObj->Resource   = pRMCObject->Resource;
+            pMapObj->Transform  = pRMCObject->Transform;
+            pMapObj->Orbit      = pRMCObject->Orbit;
+            pMapObj->Bound      = pRMCObject->Bound;
+            pMapObj->Properties = pRMCObject->Properties;
 
             auto* pNode = new NODE (pFabric, pNode_Parent, Head.Self.qwComposed);
 
@@ -362,7 +358,7 @@ void CONTAINER::Instance_Close (uint64_t twFabricIx, const std::string& sUrl, co
    m_pImpl->Instance_Close (twFabricIx, sUrl, sHash);
 }
 
-uint64_t CONTAINER::Node_Root  (uint64_t twFabricIx, const RMCOBJECT* pRMCObject) { return m_pImpl->Node_Root  (twFabricIx, pRMCObject); }
-uint64_t CONTAINER::Node_Open  (uint64_t twParentIx, const RMCOBJECT* pRMCObject) { return m_pImpl->Node_Open  (twParentIx, pRMCObject); }
-bool     CONTAINER::Node_Close (uint64_t twObjectIx)                              { return m_pImpl->Node_Close (twObjectIx); }
-NODE*    CONTAINER::Node_Find  (uint64_t twObjectIx) const                        { return m_pImpl->Node_Find  (twObjectIx); }
+uint64_t CONTAINER::Node_Root  (uint64_t twFabricIx, const MAP_OBJECT::RMCOBJECT* pRMCObject) { return m_pImpl->Node_Root  (twFabricIx, pRMCObject); }
+uint64_t CONTAINER::Node_Open  (uint64_t twParentIx, const MAP_OBJECT::RMCOBJECT* pRMCObject) { return m_pImpl->Node_Open  (twParentIx, pRMCObject); }
+bool     CONTAINER::Node_Close (uint64_t twObjectIx)                                          { return m_pImpl->Node_Close (twObjectIx); }
+NODE*    CONTAINER::Node_Find  (uint64_t twObjectIx) const                                    { return m_pImpl->Node_Find  (twObjectIx); }

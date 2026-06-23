@@ -61,47 +61,113 @@ static double SolveKepler (double dM_rad, double dEcc)
 }
 
 // ---------------------------------------------------------------------------
+// MAP_OBJECT::Impl
+// ---------------------------------------------------------------------------
+
+class MAP_OBJECT::Impl
+{
+public:
+   Impl () :
+      m_nTextureWidth (0),
+      m_nTextureHeight (0),
+      m_nTextureChannels (0),
+      m_bTextureReady (false)
+   {
+   }
+
+   bool GetTexture (const uint8_t*& pTex, int& nTexW, int& nTexH)
+   {
+      bool bResult = false;
+
+      if (m_bTextureReady.load ())
+      {
+         m_CS.lock ();
+         {
+            bResult = true;
+
+            pTex = m_aTexturePixels.data ();
+            nTexW = m_nTextureWidth;
+            nTexH = m_nTextureHeight;
+         }
+         m_CS.unlock ();
+      }
+
+      return bResult;
+   }
+
+   void SetTexture (const uint8_t* pTex, int nTexW, int nTexH)
+   {
+      m_CS.lock ();
+      {
+         m_aTexturePixels.assign (pTex, pTex + nTexW * nTexH * 4);
+         m_nTextureWidth      = nTexW;
+         m_nTextureHeight     = nTexH;
+         m_nTextureChannels   = 4;
+      }
+      m_CS.unlock ();
+
+      m_bTextureReady.store (true);
+   }
+
+private:
+   mutable std::mutex            m_CS;
+   std::vector<uint8_t>          m_aTexturePixels;
+   int                           m_nTextureWidth;
+   int                           m_nTextureHeight;
+   int                           m_nTextureChannels;
+   std::atomic<bool>             m_bTextureReady;
+};
+
+// ---------------------------------------------------------------------------
 // MAP_OBJECT
 // ---------------------------------------------------------------------------
 
-MAP_OBJECT::MAP_OBJECT (OBJECT_HEAD Head)
+MAP_OBJECT::MAP_OBJECT (OBJECT_HEAD Head) :
+   m_pImpl (new Impl ()),
+   Head (Head)
 {
-   m_Head = Head;
+}
+
+MAP_OBJECT::~MAP_OBJECT ()
+{
+   delete m_pImpl;
 }
 
 void MAP_OBJECT::Position (int64_t tmNow, double& dX, double& dY, double& dZ) const
 {
    (void) tmNow;
-   dX = m_Transform.d3Position[0];
-   dY = m_Transform.d3Position[1];
-   dZ = m_Transform.d3Position[2];
+   dX = Transform.d3Position[0];
+   dY = Transform.d3Position[1];
+   dZ = Transform.d3Position[2];
 }
 
 void MAP_OBJECT::Rotation (int64_t tmNow, double& dQx, double& dQy, double& dQz, double& dQw) const
 {
    (void) tmNow;
-   dQx = m_Transform.d4Rotation[0];
-   dQy = m_Transform.d4Rotation[1];
-   dQz = m_Transform.d4Rotation[2];
-   dQw = m_Transform.d4Rotation[3];
+   dQx = Transform.d4Rotation[0];
+   dQy = Transform.d4Rotation[1];
+   dQz = Transform.d4Rotation[2];
+   dQw = Transform.d4Rotation[3];
 }
 
 void MAP_OBJECT::Scale (double& dX, double& dY, double& dZ) const
 {
-   dX = m_Transform.d3Scale[0];
-   dY = m_Transform.d3Scale[1];
-   dZ = m_Transform.d3Scale[2];
+   dX = Transform.d3Scale[0];
+   dY = Transform.d3Scale[1];
+   dZ = Transform.d3Scale[2];
 }
 
 double MAP_OBJECT::Radius () const
 {
-   return m_Bound.d3Max[0];
+   return Bound.d3Max[0];
 }
 
 uint32_t MAP_OBJECT::ColorToU32 () const
 {
    uint32_t nColor;
-   memcpy (&nColor, &m_Properties.fColor, 4);
+
+   memcpy (&nColor, &Properties.fColor, 4);
+
    return nColor & 0x00FFFFFF;
 }
 
@@ -124,6 +190,38 @@ uint32_t MAP_OBJECT::ColorBrightToU32 () const
    return static_cast<uint32_t> ((clamp (r + 64) << 16) | (clamp (g + 64) << 8) | clamp (b + 64));
 }
 
+bool MAP_OBJECT::GetTexture (const uint8_t* &pTex, int& nTexW, int& nTexH)
+{
+   return m_pImpl->GetTexture (pTex, nTexW, nTexH);
+}
+
+void MAP_OBJECT::SetTexture (const uint8_t* pTex, int nTexW, int nTexH)
+{
+   m_pImpl->SetTexture (pTex, nTexW, nTexH);
+}
+
+MAP_OBJECT::MAP_OBJECT_CLASS MAP_OBJECT::Class () const 
+{ 
+   return Head.Self.Class (); 
+}
+
+const char* MAP_OBJECT::ClassName () const
+{
+   const char* pcszResult;
+
+   switch (Head.Self.Class ())
+   {
+   case MAP_OBJECT::MAP_OBJECT_CLASS_ROOT:         pcszResult = "root";         break;
+   case MAP_OBJECT::MAP_OBJECT_CLASS_CELESTIAL:    pcszResult = "celestial";    break;
+   case MAP_OBJECT::MAP_OBJECT_CLASS_TERRESTRIAL:  pcszResult = "terrestrial";  break;
+   case MAP_OBJECT::MAP_OBJECT_CLASS_PHYSICAL:     pcszResult = "physical";     break;
+   default:                                        pcszResult = "";             break;
+   }
+
+   return pcszResult;
+}
+
+
 // ---------------------------------------------------------------------------
 // MAP_OBJECT_ROOT
 // ---------------------------------------------------------------------------
@@ -142,7 +240,7 @@ MAP_OBJECT_CELESTIAL::MAP_OBJECT_CELESTIAL (OBJECT_HEAD Head) : MAP_OBJECT (Head
 
 bool MAP_OBJECT_CELESTIAL::HasOrbit () const
 {
-   return m_Orbit.dA != 0.0  &&  m_Orbit.tmPeriod != 0  &&  m_Transform.d4Rotation[3] != 0.0;
+   return Orbit.dA != 0.0  &&  Orbit.tmPeriod != 0  &&  Transform.d4Rotation[3] != 0.0;
 }
 
 void MAP_OBJECT_CELESTIAL::Position (int64_t tmNow, double& dX, double& dY, double& dZ) const
@@ -157,25 +255,25 @@ void MAP_OBJECT_CELESTIAL::Position (int64_t tmNow, double& dX, double& dY, doub
    }
    else
    {
-      dX = m_Transform.d3Position[0];
-      dY = m_Transform.d3Position[1];
-      dZ = m_Transform.d3Position[2];
+      dX = Transform.d3Position[0];
+      dY = Transform.d3Position[1];
+      dZ = Transform.d3Position[2];
    }
 }
 
 void MAP_OBJECT_CELESTIAL::Rotation (int64_t tmNow, double& dQx, double& dQy, double& dQz, double& dQw) const
 {
-   uint8_t bType = m_Type.bType;
+   uint8_t bType = Type.bType;
 
    if (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_STAR
    ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_PLANET
    ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOON
    ||  bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_DEBRIS)
    {
-      double eX = m_Transform.d4Rotation[0];
-      double eY = m_Transform.d4Rotation[1];
-      double eZ = m_Transform.d4Rotation[2];
-      double eW = m_Transform.d4Rotation[3];
+      double eX = Transform.d4Rotation[0];
+      double eY = Transform.d4Rotation[1];
+      double eZ = Transform.d4Rotation[2];
+      double eW = Transform.d4Rotation[3];
 
       if (eW == 0.0  &&  eX == 0.0  &&  eY == 0.0  &&  eZ == 0.0)
       {
@@ -183,9 +281,9 @@ void MAP_OBJECT_CELESTIAL::Rotation (int64_t tmNow, double& dQx, double& dQy, do
       }
       else
       {
-         double dPrecX = m_Transform.d3Position[0];
-         double dPrecY = m_Transform.d3Position[1];
-         double dPrecZ = m_Transform.d3Position[2];
+         double dPrecX = Transform.d3Position[0];
+         double dPrecY = Transform.d3Position[1];
+         double dPrecZ = Transform.d3Position[2];
          double dRate  = std::sqrt (dPrecX * dPrecX + dPrecY * dPrecY + dPrecZ * dPrecZ);
 
          if (dRate > 1e-30  &&  tmNow != 0)
@@ -210,11 +308,11 @@ void MAP_OBJECT_CELESTIAL::Rotation (int64_t tmNow, double& dQx, double& dQy, do
    }
    else if (bType == MAP_OBJECT_TYPE_TYPE_CELESTIAL_SURFACE)
    {
-      int64_t tmSpinPeriod = m_Orbit.tmPeriod;
+      int64_t tmSpinPeriod = Orbit.tmPeriod;
 
       if (tmSpinPeriod != 0)
       {
-         double dW0Rad = m_Orbit.dA;
+         double dW0Rad = Orbit.dA;
          double dAngle = dW0Rad + (static_cast<double> (tmNow) / static_cast<double> (tmSpinPeriod)) * TWO_PI;
          double dHalf  = dAngle * 0.5;
 
@@ -234,30 +332,30 @@ void MAP_OBJECT_CELESTIAL::Rotation (int64_t tmNow, double& dQx, double& dQy, do
    }
 }
 
-ORBIT_POSITION* MAP_OBJECT_CELESTIAL::PositionAtTick (int64_t tmNow, ORBIT_POSITION& out) const
+bool MAP_OBJECT_CELESTIAL::PositionAtTick (int64_t tmNow, ORBIT_POSITION& out) const
 {
-   ORBIT_POSITION* pResult = nullptr;
+   bool bResult = false;
 
-   if (m_Orbit.dA != 0.0  &&  m_Orbit.tmPeriod != 0  &&  m_Transform.d4Rotation[3] != 0.0)
+   if (Orbit.dA != 0.0  &&  Orbit.tmPeriod != 0  &&  Transform.d4Rotation[3] != 0.0)
    {
-      double dA   = m_Orbit.dA;
-      double dB   = m_Orbit.dB;
+      double dA   = Orbit.dA;
+      double dB   = Orbit.dB;
       double dEcc = std::sqrt (1.0 - (dB * dB) / (dA * dA));
 
-      int64_t tmInOrbit = ((m_Orbit.tmOrigin + tmNow) % m_Orbit.tmPeriod + m_Orbit.tmPeriod) % m_Orbit.tmPeriod;
-      double  dM        = (static_cast<double> (tmInOrbit) / static_cast<double> (m_Orbit.tmPeriod)) * TWO_PI;
+      int64_t tmInOrbit = ((Orbit.tmOrigin + tmNow) % Orbit.tmPeriod + Orbit.tmPeriod) % Orbit.tmPeriod;
+      double  dM        = (static_cast<double> (tmInOrbit) / static_cast<double> (Orbit.tmPeriod)) * TWO_PI;
       double  dE        = SolveKepler (dM, dEcc);
 
-      double dRx = m_Transform.d4Rotation[0];
-      double dRy = m_Transform.d4Rotation[1];
-      double dRz = m_Transform.d4Rotation[2];
-      double dRw = m_Transform.d4Rotation[3];
+      double dRx = Transform.d4Rotation[0];
+      double dRy = Transform.d4Rotation[1];
+      double dRz = Transform.d4Rotation[2];
+      double dRw = Transform.d4Rotation[3];
 
       if (tmNow != 0)
       {
-         double dPrecX = m_Transform.d3Position[0];
-         double dPrecY = m_Transform.d3Position[1];
-         double dPrecZ = m_Transform.d3Position[2];
+         double dPrecX = Transform.d3Position[0];
+         double dPrecY = Transform.d3Position[1];
+         double dPrecZ = Transform.d3Position[2];
          double dRate = std::sqrt (dPrecX * dPrecX + dPrecY * dPrecY + dPrecZ * dPrecZ);
 
          if (dRate > 1e-30)
@@ -284,24 +382,25 @@ ORBIT_POSITION* MAP_OBJECT_CELESTIAL::PositionAtTick (int64_t tmNow, ORBIT_POSIT
       out.y  = pPos.y;
       out.z  = pPos.z;
       out.dE = dE;
-      pResult = &out;
+
+      bResult = true;
    }
 
-   return pResult;
+   return bResult;
 }
 
 VEC3 MAP_OBJECT_CELESTIAL::OrbitTrailPoint (double dE, int64_t tmElapsed) const
 {
-   double dRx = m_Transform.d4Rotation[0];
-   double dRy = m_Transform.d4Rotation[1];
-   double dRz = m_Transform.d4Rotation[2];
-   double dRw = m_Transform.d4Rotation[3];
+   double dRx = Transform.d4Rotation[0];
+   double dRy = Transform.d4Rotation[1];
+   double dRz = Transform.d4Rotation[2];
+   double dRw = Transform.d4Rotation[3];
 
    if (tmElapsed != 0)
    {
-      double dPrecX = m_Transform.d3Position[0];
-      double dPrecY = m_Transform.d3Position[1];
-      double dPrecZ = m_Transform.d3Position[2];
+      double dPrecX = Transform.d3Position[0];
+      double dPrecY = Transform.d3Position[1];
+      double dPrecZ = Transform.d3Position[2];
       double dRate = std::sqrt (dPrecX * dPrecX + dPrecY * dPrecY + dPrecZ * dPrecZ);
 
       if (dRate > 1e-30)
@@ -319,13 +418,47 @@ VEC3 MAP_OBJECT_CELESTIAL::OrbitTrailPoint (double dE, int64_t tmElapsed) const
       }
    }
 
-   double dA   = m_Orbit.dA;
-   double dB   = m_Orbit.dB;
+   double dA   = Orbit.dA;
+   double dB   = Orbit.dB;
    double dEcc = std::sqrt (1.0 - (dB * dB) / (dA * dA));
    double dLX  = dA * (std::cos (dE) - dEcc);
    double dLY  = dB * std::sin (dE);
 
    return RotateByQuat (dRx, dRy, dRz, dRw, dLX, 0.0, -dLY);
+}
+
+const char* MAP_OBJECT_CELESTIAL::GetTypeName (MAP_OBJECT_TYPE_TYPE_CELESTIAL eType)
+{
+   const char* pcszResult;
+
+   switch (eType)
+   {
+   case MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_NONE:          pcszResult = "none";              break;
+   case MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_UNIVERSE:      pcszResult = "universe";          break;
+   case MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_SUPERCLUSTER:  pcszResult = "supercluster";      break;
+   case MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_GALAXYCLUSTER: pcszResult = "galaxycluster";     break;
+   case MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_GALAXY:        pcszResult = "galaxy";            break;
+   case MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_SECTOR:        pcszResult = "sector";            break;
+   case MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_NEBULA:        pcszResult = "nebula";            break;
+   case MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_STARCLUSTER:   pcszResult = "starcluster";       break;
+   case MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_BLACKHOLE:     pcszResult = "blackhole";         break;
+   case MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_STARSYSTEM:    pcszResult = "starsystem";        break;
+   case MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_STAR:          pcszResult = "star";              break;
+   case MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_PLANETSYSTEM:  pcszResult = "planetsystem";      break;
+   case MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_PLANET:        pcszResult = "planet";            break;
+   case MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOONSYSTEM:    pcszResult = "moonsystem";        break;
+   case MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOON:          pcszResult = "moon";              break;
+   case MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_DEBRISSYSTEM:  pcszResult = "debrissystem";      break;
+   case MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_DEBRIS:        pcszResult = "debris";            break;
+   case MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_SATELLITE:     pcszResult = "satellite";         break;
+   case MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_TRANSPORT:     pcszResult = "transport";         break;
+   case MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL_SURFACE:       pcszResult = "surface";           break;
+
+   default:
+      pcszResult = "";
+   }
+
+   return pcszResult;
 }
 
 // ---------------------------------------------------------------------------

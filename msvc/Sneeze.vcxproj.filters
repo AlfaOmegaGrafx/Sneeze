@@ -181,9 +181,6 @@
     <ClCompile Include="..\src\context\msf\MsfFile.cpp">
       <Filter>src\context\msf</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\context\msf\CertChain.cpp">
-      <Filter>src\context\msf</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\persona\Persona.cpp">
       <Filter>src\persona</Filter>
     </ClCompile>
@@ -223,6 +220,7 @@
     <ClCompile Include="..\src\sneeze\control\Fetch.cpp">
       <Filter>src\sneeze\control</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\context\msf\Chain.cpp" />
   </ItemGroup>
   <!-- Header files (.h) -->
   <ItemGroup>
@@ -238,15 +236,6 @@
     <ClInclude Include="..\src\sneeze\control\Control.h">
       <Filter>src\sneeze\control</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\context\scene\Node.h">
-      <Filter>src\context\scene</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\context\scene\Fabric.h">
-      <Filter>src\context\scene</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\context\scene\MapObject.h">
-      <Filter>src\context\scene</Filter>
-    </ClInclude>
     <ClInclude Include="..\src\context\scene\AccessControl.h">
       <Filter>src\context\scene</Filter>
     </ClInclude>
@@ -255,9 +244,6 @@
     </ClInclude>
     <ClInclude Include="..\src\context\viewport\AnariRenderer.h">
       <Filter>src\context\viewport</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\context\msf\Msf.h">
-      <Filter>src\context\msf</Filter>
     </ClInclude>
     <ClInclude Include="..\src\deps\wasm\Wasm.h">
       <Filter>src\deps\wasm</Filter>
@@ -325,6 +311,10 @@
     </ClInclude>
     <ClInclude Include="..\src\context\console\Console.h">
       <Filter>src\context\console</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Msf.h" />
+    <ClInclude Include="..\include\MapObject.h">
+      <Filter>include</Filter>
     </ClInclude>
   </ItemGroup>
   <!-- Resource files -->

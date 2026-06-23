@@ -34,8 +34,9 @@ namespace SNEEZE
    }
 }
 
-#include "Context.h"
+#include "MapObject.h"
 #include "Container.h"
+#include "Context.h"
 #include "Msf.h"
 #include "Console.h"
 #include "Network.h"

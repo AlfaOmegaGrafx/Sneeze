@@ -187,15 +187,14 @@
   <!-- Header files                                                           -->
   <!-- ===================================================================== -->
   <ItemGroup>
+    <ClInclude Include="..\include\MapObject.h" />
     <ClInclude Include="..\src\context\console\Console.h" />
     <ClInclude Include="..\src\context\network\Network.h" />
     <ClInclude Include="..\src\sneeze\Pch.h" />
-
     <ClInclude Include="..\src\context\storage\Storage.h" />
     <ClInclude Include="..\src\sneeze\Types.h" />
     <ClInclude Include="..\src\sneeze\Engine.h" />
     <ClInclude Include="..\src\sneeze\control\Control.h" />
-    <ClInclude Include="..\src\context\scene\MapObject.h" />
     <ClInclude Include="..\src\context\scene\AccessControl.h" />
     <ClInclude Include="..\src\context\viewport\Viewport.h" />
     <ClInclude Include="..\src\context\viewport\AnariRenderer.h" />

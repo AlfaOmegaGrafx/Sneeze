@@ -22,10 +22,8 @@ namespace SNEEZE
    class CONTAINER;
    class MSF;
    class NETWORK;
-   class MAP_OBJECT;
    class SCENE;
    class FABRIC;
-   struct RMCOBJECT;
 
    // ---------------------------------------------------------------------------
    // RMAP Object Index constants

@@ -15,8 +15,6 @@
 #ifndef SNEEZE_CONTEXT_H
 #define SNEEZE_CONTEXT_H
 
-#include "Container.h"
-
 namespace SNEEZE
 {
    class ENGINE;

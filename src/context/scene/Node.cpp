@@ -106,11 +106,11 @@ public:
 
       m_pMap_Object = pMap_Object;
 
-      if (m_pMap_Object  &&  m_pMap_Object->m_Resource.sReference[0] != '\0')
+      if (m_pMap_Object  &&  m_pMap_Object->Resource.sReference[0] != '\0')
       {
-         if (m_pMap_Object->m_Type.bSubtype == 255)
+         if (m_pMap_Object->Type.bSubtype == 255)
          {
-            std::string sUrl = m_pMap_Object->m_Resource.sReference;
+            std::string sUrl = m_pMap_Object->Resource.sReference;
             
             if (!sUrl.empty())
             {
@@ -148,9 +148,9 @@ public:
 
    void Texture_Request ()
    {
-      if (m_pMap_Object  &&  m_pMap_Object->m_Resource.sReference[0] != '\0')
+      if (m_pMap_Object  &&  m_pMap_Object->Resource.sReference[0] != '\0')
       {
-         m_pFile = m_pFabric->Scene ()->Network ()->File_Open (m_pFabric->Container (), m_pMap_Object->m_Resource.sReference, this);
+         m_pFile = m_pFabric->Scene ()->Network ()->File_Open (m_pFabric->Container (), m_pMap_Object->Resource.sReference, this);
       }
    }
 
@@ -180,14 +180,8 @@ public:
 
          if (pPixels)
          {
-            {
-               std::lock_guard<std::mutex> lock (m_pMap_Object->m_textureMutex);
-               m_pMap_Object->m_aTexturePixels.assign (pPixels, pPixels + nW * nH * 4);
-               m_pMap_Object->m_nTextureWidth    = nW;
-               m_pMap_Object->m_nTextureHeight   = nH;
-               m_pMap_Object->m_nTextureChannels = 4;
-            }
-            m_pMap_Object->m_bTextureReady.store (true);
+            m_pMap_Object->SetTexture (pPixels, nW, nH);
+
             stbi_image_free (pPixels);
          }
       }
@@ -306,8 +300,8 @@ std::string NODE::Name () const
    if (m_pImpl->m_pMap_Object)
    {
       // m_Name.wsName is a fixed-size UTF-16 buffer (BMP only for names).
-      const uint16_t* pwName = m_pImpl->m_pMap_Object->m_Name.wsName;
-      const int       nMax   = static_cast<int> (sizeof (m_pImpl->m_pMap_Object->m_Name.wsName) / sizeof (uint16_t));
+      const uint16_t* pwName = m_pImpl->m_pMap_Object->Name.wsName;
+      const int       nMax   = static_cast<int> (sizeof (m_pImpl->m_pMap_Object->Name.wsName) / sizeof (uint16_t));
 
       for (int i = 0; i < nMax  &&  pwName[i] != 0; i++)
       {
@@ -334,52 +328,13 @@ std::string NODE::Name () const
    return sResult;
 }
 
-static const char* ClassName_Lookup (MAP_OBJECT_CLASS eClass)
+static const char* ClassName_Lookup (MAP_OBJECT::MAP_OBJECT_CLASS eClass)
 {
-   switch (eClass)
-   {
-      case MAP_OBJECT_CLASS_ROOT:        return "root";
-      case MAP_OBJECT_CLASS_CELESTIAL:   return "celestial";
-      case MAP_OBJECT_CLASS_TERRESTRIAL: return "terrestrial";
-      case MAP_OBJECT_CLASS_PHYSICAL:    return "physical";
-      default:                           return "";
-   }
-}
-
-static const char* CelestialTypeName_Lookup (uint8_t bType)
-{
-   switch (bType)
-   {
-      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_NONE:          return "none";
-      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_UNIVERSE:      return "universe";
-      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_SUPERCLUSTER:  return "supercluster";
-      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_GALAXYCLUSTER: return "galaxycluster";
-      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_GALAXY:        return "galaxy";
-      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_SECTOR:        return "sector";
-      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_NEBULA:        return "nebula";
-      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_STARCLUSTER:   return "starcluster";
-      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_BLACKHOLE:     return "blackhole";
-      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_STARSYSTEM:    return "starsystem";
-      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_STAR:          return "star";
-      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_PLANETSYSTEM:  return "planetsystem";
-      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_PLANET:        return "planet";
-      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOONSYSTEM:    return "moonsystem";
-      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_MOON:          return "moon";
-      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_DEBRISSYSTEM:  return "debrissystem";
-      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_DEBRIS:        return "debris";
-      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_SATELLITE:     return "satellite";
-      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_TRANSPORT:     return "transport";
-      case MAP_OBJECT_TYPE_TYPE_CELESTIAL_SURFACE:       return "surface";
-      default:                                           return "";
-   }
 }
 
 std::string NODE::ClassName () const
 {
-   if (m_pImpl->m_pMap_Object)
-      return ClassName_Lookup (m_pImpl->m_pMap_Object->Class ());
-
-   return std::string ();
+   return m_pImpl->m_pMap_Object ? m_pImpl->m_pMap_Object->ClassName () : "";
 }
 
 std::string NODE::TypeName () const
@@ -388,12 +343,12 @@ std::string NODE::TypeName () const
 
    if (m_pImpl->m_pMap_Object)
    {
-      uint8_t bType = m_pImpl->m_pMap_Object->m_Type.bType;
+      uint8_t bType = m_pImpl->m_pMap_Object->Type.bType;
 
       // Type identifiers are class-specific; only celestial bodies have named
       // types today. Other classes fall back to the raw numeric type.
-      if (m_pImpl->m_pMap_Object->Class () == MAP_OBJECT_CLASS_CELESTIAL)
-         sResult = CelestialTypeName_Lookup (bType);
+      if (m_pImpl->m_pMap_Object->Class () == MAP_OBJECT::MAP_OBJECT_CLASS_CELESTIAL)
+         sResult = MAP_OBJECT_CELESTIAL::GetTypeName (static_cast<MAP_OBJECT_CELESTIAL::MAP_OBJECT_TYPE_TYPE_CELESTIAL> (bType));
 
       if (sResult.empty ())
          sResult = "type" + std::to_string (static_cast<int> (bType));
@@ -404,7 +359,7 @@ std::string NODE::TypeName () const
 
 int NODE::Subtype () const
 {
-   return m_pImpl->m_pMap_Object ? static_cast<int> (m_pImpl->m_pMap_Object->m_Type.bSubtype) : 0;
+   return m_pImpl->m_pMap_Object ? static_cast<int> (m_pImpl->m_pMap_Object->Type.bSubtype) : 0;
 }
 
 FABRIC*     NODE::Fabric            ()                    const { return m_pImpl->m_pFabric; }
