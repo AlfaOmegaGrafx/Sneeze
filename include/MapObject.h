@@ -110,19 +110,6 @@ namespace SNEEZE
          uint8_t               abReserved[12];
       };
 
-      struct RMCOBJECT
-      {
-         OBJECT_HEAD           Head;
-         MAP_OBJECT_NAME       Name;
-         MAP_OBJECT_TYPE       Type;
-         MAP_OBJECT_OWNER      Owner;
-         MAP_OBJECT_RESOURCE   Resource;
-         MAP_OBJECT_TRANSFORM  Transform;
-         MAP_OBJECT_ORBIT      Orbit;
-         MAP_OBJECT_BOUND      Bound;
-         MAP_OBJECT_PROPERTIES Properties;
-      };
-
    public:
       OBJECT_HEAD                   Head        = {};
       MAP_OBJECT_NAME               Name        = {};
@@ -229,5 +216,20 @@ namespace SNEEZE
    public:
       explicit MAP_OBJECT_PHYSICAL (OBJECT_HEAD Head);
    };
+
+//-------------------------
+   struct RMCOBJECT
+   {
+      MAP_OBJECT::OBJECT_HEAD           Head;
+      MAP_OBJECT::MAP_OBJECT_NAME       Name;
+      MAP_OBJECT::MAP_OBJECT_TYPE       Type;
+      MAP_OBJECT::MAP_OBJECT_OWNER      Owner;
+      MAP_OBJECT::MAP_OBJECT_RESOURCE   Resource;
+      MAP_OBJECT::MAP_OBJECT_TRANSFORM  Transform;
+      MAP_OBJECT::MAP_OBJECT_ORBIT      Orbit;
+      MAP_OBJECT::MAP_OBJECT_BOUND      Bound;
+      MAP_OBJECT::MAP_OBJECT_PROPERTIES Properties;
+   };
+
 }
 #endif // SNEEZE_SOM_MAPOBJECT_H

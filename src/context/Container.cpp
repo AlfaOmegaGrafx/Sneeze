@@ -169,7 +169,7 @@ public:
    // See Scene.md "Fabric Ownership Modes" for the full discussion.
    // -----------------------------------------------------------------------
 
-   uint64_t Node_Root (uint64_t twFabricIx, const MAP_OBJECT::RMCOBJECT* pRMCObject)
+   uint64_t Node_Root (uint64_t twFabricIx, const RMCOBJECT* pRMCObject)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxContainer);
 
@@ -186,7 +186,7 @@ public:
       return twObjectIx;
    }
 
-   uint64_t Node_Open (uint64_t twParentIx, const MAP_OBJECT::RMCOBJECT* pRMCObject)
+   uint64_t Node_Open (uint64_t twParentIx, const RMCOBJECT* pRMCObject)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxContainer);
 
@@ -203,7 +203,7 @@ public:
       return twObjectIx;
    }
 
-   uint64_t Node_Create (FABRIC* pFabric, NODE* pNode_Parent, const MAP_OBJECT::RMCOBJECT* pRMCObject)
+   uint64_t Node_Create (FABRIC* pFabric, NODE* pNode_Parent, const RMCOBJECT* pRMCObject)
    {
       MAP_OBJECT::OBJECT_HEAD      Head       = pRMCObject->Head;
       MAP_OBJECT::MAP_OBJECT_CLASS eClass     = pRMCObject->Head.Self.Class ();
@@ -212,7 +212,11 @@ public:
       if (twObjectIx == OBJECTIX_IDENTITY)
       {
          if (m_twObjectIx_Next < OBJECTIX_MAX)
-            twObjectIx = ++m_twObjectIx_Next;
+         {
+            twObjectIx           = ++m_twObjectIx_Next;
+
+            Head.Self.qwComposed = OBJECTIX_COMPOSE (eClass, twObjectIx);
+         }
       }
       else if (twObjectIx > OBJECTIX_NULL  &&  twObjectIx <= OBJECTIX_MAX)
       {
@@ -226,8 +230,6 @@ public:
 
       if (twObjectIx > OBJECTIX_NULL  &&  twObjectIx <= OBJECTIX_MAX)
       {
-         Head.Self.qwComposed = OBJECTIX_COMPOSE (eClass, twObjectIx);
-
          MAP_OBJECT* pMapObj = nullptr;
 
          switch (eClass)
@@ -358,7 +360,7 @@ void CONTAINER::Instance_Close (uint64_t twFabricIx, const std::string& sUrl, co
    m_pImpl->Instance_Close (twFabricIx, sUrl, sHash);
 }
 
-uint64_t CONTAINER::Node_Root  (uint64_t twFabricIx, const MAP_OBJECT::RMCOBJECT* pRMCObject) { return m_pImpl->Node_Root  (twFabricIx, pRMCObject); }
-uint64_t CONTAINER::Node_Open  (uint64_t twParentIx, const MAP_OBJECT::RMCOBJECT* pRMCObject) { return m_pImpl->Node_Open  (twParentIx, pRMCObject); }
+uint64_t CONTAINER::Node_Root  (uint64_t twFabricIx, const RMCOBJECT* pRMCObject) { return m_pImpl->Node_Root  (twFabricIx, pRMCObject); }
+uint64_t CONTAINER::Node_Open  (uint64_t twParentIx, const RMCOBJECT* pRMCObject) { return m_pImpl->Node_Open  (twParentIx, pRMCObject); }
 bool     CONTAINER::Node_Close (uint64_t twObjectIx)                                          { return m_pImpl->Node_Close (twObjectIx); }
 NODE*    CONTAINER::Node_Find  (uint64_t twObjectIx) const                                    { return m_pImpl->Node_Find  (twObjectIx); }

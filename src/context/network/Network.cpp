@@ -71,7 +71,7 @@ public:
 
          for (auto* pFile : m_apFile)
          {
-            m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "NETWORK", "Leaked File: " + pFile->Url ());
+//            m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Trace, "NETWORK", "Leaked File: " + pFile->Url ());
             delete pFile;
          }
          m_apFile.clear ();

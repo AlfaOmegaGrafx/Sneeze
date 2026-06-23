@@ -25,9 +25,9 @@ using namespace SNEEZE;
 // quaternion). A plain zero-fill leaves a degenerate transform, and under
 // universal TRS a zero-scale ancestor collapses every descendant to the origin,
 // so synthetic nodes start from identity just like the JSON decoder does.
-static void RmcObject_Init (MAP_OBJECT::RMCOBJECT& RMCObject)
+static void RmcObject_Init (RMCOBJECT& RMCObject)
 {
-   memset (&RMCObject, 0, sizeof (MAP_OBJECT::RMCOBJECT));
+   memset (&RMCObject, 0, sizeof (RMCOBJECT));
    RMCObject.Transform.d4Rotation[3] = 1.0;
    RMCObject.Transform.d3Scale[0]    = 1.0;
    RMCObject.Transform.d3Scale[1]    = 1.0;
@@ -108,7 +108,7 @@ public:
    {
       bool bResult = false;
 
-      MAP_OBJECT::RMCOBJECT RMCObject;
+      RMCOBJECT RMCObject;
       uint64_t twObjectIx;
 
       if ((m_pFabric_Root = Fabric_Open (nullptr, nullptr, sUrl)) != nullptr)

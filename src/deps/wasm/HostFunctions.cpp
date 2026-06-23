@@ -526,9 +526,9 @@ static uint64_t ComposeFromId (const std::string& sId)
    return twResult;
 }
 
-static void RmcObject_FromJson (const nlohmann::json& j, MAP_OBJECT::RMCOBJECT* pObject)
+static void RmcObject_FromJson (const nlohmann::json& j, RMCOBJECT* pObject)
 {
-   *pObject = MAP_OBJECT::RMCOBJECT {};
+   *pObject = RMCOBJECT {};
 
    // Sensible decode defaults for omitted transform fields: identity orientation and unit scale 
    // (a zero quaternion / zero scale would be degenerate). Present fields below overwrite these.
@@ -648,7 +648,7 @@ static uint32_t Map_Open_Children (CONTAINER* pContainer, uint64_t twParentIx, c
    {
       for (const auto& jChild : jParent["Children"])
       {
-         MAP_OBJECT::RMCOBJECT RMCObject;
+         RMCOBJECT RMCObject;
          RmcObject_FromJson (jChild, &RMCObject);
 
          uint64_t twChildIx = pContainer->Node_Open (twParentIx, &RMCObject);
@@ -686,7 +686,7 @@ wasm_trap_t* Scene_Node_Map (void* pEnv, wasmtime_caller_t* pCaller, const wasmt
          {
             const nlohmann::json& jRoot = jPayload["data"];
 
-            MAP_OBJECT::RMCOBJECT RMCObject;
+            RMCOBJECT RMCObject;
             RmcObject_FromJson (jRoot, &RMCObject);
 
             uint64_t twRootIx = pContainer->Node_Root (twFabricIx, &RMCObject);
@@ -722,7 +722,7 @@ wasm_trap_t* Scene_Node_Root (void* pEnv, wasmtime_caller_t* pCaller, const wasm
       int32_t  nPtr       = pArgs[1].of.i32;
       int32_t  nLen       = pArgs[2].of.i32;
 
-      if (nLen >= static_cast<int32_t> (sizeof (MAP_OBJECT::RMCOBJECT)))
+      if (nLen >= static_cast<int32_t> (sizeof (RMCOBJECT)))
       {
          const uint8_t* pBytes = ReadWasmBytes (pCaller, nPtr, nLen);
 
@@ -732,7 +732,7 @@ wasm_trap_t* Scene_Node_Root (void* pEnv, wasmtime_caller_t* pCaller, const wasm
 
             if (pContainer)
             {
-               const auto* pObject = reinterpret_cast<const MAP_OBJECT::RMCOBJECT*> (pBytes);
+               const auto* pObject = reinterpret_cast<const RMCOBJECT*> (pBytes);
                twResult = pContainer->Node_Root (twFabricIx, pObject);
             }
          }
@@ -758,7 +758,7 @@ wasm_trap_t* Scene_Node_Open (void* pEnv, wasmtime_caller_t* pCaller, const wasm
       int32_t  nPtr       = pArgs[1].of.i32;
       int32_t  nLen       = pArgs[2].of.i32;
 
-      if (nLen >= static_cast<int32_t> (sizeof (MAP_OBJECT::RMCOBJECT)))
+      if (nLen >= static_cast<int32_t> (sizeof (RMCOBJECT)))
       {
          const uint8_t* pBytes = ReadWasmBytes (pCaller, nPtr, nLen);
 
@@ -768,7 +768,7 @@ wasm_trap_t* Scene_Node_Open (void* pEnv, wasmtime_caller_t* pCaller, const wasm
 
             if (pContainer)
             {
-               const auto* pObject = reinterpret_cast<const MAP_OBJECT::RMCOBJECT*> (pBytes);
+               const auto* pObject = reinterpret_cast<const RMCOBJECT*> (pBytes);
                twResult = pContainer->Node_Open (twParentIx, pObject);
             }
          }
