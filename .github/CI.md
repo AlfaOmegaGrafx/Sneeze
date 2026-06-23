@@ -23,7 +23,8 @@ repo; the wiki is a mirror.
 
 **Secrets** (Settings → Actions): `WIKIJS_GRAPHQL_URL` (default `https://omb.wiki/graphql`),
 `WIKIJS_API_TOKEN` (bearer token from Wiki.js Administration → API Access, scopes:
-`write:pages` + `read:pages`). Optional: `CF_ACCESS_CLIENT_ID` and
+`write:pages` + `read:pages` — **read alone is not enough**; `pages.list` succeeding does not
+imply publish will work). Optional: `CF_ACCESS_CLIENT_ID` and
 `CF_ACCESS_CLIENT_SECRET` if omb.wiki sits behind Cloudflare Access. Until configured,
 `wiki-publish` exits successfully with a notice and changes nothing on omb.wiki.
 
@@ -31,6 +32,23 @@ repo; the wiki is a mirror.
 is blocking GitHub Actions before Wiki.js sees the request. The wiki admin must add a WAF rule
 to skip bot checks for `POST /graphql`, or issue a Cloudflare Access service token and store it
 in the optional secrets above. This is not a Wiki.js token permissions problem.
+
+**Wiki.js `Forbidden` + `INTERNAL_SERVER_ERROR` on create/update:** This is a permission denial,
+not a server fault. Wiki.js `@auth` throws `Error('Forbidden')`, which GraphQL surfaces as
+`extensions.code: INTERNAL_SERVER_ERROR`. The mutation never runs. `pages.list` can succeed with
+only `read:pages`; create/update need `write:pages`, `manage:pages`, or `manage:system`.
+
+**Full Access API keys are not a special bypass.** Wiki.js signs them with `grp: 1` and loads
+the Administrators group's `permissions` array from the database into `req.user.permissions`.
+If group id 1 is missing `write:pages` / `manage:system` (or the groups cache is stale after key
+creation), Full Access tokens fail create/update even though the UI label says Full Access.
+Restart Wiki.js after API key or group changes.
+
+**Wiki.js v2 `6013` on `singleByPath`:** Wiki.js 2.x incorrectly requires `manage:pages` and
+`delete:pages` in the `singleByPath` / `single` resolvers (see
+[requarks/wiki#3205](https://github.com/requarks/wiki/issues/3205)). `pages.list` works with
+`read:pages` only. `publish-wiki.py` indexes paths from `pages.list` for upsert lookups. Create
+and update still require `write:pages` on the API group and a matching page rule under `/sneeze`.
 
 Config: `docs/wiki/publish.json`. Script: `scripts/publish-wiki.py`.
 
