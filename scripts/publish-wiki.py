@@ -5,9 +5,11 @@
 # Home.md replaces the existing /sneeze landing page.
 #
 # Usage:
-#   python scripts/publish-wiki.py --dry-run
-#   python scripts/publish-wiki.py --all
-#   python scripts/publish-wiki.py --page docs/systems/scene.md
+#   python scripts/publish-wiki.py --probe          # verify API read + write before bulk publish
+#   python scripts/publish-wiki.py --dry-run --all
+#   python scripts/publish-wiki.py --all            # publish all 72 docs pages
+#   python scripts/publish-wiki.py --config docs/wiki/publish.rp1.json --probe
+#   python scripts/publish-wiki.py --config docs/wiki/publish.rp1.json --all
 #
 # Environment (live publish only):
 #   WIKIJS_GRAPHQL_URL  e.g. https://omb.wiki/graphql
@@ -17,6 +19,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 import re
@@ -53,13 +56,17 @@ mutation PublishUpdate($id: Int!, $content: String!, $description: String!, $edi
 }
 """
 
-PAGE_BY_PATH_QUERY = """
-query PageByPath($path: String!, $locale: String!) {
+# Wiki.js v2 bug: pages.single / singleByPath check manage:pages + delete:pages in the
+# resolver even though the schema only requires read:pages. pages.list works with
+# read:pages alone, so we index paths from list for upsert lookups.
+# https://github.com/requarks/wiki/issues/3205
+PAGE_LIST_QUERY = """
+query PageList {
    pages {
-      singleByPath(path: $path, locale: $locale) {
+      list {
          id
          path
-         title
+         locale
       }
    }
 }
@@ -74,6 +81,39 @@ mutation RenderPage($id: Int!) {
    }
 }
 """
+
+DELETE_MUTATION = """
+mutation PublishDelete($id: Int!) {
+   pages {
+      delete(id: $id) {
+         responseResult { succeeded message errorCode }
+      }
+   }
+}
+"""
+
+PROBE_PATH = "sneeze/_publish_probe"
+
+RENDER_PROBE_MUTATION = """
+mutation RenderProbe($id: Int!) {
+   pages {
+      render(id: $id) {
+         responseResult { succeeded message }
+      }
+   }
+}
+"""
+
+
+def decode_jwt_payload(token: str) -> dict:
+   parts = token.strip().split(".")
+   if len(parts) < 2:
+      return {}
+   segment = parts[1] + "=" * (-len(parts[1]) % 4)
+   try:
+      return json.loads(base64.urlsafe_b64decode(segment))
+   except (json.JSONDecodeError, ValueError):
+      return {}
 
 USER_AGENT = (
    "Sneeze-Docs-Publisher/1.0 "
@@ -217,6 +257,7 @@ class WikiJsClient:
    def __init__(self, graphql_url: str, token: str) -> None:
       self.graphql_url = graphql_url
       self.token = token
+      self._page_index: dict[tuple[str, str], int] | None = None
 
    def _request_headers(self) -> dict[str, str]:
       headers = {
@@ -245,7 +286,7 @@ class WikiJsClient:
          )
       return f"HTTP {code}: {detail}"
 
-   def graphql(self, query: str, variables: dict | None = None, ignore_codes: set[int] | None = None) -> dict:
+   def graphql_raw(self, query: str, variables: dict | None = None) -> dict:
       payload = json.dumps({"query": query, "variables": variables or {}}).encode("utf-8")
       req = urllib.request.Request(
          self.graphql_url,
@@ -254,16 +295,72 @@ class WikiJsClient:
          headers=self._request_headers(),
       )
       try:
-         with urllib.request.urlopen(req, timeout=120) as resp:
-            body = json.loads(resp.read().decode("utf-8"))
+         with urllib.request.urlopen(req, timeout=300) as resp:
+            raw = resp.read().decode("utf-8")
+            try:
+               return json.loads(raw)
+            except json.JSONDecodeError as je:
+               raise RuntimeError(
+                  f"Server returned non-JSON ({len(raw)} bytes). "
+                  f"First 500 chars: {raw[:500]}"
+               ) from je
       except urllib.error.HTTPError as exc:
          detail = exc.read().decode("utf-8", errors="replace")
          raise RuntimeError(self._http_error_message(exc.code, detail)) from exc
+
+   def graphql(self, query: str, variables: dict | None = None, ignore_codes: set[int] | None = None) -> dict:
+      body = self.graphql_raw(query, variables)
       if body.get("errors"):
          if ignore_codes and self._errors_only_codes(body["errors"], ignore_codes):
             return body.get("data") or {}
-         raise RuntimeError(json.dumps(body["errors"], indent=2))
+         raise RuntimeError(self._format_graphql_errors(body["errors"]))
       return body.get("data") or {}
+
+   @staticmethod
+   def _format_graphql_errors(errors: list) -> str:
+      lines = [json.dumps(errors, indent=2)]
+      for err in errors:
+         if err.get("message") != "Forbidden":
+            continue
+         path = err.get("path") or []
+         ext = err.get("extensions") or {}
+         if ext.get("code") == "INTERNAL_SERVER_ERROR":
+            lines.append(
+               "\nWiki.js returned Forbidden with extensions.code INTERNAL_SERVER_ERROR. "
+               "That is not a server crash — the @auth directive throws a plain Error('Forbidden') "
+               "when the API token's permissions array lacks a required scope. The mutation never runs."
+            )
+         if "create" in path or "update" in path:
+            lines.append(
+               "\nRequired scope for pages.create / pages.update: one of write:pages, manage:pages, "
+               "or manage:system in the token's effective permissions.\n"
+               "pages.list succeeding only proves read:pages (or manage:system) — not write access.\n"
+               "Full Access API keys are not a bypass: Wiki.js sets JWT grp=1 and loads "
+               "WIKI.auth.groups[1].permissions from the database (Administrators group). "
+               "If that array is missing write:pages / manage:system, Full Access still fails here.\n"
+               "Checks on omb.wiki:\n"
+               "  1. SELECT id, name, permissions FROM groups WHERE id = 1; "
+               "(must include manage:system or write:pages)\n"
+               "  2. Restart Wiki.js after creating or revoking API keys (reloadApiKeys / reloadGroups)\n"
+               "  3. Or create a non-Full-Access key bound to a group that has write:pages + "
+               "ALLOW page rules for sneeze/\n"
+               "Test write access:\n"
+               '  curl -X POST https://omb.wiki/graphql -H "Authorization: Bearer <token>" '
+               '-H "Content-Type: application/json" -d '
+               '\'{"query":"mutation { pages { create(path: \\"sneeze/_write_test\\", title: \\"test\\", '
+               'content: \\"x\\", description: \\"\\", editor: \\"markdown\\", isPublished: true, '
+               'isPrivate: false, locale: \\"en\\", tags: []) { responseResult { succeeded message errorCode } } } }"}\''
+            )
+            break
+         exc = (err.get("extensions") or {}).get("exception") or {}
+         if exc.get("code") == 6013:
+            lines.append(
+               "\nWiki.js v2 bug: pages.singleByPath requires manage:pages + delete:pages in the "
+               "resolver (not just read:pages). publish-wiki.py uses pages.list instead; if you "
+               "see this elsewhere, enable delete:pages on the API group or upgrade Wiki.js."
+            )
+            break
+      return "\n".join(lines)
 
    @staticmethod
    def _errors_only_codes(errors: list, allowed: set[int]) -> bool:
@@ -274,12 +371,19 @@ class WikiJsClient:
             codes.add(int(exc["code"]))
       return bool(codes) and codes <= allowed
 
+   def refresh_page_index(self) -> None:
+      data = self.graphql(PAGE_LIST_QUERY)
+      pages = ((data.get("pages") or {}).get("list")) or []
+      self._page_index = {(p["path"], p["locale"]): int(p["id"]) for p in pages}
+
    def page_id_for_path(self, path: str, locale: str) -> int | None:
-      data = self.graphql(PAGE_BY_PATH_QUERY, {"path": path, "locale": locale}, ignore_codes={6003})
-      page = (((data.get("pages") or {}).get("singleByPath")) or None)
-      if not page:
-         return None
-      return int(page["id"])
+      if self._page_index is None:
+         self.refresh_page_index()
+      return self._page_index.get((path, locale))
+
+   def note_page_id(self, path: str, locale: str, page_id: int) -> None:
+      if self._page_index is not None:
+         self._page_index[(path, locale)] = page_id
 
    def upsert(self, path: str, title: str, content: str, description: str, locale: str, tags: list[str]) -> None:
       page_id = self.page_id_for_path(path, locale)
@@ -298,8 +402,12 @@ class WikiJsClient:
          data = self.graphql(CREATE_MUTATION, variables)
          result = (((data.get("pages") or {}).get("create") or {}).get("responseResult")) or {}
          if result.get("succeeded"):
+            page = (((data.get("pages") or {}).get("create") or {}).get("page")) or {}
+            if page.get("id"):
+               self.note_page_id(path, locale, int(page["id"]))
             return
          if result.get("errorCode") == 6002:
+            self.refresh_page_index()
             page_id = self.page_id_for_path(path, locale)
          else:
             raise RuntimeError(result.get("message") or json.dumps(result))
@@ -311,11 +419,117 @@ class WikiJsClient:
       if not result.get("succeeded"):
          raise RuntimeError(result.get("message") or json.dumps(result))
 
-   def render(self, page_id: int) -> None:
-      data = self.graphql(RENDER_MUTATION, {"id": page_id})
-      result = (((data.get("pages") or {}).get("render") or {}).get("responseResult")) or {}
+   def render(self, page_id: int) -> bool:
+      body = self.graphql_raw(RENDER_MUTATION, {"id": page_id})
+      if body.get("errors"):
+         for err in body["errors"]:
+            if err.get("message") == "Forbidden" and "render" in (err.get("path") or []):
+               return False
+         raise RuntimeError(self._format_graphql_errors(body["errors"]))
+      result = (((body.get("data") or {}).get("pages") or {}).get("render") or {}).get("responseResult") or {}
       if not result.get("succeeded"):
          raise RuntimeError(result.get("message") or json.dumps(result))
+      return True
+
+   def probe(self, locale: str, path_prefix: str) -> int:
+      print(f"publish-wiki: probing {self.graphql_url}")
+      payload = decode_jwt_payload(self.token)
+      api_id = payload.get("api")
+      grp_id = payload.get("grp")
+      if api_id is not None and grp_id is not None:
+         print(f"  token: api key id={api_id}, group id={grp_id}")
+         if grp_id == 1:
+            print(
+               "  note: Full Access tokens use group 1 (Administrators). That group's "
+               "permissions are locked in the UI and loaded from the database — if group 1 "
+               "lost manage:system, Full Access cannot write."
+            )
+         else:
+            print(
+               f"  note: non-Full-Access token — effective permissions come from group {grp_id} only. "
+               "Enable write:pages on that group (not just read:pages)."
+            )
+      else:
+         print("  token: could not decode JWT payload (not a Wiki.js API key?)")
+
+      body = self.graphql_raw(PAGE_LIST_QUERY)
+      if body.get("errors"):
+         print("::error::READ FAILED — pages.list")
+         print(self._format_graphql_errors(body["errors"]))
+         return 1
+      pages = (((body.get("data") or {}).get("pages") or {}).get("list")) or []
+      sneeze_pages = [p for p in pages if str(p.get("path", "")).startswith(path_prefix)]
+      print(f"  read:  OK ({len(pages)} page(s) visible, {len(sneeze_pages)} under {path_prefix}/)")
+
+      if sneeze_pages:
+         probe_render_id = int(sneeze_pages[0]["id"])
+         render_body = self.graphql_raw(RENDER_PROBE_MUTATION, {"id": probe_render_id})
+         if render_body.get("errors"):
+            print("  manage:system: NO (pages.render blocked — token lacks manage:system)")
+         else:
+            rr = ((((render_body.get("data") or {}).get("pages") or {}).get("render") or {}).get("responseResult")) or {}
+            if rr.get("succeeded"):
+               print("  manage:system: YES (pages.render succeeded)")
+            else:
+               print(f"  manage:system: NO ({rr.get('message')})")
+
+      variables = {
+         "content": "publish-wiki probe — safe to delete",
+         "description": "API write probe",
+         "editor": "markdown",
+         "isPublished": False,
+         "isPrivate": True,
+         "locale": locale,
+         "path": PROBE_PATH,
+         "tags": ["probe"],
+         "title": "Publish probe",
+      }
+      body = self.graphql_raw(CREATE_MUTATION, variables)
+      if body.get("errors"):
+         print("::error::WRITE FAILED — pages.create (mutation blocked before resolver)")
+         print(self._format_graphql_errors(body["errors"]))
+         print(
+            "\nMost likely fix (pick one):\n"
+            "  A) Do NOT use Full Access. Administration → API Access → New API Key →\n"
+            "     uncheck Full Access, select your sneeze-api group (must have write:pages),\n"
+            "     restart Wiki.js, update WIKIJS_API_TOKEN, run --probe again.\n"
+            "  B) If you must use Full Access, fix group 1 in the database (UI cannot edit it):\n"
+            '     SELECT id, name, permissions FROM groups WHERE id = 1;\n'
+            "     permissions must include manage:system (fresh installs only store that).\n"
+            '     UPDATE groups SET permissions = \'["manage:system"]\' WHERE id = 1;\n'
+            "     then restart Wiki.js.\n"
+            "Then: python scripts/publish-wiki.py --all"
+         )
+         return 1
+
+      create = (((body.get("data") or {}).get("pages") or {}).get("create")) or {}
+      result = create.get("responseResult") or {}
+      page = create.get("page") or {}
+      if not result.get("succeeded"):
+         code = result.get("errorCode")
+         print(f"::error::WRITE FAILED — pages.create errorCode {code}: {result.get('message')}")
+         if code in (6008, 6009):
+            print(
+               "\nAuth passed but page rules blocked the write.\n"
+               "Groups → (token's group) → Page rules → Allow sneeze/ with write:pages"
+            )
+         return 1
+
+      page_id = int(page["id"])
+      print(f"  write: OK (created {PROBE_PATH} id={page_id})")
+
+      del_body = self.graphql_raw(DELETE_MUTATION, {"id": page_id})
+      if del_body.get("errors"):
+         print(f"::warning::PROBE PAGE LEFT BEHIND — delete {PROBE_PATH} (id={page_id}) manually")
+         print("  write access confirmed; safe to run --all")
+         return 0
+      del_result = ((((del_body.get("data") or {}).get("pages") or {}).get("delete") or {}).get("responseResult")) or {}
+      if del_result.get("succeeded"):
+         print("  cleanup: OK (probe page deleted)")
+      else:
+         print(f"::warning::PROBE PAGE LEFT BEHIND — delete {PROBE_PATH} (id={page_id}) manually")
+      print("\nProbe passed. Publish all docs:\n  python scripts/publish-wiki.py --all")
+      return 0
 
 
 def prepare_page(path: Path, docs_root: Path, config: dict, path_map: dict[str, str], sha: str) -> tuple[str, str, str, str]:
@@ -343,10 +557,12 @@ def git_head(repo_root: Path) -> str:
 
 def main() -> int:
    parser = argparse.ArgumentParser(description="Publish Sneeze docs/ to omb.wiki (Wiki.js)")
+   parser.add_argument("--probe", action="store_true", help="Test API read + write; exit before bulk publish")
    parser.add_argument("--dry-run", action="store_true", help="Transform only; do not call the API")
    parser.add_argument("--all", action="store_true", help="Publish every docs/**/*.md page")
    parser.add_argument("--page", action="append", default=[], help="Publish one repo-relative docs path")
-   parser.add_argument("--config", default="", help="Override publish.json path")
+   parser.add_argument("--skip-render", action="store_true", help="Skip pages.render after upsert (needs manage:system)")
+   parser.add_argument("--config", default="", help="Publish config JSON (default: docs/wiki/publish.json; test: docs/wiki/publish.rp1.json)")
    args = parser.parse_args()
 
    repo_root = find_repo_root(Path(__file__).resolve().parent)
@@ -359,13 +575,24 @@ def main() -> int:
       print(f"::error::Docs root missing: {docs_root}", file=sys.stderr)
       return 2
 
-   if not args.all and not args.page:
-      parser.error("Specify --all or at least one --page")
+   if not args.probe and not args.all and not args.page:
+      parser.error("Specify --probe, --all, or at least one --page")
+
+   graphql_url = os.environ.get("WIKIJS_GRAPHQL_URL", config.get("graphql_url", "")).strip()
+   token = os.environ.get("WIKIJS_API_TOKEN", "").strip()
+   locale = config.get("locale", "en")
+   path_prefix = config.get("path_prefix", "sneeze").strip("/")
+
+   if args.probe:
+      if not graphql_url or not token:
+         print("::error::Set WIKIJS_GRAPHQL_URL and WIKIJS_API_TOKEN", file=sys.stderr)
+         return 2
+      return WikiJsClient(graphql_url, token).probe(locale, path_prefix)
 
    pages: list[Path] = []
    if args.all:
       pages = list_doc_pages(docs_root)
-   else:
+   elif args.page:
       for item in args.page:
          path = Path(item)
          if not path.is_absolute():
@@ -377,11 +604,7 @@ def main() -> int:
 
    path_map = build_path_map(docs_root, config["path_prefix"], config["home"])
    sha = git_head(repo_root)
-   locale = config.get("locale", "en")
    description = f"Synced from MetaversalCorp/Sneeze@{sha[:12]}"
-
-   graphql_url = os.environ.get("WIKIJS_GRAPHQL_URL", config.get("graphql_url", "")).strip()
-   token = os.environ.get("WIKIJS_API_TOKEN", "").strip()
 
    if args.dry_run:
       print(f"publish-wiki: dry-run | pages={len(pages)} | HEAD={sha}")
@@ -396,6 +619,7 @@ def main() -> int:
       return 0
 
    client = WikiJsClient(graphql_url, token)
+   client.refresh_page_index()
    publish_order = order_publish_pages(pages, docs_root, config["home"])
    print(f"publish-wiki: publishing {len(publish_order)} page(s) to {graphql_url}")
 
@@ -407,13 +631,30 @@ def main() -> int:
       published_paths.append(wiki_path)
 
    print(f"publish-wiki: re-rendering {len(published_paths)} page(s) to refresh internal links")
-   for wiki_path in published_paths:
-      page_id = client.page_id_for_path(wiki_path, locale)
-      if page_id is not None:
+   if args.skip_render:
+      print("  skipped (--skip-render)")
+   else:
+      render_ok = 0
+      render_skip = False
+      for wiki_path in published_paths:
+         if render_skip:
+            continue
+         page_id = client.page_id_for_path(wiki_path, locale)
+         if page_id is None:
+            continue
          print(f"  render {wiki_path}")
-         client.render(page_id)
+         if client.render(page_id):
+            render_ok += 1
+         else:
+            print(
+               "::warning::pages.render requires manage:system; token has write:pages only. "
+               "Skipping remaining renders — upserted content is live; Wiki.js will render on view."
+            )
+            render_skip = True
+      if not render_skip:
+         print(f"  rendered {render_ok} page(s)")
 
-   print(f"publish-wiki: done ({len(published_paths)} page(s))")
+   print(f"publish-wiki: done ({len(published_paths)} page(s) upserted)")
    return 0
 
 
