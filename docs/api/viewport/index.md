@@ -12,16 +12,7 @@ nav:
 
 # Viewport API
 
-The viewport subsystem's public surface is declared in `include/Viewport.h`. It
-is the engine's rendering surface and orbit camera: the object an embedding
-application activates to turn a live [scene](../../systems/scene.md) into frames,
-and through which it feeds input and receives finished pixels. For the
-*architecture* — deferred renderer creation under thread affinity, the
-compositor-driven frame loop, the native-surface vs. readback paths — read the
-[Viewport system](../../systems/viewport.md) page. This section is the precise
-per-class reference: each page documents every public method's purpose,
-parameters, return value, and the pitfalls (threading, lifetime, the
-framebuffer handoff) to watch for.
+The viewport subsystem's public surface is declared in `include/Viewport.h`. It is the engine's rendering surface and orbit camera: the object an embedding application activates to turn a live [scene](../../systems/scene.md) into frames, and through which it feeds input and receives finished pixels. For the *architecture* — deferred renderer creation under thread affinity, the compositor-driven frame loop, the native-surface vs. readback paths — read the [Viewport system](../../systems/viewport.md) page. This section is the precise per-class reference: each page documents every public method's purpose, parameters, return value, and the pitfalls (threading, lifetime, the framebuffer handoff) to watch for.
 
 ```cpp
 #include <Viewport.h>   // brought in transitively via <Sneeze.h>
@@ -35,27 +26,18 @@ namespace SNEEZE { ... }
 | `VIEWPORT` | [VIEWPORT](VIEWPORT.md) | The per-context rendering surface; owns the renderer, input, framebuffer, camera, and timing. |
 | `VIEWPORT::RENDERER` | [RENDERER](RENDERER.md) | The abstract rendering backend interface (concrete implementation is internal). |
 
-`VIEWPORT` uses the pimpl idiom. It also publishes two nested helpers used across
-the host boundary:
+`VIEWPORT` uses the pimpl idiom. It also publishes two nested helpers used across the host boundary:
 
-- **`VIEWPORT::VIEW`** — the orbit-camera state (angles, distance, look-at target)
-  with an `Update` method that folds one frame of input into the camera.
-- **`VIEWPORT::INPUT`** — a plain struct of accumulated input deltas (mouse,
-  scroll, buttons, key flags) produced by the host and consumed once per frame.
+- **`VIEWPORT::VIEW`** — the orbit-camera state (angles, distance, look-at target) with an `Update` method that folds one frame of input into the camera.
+- **`VIEWPORT::INPUT`** — a plain struct of accumulated input deltas (mouse, scroll, buttons, key flags) produced by the host and consumed once per frame.
 
 Both are documented in full on the [VIEWPORT](VIEWPORT.md) page.
 
-> **Who calls this.** An application embedding the engine owns the host side of
-> the contract: it implements `IVIEWPORT` (declared with the engine's public
-> interfaces), calls `Activate` to start rendering, pushes input through
-> `Input_Mouse` / `Input_Key`, and receives frames via the host's `OnFrameReady`.
-> Most other members are driven by the engine's compositor and are documented here
-> for contributors.
+> **Who calls this.** An application embedding the engine owns the host side of > the contract: it implements `IVIEWPORT` (declared with the engine's public > interfaces), calls `Activate` to start rendering, pushes input through > `Input_Mouse` / `Input_Key`, and receives frames via the host's `OnFrameReady`. > Most other members are driven by the engine's compositor and are documented here > for contributors.
 
 ## The host interface (`IVIEWPORT`)
 
-A viewport only renders while a host is attached. The host implements three
-methods:
+A viewport only renders while a host is attached. The host implements three methods:
 
 | Method | Purpose |
 |---|---|

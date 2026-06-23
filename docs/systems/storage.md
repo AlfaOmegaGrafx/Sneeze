@@ -16,42 +16,23 @@ nav:
 
 # Storage System
 
-The storage system is the engine's persistent document store — the place where a
-content source keeps state that should outlive a single visit. If the
-[network system](network.md) is the engine's read-mostly cache of *fetched* bytes,
-storage is its read-write store of *authored* data: JSON documents a source writes
-and reads back, scoped and isolated per identity, durable across restarts and
-crashes. It is the engine's analog of a web browser's `localStorage` and
-`sessionStorage`, but holding structured JSON instead of flat strings.
+The storage system is the engine's persistent document store — the place where a content source keeps state that should outlive a single visit. If the [network system](network.md) is the engine's read-mostly cache of *fetched* bytes, storage is its read-write store of *authored* data: JSON documents a source writes and reads back, scoped and isolated per identity, durable across restarts and crashes. It is the engine's analog of a web browser's `localStorage` and `sessionStorage`, but holding structured JSON instead of flat strings.
 
-It assumes you have read [Core Concepts](../overview/core-concepts.md). The exact
-class and method signatures are in the [Storage API reference](../api/storage/index.md);
-this page is about how and why the system works.
+It assumes you have read [Core Concepts](../overview/core-concepts.md). The exact class and method signatures are in the [Storage API reference](../api/storage/index.md); this page is about how and why the system works.
 
 ---
 
 ## Why it exists
 
-Sandboxed content code needs somewhere to remember things — a player's name and
-chips, a session's progress, preferences shared across a publisher's worlds. A web
-page gets `localStorage`; the engine needs the equivalent, but with constraints the
-web does not impose:
+Sandboxed content code needs somewhere to remember things — a player's name and chips, a session's progress, preferences shared across a publisher's worlds. A web page gets `localStorage`; the engine needs the equivalent, but with constraints the web does not impose:
 
-- **Identity-scoped isolation.** A source must only see its own data, and data must
-  be partitioned by the cryptographic identity ([container](container.md)) that owns
-  it — not by a forgeable domain name.
-- **Two lifetimes.** Some data must survive restarts (permanent); some must be wiped
-  when the session ends (temporary).
-- **Two reach levels.** Some data is private to one container; some is shared among
-  all containers belonging to the same organization.
-- **Structured access.** Content wants to read and write deep into a JSON document by
-  path, not serialize and reserialize the whole blob for every change.
-- **Crash durability.** A power loss between writes must not corrupt or lose
-  acknowledged data.
+- **Identity-scoped isolation.** A source must only see its own data, and data must be partitioned by the cryptographic identity ([container](container.md)) that owns it — not by a forgeable domain name.
+- **Two lifetimes.** Some data must survive restarts (permanent); some must be wiped when the session ends (temporary).
+- **Two reach levels.** Some data is private to one container; some is shared among all containers belonging to the same organization.
+- **Structured access.** Content wants to read and write deep into a JSON document by path, not serialize and reserialize the whole blob for every change.
+- **Crash durability.** A power loss between writes must not corrupt or lose acknowledged data.
 
-The system meets these with three classes — `STORAGE`, `SILO`, and the private
-`UNIT` — and a small on-disk format of JSON documents, `.meta` sidecars, and a
-write-ahead changelog.
+The system meets these with three classes — `STORAGE`, `SILO`, and the private `UNIT` — and a small on-disk format of JSON documents, `.meta` sidecars, and a write-ahead changelog.
 
 ---
 
@@ -59,17 +40,11 @@ write-ahead changelog.
 
 ### STORAGE — the per-context orchestrator
 
-One `STORAGE` exists per [context](context.md) (per browsing session). It is a thin
-orchestrator: it opens and closes silos for containers, enumerates them for the
-inspector, and owns the **unit cache** — a map from on-disk pathname to the live
-`UNIT` for that file. It holds almost no document logic itself; its job is lifecycle
-and deduplication.
+One `STORAGE` exists per [context](context.md) (per browsing session). It is a thin orchestrator: it opens and closes silos for containers, enumerates them for the inspector, and owns the **unit cache** — a map from on-disk pathname to the live `UNIT` for that file. It holds almost no document logic itself; its job is lifecycle and deduplication.
 
 ### SILO — the per-container handle
 
-A `SILO` is the handle a caller actually works with. It is created for one container
-and groups **four `UNIT`s**, one for each combination of lifetime and reach,
-selected by the `eSILO_SCOPE` enum:
+A `SILO` is the handle a caller actually works with. It is created for one container and groups **four `UNIT`s**, one for each combination of lifetime and reach, selected by the `eSILO_SCOPE` enum:
 
 | Scope | Lifetime | Reach |
 |---|---|---|
@@ -78,22 +53,13 @@ selected by the `eSILO_SCOPE` enum:
 | `kSILO_SCOPE_TEMPORARY_ORG` | wiped at session end | shared across the organization |
 | `kSILO_SCOPE_TEMPORARY_COMPANY` | wiped at session end | private to this container |
 
-(The "company" naming in the code denotes the per-container scope.) Every read/write
-call on a silo names the scope, and the silo routes it to the matching unit. The silo
-is the object handed to both WASM host functions and the inspector.
+(The "company" naming in the code denotes the per-container scope.) Every read/write call on a silo names the scope, and the silo routes it to the matching unit. The silo is the object handed to both WASM host functions and the inspector.
 
 ### UNIT — the private document, one per file
 
-A `UNIT` is the network system's `ASSET` analog: a private internal class, declared
-only in the module's private header, representing **one JSON file on disk**. It owns
-the in-memory `nlohmann::json` document, the path-based read/write logic, the `.meta`
-sidecar, and the changelog. Callers never touch a unit directly — they go through a
-silo — but every document operation ultimately runs on a unit.
+A `UNIT` is the network system's `ASSET` analog: a private internal class, declared only in the module's private header, representing **one JSON file on disk**. It owns the in-memory `nlohmann::json` document, the path-based read/write logic, the `.meta` sidecar, and the changelog. Callers never touch a unit directly — they go through a silo — but every document operation ultimately runs on a unit.
 
-The reason units are separate from silos is **sharing**. Two containers from the same
-organization must see the *same* organization document. Their two silos therefore
-point at the *same* organization unit, deduplicated through `STORAGE`'s unit cache by
-pathname. Per-container units, by contrast, are unique to one silo.
+The reason units are separate from silos is **sharing**. Two containers from the same organization must see the *same* organization document. Their two silos therefore point at the *same* organization unit, deduplicated through `STORAGE`'s unit cache by pathname. Per-container units, by contrast, are unique to one silo.
 
 ```mermaid
 flowchart TD
@@ -116,34 +82,21 @@ flowchart TD
 
 ## The two-counter UNIT model
 
-Like the network system's asset, a unit is governed by **two independent counters**,
-and the distinction is again the crux of the design.
+Like the network system's asset, a unit is governed by **two independent counters**, and the distinction is again the crux of the design.
 
-- **`m_nCount_Open`** counts how many silos *reference* this unit — its lifetime in
-  the cache. `Unit_Open` finds-or-creates the unit and increments it; `Unit_Close`
-  decrements, and at zero removes the unit from the cache and deletes it. This is what
-  makes org-unit sharing work: two silos referencing `organization.json` keep its
-  open-count at two, so neither closing alone destroys it.
+- **`m_nCount_Open`** counts how many silos *reference* this unit — its lifetime in the cache. `Unit_Open` finds-or-creates the unit and increments it; `Unit_Close` decrements, and at zero removes the unit from the cache and deletes it. This is what makes org-unit sharing work: two silos referencing `organization.json` keep its open-count at two, so neither closing alone destroys it.
 
-- **`m_nCount_Load`** counts how many consumers have the document *loaded into memory*.
-  `Attach` increments it and, on the `0 → 1` transition, loads the document from disk
-  (and replays the changelog). `Detach` decrements it and, on the `1 → 0` transition,
-  saves the `.meta` sidecar, flushes the document if dirty, and **evicts** the
-  in-memory JSON to free the memory.
+- **`m_nCount_Load`** counts how many consumers have the document *loaded into memory*. `Attach` increments it and, on the `0 → 1` transition, loads the document from disk (and replays the changelog). `Detach` decrements it and, on the `1 → 0` transition, saves the `.meta` sidecar, flushes the document if dirty, and **evicts** the in-memory JSON to free the memory.
 
-The separation lets a unit stay alive (referenced) while its data is unloaded
-(evicted) — and lets shared org data be loaded once and seen by every attached silo.
+The separation lets a unit stay alive (referenced) while its data is unloaded (evicted) — and lets shared org data be loaded once and seen by every attached silo.
 
-> **Loading is not automatic on open.** A freshly opened silo's units are referenced
-> but not loaded. A caller must call `SILO::Attach` before reading or writing, or the
-> document is empty. Attach/Detach is explicit — see [Explicit attach](#explicit-attach-and-detach).
+> **Loading is not automatic on open.** A freshly opened silo's units are referenced > but not loaded. A caller must call `SILO::Attach` before reading or writing, or the > document is empty. Attach/Detach is explicit — see [Explicit attach](#explicit-attach-and-detach).
 
 ---
 
 ## Path-based JSON access
 
-A unit is read and written by **path string** rather than by handing whole documents
-around. The path grammar is dot-separated keys with bracketed array indices:
+A unit is read and written by **path string** rather than by handing whole documents around. The path grammar is dot-separated keys with bracketed array indices:
 
 ```text
 player.name
@@ -151,14 +104,7 @@ game.scores[0]
 game.poker.table[5].card-color
 ```
 
-The navigator walks the document segment by segment to find the parent container and
-the final key. On a `Set`, intermediate objects and arrays are **auto-created** —
-naming `a.b.c` when `a` does not exist creates the objects along the way — and array
-indices **auto-extend**, padding with nulls (or empty objects, while navigating
-intermediate segments) up to the requested index. `Get` returns the value or an empty
-JSON value if the path is absent; `Has` reports presence; `Remove` deletes the leaf
-(erasing an array element or an object key). A bulk `Json` getter/setter reads or
-replaces the entire document as a serialized string.
+The navigator walks the document segment by segment to find the parent container and the final key. On a `Set`, intermediate objects and arrays are **auto-created** — naming `a.b.c` when `a` does not exist creates the objects along the way — and array indices **auto-extend**, padding with nulls (or empty objects, while navigating intermediate segments) up to the requested index. `Get` returns the value or an empty JSON value if the path is absent; `Has` reports presence; `Remove` deletes the leaf (erasing an array element or an object key). A bulk `Json` getter/setter reads or replaces the entire document as a serialized string.
 
 ---
 
@@ -174,19 +120,9 @@ Each unit maps to up to three files sharing a base pathname:
 
 ### Write-ahead changelog (crash recovery)
 
-The document file is rewritten in full only at save time, which is comparatively
-expensive and would be ruinous to do on every mutation. Instead, **every mutation
-appends one line to the `.log` sidecar** before the in-memory change is considered
-durable. Each line is a small JSON array — `["Set", "path", value]` or
-`["Remove", "path"]` — written in JSONL (one JSON value per line) and flushed by
-append.
+The document file is rewritten in full only at save time, which is comparatively expensive and would be ruinous to do on every mutation. Instead, **every mutation appends one line to the `.log` sidecar** before the in-memory change is considered durable. Each line is a small JSON array — `["Set", "path", value]` or `["Remove", "path"]` — written in JSONL (one JSON value per line) and flushed by append.
 
-Recovery is replay. When a unit loads, it parses the last good `.json`, then replays
-every line of the `.log` on top of it, reconstructing the exact state at the moment
-of the crash. On a clean save the full document is written (via the same
-`.temp`-then-atomic-rename pattern the rest of the engine uses) and the `.log` is
-deleted, collapsing the accumulated changes back into the base file. A crash before
-that save simply leaves a `.log` to replay next time.
+Recovery is replay. When a unit loads, it parses the last good `.json`, then replays every line of the `.log` on top of it, reconstructing the exact state at the moment of the crash. On a clean save the full document is written (via the same `.temp`-then-atomic-rename pattern the rest of the engine uses) and the `.log` is deleted, collapsing the accumulated changes back into the base file. A crash before that save simply leaves a `.log` to replay next time.
 
 ```mermaid
 sequenceDiagram
@@ -204,15 +140,11 @@ sequenceDiagram
 
 ### The `.meta` sidecar
 
-The sidecar records the owning container's identity (fingerprint, organization, the
-hashes, trust level), the scope, the document size, timestamps, and an access count.
-It is written on the last detach and read at construction so the inspector can list a
-unit's metadata without loading the full document.
+The sidecar records the owning container's identity (fingerprint, organization, the hashes, trust level), the scope, the document size, timestamps, and an access count. It is written on the last detach and read at construction so the inspector can list a unit's metadata without loading the full document.
 
 ### Disk layout
 
-Permanent and temporary scopes live under different roots; org and container units
-are distinguished by filename within an identity-keyed directory:
+Permanent and temporary scopes live under different roots; org and container units are distinguished by filename within an identity-keyed directory:
 
 ```text
 <PermanentPath>/Storage/<personaHash>/<fp[0:2]>/<fp[2:24]>/
@@ -224,34 +156,21 @@ are distinguished by filename within an identity-keyed directory:
     container-<id>.json                   this container, temporary
 ```
 
-Because org units share an identity-keyed path and filename, two containers from the
-same organization resolve to the same pathname — which is exactly the key `STORAGE`
-deduplicates on, giving them one shared `UNIT`.
+Because org units share an identity-keyed path and filename, two containers from the same organization resolve to the same pathname — which is exactly the key `STORAGE` deduplicates on, giving them one shared `UNIT`.
 
 ---
 
 ## Explicit attach and detach
 
-Engaging with a silo's data is a deliberate, reference-counted act. `SILO::Attach`
-attaches all four of its units (loading any that were not already in memory);
-`SILO::Detach` detaches them (saving and evicting any that drop to zero loaders). The
-silo guards this with a `m_bAttached` flag so attach/detach are idempotent at the silo
-level — a silo attaches its units exactly once regardless of repeated calls.
+Engaging with a silo's data is a deliberate, reference-counted act. `SILO::Attach` attaches all four of its units (loading any that were not already in memory); `SILO::Detach` detaches them (saving and evicting any that drop to zero loaders). The silo guards this with a `m_bAttached` flag so attach/detach are idempotent at the silo level — a silo attaches its units exactly once regardless of repeated calls.
 
-A typical lifetime: a host opens a silo for a container, attaches it, performs
-reads and writes by scope and path, detaches, and closes the silo. The silo's
-destructor detaches if the caller forgot, then closes its units — so a dropped silo
-still flushes its dirty data, but relying on that is poor form.
+A typical lifetime: a host opens a silo for a container, attaches it, performs reads and writes by scope and path, detaches, and closes the silo. The silo's destructor detaches if the caller forgot, then closes its units — so a dropped silo still flushes its dirty data, but relying on that is poor form.
 
 ---
 
 ## Runtime behavior and notifications
 
-`STORAGE` reports silo lifecycle and mutations to the host so developer tools can
-observe the store: a silo creation, a silo deletion, and a per-mutation change
-notification carrying the silo, the scope, and the path that changed. Bulk `Json`
-replacement reports a change with an empty path. These notifications are the storage
-counterpart of the network system's file-change notifications.
+`STORAGE` reports silo lifecycle and mutations to the host so developer tools can observe the store: a silo creation, a silo deletion, and a per-mutation change notification carrying the silo, the scope, and the path that changed. Bulk `Json` replacement reports a change with an empty path. These notifications are the storage counterpart of the network system's file-change notifications.
 
 ---
 
@@ -259,18 +178,11 @@ counterpart of the network system's file-change notifications.
 
 Each layer carries its own lock:
 
-- **`m_mxStorage`** (a recursive mutex on `STORAGE::Impl`) guards the silo list and
-  the unit cache, held across `Silo_Open`/`Silo_Close`/`Silo_Enum` and the
-  `Unit_Open`/`Unit_Close` they drive.
-- **`m_mutex`** (a recursive mutex per `UNIT`) guards a unit's document and all its
-  reads, writes, loads, saves, and evictions.
-- **`m_mxSilo`** (a plain mutex per `SILO`) guards the silo's attach/detach
-  transition and its `m_bAttached` flag.
+- **`m_mxStorage`** (a recursive mutex on `STORAGE::Impl`) guards the silo list and the unit cache, held across `Silo_Open`/`Silo_Close`/`Silo_Enum` and the `Unit_Open`/`Unit_Close` they drive.
+- **`m_mutex`** (a recursive mutex per `UNIT`) guards a unit's document and all its reads, writes, loads, saves, and evictions.
+- **`m_mxSilo`** (a plain mutex per `SILO`) guards the silo's attach/detach transition and its `m_bAttached` flag.
 
-The unit's own mutex makes individual document operations safe, but the silo's
-pass-through getters and setters do not themselves take a lock around the
-unit-cache — they assume the unit they hold remains valid for the duration, which it
-does as long as the silo is open.
+The unit's own mutex makes individual document operations safe, but the silo's pass-through getters and setters do not themselves take a lock around the unit-cache — they assume the unit they hold remains valid for the duration, which it does as long as the silo is open.
 
 ---
 
@@ -278,20 +190,10 @@ does as long as the silo is open.
 
 Drawn from the code as it stands.
 
-- **No automatic temporary wipe on session end.** The scope names distinguish
-  permanent from temporary by writing them under different roots
-  (`Path_Temporary` vs `Path_Permanent`); actually clearing the temporary tree is the
-  responsibility of whoever manages that path's lifetime, not of `STORAGE` itself.
-- **Reads before attach see an empty document.** Because loading is tied to attach,
-  calling `Get`/`Has` on a silo that was opened but never attached returns empty
-  results rather than the on-disk data. There is no lazy load on first access.
-- **Silo pass-through is not independently locked.** A silo routes calls straight to
-  its units without taking `m_mxStorage`; safety rests on the unit's own mutex and on
-  the silo outliving the calls — there is no guard against another thread closing the
-  silo mid-call.
-- **Changelog growth is unbounded between saves.** The `.log` only collapses into the
-  `.json` on a save (last detach or an explicit flush). A long-lived attached unit
-  with heavy churn accumulates an ever-growing changelog until it next detaches.
+- **No automatic temporary wipe on session end.** The scope names distinguish permanent from temporary by writing them under different roots (`Path_Temporary` vs `Path_Permanent`); actually clearing the temporary tree is the responsibility of whoever manages that path's lifetime, not of `STORAGE` itself.
+- **Reads before attach see an empty document.** Because loading is tied to attach, calling `Get`/`Has` on a silo that was opened but never attached returns empty results rather than the on-disk data. There is no lazy load on first access.
+- **Silo pass-through is not independently locked.** A silo routes calls straight to its units without taking `m_mxStorage`; safety rests on the unit's own mutex and on the silo outliving the calls — there is no guard against another thread closing the silo mid-call.
+- **Changelog growth is unbounded between saves.** The `.log` only collapses into the `.json` on a save (last detach or an explicit flush). A long-lived attached unit with heavy churn accumulates an ever-growing changelog until it next detaches.
 
 ---
 

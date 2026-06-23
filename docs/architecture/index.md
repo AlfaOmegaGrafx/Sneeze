@@ -7,8 +7,7 @@ verified: 92fdc1c
 
 # Architecture
 
-How Sneeze is put together: the major objects, who owns whom, how data flows from
-a network address to a rendered frame, and the rules the codebase holds itself to.
+How Sneeze is put together: the major objects, who owns whom, how data flows from a network address to a rendered frame, and the rules the codebase holds itself to.
 
 Read them in order:
 

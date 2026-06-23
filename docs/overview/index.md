@@ -7,9 +7,7 @@ verified: 92fdc1c
 
 # Overview
 
-The starting point for anyone new to Sneeze. These pages explain what the project
-is, the ideas it is built on, and the open standards it depends on — no code, no
-build steps, just the mental model.
+The starting point for anyone new to Sneeze. These pages explain what the project is, the ideas it is built on, and the open standards it depends on — no code, no build steps, just the mental model.
 
 Read them in order:
 

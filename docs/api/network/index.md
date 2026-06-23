@@ -12,13 +12,7 @@ nav:
 
 # Network API
 
-The network subsystem's public surface is declared in `include/Network.h`. It is the
-engine's resource loader and on-disk cache: callers open a [`FILE`](FILE.md) handle
-for a URL, optionally register an [`IFILE`](IFILE.md) listener, and read the bytes
-when they arrive. For the *architecture* — why there are two object types, how the
-two-counter asset lifecycle works, how a fetch is dispatched and how deletion is
-deferred — read the [Network system](../../systems/network.md) page. This section is
-the precise per-class reference.
+The network subsystem's public surface is declared in `include/Network.h`. It is the engine's resource loader and on-disk cache: callers open a [`FILE`](FILE.md) handle for a URL, optionally register an [`IFILE`](IFILE.md) listener, and read the bytes when they arrive. For the *architecture* — why there are two object types, how the two-counter asset lifecycle works, how a fetch is dispatched and how deletion is deferred — read the [Network system](../../systems/network.md) page. This section is the precise per-class reference.
 
 ```cpp
 #include <Network.h>   // brought in transitively via <Sneeze.h>
@@ -33,16 +27,9 @@ namespace SNEEZE { ... }
 | `FILE` | [FILE](FILE.md) | A per-caller handle to a cached resource; carries a snapshot of display fields and the dual-flag deletion machinery. |
 | `IFILE` | [IFILE](IFILE.md) | The completion-listener interface a caller implements (`OnFileReady` / `OnFileFailed`). Also covers `IENUM_FILE`. |
 
-`NETWORK` and `FILE` use the pimpl idiom — each is a thin handle over a private
-implementation. The shared per-URL state lives in a private `ASSET` class that is not
-part of the public surface (it is documented conceptually in the
-[Network system](../../systems/network.md#the-two-core-types-file-and-asset)).
+`NETWORK` and `FILE` use the pimpl idiom — each is a thin handle over a private implementation. The shared per-URL state lives in a private `ASSET` class that is not part of the public surface (it is documented conceptually in the [Network system](../../systems/network.md#the-two-core-types-file-and-asset)).
 
-> **Who calls this.** The network surface is mostly engine-internal — the
-> [scene](../scene/index.md) drives MSF, WASM, and texture fetches through it — but it
-> is also the seam a host's developer tools attach to, via `File_Enum` and the
-> `ICONTEXT` file notifications. An application embedding Sneeze rarely opens files
-> directly.
+> **Who calls this.** The network surface is mostly engine-internal — the > [scene](../scene/index.md) drives MSF, WASM, and texture fetches through it — but it > is also the seam a host's developer tools attach to, via `File_Enum` and the > `ICONTEXT` file notifications. An application embedding Sneeze rarely opens files > directly.
 
 ## Enums
 

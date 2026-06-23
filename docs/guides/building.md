@@ -12,34 +12,20 @@ nav:
 
 # Building Sneeze
 
-This page is the short version of how Sneeze builds, oriented around the *mental model* so
-the commands make sense. The exhaustive, copy-pasteable instructions — every prerequisite,
-every platform, every flag, and a full troubleshooting table — live in the repository's
-[`README.md`](../../README.md). Read this to understand the shape of the build; go there to
-actually run it.
+This page is the short version of how Sneeze builds, oriented around the *mental model* so the commands make sense. The exhaustive, copy-pasteable instructions — every prerequisite, every platform, every flag, and a full troubleshooting table — live in the repository's [`README.md`](../../README.md). Read this to understand the shape of the build; go there to actually run it.
 
-The one idea that explains everything: **Sneeze is built in two completely independent
-stages — dependencies, then the engine — and they never share a build tree.**
+The one idea that explains everything: **Sneeze is built in two completely independent stages — dependencies, then the engine — and they never share a build tree.**
 
 ---
 
 ## Two trees, one wall between them
 
-The repository has **two separate CMake projects** and, deliberately, no top-level project
-that spans them:
+The repository has **two separate CMake projects** and, deliberately, no top-level project that spans them:
 
-- **`deps/`** — builds every third-party library (the renderer device, the WASM runtime,
-  SPIR-V tooling, OpenXR, the UI toolkit, the crypto stack, and more) from source into a
-  per-configuration dependency tree. This is the slow stage: roughly one to two hours on a
-  fresh machine, but it is a *one-time* cost — the results are stamp-cached and reused.
-- **`src/`** — builds Sneeze itself: a single static library (`Sneeze.lib` /
-  `libSneeze.a`) plus the test executables. This is the fast stage: seconds per edit. It
-  consumes the installed dependency headers and libraries by path; it never reaches into
-  `deps/`.
+- **`deps/`** — builds every third-party library (the renderer device, the WASM runtime, SPIR-V tooling, OpenXR, the UI toolkit, the crypto stack, and more) from source into a per-configuration dependency tree. This is the slow stage: roughly one to two hours on a fresh machine, but it is a *one-time* cost — the results are stamp-cached and reused.
+- **`src/`** — builds Sneeze itself: a single static library (`Sneeze.lib` / `libSneeze.a`) plus the test executables. This is the fast stage: seconds per edit. It consumes the installed dependency headers and libraries by path; it never reaches into `deps/`.
 
-The build scripts in `scripts/` are the *only* glue between the two. Neither CMake project
-references the other. This separation is why your day-to-day rebuild is fast: it only ever
-touches the `src/` tree.
+The build scripts in `scripts/` are the *only* glue between the two. Neither CMake project references the other. This separation is why your day-to-day rebuild is fast: it only ever touches the `src/` tree.
 
 ```mermaid
 flowchart LR
@@ -58,8 +44,7 @@ flowchart LR
 
 ## One script per platform
 
-A single script per platform drives both stages. By default it runs **only the fast
-stage** — compile and link Sneeze — which is what you want almost every time.
+A single script per platform drives both stages. By default it runs **only the fast stage** — compile and link Sneeze — which is what you want almost every time.
 
 | You want to… | Windows (PowerShell) | Linux / macOS |
 |---|---|---|
@@ -70,15 +55,9 @@ stage** — compile and link Sneeze — which is what you want almost every time
 | Reconfigure Sneeze (after editing CMake) | `.\scripts\build-windows.ps1 -Fresh` | `./scripts/build-linux.sh --fresh` |
 | Rebuild one dependency from scratch | `.\scripts\build-windows.ps1 -Only <dep> -Rebuild` | `./scripts/build-linux.sh --only <dep> --rebuild` |
 
-`-Config` / `--config` selects Debug or Release (default Release). Debug and Release live
-in fully separate dependency trees, so you can keep both populated side by side. `-Rebuild`
-is a *modifier* that forces a from-scratch rebuild of whatever the other flags select; on
-its own it never touches `deps/`.
+`-Config` / `--config` selects Debug or Release (default Release). Debug and Release live in fully separate dependency trees, so you can keep both populated side by side. `-Rebuild` is a *modifier* that forces a from-scratch rebuild of whatever the other flags select; on its own it never touches `deps/`.
 
-> **First-time order on any platform: Release before Debug.** The Debug renderer build
-> reuses a Release build-time tool; building Debug first will halt with an explanatory
-> message. Running `-All` once (it defaults to Release) and then `-All -Config Debug` is the
-> sequence that "just works."
+> **First-time order on any platform: Release before Debug.** The Debug renderer build > reuses a Release build-time tool; building Debug first will halt with an explanatory > message. Running `-All` once (it defaults to Release) and then `-All -Config Debug` is the > sequence that "just works."
 
 ---
 
@@ -86,37 +65,22 @@ its own it never touches `deps/`.
 
 After a successful build:
 
-- `builds/<platform>/install/<config>/lib/` — the static library (`Sneeze.lib` /
-  `libSneeze.a`) you link against.
+- `builds/<platform>/install/<config>/lib/` — the static library (`Sneeze.lib` / `libSneeze.a`) you link against.
 - `builds/<platform>/install/<config>/bin/` — the test executables and command-line tools.
 
-`<platform>` is a slug like `windows-x64`, `linux-x64`, or `macos-arm64`; `<config>` is
-`debug` or `release`. On Windows the `src/` stage is a single multi-config Visual Studio
-solution — open `builds/windows-x64/build/Sneeze.sln` once and the Debug/Release dropdown
-flips configurations without reconfiguring. For daily editing, the IDE (or your editor with
-Ninja Multi-Config on Linux/macOS) is faster than re-invoking the script; the scripts exist
-for fresh checkouts, CMake changes, cross-platform builds, and CI.
+`<platform>` is a slug like `windows-x64`, `linux-x64`, or `macos-arm64`; `<config>` is `debug` or `release`. On Windows the `src/` stage is a single multi-config Visual Studio solution — open `builds/windows-x64/build/Sneeze.sln` once and the Debug/Release dropdown flips configurations without reconfiguring. For daily editing, the IDE (or your editor with Ninja Multi-Config on Linux/macOS) is faster than re-invoking the script; the scripts exist for fresh checkouts, CMake changes, cross-platform builds, and CI.
 
 ---
 
 ## Consuming Sneeze from an application
 
-A host application links Sneeze as a static library. The expected integration is via CMake
-`add_subdirectory` on the `src/` project: when the application links the `Sneeze` target,
-all of Sneeze's dependencies are pulled in transitively (they are declared `PUBLIC`), so the
-application does not configure them itself. The application supplies its own windowing/input
-library (Sneeze owns none) and includes the engine's public headers from `include/`. See
-[Embedding Sneeze](embedding-sneeze.md) for the code side of that integration.
+A host application links Sneeze as a static library. The expected integration is via CMake `add_subdirectory` on the `src/` project: when the application links the `Sneeze` target, all of Sneeze's dependencies are pulled in transitively (they are declared `PUBLIC`), so the application does not configure them itself. The application supplies its own windowing/input library (Sneeze owns none) and includes the engine's public headers from `include/`. See [Embedding Sneeze](embedding-sneeze.md) for the code side of that integration.
 
 ---
 
 ## When something breaks
 
-The README carries the full troubleshooting table — missing tools, PATH issues, the
-Windows MSVC-environment requirement, the Release-before-Debug rule, and the
-configuration-mismatch link error. Start there. The most common first-time snags are a
-missing build prerequisite (the README lists each and how to install it) and running the
-Windows script outside a "Developer PowerShell for VS 2022" window.
+The README carries the full troubleshooting table — missing tools, PATH issues, the Windows MSVC-environment requirement, the Release-before-Debug rule, and the configuration-mismatch link error. Start there. The most common first-time snags are a missing build prerequisite (the README lists each and how to install it) and running the Windows script outside a "Developer PowerShell for VS 2022" window.
 
 ---
 

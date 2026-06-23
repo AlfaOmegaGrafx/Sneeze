@@ -17,14 +17,7 @@ nav:
 
 # `ICONTEXT`
 
-The per-session **inspector interface**. A host application implements `ICONTEXT` and
-passes it to [`ENGINE::Context_Open`](ENGINE.md#context-management); the engine then calls
-its `On…` methods as things happen *inside that session* — containers opening and closing,
-network files appearing and changing, storage silos mutating, console entries being added
-and evicted. It exists so a host can observe and surface a context's internal activity (a
-developer inspector, a network panel, a console view) without reaching into the engine's
-internals. For the bigger picture of what a context is, see the
-[Engine system](../../systems/engine.md) and [Context system](../../systems/context.md).
+The per-session **inspector interface**. A host application implements `ICONTEXT` and passes it to [`ENGINE::Context_Open`](ENGINE.md#context-management); the engine then calls its `On…` methods as things happen *inside that session* — containers opening and closing, network files appearing and changing, storage silos mutating, console entries being added and evicted. It exists so a host can observe and surface a context's internal activity (a developer inspector, a network panel, a console view) without reaching into the engine's internals. For the bigger picture of what a context is, see the [Engine system](../../systems/engine.md) and [Context system](../../systems/context.md).
 
 ```cpp
 class ICONTEXT
@@ -53,35 +46,18 @@ public:
 ## Role and ownership
 
 - **Implemented by** the host application; passed to `ENGINE::Context_Open`.
-- **Held by** the `CONTEXT` for its lifetime; reached by per-session subsystems as
-  `m_pContext->Host()`. The host owns the object and **must keep it alive at least as long
-  as the context** it was given to.
-- **Direction is engine → host.** Every method is a callback the engine invokes; the host
-  never calls them.
-- **Every method is optional.** All have default implementations (no-ops, or
-  `OnNetworkFileCreated` returning `true`), so a host overrides only the events it cares
-  about. The interface is purely observational, with one exception:
-  `OnNetworkFileCreated` can *veto* a file (see below).
+- **Held by** the `CONTEXT` for its lifetime; reached by per-session subsystems as `m_pContext->Host()`. The host owns the object and **must keep it alive at least as long as the context** it was given to.
+- **Direction is engine → host.** Every method is a callback the engine invokes; the host never calls them.
+- **Every method is optional.** All have default implementations (no-ops, or `OnNetworkFileCreated` returning `true`), so a host overrides only the events it cares about. The interface is purely observational, with one exception: `OnNetworkFileCreated` can *veto* a file (see below).
 
 ---
 
 ## Threading and pitfalls
 
-- **Callbacks arrive on the thread doing the work — often not the host's thread.** Network
-  callbacks fire from fetch agents and the network layer; console, storage, and container
-  callbacks fire from whichever thread performed the operation. A host implementation
-  **must be thread-safe** and should not block, since several of these sit on hot paths.
-- **Do not call back into the engine re-entrantly from a callback.** These fire while the
-  originating subsystem holds its own locks (the storage mutex during a silo change, the
-  console state during an entry add). Re-entering the same subsystem from inside the
-  callback risks deadlock; copy out what you need and defer.
-- **Pointer and shared-pointer lifetimes differ.** The `CONTAINER*`, `FILE*`, and `SILO*`
-  arguments are borrowed — valid only for the duration of the call (and the matching
-  `…Deleted` callback marks the end of validity). The console entries are
-  `std::shared_ptr<const ENTRY>`, so a host may retain a reference and read the entry
-  safely after the call returns.
-- **`OnNetworkFileCreated` is the only callback whose return value matters** — returning
-  `false` rejects the file (see its entry).
+- **Callbacks arrive on the thread doing the work — often not the host's thread.** Network callbacks fire from fetch agents and the network layer; console, storage, and container callbacks fire from whichever thread performed the operation. A host implementation **must be thread-safe** and should not block, since several of these sit on hot paths.
+- **Do not call back into the engine re-entrantly from a callback.** These fire while the originating subsystem holds its own locks (the storage mutex during a silo change, the console state during an entry add). Re-entering the same subsystem from inside the callback risks deadlock; copy out what you need and defer.
+- **Pointer and shared-pointer lifetimes differ.** The `CONTAINER*`, `FILE*`, and `SILO*` arguments are borrowed — valid only for the duration of the call (and the matching `…Deleted` callback marks the end of validity). The console entries are `std::shared_ptr<const ENTRY>`, so a host may retain a reference and read the entry safely after the call returns.
+- **`OnNetworkFileCreated` is the only callback whose return value matters** — returning `false` rejects the file (see its entry).
 
 ---
 
@@ -89,17 +65,13 @@ public:
 
 ### `virtual void OnContainerCreated (CONTAINER*) {}`
 - **Implemented by.** The host (optional).
-- **Called by.** A `CONTAINER`, when its resources first open (its reference count rises
-  from zero and its WASM store and linker are initialized).
-- **Parameters.** The container that opened. It exposes its console stream and storage silo
-  for inspection.
-- **Contract.** Observational. The container pointer is valid until the matching
-  `OnContainerDeleted`.
+- **Called by.** A `CONTAINER`, when its resources first open (its reference count rises from zero and its WASM store and linker are initialized).
+- **Parameters.** The container that opened. It exposes its console stream and storage silo for inspection.
+- **Contract.** Observational. The container pointer is valid until the matching `OnContainerDeleted`.
 
 ### `virtual void OnContainerDeleted (CONTAINER*) {}`
 - **Implemented by.** The host (optional).
-- **Called by.** A `CONTAINER`, when its last reference is released (its open count drops to
-  zero) and just before its resources are torn down.
+- **Called by.** A `CONTAINER`, when its last reference is released (its open count drops to zero) and just before its resources are torn down.
 - **Parameters.** The container being deleted.
 - **Contract.** Observational. Do not retain the pointer past this call.
 
@@ -109,19 +81,14 @@ public:
 
 ### `virtual bool OnNetworkFileCreated (FILE*) { return true; }`
 - **Implemented by.** The host (optional).
-- **Called by.** The network layer when a [`FILE`](../network/index.md) is created for a
-  request.
+- **Called by.** The network layer when a [`FILE`](../network/index.md) is created for a request.
 - **Parameters.** The newly created file.
-- **Contract.** **Return `true` to accept the file, `false` to reject it** — the network
-  layer interprets a `false` return as a signal to clear the file. The default accepts.
-  This is the one inspector callback that can influence engine behavior rather than merely
-  observe it.
+- **Contract.** **Return `true` to accept the file, `false` to reject it** — the network layer interprets a `false` return as a signal to clear the file. The default accepts. This is the one inspector callback that can influence engine behavior rather than merely observe it.
 - **Returns.** Whether the file may proceed.
 
 ### `virtual void OnNetworkFileChanged (FILE*) {}`
 - **Implemented by.** The host (optional).
-- **Called by.** The network layer when a file's state changes (for example its fetch
-  progresses or completes).
+- **Called by.** The network layer when a file's state changes (for example its fetch progresses or completes).
 - **Parameters.** The file whose state changed.
 - **Contract.** Observational; fired from the network/fetch path.
 
@@ -139,17 +106,13 @@ public:
 - **Implemented by.** The host (optional).
 - **Called by.** `STORAGE`, when a [`SILO`](../storage/index.md) is created and initialized.
 - **Parameters.** The new silo.
-- **Contract.** Observational. The silo carries the identity (display name / CID) of the
-  source it belongs to.
+- **Contract.** Observational. The silo carries the identity (display name / CID) of the source it belongs to.
 
 ### `virtual void OnStorageSiloChanged (SILO*, eSILO_SCOPE eScope, const std::string&) {}`
 - **Implemented by.** The host (optional).
 - **Called by.** A `SILO`, on every mutation — `Set`, `Remove`, and bulk JSON replacement.
-- **Parameters.** The silo that changed; `eScope` — which storage scope was affected (for
-  example a permanent company-wide scope); the key path that changed (empty for a bulk
-  replacement).
-- **Contract.** Observational; fired while the storage layer holds its lock — do not
-  re-enter storage from here.
+- **Parameters.** The silo that changed; `eScope` — which storage scope was affected (for example a permanent company-wide scope); the key path that changed (empty for a bulk replacement).
+- **Contract.** Observational; fired while the storage layer holds its lock — do not re-enter storage from here.
 
 ### `virtual void OnStorageSiloDeleted (SILO*) {}`
 - **Implemented by.** The host (optional).
@@ -165,17 +128,13 @@ public:
 - **Implemented by.** The host (optional).
 - **Called by.** `CONSOLE`, when a new [`ENTRY`](../console/index.md) is appended.
 - **Parameters.** A shared pointer to the immutable entry.
-- **Contract.** Observational. Because the argument is a `shared_ptr<const ENTRY>`, the host
-  **may retain it** and read the entry after the call.
+- **Contract.** Observational. Because the argument is a `shared_ptr<const ENTRY>`, the host **may retain it** and read the entry after the call.
 
 ### `virtual void OnConsoleEntryDeleted (std::shared_ptr<const ENTRY>) {}`
 - **Implemented by.** The host (optional).
-- **Called by.** `CONSOLE`, when an entry leaves the buffer — both on eviction as the ring
-  buffer overflows its cache limit and on an explicit `Clear` (fired once per evicted
-  entry).
+- **Called by.** `CONSOLE`, when an entry leaves the buffer — both on eviction as the ring buffer overflows its cache limit and on an explicit `Clear` (fired once per evicted entry).
 - **Parameters.** A shared pointer to the entry being removed.
-- **Contract.** Observational. The host's retained reference (if any) remains valid as long
-  as the host holds the shared pointer; the engine is simply dropping its own reference.
+- **Contract.** Observational. The host's retained reference (if any) remains valid as long as the host holds the shared pointer; the engine is simply dropping its own reference.
 
 ---
 

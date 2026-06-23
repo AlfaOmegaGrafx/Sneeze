@@ -13,13 +13,7 @@ nav:
 
 # `CONTAINER::CID`
 
-The identity record of a [`CONTAINER`](CONTAINER.md) — the small, copyable value that
-names a signed content source and decides how two sources compare. A `CID` is built by
-the [`CONTEXT`](../context/index.md) from a verified [`MSF`](../msf/index.md): its fields
-come from the source's signing certificate and manifest plus the current
-[persona](../persona/index.md). The container's pool key and display name are both derived
-from it. For the conceptual picture see the [Container system](../../systems/container.md)
-page; this page is the exact behavior of every public member.
+The identity record of a [`CONTAINER`](CONTAINER.md) — the small, copyable value that names a signed content source and decides how two sources compare. A `CID` is built by the [`CONTEXT`](../context/index.md) from a verified [`MSF`](../msf/index.md): its fields come from the source's signing certificate and manifest plus the current [persona](../persona/index.md). The container's pool key and display name are both derived from it. For the conceptual picture see the [Container system](../../systems/container.md) page; this page is the exact behavior of every public member.
 
 ```cpp
 class CONTAINER::CID
@@ -43,12 +37,9 @@ public:
 
 ## Role and ownership
 
-- **Built by** `CONTEXT::Container_Open`, which populates the fields from an MSF (or
-  synthesizes a "Root" identity for the source-less root fabric) and assigns `eTrust`.
-- **Copied into** the `CONTAINER` it identifies — the container keeps its own copy,
-  returned by [`CONTAINER::Identity()`](CONTAINER.md).
-- **Plain value type.** All fields are public; there is no pimpl and no internal locking.
-  Treat it as an immutable record once built.
+- **Built by** `CONTEXT::Container_Open`, which populates the fields from an MSF (or synthesizes a "Root" identity for the source-less root fabric) and assigns `eTrust`.
+- **Copied into** the `CONTAINER` it identifies — the container keeps its own copy, returned by [`CONTAINER::Identity()`](CONTAINER.md).
+- **Plain value type.** All fields are public; there is no pimpl and no internal locking. Treat it as an immutable record once built.
 
 ---
 
@@ -72,10 +63,8 @@ CID ();
 ```
 
 ### `CID()`
-- **Purpose.** Construct an empty identity with `eTrust` defaulted to `kTRUST_NONE`. All
-  string fields are empty.
-- **Notes.** The context fills the fields in immediately after constructing one; you
-  rarely build a `CID` yourself.
+- **Purpose.** Construct an empty identity with `eTrust` defaulted to `kTRUST_NONE`. All string fields are empty.
+- **Notes.** The context fills the fields in immediately after constructing one; you rarely build a `CID` yourself.
 
 ---
 
@@ -87,26 +76,14 @@ std::string Key         () const;
 ```
 
 ### `std::string DisplayName () const`
-- **Purpose.** The name a host shows the user for this source. Returns
-  `organization/container` when the source is trusted enough (`eTrust >= kTRUST_EXPIRED`),
-  and `organizationHash/container` otherwise — so an untrusted source cannot present a
-  recognizable organization name.
+- **Purpose.** The name a host shows the user for this source. Returns `organization/container` when the source is trusted enough (`eTrust >= kTRUST_EXPIRED`), and `organizationHash/container` otherwise — so an untrusted source cannot present a recognizable organization name.
 - **Returns.** The display string.
-- **Notes.** Because trust is currently forced to `kTRUST_EXPIRED` for MSF-derived
-  containers (see [Container → Trust levels](../../systems/container.md#trust-levels)),
-  `DisplayName` reflects that forced value, not the real verification result, until the
-  override is removed.
+- **Notes.** Because trust is currently forced to `kTRUST_EXPIRED` for MSF-derived containers (see [Container → Trust levels](../../systems/container.md#trust-levels)), `DisplayName` reflects that forced value, not the real verification result, until the override is removed.
 
 ### `std::string Key () const`
-- **Purpose.** The pooling key — the string the context's container map is keyed by.
-  Identical key means identical identity means one shared container.
-- **Returns.** A string of the form `persona/fp2/fp22/container`, composed from the first
-  12 characters of `sPersonaHash`, the first 2 characters of `sFingerprint`, the next 22
-  characters of `sFingerprint`, and `sContainer`. Pieces shorter than expected are taken
-  as far as available.
-- **Notes.** Built once and cached by the `CONTAINER` (returned by
-  [`CONTAINER::Key()`](CONTAINER.md)). Note that `eTrust` is **not** part of the key — the
-  same source at different trust levels still pools to one container.
+- **Purpose.** The pooling key — the string the context's container map is keyed by. Identical key means identical identity means one shared container.
+- **Returns.** A string of the form `persona/fp2/fp22/container`, composed from the first 12 characters of `sPersonaHash`, the first 2 characters of `sFingerprint`, the next 22 characters of `sFingerprint`, and `sContainer`. Pieces shorter than expected are taken as far as available.
+- **Notes.** Built once and cached by the `CONTAINER` (returned by [`CONTAINER::Key()`](CONTAINER.md)). Note that `eTrust` is **not** part of the key — the same source at different trust levels still pools to one container.
 
 ---
 

@@ -12,13 +12,7 @@ nav:
 
 # Container API
 
-The container subsystem's public surface is declared in `include/Container.h`. It
-consists of the `CONTAINER` class, its nested identity record `CONTAINER::CID`, and the
-`eTRUST` trust-level enum. A container is the engine's runtime manifestation of one
-signed content source — its identity, sandbox, and per-source resources. For the
-*architecture* — why containers exist, what a `CID` is, what `Open`/`Close` manage —
-read the [Container system](../../systems/container.md) page. This section is the precise
-per-class reference.
+The container subsystem's public surface is declared in `include/Container.h`. It consists of the `CONTAINER` class, its nested identity record `CONTAINER::CID`, and the `eTRUST` trust-level enum. A container is the engine's runtime manifestation of one signed content source — its identity, sandbox, and per-source resources. For the *architecture* — why containers exist, what a `CID` is, what `Open`/`Close` manage — read the [Container system](../../systems/container.md) page. This section is the precise per-class reference.
 
 ```cpp
 #include <Container.h>   // brought in transitively via <Sneeze.h>
@@ -32,14 +26,9 @@ namespace SNEEZE { ... }
 | `CONTAINER` | [CONTAINER](CONTAINER.md) | One signed source's runtime identity and sandbox; owns its console stream, storage silo, and WASM store; reference-counted and pooled by the context. |
 | `CONTAINER::CID` | [CID](CID.md) | The identity record — fingerprint, organization, container name, persona hash, and trust level — that names and pools a container. |
 
-`CONTAINER` uses the pimpl idiom — it is a thin handle over a private implementation.
-`CID` is a plain value record with public fields and two derived strings.
+`CONTAINER` uses the pimpl idiom — it is a thin handle over a private implementation. `CID` is a plain value record with public fields and two derived strings.
 
-> **Who calls this.** Containers are engine-internal. The [context](../context/index.md)
-> creates and pools them (`CONTEXT::Container_Open`), and [fabrics](../scene/FABRIC.md)
-> open WASM instances in them (`Instance_Open` / `Instance_Close`). A host application
-> typically only *observes* containers, through the `ICONTEXT::OnContainerCreated` /
-> `OnContainerDeleted` callbacks, and reads a container's `Identity()` to display it.
+> **Who calls this.** Containers are engine-internal. The [context](../context/index.md) > creates and pools them (`CONTEXT::Container_Open`), and [fabrics](../scene/FABRIC.md) > open WASM instances in them (`Instance_Open` / `Instance_Close`). A host application > typically only *observes* containers, through the `ICONTEXT::OnContainerCreated` / > `OnContainerDeleted` callbacks, and reads a container's `Identity()` to display it.
 
 ## The `eTRUST` enum
 
@@ -54,8 +43,7 @@ A source's trust level, from least to most trusted:
 | `kTRUST_VERIFIED` | Signature valid, chain trusted and current. |
 | `kTRUST_ROOT` | The engine's own root container (the source-less root fabric). |
 
-The values are ordered; comparisons like `eTrust >= kTRUST_EXPIRED` are meaningful (and
-used by [`CID::DisplayName`](CID.md)).
+The values are ordered; comparisons like `eTrust >= kTRUST_EXPIRED` are meaningful (and used by [`CID::DisplayName`](CID.md)).
 
 ---
 
