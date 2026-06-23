@@ -7,26 +7,32 @@ Each platform builds all 11 deps in parallel tiers, then Sneeze itself.
 
 - **`build.yml`** — orchestrator, one job per platform, calls the reusable workflow
 - **`build-platform.yml`** — reusable workflow called per platform; runs the tiered dep build
-- **`docs.yml`** — documentation drift check and Wiki.js publish for `docs/`
+- **`docs.yml`** — documentation drift check and wiki transform dry-run for `docs/`
+- **`deploy-wiki.yml`** — live Wiki.js publish on push to `main` when `docs/` changes (+ manual dispatch)
 
-## Documentation (`docs.yml`)
+## Documentation
 
-Publishes the curated wiki under `docs/` to **omb.wiki** (Wiki.js, `/sneeze/...` paths).
-`docs/Home.md` replaces the existing `/sneeze` landing page. Source files stay in this
-repo; the wiki is a mirror.
+Source of truth: `docs/**/*.md`. Publish target: **omb.wiki** `/sneeze/...` via `scripts/publish-wiki.py`.
+`docs/Home.md` replaces the `/sneeze` landing page.
+
+### `docs.yml` (check only)
 
 | Job | When | What |
 |-----|------|------|
 | `docdrift` | PR + push + dispatch | `tools/DocDrift/docdrift.py` (warn-only) |
 | `wiki-transform` | PR + push + dispatch | `scripts/publish-wiki.py --dry-run --all` |
-| `wiki-publish` | push to `main` + `workflow_dispatch` | Live Wiki.js upsert (no-op until secrets exist) |
 
-**Secrets** (Settings → Actions): `WIKIJS_GRAPHQL_URL` (default `https://omb.wiki/graphql`),
-`WIKIJS_API_TOKEN` (bearer token from Wiki.js Administration → API Access, scopes:
-`write:pages` + `read:pages` — **read alone is not enough**; `pages.list` succeeding does not
-imply publish will work). Optional: `CF_ACCESS_CLIENT_ID` and
-`CF_ACCESS_CLIENT_SECRET` if omb.wiki sits behind Cloudflare Access. Until configured,
-`wiki-publish` exits successfully with a notice and changes nothing on omb.wiki.
+### `deploy-wiki.yml` (live publish)
+
+| When | What |
+|------|------|
+| Push to `main` with changes under `docs/**` (or publish script) | `scripts/publish-wiki.py --all` |
+| Manual dispatch | Optional `target` URL and `dry_run` |
+
+**Secrets** (Settings → Actions): `WIKIJS_API_TOKEN` (scopes: `write:pages` + `read:pages`).
+Optional: `WIKIJS_GRAPHQL_URL` (defaults to `https://omb.wiki/graphql`), `CF_ACCESS_CLIENT_ID`,
+`CF_ACCESS_CLIENT_SECRET` if omb.wiki sits behind Cloudflare Access. Until `WIKIJS_API_TOKEN` is
+set, publish exits successfully with a notice and changes nothing on omb.wiki.
 
 **Cloudflare 403 / error 1010:** If publish fails with `HTTP 403: error code: 1010`, Cloudflare
 is blocking GitHub Actions before Wiki.js sees the request. The wiki admin must add a WAF rule

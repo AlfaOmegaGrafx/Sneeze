@@ -1,10 +1,5 @@
-# Docs — drift detection and Wiki.js publish for docs/.
-#
-# Source of truth: docs/**/*.md in this repo.
-# Publish target: omb.wiki /sneeze/... via scripts/publish-wiki.py (Wiki.js GraphQL).
-# Home.md replaces the existing /sneeze landing page.
-#
-# Until WIKIJS_* secrets are configured, publish is a no-op (exit 0 with notice).
+# Docs — drift detection and wiki transform dry-run for docs/.
+# Live publish: .github/workflows/deploy-wiki.yml (push to main + manual dispatch).
 #
 name: Docs
 
@@ -45,18 +40,3 @@ jobs:
 
       - name: Dry-run wiki transform
         run: python scripts/publish-wiki.py --dry-run --all
-
-  wiki-publish:
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
-    needs: [docdrift, wiki-transform]
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Publish to Wiki.js
-        env:
-          WIKIJS_GRAPHQL_URL: ${{ secrets.WIKIJS_GRAPHQL_URL }}
-          WIKIJS_API_TOKEN: ${{ secrets.WIKIJS_API_TOKEN }}
-          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
-          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
-        run: python scripts/publish-wiki.py --all
