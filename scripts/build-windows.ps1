@@ -225,7 +225,9 @@ function Get-DepPin ([string] $Dep) {
 
    $text = Get-Content -Raw -LiteralPath $cmakeFile
 
-   $mTag = [regex]::Match($text, 'GIT_TAG\s+(\S+)')
+   # Match the GIT_TAG directive only, never the word "GIT_TAG" inside a comment:
+   # require that nothing from the start of the line up to GIT_TAG is a '#'.
+   $mTag = [regex]::Match($text, '(?m)^[^#\r\n]*\bGIT_TAG\s+(\S+)')
    if (-not $mTag.Success) { return $null }
 
    $mRepo  = [regex]::Match($text, 'SNEEZE_DEP_REPO\}/([^"]+)"')
