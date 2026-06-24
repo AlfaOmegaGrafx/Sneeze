@@ -548,7 +548,7 @@ set (SOM_SOURCES
    context/scene/Node.cpp
    context/scene/Fabric.cpp
    context/scene/Scene.cpp
-   context/scene/MapObject.cpp
+   context/scene/Map_Object.cpp
    context/scene/AccessControl.cpp)
 set (SOM_HEADERS
    context/scene/AccessControl.h)
@@ -646,8 +646,8 @@ else ()
    set (XR_SOURCES deps/xr/XrRuntime_Stub.cpp)
 endif ()
 
-set (UI_SOURCES      deps/ui/UiContext.cpp)
-set (UI_HEADERS      deps/ui/UiContext.h)
+set (UI_SOURCES      deps/ui/Ui_Context.cpp deps/ui/Ui_Render.cpp deps/ui/Ui_Panel.cpp)
+set (UI_HEADERS      deps/ui/Ui_Context.h deps/ui/Ui_Render.h deps/ui/Ui_Panel.h)
 
 set (COMPUTE_SOURCES deps/compute/EmbeddedKernels.cpp deps/compute/ComputeDispatch.cpp)
 set (COMPUTE_HEADERS deps/compute/EmbeddedKernels.h deps/compute/ComputeDispatch.h)
@@ -667,7 +667,7 @@ set (INCLUDE_HEADERS
    ../include/Network.h
    ../include/Container.h
    ../include/Scene.h
-   ../include/MapObject.h
+   ../include/Map_Object.h
    ../include/Viewport.h
    ../include/Storage.h
    ../include/Console.h

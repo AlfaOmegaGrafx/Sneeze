@@ -1,0 +1,100 @@
+// Copyright 2026 Metaversal Corporation
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#ifndef SNEEZE_UI_RENDER_H
+#define SNEEZE_UI_RENDER_H
+
+#include <RmlUi/Core/RenderInterface.h>
+
+#include <cstdint>
+#include <unordered_map>
+#include <vector>
+
+namespace SNEEZE
+{
+   namespace DEP
+   {
+      // Software RmlUi render interface. Rasterizes RmlUi's 2D geometry into a
+      // CPU RGBA8 canvas (premultiplied alpha, row-major, top-down origin) that
+      // is then handed to ANARI as an image2D sampler for an unlit quad. Keeps
+      // the UI path fully portable and free of any GPU coupling; only the
+      // required RmlUi entry points are implemented (the optional layer / filter
+      // / shader hooks keep their base no-op defaults, so soft-glow effects are
+      // deferred to a future GPU path).
+      class UI_RENDER : public Rml::RenderInterface
+      {
+      public:
+         UI_RENDER ();
+         ~UI_RENDER () override;
+
+         void Resize (int nWidth, int nHeight);
+         void Clear ();
+
+         int            Width  () const { return m_nWidth; }
+         int            Height () const { return m_nHeight; }
+         const uint8_t* Pixels () const { return m_aPixel.data (); }
+
+         // Diagnostics (reset on Clear): how many geometry batches the last
+         // pass drew, and how many of those carried a texture (text/atlas).
+         int DrawCount    () const { return m_nDrawCount; }
+         int DrawTextured () const { return m_nDrawTextured; }
+
+         Rml::CompiledGeometryHandle CompileGeometry (Rml::Span<const Rml::Vertex> aVertex, Rml::Span<const int> aIndex) override;
+         void                        RenderGeometry (Rml::CompiledGeometryHandle hGeometry, Rml::Vector2f vTranslation, Rml::TextureHandle hTexture) override;
+         void                        ReleaseGeometry (Rml::CompiledGeometryHandle hGeometry) override;
+
+         Rml::TextureHandle LoadTexture (Rml::Vector2i& vDimensions, const Rml::String& sSource) override;
+         Rml::TextureHandle GenerateTexture (Rml::Span<const Rml::byte> aSource, Rml::Vector2i vDimensions) override;
+         void               ReleaseTexture (Rml::TextureHandle hTexture) override;
+
+         void EnableScissorRegion (bool bEnable) override;
+         void SetScissorRegion (Rml::Rectanglei rRegion) override;
+
+      private:
+         struct GEOMETRY
+         {
+            std::vector<Rml::Vertex> aVertex;
+            std::vector<int>         aIndex;
+         };
+
+         struct TEXTURE
+         {
+            int                  nWidth  = 0;
+            int                  nHeight = 0;
+            std::vector<uint8_t> aPixel;
+         };
+
+         void RasterTriangle (const Rml::Vertex& v0, const Rml::Vertex& v1, const Rml::Vertex& v2, const TEXTURE* pTexture);
+
+         int                  m_nWidth;
+         int                  m_nHeight;
+         std::vector<uint8_t> m_aPixel;
+
+         std::unordered_map<Rml::CompiledGeometryHandle, GEOMETRY> m_umpGeometry;
+         std::unordered_map<Rml::TextureHandle, TEXTURE>          m_umpTexture;
+         Rml::CompiledGeometryHandle                              m_hGeometryNext;
+         Rml::TextureHandle                                       m_hTextureNext;
+
+         bool m_bScissor;
+         int  m_nScissorX;
+         int  m_nScissorY;
+         int  m_nScissorW;
+         int  m_nScissorH;
+
+         int  m_nDrawCount;
+         int  m_nDrawTextured;
+      };
+   } // namespace DEP
+}
+#endif // SNEEZE_UI_RENDER_H

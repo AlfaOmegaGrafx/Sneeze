@@ -12,23 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "ui/UiContext.h"
+#include "ui/Ui_Context.h"
+#include "ui/Ui_Render.h"
 
 #include <RmlUi/Core.h>
-#include <RmlUi/Core/RenderInterface.h>
 #include <RmlUi/Core/SystemInterface.h>
 
 #include <chrono>
+#include <string>
 
 using namespace SNEEZE::DEP;
 
 namespace
 {
-   // Minimal system interface - provides elapsed time and logging.
-   class STUB_SYSTEM : public Rml::SystemInterface
+   // System interface: elapsed time + log routing into the engine.
+   class UI_SYSTEM : public Rml::SystemInterface
    {
    public:
-      STUB_SYSTEM ()
+      UI_SYSTEM ()
          : m_pEngine (nullptr)
       {
          tpStart = std::chrono::steady_clock::now ();
@@ -61,75 +62,81 @@ namespace
       std::chrono::steady_clock::time_point tpStart;
    };
 
-   // Minimal render interface - stubs every pure virtual so the library
-   // links and initializes. No pixels are drawn; real rendering comes
-   // when RmlUi is wired to ANARI through the SOM.
-   class STUB_RENDER : public Rml::RenderInterface
-   {
-   public:
-      Rml::CompiledGeometryHandle CompileGeometry (Rml::Span<const Rml::Vertex>, Rml::Span<const int>) override
-      {
-         return Rml::CompiledGeometryHandle (1);
-      }
-
-      void RenderGeometry (Rml::CompiledGeometryHandle, Rml::Vector2f, Rml::TextureHandle) override {}
-      void ReleaseGeometry (Rml::CompiledGeometryHandle) override {}
-
-      Rml::TextureHandle LoadTexture (Rml::Vector2i& pDimensions, const Rml::String&) override
-      {
-         pDimensions = Rml::Vector2i (1, 1);
-         return Rml::TextureHandle (1);
-      }
-
-      Rml::TextureHandle GenerateTexture (Rml::Span<const Rml::byte>, Rml::Vector2i) override
-      {
-         return Rml::TextureHandle (1);
-      }
-
-      void ReleaseTexture (Rml::TextureHandle) override {}
-      void EnableScissorRegion (bool) override {}
-      void SetScissorRegion (Rml::Rectanglei) override {}
-   };
-
-   static STUB_SYSTEM      pStubSystem;
-   static STUB_RENDER      pStubRender;
+   static UI_SYSTEM pUiSystem;
 } // anonymous namespace
 
 UI_CONTEXT::UI_CONTEXT ()
    : m_pEngine (nullptr)
-   , bInitialized (false)
+   , m_pRender (nullptr)
+   , m_bInitialized (false)
+   , m_bFontLoaded (false)
 {
 }
 
 UI_CONTEXT::~UI_CONTEXT ()
 {
-   if (bInitialized)
+   if (m_bInitialized)
    {
       Rml::Shutdown ();
-      bInitialized = false;
+      m_bInitialized = false;
    }
+   // The render interface must outlive Rml::Shutdown (which releases geometry
+   // and textures back through it), so it is destroyed last.
+   delete m_pRender;
+   m_pRender = nullptr;
 }
 
 bool UI_CONTEXT::Initialize (ENGINE* pEngine)
 {
    m_pEngine = pEngine;
-   pStubSystem.SetSneeze (pEngine);
+   m_pRender = new UI_RENDER ();
 
-   Rml::SetSystemInterface (&pStubSystem);
-   Rml::SetRenderInterface (&pStubRender);
+   pUiSystem.SetSneeze (pEngine);
+   Rml::SetSystemInterface (&pUiSystem);
+   Rml::SetRenderInterface (m_pRender);
 
-   bool bOk = Rml::Initialise ();
-   if (!bOk)
+   m_bInitialized = Rml::Initialise ();
+   if (!m_bInitialized)
    {
       m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "UI_CONTEXT", "Rml::Initialise failed");
-      bInitialized = false;
    }
    else
    {
-      bInitialized = true;
       Rml::String sVersion = Rml::GetVersion ();
-      m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "UI_CONTEXT", "RmlUi " + std::string (sVersion.c_str ()) + " initialized (stub renderer)");
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "UI_CONTEXT", "RmlUi " + std::string (sVersion.c_str ()) + " initialized");
    }
 
-   return bInitialized;
+   return m_bInitialized;
+}
+
+bool UI_CONTEXT::EnsureFont ()
+{
+   if (m_bFontLoaded)
+      return true;
+
+   // TEMP: test-only font path. Replace with an Artemis-provided font hand-off
+   // (the host owns presentation assets; the engine should not bundle fonts).
+   // RmlUi reads each face's weight from the file, so loading several weights
+   // lets font-weight in CSS select the right one.
+   const char* const aszFont[] =
+   {
+      "E:/Dev/OMB/Artemis/deps/fonts/Inter/Inter-Regular.ttf",
+      "E:/Dev/OMB/Artemis/deps/fonts/Inter/Inter-Medium.ttf",
+      "E:/Dev/OMB/Artemis/deps/fonts/Inter/Inter-SemiBold.ttf",
+      "E:/Dev/OMB/Artemis/deps/fonts/Inter/Inter-Bold.ttf",
+   };
+   for (const char* szFont : aszFont)
+   {
+      if (!Rml::LoadFontFace (szFont))
+         m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "UI_CONTEXT", std::string ("LoadFontFace failed: ") + szFont);
+      else
+         m_bFontLoaded = true;
+   }
+
+   return m_bFontLoaded;
+}
+
+bool UI_CONTEXT::EnsureReady ()
+{
+   return m_bInitialized  &&  EnsureFont ();
 }

@@ -133,9 +133,9 @@ String/byte I/O helpers move data across the WASM boundary:
 | File | Contents |
 |------|----------|
 | `Wasm.h` | WASM_RUNTIME, WASM_STORE, WASM_INSTANCE declarations |
-| `WasmRuntime.cpp` | WASM_RUNTIME implementation |
-| `WasmStore.cpp` | WASM_STORE implementation |
-| `WasmInstance.cpp` | WASM_INSTANCE implementation |
+| `Wasm_Runtime.cpp` | WASM_RUNTIME implementation |
+| `Wasm_Store.cpp` | WASM_STORE implementation |
+| `Wasm_Instance.cpp` | WASM_INSTANCE implementation |
 | `HostFunctions.h` | Host function declarations (32 functions) |
 | `HostFunctions.cpp` | Host function implementations |
 | `ThreadPool.h/cpp` | Fixed-size worker pool for parallel WASM execution |

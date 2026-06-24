@@ -18,11 +18,16 @@
 #include <RmlUi/Core/ElementDocument.h>
 #include <RmlUi/Core/FontEngineInterface.h>
 #include <RmlUi/Core/RenderInterface.h>
+#include <RmlUi/Core/Span.h>
 #include <RmlUi/Core/StreamMemory.h>
 #include <RmlUi/Core/SystemInterface.h>
+#include <RmlUi/Core/Vertex.h>
+
+#include "ui/Ui_Render.h"
 
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 
@@ -44,7 +49,7 @@ static void Check (bool bCondition, const char* szName)
 }
 
 // ---------------------------------------------------------------------------
-// Stub interfaces (same as UiContext.cpp - self-contained for the test)
+// Stub interfaces (same as Ui_Context.cpp - self-contained for the test)
 // ---------------------------------------------------------------------------
 
 namespace
@@ -275,6 +280,102 @@ static void TestMultipleContexts ()
 }
 
 // ---------------------------------------------------------------------------
+// Test 6: Software render interface (UI_RENDER) rasterization
+// ---------------------------------------------------------------------------
+static void TestSoftwareRasterizer ()
+{
+   std::printf ("\n[Test 6] Software rasterizer (UI_RENDER)\n");
+
+   SNEEZE::DEP::UI_RENDER render;
+   render.Resize (64, 64);
+   render.Clear ();
+
+   const uint8_t* aPx = render.Pixels ();
+   auto At = [&] (int x, int y, int c) -> int { return aPx[(static_cast<size_t> (y) * 64 + x) * 4 + c]; };
+
+   auto MakeVertex = [] (float x, float y, Rml::ColourbPremultiplied colour, float u, float v) -> Rml::Vertex
+   {
+      Rml::Vertex vertex;
+      vertex.position  = Rml::Vector2f (x, y);
+      vertex.colour    = colour;
+      vertex.tex_coord = Rml::Vector2f (u, v);
+      return vertex;
+   };
+
+   const int aIndex[6] = { 0, 1, 2,  0, 2, 3 };
+
+   // --- Opaque red quad over the left half ---
+   const Rml::ColourbPremultiplied red (255, 0, 0, 255);
+   Rml::Vertex aRed[4] = {
+      MakeVertex (0.0f,  0.0f,  red, 0.0f, 0.0f),
+      MakeVertex (32.0f, 0.0f,  red, 1.0f, 0.0f),
+      MakeVertex (32.0f, 64.0f, red, 1.0f, 1.0f),
+      MakeVertex (0.0f,  64.0f, red, 0.0f, 1.0f),
+   };
+   Rml::CompiledGeometryHandle hRed = render.CompileGeometry (Rml::Span<const Rml::Vertex> (aRed, 4), Rml::Span<const int> (aIndex, 6));
+   render.RenderGeometry (hRed, Rml::Vector2f (0.0f, 0.0f), 0);
+
+   Check (At (10, 10, 0) == 255  &&  At (10, 10, 3) == 255, "opaque red fills inside the quad");
+   Check (At (50, 10, 3) == 0, "area outside the quad stays transparent");
+
+   // --- 50% blue over the whole canvas: premultiplied (0,0,128,128) ---
+   const Rml::ColourbPremultiplied blue (0, 0, 128, 128);
+   Rml::Vertex aBlue[4] = {
+      MakeVertex (0.0f,  0.0f,  blue, 0.0f, 0.0f),
+      MakeVertex (64.0f, 0.0f,  blue, 1.0f, 0.0f),
+      MakeVertex (64.0f, 64.0f, blue, 1.0f, 1.0f),
+      MakeVertex (0.0f,  64.0f, blue, 0.0f, 1.0f),
+   };
+   Rml::CompiledGeometryHandle hBlue = render.CompileGeometry (Rml::Span<const Rml::Vertex> (aBlue, 4), Rml::Span<const int> (aIndex, 6));
+   render.RenderGeometry (hBlue, Rml::Vector2f (0.0f, 0.0f), 0);
+
+   // Over red: R = 0 + 255*(127/255) = 127, B = 128, A clamps to 255.
+   Check (std::abs (At (10, 10, 0) - 127) <= 2, "blue-over-red red channel ~127");
+   Check (std::abs (At (10, 10, 2) - 128) <= 2, "blue-over-red blue channel ~128");
+   // Over transparent: straight premultiplied blue.
+   Check (std::abs (At (50, 10, 2) - 128) <= 1  &&  At (50, 10, 3) == 128, "blue over empty is premultiplied blue");
+
+   // --- Generated texture sampled through a white quad ---
+   render.Clear ();
+   const uint8_t aTexel[16] = {
+      255, 0,   0,   255,   0,   255, 0,   255,
+      0,   0,   255, 255,   255, 255, 255, 255,
+   };
+   Rml::TextureHandle hTex = render.GenerateTexture (Rml::Span<const Rml::byte> (aTexel, 16), Rml::Vector2i (2, 2));
+
+   const Rml::ColourbPremultiplied white (255, 255, 255, 255);
+   Rml::Vertex aTexQuad[4] = {
+      MakeVertex (0.0f,  0.0f,  white, 0.0f, 0.0f),
+      MakeVertex (64.0f, 0.0f,  white, 1.0f, 0.0f),
+      MakeVertex (64.0f, 64.0f, white, 1.0f, 1.0f),
+      MakeVertex (0.0f,  64.0f, white, 0.0f, 1.0f),
+   };
+   Rml::CompiledGeometryHandle hTexGeom = render.CompileGeometry (Rml::Span<const Rml::Vertex> (aTexQuad, 4), Rml::Span<const int> (aIndex, 6));
+   render.RenderGeometry (hTexGeom, Rml::Vector2f (0.0f, 0.0f), hTex);
+
+   Check (At (16, 16, 0) == 255  &&  At (16, 16, 1) == 0, "texture top-left texel is red");
+   Check (At (48, 16, 1) == 255  &&  At (48, 16, 0) == 0, "texture top-right texel is green");
+   Check (At (16, 48, 2) == 255, "texture bottom-left texel is blue");
+
+   // --- Scissor clipping ---
+   render.Clear ();
+   render.EnableScissorRegion (true);
+   render.SetScissorRegion (Rml::Rectanglei::FromPositionSize (Rml::Vector2i (0, 0), Rml::Vector2i (16, 16)));
+   Rml::CompiledGeometryHandle hClip = render.CompileGeometry (Rml::Span<const Rml::Vertex> (aBlue, 4), Rml::Span<const int> (aIndex, 6));
+   render.RenderGeometry (hClip, Rml::Vector2f (0.0f, 0.0f), 0);
+   render.EnableScissorRegion (false);
+
+   Check (At (8, 8, 3) == 128, "pixel inside scissor is drawn");
+   Check (At (32, 32, 3) == 0, "pixel outside scissor is clipped");
+
+   render.ReleaseGeometry (hRed);
+   render.ReleaseGeometry (hBlue);
+   render.ReleaseGeometry (hTexGeom);
+   render.ReleaseGeometry (hClip);
+   render.ReleaseTexture (hTex);
+}
+
+// ---------------------------------------------------------------------------
 
 int RunUiTests (int /*nArgc*/, char** /*aArgv*/)
 {
@@ -293,6 +394,7 @@ int RunUiTests (int /*nArgc*/, char** /*aArgv*/)
       TestLoadDocument ();
       TestUpdateCycle ();
       TestMultipleContexts ();
+      TestSoftwareRasterizer ();
 
       Rml::Shutdown ();
    }

@@ -270,7 +270,7 @@ SNEEZE::NETWORK*            SNEEZE::CONTEXT::Network        () const { return m_
 SNEEZE::STORAGE*            SNEEZE::CONTEXT::Storage        () const { return m_pImpl->m_pStorage; }
 SNEEZE::SCENE*              SNEEZE::CONTEXT::Scene          () const { return m_pImpl->m_pScene; }
 SNEEZE::VIEWPORT*           SNEEZE::CONTEXT::Viewport       () const { return m_pImpl->m_pViewport; }
-SNEEZE::DEP::WASM_RUNTIME*  SNEEZE::CONTEXT::WasmRuntime    () const { return m_pImpl->m_pEngine->WasmRuntime (); }
+SNEEZE::DEP::WASM_RUNTIME*  SNEEZE::CONTEXT::Wasm_Runtime   () const { return m_pImpl->m_pEngine->Wasm_Runtime (); }
 const std::string&          SNEEZE::CONTEXT::Path_Permanent () const { return m_pImpl->m_sPath_Permanent; }
 const std::string&          SNEEZE::CONTEXT::Path_Temporary () const { return m_pImpl->m_sPath_Temporary; }
 

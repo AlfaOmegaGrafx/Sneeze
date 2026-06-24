@@ -170,15 +170,19 @@ const std::string& Path_Session    () const;
 ## Subsystems
 
 ```cpp
-persona::PERSONA*  Persona     () const;
-DEP::WASM_RUNTIME* WasmRuntime () const;
+persona::PERSONA*  Persona      () const;
+DEP::WASM_RUNTIME* Wasm_Runtime () const;
+DEP::UI_CONTEXT*   Ui_Context   () const;
 ```
 
 ### `persona::PERSONA* Persona () const`
 - **Purpose / Returns.** The shared identity proxy. See [Persona](../persona/index.md).
 
-### `DEP::WASM_RUNTIME* WasmRuntime () const`
+### `DEP::WASM_RUNTIME* Wasm_Runtime () const`
 - **Purpose / Returns.** The engine-wide WebAssembly runtime that hosts every container's sandbox.
+
+### `DEP::UI_CONTEXT* Ui_Context () const`
+- **Purpose / Returns.** The shared RmlUi manager: the one-time global RmlUi lifecycle, system interface, fonts, and the single render interface every in-scene panel draws through. See [UI](../../systems/ui.md).
 
 ---
 

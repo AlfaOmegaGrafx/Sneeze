@@ -12,13 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef SNEEZE_SOM_MAPOBJECT_H
-#define SNEEZE_SOM_MAPOBJECT_H
+#ifndef SNEEZE_SOM_MAP_OBJECT_H
+#define SNEEZE_SOM_MAP_OBJECT_H
 
 #include "sneeze/Types.h"
 
 namespace SNEEZE
 {
+   class ENGINE;
+
+   namespace DEP
+   {
+      class UI_PANEL;
+   }
+
    // Compose a class discriminator and a 48-bit object index into one OBJECTIX value. Use this instead of hardcoding opaque 64-bit literals.
    #define OBJECTIX_COMPOSE(eClass, twObjectIx)      ((static_cast<uint64_t> (eClass) << 48)  |  (static_cast<uint64_t> (twObjectIx) & 0x0000FFFFFFFFFFFFull))
 
@@ -37,6 +44,7 @@ namespace SNEEZE
          MAP_OBJECT_CLASS_CELESTIAL   = 71,
          MAP_OBJECT_CLASS_TERRESTRIAL = 72,
          MAP_OBJECT_CLASS_PHYSICAL    = 73,
+         MAP_OBJECT_CLASS_PANEL       = 74,
       };
 
       struct OBJECTIX
@@ -217,6 +225,28 @@ namespace SNEEZE
       explicit MAP_OBJECT_PHYSICAL (OBJECT_HEAD Head);
    };
 
+   // An in-scene UI panel (RmlUi RML+CSS rasterized to a textured quad). Owns
+   // its own UI surface; the panel's world size comes from Bound.d3Max[0,1] and
+   // its placement from the node's TRS, so it flows through the compositor and
+   // per-scene render scale exactly like any other node.
+   class MAP_OBJECT_PANEL : public MAP_OBJECT
+   {
+   public:
+      explicit MAP_OBJECT_PANEL (OBJECT_HEAD Head);
+      ~MAP_OBJECT_PANEL () override;
+
+      // Rasterize the panel's UI into its canvas (call on the render thread).
+      // Cheap when unchanged. Returns true if Pixels() is valid.
+      bool Render (ENGINE* pEngine, int nWidth, int nHeight);
+
+      const uint8_t* Pixels () const;
+      int            Width  () const;
+      int            Height () const;
+
+   private:
+      DEP::UI_PANEL* m_pPanel;
+   };
+
 //-------------------------
    struct RMCOBJECT
    {
@@ -232,4 +262,4 @@ namespace SNEEZE
    };
 
 }
-#endif // SNEEZE_SOM_MAPOBJECT_H
+#endif // SNEEZE_SOM_MAP_OBJECT_H

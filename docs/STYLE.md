@@ -73,7 +73,7 @@ sources:
   - src/context/scene/Scene.cpp
   - src/context/scene/Node.cpp
   - src/context/scene/Fabric.cpp
-  - src/context/scene/MapObject.h
+  - include/Map_Object.h
 verified: 92fdc1c
 nav:
   prev: systems/storage.md

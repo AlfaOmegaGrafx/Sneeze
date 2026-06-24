@@ -61,7 +61,7 @@ namespace SNEEZE
       CONSOLE*            Console         () const;
       NETWORK*            Network         () const;
       STORAGE*            Storage         () const;
-      DEP::WASM_RUNTIME*  WasmRuntime     () const;
+      DEP::WASM_RUNTIME*  Wasm_Runtime    () const;
       VIEWPORT*           Viewport        () const;
       SCENE*              Scene           () const;
 

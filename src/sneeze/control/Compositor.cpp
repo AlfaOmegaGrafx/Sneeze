@@ -400,9 +400,16 @@ struct LIGHT_BUILD
    double dx, dy, dz;            // metres
 };
 
-static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, std::vector<SPHERE_BUILD>& aSphere, std::vector<CURVE_BUILD>& aCurve, std::vector<LIGHT_BUILD>& aLight, std::vector<BOX_BUILD>& aBox, double& dMaxReach)
+struct PANEL_BUILD
 {
-   MAP_OBJECT* pObj = pNode->MapObject ();
+   const uint8_t* pPixels;       // straight-alpha RGBA8, top-down (owned by the panel node)
+   int            nW, nH;
+   double         dAspect;       // panel width / height (quad shape only)
+};
+
+static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, SNEEZE::ENGINE* pEngine, std::vector<SPHERE_BUILD>& aSphere, std::vector<CURVE_BUILD>& aCurve, std::vector<LIGHT_BUILD>& aLight, std::vector<BOX_BUILD>& aBox, std::vector<PANEL_BUILD>& aPanel, double& dMaxReach)
+{
+   MAP_OBJECT* pObj = pNode->Map_Object ();
    WORLD_FRAME childFrame = frame;
 
    if (pObj)
@@ -581,20 +588,44 @@ static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, 
             if (dBoxReach > dMaxReach) dMaxReach = dBoxReach;
          }
       }
+      else if (pObj->Class () == MAP_OBJECT::MAP_OBJECT_CLASS_PANEL)
+      {
+         // A panel manifests as a flat, textured quad. The UI is rasterized here,
+         // on the compositor thread (the only thread that touches both RmlUi and
+         // the renderer); the cost is paid once and cached, so re-traversal each
+         // frame is cheap. Panels are chrome, not scene geometry: they do NOT
+         // contribute to dMaxReach, so a panel never changes how the 3D content
+         // is framed. Bound.d3Max[0,1] gives only the quad's aspect ratio; the
+         // panel's on-screen size and placement are resolved at the flatten seam
+         // (below) relative to the framed scene.
+         auto* pPanel = static_cast<MAP_OBJECT_PANEL*> (pObj);
+         double dPanelW = pObj->Bound.d3Max[0];
+         double dPanelH = pObj->Bound.d3Max[1];
+
+         if (dPanelW > 0.0  &&  dPanelH > 0.0  &&  pPanel->Render (pEngine, 512, 512)  &&  pPanel->Pixels ())
+         {
+            PANEL_BUILD panel;
+            panel.pPixels = pPanel->Pixels ();
+            panel.nW      = pPanel->Width ();
+            panel.nH      = pPanel->Height ();
+            panel.dAspect = dPanelW / dPanelH;
+            aPanel.push_back (panel);
+         }
+      }
    }
 
    for (int i = 0; i < pNode->Node_Count (); i++)
    {
       NODE* pChild = pNode->Child (i);
       if (pChild)
-         TraverseNode (pChild, childFrame, tmNow, aSphere, aCurve, aLight, aBox, dMaxReach);
+         TraverseNode (pChild, childFrame, tmNow, pEngine, aSphere, aCurve, aLight, aBox, aPanel, dMaxReach);
    }
 
    // An attachment point spawns a child fabric; traverse it in this node's own
    // accumulated frame so the secondary fabric inherits this node's transform.
    FABRIC* pAttached = pNode->Fabric_Attachment ();
    if (pAttached  &&  pAttached->Node_Root ())
-      TraverseNode (pAttached->Node_Root (), childFrame, tmNow, aSphere, aCurve, aLight, aBox, dMaxReach);
+      TraverseNode (pAttached->Node_Root (), childFrame, tmNow, pEngine, aSphere, aCurve, aLight, aBox, aPanel, dMaxReach);
 }
 
 void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
@@ -661,17 +692,19 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
       std::vector<CURVE_BUILD>  aCurveBuild;
       std::vector<BOX_BUILD>    aBoxBuild;
       std::vector<LIGHT_BUILD>  aLightBuild;
+      std::vector<PANEL_BUILD>  aPanelBuild;
 
       SCENE* pScene = pViewport->Scene ();
       FABRIC* pFabric_Root = pScene ? pScene->Fabric_Root () : nullptr;
       NODE* pSomRoot = pFabric_Root ? pFabric_Root->Node_Root () : nullptr;
+      SNEEZE::ENGINE* pEngine = pViewport->Engine ();
 
       double dMaxReach = 0.0;
 
       if (pSomRoot)
       {
          WORLD_FRAME rootFrame;
-         TraverseNode (pSomRoot, rootFrame, tmNow, aSphereBuild, aCurveBuild, aLightBuild, aBoxBuild, dMaxReach);
+         TraverseNode (pSomRoot, rootFrame, tmNow, pEngine, aSphereBuild, aCurveBuild, aLightBuild, aBoxBuild, aPanelBuild, dMaxReach);
       }
 
       // One uniform per-scene render scale, applied at this single flatten seam:
@@ -750,6 +783,69 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
          aBoxes.push_back (box);
       }
 
+      // TEST: a single panel is injected into every fabric, so it is sized and
+      // placed as a fraction of the framed scene (render units) rather than in
+      // absolute metres -- one absolute size cannot suit both a planetary system
+      // and a city block. A real per-fabric panel would author metres in
+      // Bound/Transform and ride dRenderScale exactly like a box; that path is
+      // unchanged. The panel is billboarded toward the camera (its +Z normal
+      // tracks the eye) so it stays readable from any orbit angle instead of
+      // being seen edge-on. It is anchored just above the scene centre -- which
+      // is the camera's look-at point and, in a planetary fabric, the sun -- and
+      // lifted by a half-height so it floats above a y=0 ground rather than
+      // intersecting it. Billboarding per node is a future panel property.
+      std::vector<PANEL_DATA> aPanels;
+      aPanels.reserve (aPanelBuild.size ());
+      for (const auto& pb : aPanelBuild)
+      {
+         double dHeight = 0.26 * TARGET_EXTENT;          // quad height, render units
+         double dWidth  = dHeight * pb.dAspect;
+
+         double dAnchorX = 0.0;
+         double dAnchorY = 0.5 * dHeight + 0.10 * TARGET_EXTENT;   // float above ground, near the sun
+         double dAnchorZ = 0.0;
+
+         // Billboard basis: +Z (panel normal) points at the eye; +Y stays world-up.
+         double dNx = dCamX - dAnchorX, dNy = dCamY - dAnchorY, dNz = dCamZ - dAnchorZ;
+         double dNLen = std::sqrt (dNx * dNx + dNy * dNy + dNz * dNz);
+         if (dNLen < 1e-9) { dNx = 0.0; dNy = 0.0; dNz = 1.0; dNLen = 1.0; }
+         dNx /= dNLen; dNy /= dNLen; dNz /= dNLen;
+
+         // right = normalize(worldUp x normal); worldUp = (0,1,0)
+         double dRx = dNz, dRy = 0.0, dRz = -dNx;
+         double dRLen = std::sqrt (dRx * dRx + dRz * dRz);
+         if (dRLen < 1e-9) { dRx = 1.0; dRy = 0.0; dRz = 0.0; dRLen = 1.0; }
+         dRx /= dRLen; dRz /= dRLen;
+
+         // up = normal x right
+         double dUx = dNy * dRz - dNz * dRy;
+         double dUy = dNz * dRx - dNx * dRz;
+         double dUz = dNx * dRy - dNy * dRx;
+
+         PANEL_DATA panel;
+         panel.m16[0]  = static_cast<float> (dRx * dWidth);
+         panel.m16[1]  = static_cast<float> (dRy * dWidth);
+         panel.m16[2]  = static_cast<float> (dRz * dWidth);
+         panel.m16[3]  = 0.0f;
+         panel.m16[4]  = static_cast<float> (dUx * dHeight);
+         panel.m16[5]  = static_cast<float> (dUy * dHeight);
+         panel.m16[6]  = static_cast<float> (dUz * dHeight);
+         panel.m16[7]  = 0.0f;
+         panel.m16[8]  = static_cast<float> (dNx);
+         panel.m16[9]  = static_cast<float> (dNy);
+         panel.m16[10] = static_cast<float> (dNz);
+         panel.m16[11] = 0.0f;
+         panel.m16[12] = static_cast<float> (dAnchorX);
+         panel.m16[13] = static_cast<float> (dAnchorY);
+         panel.m16[14] = static_cast<float> (dAnchorZ);
+         panel.m16[15] = 1.0f;
+
+         panel.pPixels = pb.pPixels;
+         panel.nWidth  = pb.nW;
+         panel.nHeight = pb.nH;
+         aPanels.push_back (panel);
+      }
+
       pRenderer->SetLights (aLight);
 
       pViewport->Accumulate (VIEWPORT::kACCUMULATE_SCENE, tpSceneStart);
@@ -761,6 +857,7 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
       pRenderer->SubmitSpheres (aSpheres);
       pRenderer->SubmitCurves (aCurves);
       pRenderer->SubmitBoxes (aBoxes);
+      pRenderer->SubmitPanels (aPanels);
       pRenderer->EndFrame ();
 
       pViewport->Accumulate (VIEWPORT::kACCUMULATE_SUBMIT, pRenderer->GetLastSubmitSeconds ());

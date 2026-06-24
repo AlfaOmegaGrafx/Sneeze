@@ -14,7 +14,7 @@
 
 #include <Sneeze.h>
 #include "SpatialIndex.h"
-#include "MapObject.h"
+#include "Map_Object.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -125,7 +125,7 @@ void SPATIAL_INDEX::Build (const std::vector<NODE*>& apNodes)
 
    for (auto* pNode : apNodes)
    {
-      MAP_OBJECT* pObj = pNode->MapObject ();
+      MAP_OBJECT* pObj = pNode->Map_Object ();
       if (pObj)
       {
          AABB pBounds;

@@ -13,7 +13,8 @@
 // limitations under the License.
 
 #include <Sneeze.h>
-#include "MapObject.h"
+#include "Map_Object.h"
+#include "ui/Ui_Panel.h"
 #include <cstring>
 
 using namespace SNEEZE;
@@ -215,6 +216,7 @@ const char* MAP_OBJECT::ClassName (MAP_OBJECT_CLASS eType)
    case MAP_OBJECT::MAP_OBJECT_CLASS_CELESTIAL:    pcszResult = "celestial";    break;
    case MAP_OBJECT::MAP_OBJECT_CLASS_TERRESTRIAL:  pcszResult = "terrestrial";  break;
    case MAP_OBJECT::MAP_OBJECT_CLASS_PHYSICAL:     pcszResult = "physical";     break;
+   case MAP_OBJECT::MAP_OBJECT_CLASS_PANEL:        pcszResult = "panel";        break;
    default:                                        pcszResult = "";             break;
    }
 
@@ -475,4 +477,39 @@ MAP_OBJECT_TERRESTRIAL::MAP_OBJECT_TERRESTRIAL (OBJECT_HEAD Head) : MAP_OBJECT (
 
 MAP_OBJECT_PHYSICAL::MAP_OBJECT_PHYSICAL (OBJECT_HEAD Head) : MAP_OBJECT (Head)
 {
+}
+
+// ---------------------------------------------------------------------------
+// MAP_OBJECT_PANEL
+// ---------------------------------------------------------------------------
+
+MAP_OBJECT_PANEL::MAP_OBJECT_PANEL (OBJECT_HEAD Head) :
+   MAP_OBJECT (Head),
+   m_pPanel (new DEP::UI_PANEL ())
+{
+}
+
+MAP_OBJECT_PANEL::~MAP_OBJECT_PANEL ()
+{
+   delete m_pPanel;
+}
+
+bool MAP_OBJECT_PANEL::Render (ENGINE* pEngine, int nWidth, int nHeight)
+{
+   return m_pPanel->Render (pEngine, nWidth, nHeight);
+}
+
+const uint8_t* MAP_OBJECT_PANEL::Pixels () const
+{
+   return m_pPanel->Pixels ();
+}
+
+int MAP_OBJECT_PANEL::Width () const
+{
+   return m_pPanel->Width ();
+}
+
+int MAP_OBJECT_PANEL::Height () const
+{
+   return m_pPanel->Height ();
 }

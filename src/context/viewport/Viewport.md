@@ -48,6 +48,8 @@ SetLights (vector<LIGHT_DATA>)
 BeginFrame ()
 SubmitSpheres (vector<SPHERE_DATA>)
 SubmitCurves (vector<CURVE_DATA>)
+SubmitBoxes (vector<BOX_DATA>)
+SubmitPanels (vector<PANEL_DATA>)
 EndFrame ()
 ```
 
@@ -66,6 +68,8 @@ framebuffer publish path is skipped entirely.
 | `SPHERE_DATA` | Position, radius, color, optional texture pixels, emissive flag |
 | `CURVE_POINT` | Vertex with position and radius |
 | `CURVE_DATA` | Polyline (vector of CURVE_POINTs) with color |
+| `BOX_DATA` | Column-major world transform (`m16`) + color |
+| `PANEL_DATA` | Column-major world transform (`m16`, size baked in) + straight-alpha RGBA8 pixels + width/height |
 | `CAMERA_DATA` | Eye, look direction, up, FOV, aspect, near/far |
 | `LIGHT_DATA` | World position of one star-driven point light |
 | `UV_SPHERE` | Generated mesh: positions, normals, texcoords, indices |
@@ -85,6 +89,23 @@ shape. (Filament's ambient term alone is weak fill without an environment map,
 and Halogen may not honor the ANARI `"ambient"` `radiance` at all — the explicit
 directional light is what makes starless scenes legible.) The scene rebuilds
 when the light **count** changes (`m_bSceneDirty` is set in `SetLights`).
+
+### Panels
+
+`SubmitPanels(vector<PANEL_DATA>)` carries in-scene UI panels (see `Ui_Context.md`
+and `Scene.md` `MAP_OBJECT_PANEL`). Each `PANEL_DATA` is just a column-major world
+transform (`m16`, size baked in) plus a straight-alpha RGBA8 pixel buffer and its
+dimensions — the renderer stays UI-agnostic, treating a panel like a textured box.
+
+The ANARI backend builds one instance per panel from a **shared unit quad** (XY
+plane, `+Z` normal, `attribute0` UVs, double-sided so a panel turned away is not
+culled; V is flipped vs. position so the top-down UI canvas reads upright). The
+panel pixels become an `image2D` array feeding a sampler, and the material is the
+**unlit** Halogen extension in `"blend"` mode (`color` = the sampler), so the
+panel shows its true RGBA, lighting-independent, with per-texel alpha. Panel
+instance transforms are patched every frame in `UpdateScene`, so a billboarded
+panel tracks the camera without a rebuild; a rebuild is triggered only when the
+panel **count** or a panel's pixel pointer changes.
 
 ## RENDERER::ANARI
 
@@ -149,7 +170,7 @@ ANARI renderer for textured planet rendering.
 | File | Contents |
 |------|----------|
 | `Viewport.cpp` | VIEWPORT::Impl (activate/deactivate, input, framebuffer, timing) |
-| `Viewport.h` | Private header — RENDERER base, SPHERE_DATA, CURVE_DATA, CAMERA_DATA, UV_SPHERE |
+| `Viewport.h` | Private header — RENDERER base, SPHERE_DATA, CURVE_DATA, BOX_DATA, PANEL_DATA, CAMERA_DATA, UV_SPHERE |
 | `AnariRenderer.h` | RENDERER::ANARI declaration |
 | `AnariRenderer.cpp` | ANARI implementation (device, scene retention, native surface) |
 | `UVSphere.cpp` | GenerateUVSphere implementation |

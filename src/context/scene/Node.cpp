@@ -14,7 +14,7 @@
 
 #include <Sneeze.h>
 
-#include "MapObject.h"
+#include "Map_Object.h"
 #include "stb/stb_image.h"
 #include <algorithm>
 
@@ -366,7 +366,7 @@ FABRIC*     NODE::Fabric            ()                    const { return m_pImpl
 FABRIC*     NODE::Fabric_Attachment ()                    const { return m_pImpl->m_pFabric_Attachment; }
 
 bool        NODE::IsPrivate         ()                    const { return m_pImpl->m_bPrivate; }
-MAP_OBJECT* NODE::MapObject         ()                    const { return m_pImpl->m_pMap_Object; }
+MAP_OBJECT* NODE::Map_Object        ()                    const { return m_pImpl->m_pMap_Object; }
 
 NODE*       NODE::Parent            ()                    const { return m_pImpl->Parent (); }
 NODE*       NODE::Child             (int nPosition)       const { return m_pImpl->Child (nPosition); }

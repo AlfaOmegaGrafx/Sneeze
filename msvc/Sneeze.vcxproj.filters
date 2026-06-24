@@ -166,7 +166,7 @@
     <ClCompile Include="..\src\context\scene\Scene.cpp">
       <Filter>src\context\scene</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\context\scene\MapObject.cpp">
+    <ClCompile Include="..\src\context\scene\Map_Object.cpp">
       <Filter>src\context\scene</Filter>
     </ClCompile>
     <ClCompile Include="..\src\context\scene\AccessControl.cpp">
@@ -202,7 +202,13 @@
     <ClCompile Include="..\src\deps\xr\XrRuntime.cpp">
       <Filter>src\deps\xr</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\deps\ui\UiContext.cpp">
+    <ClCompile Include="..\src\deps\ui\Ui_Context.cpp">
+      <Filter>src\deps\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\deps\ui\Ui_Render.cpp">
+      <Filter>src\deps\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\deps\ui\Ui_Panel.cpp">
       <Filter>src\deps\ui</Filter>
     </ClCompile>
     <ClCompile Include="..\src\deps\compute\EmbeddedKernels.cpp">
@@ -260,7 +266,13 @@
     <ClInclude Include="..\src\deps\xr\XrRuntime.h">
       <Filter>src\deps\xr</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\deps\ui\UiContext.h">
+    <ClInclude Include="..\src\deps\ui\Ui_Context.h">
+      <Filter>src\deps\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\deps\ui\Ui_Render.h">
+      <Filter>src\deps\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\deps\ui\Ui_Panel.h">
       <Filter>src\deps\ui</Filter>
     </ClInclude>
     <ClInclude Include="..\src\deps\compute\EmbeddedKernels.h">
@@ -313,7 +325,7 @@
       <Filter>src\context\console</Filter>
     </ClInclude>
     <ClInclude Include="..\include\Msf.h" />
-    <ClInclude Include="..\include\MapObject.h">
+    <ClInclude Include="..\include\Map_Object.h">
       <Filter>include</Filter>
     </ClInclude>
   </ItemGroup>

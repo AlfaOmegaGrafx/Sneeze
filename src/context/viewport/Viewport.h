@@ -66,6 +66,18 @@ namespace SNEEZE
       float r, g, b;
    };
 
+   // An in-scene UI panel: a textured, alpha-blended quad. The compositor bakes
+   // the panel's world size into m16 (unit quad in the local XY plane, +Z
+   // normal), so the renderer stays UI-agnostic -- it only sees a transform and
+   // a pixel buffer, identical in spirit to a textured box.
+   struct PANEL_DATA
+   {
+      float          m16[16];            // column-major world transform (render space), size baked in
+      const uint8_t* pPixels  = nullptr; // straight-alpha RGBA8, row-major, top-down
+      int            nWidth   = 0;
+      int            nHeight  = 0;
+   };
+
    struct CAMERA_DATA
    {
       float dPosX, dPosY, dPosZ;
@@ -103,6 +115,7 @@ namespace SNEEZE
       virtual void SubmitSpheres (const std::vector<SPHERE_DATA>& aSpheres) = 0;
       virtual void SubmitCurves (const std::vector<CURVE_DATA>& aCurves) = 0;
       virtual void SubmitBoxes (const std::vector<BOX_DATA>& aBoxes) { (void) aBoxes; }
+      virtual void SubmitPanels (const std::vector<PANEL_DATA>& aPanels) { (void) aPanels; }
       virtual void EndFrame () = 0;
 
       // Forces a full scene rebuild on the next frame (e.g. after a scene swap).

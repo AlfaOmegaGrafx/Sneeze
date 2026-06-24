@@ -84,7 +84,7 @@ public:
             {
                m_pSilo->Attach ();
 
-               if ((m_pWasm_Store = m_pContext->WasmRuntime ()->Store_Open ()))
+               if ((m_pWasm_Store = m_pContext->Wasm_Runtime ()->Store_Open ()))
                {
                   m_pWasm_Store->HostData (static_cast<void*> (m_pContainer));
                   m_pWasm_Store->Linker_Initialize ();
@@ -114,7 +114,7 @@ public:
 
          if (m_pWasm_Store)
          {
-            m_pContext->WasmRuntime ()->Store_Close (m_pWasm_Store);
+            m_pContext->Wasm_Runtime ()->Store_Close (m_pWasm_Store);
             m_pWasm_Store = nullptr;
          }
 
@@ -238,6 +238,7 @@ public:
             case MAP_OBJECT::MAP_OBJECT_CLASS_CELESTIAL:   pMapObj = new MAP_OBJECT_CELESTIAL   (Head);  break;
             case MAP_OBJECT::MAP_OBJECT_CLASS_TERRESTRIAL: pMapObj = new MAP_OBJECT_TERRESTRIAL (Head);  break;
             case MAP_OBJECT::MAP_OBJECT_CLASS_PHYSICAL:    pMapObj = new MAP_OBJECT_PHYSICAL    (Head);  break;
+            case MAP_OBJECT::MAP_OBJECT_CLASS_PANEL:       pMapObj = new MAP_OBJECT_PANEL       (Head);  break;
          }
 
          if (pMapObj)
@@ -273,7 +274,7 @@ public:
 
       if (pNode)
       {
-         MAP_OBJECT* pMapObj = pNode->MapObject ();
+         MAP_OBJECT* pMapObj = pNode->Map_Object ();
 
          m_umpNode.erase (twObjectIx);
 

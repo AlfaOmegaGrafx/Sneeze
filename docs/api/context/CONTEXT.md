@@ -46,7 +46,7 @@ private:
 - **Owns** one each of `CONSOLE`, `NETWORK`, `STORAGE`, `SCENE`, and `VIEWPORT`, created in that order during `Initialize` and destroyed in reverse in the destructor.
 - **Owns** a pool of `CONTAINER` objects, keyed by container identity ([`CID::Key()`](../container/CID.md)), in an `unordered_map`. The map is the authoritative owner of every container in the session.
 - **Holds** a back-pointer to its `ENGINE` and to the host's `ICONTEXT`, plus the two on-disk paths and the session kind it was constructed with.
-- **Reaches** the WASM runtime through the engine (`WasmRuntime()` forwards to `ENGINE::WasmRuntime`); it caches no copy of engine-owned services.
+- **Reaches** the WASM runtime through the engine (`Wasm_Runtime()` forwards to `ENGINE::Wasm_Runtime`); it caches no copy of engine-owned services.
 
 ---
 
@@ -148,7 +148,7 @@ ENGINE*             Engine         () const;
 CONSOLE*            Console        () const;
 NETWORK*            Network        () const;
 STORAGE*            Storage        () const;
-DEP::WASM_RUNTIME*  WasmRuntime    () const;
+DEP::WASM_RUNTIME*  Wasm_Runtime   () const;
 VIEWPORT*           Viewport       () const;
 SCENE*              Scene          () const;
 const std::string&  Path_Permanent () const;
@@ -162,7 +162,7 @@ const std::string&  Path_Temporary () const;
 | `Console()` | The session's console. | Valid after `Initialize`. |
 | `Network()` | The session's network subsystem. | Valid after `Initialize`. |
 | `Storage()` | The session's storage subsystem. | Valid after `Initialize`. |
-| `WasmRuntime()` | The engine's WASM runtime. | Forwarded from the engine, not owned by the context. |
+| `Wasm_Runtime()` | The engine's WASM runtime. | Forwarded from the engine, not owned by the context. |
 | `Viewport()` | The session's viewport. | Valid after `Initialize`. |
 | `Scene()` | The session's scene. | **Replaced by `Url`/`Reload`** — do not cache across navigation. |
 | `Path_Permanent()` | The durable data path (by const reference). | Set at construction. |

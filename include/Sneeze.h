@@ -31,10 +31,11 @@ namespace SNEEZE
    namespace DEP
    {
       class WASM_RUNTIME;
+      class UI_CONTEXT;
    }
 }
 
-#include "MapObject.h"
+#include "Map_Object.h"
 #include "Container.h"
 #include "Context.h"
 #include "Msf.h"
@@ -161,7 +162,8 @@ namespace SNEEZE
       // --- Subsystems ---
 
       persona::PERSONA*        Persona () const;
-      DEP::WASM_RUNTIME*       WasmRuntime () const;
+      DEP::WASM_RUNTIME*       Wasm_Runtime () const;
+      DEP::UI_CONTEXT*         Ui_Context () const;
 
       void                     Queue_Post_Fetch      (JOB_FETCH* pJob_Fetch);
       void                     Queue_Post_Compositor (JOB_COMPOSITOR* pJob_Compositor);

@@ -147,7 +147,7 @@ Each module has a `*.md` file with its own documentation. **Read these when you 
 | `src/deps/wasm/` | `Wasm.md` | WASM sandbox (WASM_RUNTIME, WASM_STORE, WASM_INSTANCE) |
 | `src/deps/spirv/` | `SpvPipeline.md` | SPIR-V validation |
 | `src/deps/xr/` | `XrRuntime.md` | OpenXR device abstraction |
-| `src/deps/ui/` | `UiContext.md` | RmlUi HTML/CSS UI toolkit |
+| `src/deps/ui/` | `Ui_Context.md` | RmlUi HTML/CSS UI toolkit (UI_CONTEXT, UI_PANEL, UI_RENDER) |
 | `src/deps/compute/` | `ComputeDispatch.md` | SPIR-V kernel embedding + GPU dispatch via Vox |
 | `src/persona/` | `Persona.md` | Local identity proxy |
 | `src/cmake/` | `Cmake.md` | CMake find-modules and build configuration |

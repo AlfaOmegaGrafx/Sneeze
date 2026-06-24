@@ -817,7 +817,7 @@ wasm_trap_t* Scene_Node_Position (void* pEnv, wasmtime_caller_t* pCaller, const 
       if (pContainer)
       {
          NODE* pNode = pContainer->Node_Find (twObjectIx);
-         MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
+         MAP_OBJECT* pObj = pNode ? pNode->Map_Object () : nullptr;
 
          if (pObj)
          {
@@ -843,7 +843,7 @@ wasm_trap_t* Scene_Node_Scale (void* pEnv, wasmtime_caller_t* pCaller, const was
       if (pContainer)
       {
          NODE* pNode = pContainer->Node_Find (twObjectIx);
-         MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
+         MAP_OBJECT* pObj = pNode ? pNode->Map_Object () : nullptr;
 
          if (pObj)
             pObj->Transform.d3Scale[0] = pArgs[1].of.f64;
@@ -865,7 +865,7 @@ wasm_trap_t* Scene_Node_Bound (void* pEnv, wasmtime_caller_t* pCaller, const was
       if (pContainer)
       {
          NODE* pNode = pContainer->Node_Find (twObjectIx);
-         MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
+         MAP_OBJECT* pObj = pNode ? pNode->Map_Object () : nullptr;
 
          if (pObj)
          {
@@ -891,7 +891,7 @@ wasm_trap_t* Scene_Node_Color (void* pEnv, wasmtime_caller_t* pCaller, const was
       if (pContainer)
       {
          NODE* pNode = pContainer->Node_Find (twObjectIx);
-         MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
+         MAP_OBJECT* pObj = pNode ? pNode->Map_Object () : nullptr;
 
          if (pObj)
          {
@@ -916,7 +916,7 @@ wasm_trap_t* Scene_Node_Name (void* pEnv, wasmtime_caller_t* pCaller, const wasm
       if (pContainer)
       {
          NODE* pNode = pContainer->Node_Find (twObjectIx);
-         MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
+         MAP_OBJECT* pObj = pNode ? pNode->Map_Object () : nullptr;
 
          if (pObj)
          {
@@ -946,7 +946,7 @@ wasm_trap_t* Scene_Node_Radius (void* pEnv, wasmtime_caller_t* pCaller, const wa
       if (pContainer)
       {
          NODE* pNode = pContainer->Node_Find (twObjectIx);
-         MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
+         MAP_OBJECT* pObj = pNode ? pNode->Map_Object () : nullptr;
 
          if (pObj)
          {
@@ -972,7 +972,7 @@ wasm_trap_t* Scene_Node_Texture (void* pEnv, wasmtime_caller_t* pCaller, const w
       if (pContainer)
       {
          NODE* pNode = pContainer->Node_Find (twObjectIx);
-         MAP_OBJECT* pObj = pNode ? pNode->MapObject () : nullptr;
+         MAP_OBJECT* pObj = pNode ? pNode->Map_Object () : nullptr;
 
          if (pObj)
          {

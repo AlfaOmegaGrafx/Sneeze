@@ -98,7 +98,7 @@ An object handle is an `OBJECTIX`: a single `uint64_t` (`qwComposed`) that packs
 two fields. The upper 16 bits are a `MAP_OBJECT_CLASS` discriminator; the low 48
 bits are the object index. Two accessors split it: `ObjectIx()` returns the low
 48 bits, `Class()` returns the upper 16 cast to `MAP_OBJECT_CLASS`. Compose the
-two with the `OBJECTIX_COMPOSE(eClass, twObjectIx)` macro (in `MapObject.h`)
+two with the `OBJECTIX_COMPOSE(eClass, twObjectIx)` macro (in `Map_Object.h`)
 rather than writing opaque 64-bit literals.
 
 `OBJECT_HEAD` carries two OBJECTIX values — `Self` and `Parent` — so every node
@@ -202,7 +202,7 @@ for (int i = 0; i < pParent->Node_Count (); ++i)
 | Accessor | Description |
 |----------|-------------|
 | `ObjectIx()` | Composed object handle (class in upper 16 bits, 48-bit index in low bits) |
-| `MapObject()` | Associated MAP_OBJECT |
+| `Map_Object()` | Associated MAP_OBJECT |
 | `Fabric()` | Owning FABRIC |
 | `Parent()` | Parent NODE |
 | `Child(n)` | Nth child |
@@ -256,20 +256,36 @@ and must agree with the class packed into the handle:
 | `MAP_OBJECT_CELESTIAL` | `MAP_OBJECT_CLASS_CELESTIAL` (71) | Orbital bodies and frames |
 | `MAP_OBJECT_TERRESTRIAL` | `MAP_OBJECT_CLASS_TERRESTRIAL` (72) | — |
 | `MAP_OBJECT_PHYSICAL` | `MAP_OBJECT_CLASS_PHYSICAL` (73) | — |
+| `MAP_OBJECT_PANEL` | `MAP_OBJECT_CLASS_PANEL` (74) | In-scene RmlUi panel (textured quad) |
 
 Every derived constructor takes an `OBJECT_HEAD` and forwards it to the base.
 
 ### MAP_OBJECT_CELESTIAL
 
 Contains orbital mechanics data via the `ORBIT_POSITION` struct (defined in
-`MapObject.h`). File-local static functions `SolveKepler`, `QuatMultiply`, and
-`RotateByQuat` in `MapObject.cpp` compute orbital positions from `m_Orbit` and
+`Map_Object.h`). File-local static functions `SolveKepler`, `QuatMultiply`, and
+`RotateByQuat` in `Map_Object.cpp` compute orbital positions from `m_Orbit` and
 `m_Transform`. The compositor calls `PositionAtTick()` for animation.
 
 The celestial type is stored in `m_Type.bType`, valued from the
 `MAP_OBJECT_TYPE_TYPE_CELESTIAL_*` enum (NONE, UNIVERSE, ... STARSYSTEM=9,
 STAR=10, PLANETSYSTEM=11, PLANET=12, MOON=13, DEBRIS=14, SURFACE=17, etc.). The
 compositor and `Rotation()` branch on this value.
+
+### MAP_OBJECT_PANEL
+
+An in-scene UI panel — an RmlUi RML+CSS document rasterized to a textured quad.
+It owns a `DEP::UI_PANEL` (see `Ui_Context.md`) and exposes
+`Render(ENGINE*, w, h)` plus `Pixels()/Width()/Height()`. The compositor calls
+`Render` during traversal (on the render thread; cheap when unchanged) and hands
+the pixels to the renderer as an unlit, alpha-blended quad.
+
+By design a panel rides the universal TRS like any other node: its world size is
+authored in `Bound.d3Max[0,1]` (metres) and its placement in the node's
+transform. The current browser-internal **test** panel is the exception — it is
+injected by `Scene::Panel_Inject_Test` into every fabric, so the compositor sizes
+and billboards it relative to the framed scene rather than from absolute metres
+(see `Control.md`). This scaffolding stands in for the future panel API.
 
 ## Fabric Ownership Modes
 
@@ -399,6 +415,6 @@ their caller.
 | `Fabric.cpp` | FABRIC + Impl (WASM module lifecycle, node linkage, child fabrics; closes its root node via `Container()->Node_Close`) |
 | `Node.cpp` | NODE + Impl (tree ops, texture loading via IFILE, delegates fabric ops to SCENE; closes child nodes via `Container()->Node_Close`) |
 | `../Container.cpp` | CONTAINER + Impl — owns the per-container node handle table and the `Node_Root/Open/Close/Find` + private `Node_Create` operations |
-| `MapObject.h` | MAP_OBJECT hierarchy, ORBIT_POSITION struct, MAP_OBJECT_CLASS enum, celestial type enum, OBJECTIX (+ OBJECTIX_COMPOSE), RMCOBJECT wire structs |
-| `MapObject.cpp` | MAP_OBJECT methods, SolveKepler, QuatMultiply, RotateByQuat |
+| `Map_Object.h` | MAP_OBJECT hierarchy, ORBIT_POSITION struct, MAP_OBJECT_CLASS enum, celestial type enum, OBJECTIX (+ OBJECTIX_COMPOSE), RMCOBJECT wire structs |
+| `Map_Object.cpp` | MAP_OBJECT methods, SolveKepler, QuatMultiply, RotateByQuat |
 | `AccessControl.h/cpp` | CanRead/CanWrite enforcement |

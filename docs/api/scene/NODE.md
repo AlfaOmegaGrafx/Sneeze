@@ -5,7 +5,7 @@ audience: [integrator, contributor]
 sources:
   - include/Scene.h
   - src/context/scene/Node.cpp
-  - src/context/scene/MapObject.h
+  - include/Map_Object.h
 verified: 92fdc1c
 nav:
   prev: api/scene/FABRIC.md
@@ -113,7 +113,7 @@ bool Initialize (MAP_OBJECT* pMapObject);
 
 ```cpp
 uint64_t    ObjectIx          () const;
-MAP_OBJECT* MapObject         () const;
+MAP_OBJECT* Map_Object        () const;
 FABRIC*     Fabric            () const;
 FABRIC*     Fabric_Attachment () const;
 NODE*       Parent            () const;
@@ -125,7 +125,7 @@ bool        IsPrivate         () const;
 | Accessor | Returns | Notes |
 |---|---|---|
 | `ObjectIx()` | The node's scene-global object index. | Fixed at construction; the key for `SCENE::Node_Find`. |
-| `MapObject()` | The content payload, or null. | Null until `Initialize`. |
+| `Map_Object()` | The content payload, or null. | Null until `Initialize`. |
 | `Fabric()` | The owning fabric. | Never null; never reassigned. |
 | `Fabric_Attachment()` | The child fabric mounted on this node, or null. | At most one; set via `Fabric_Add`. |
 | `Parent()` | The parent node — or, for a fabric root, the fabric's attachment node. | Crosses fabric boundaries (see pitfalls). |

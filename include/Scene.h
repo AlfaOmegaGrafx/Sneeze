@@ -63,7 +63,7 @@ namespace SNEEZE
       std::string        ClassName         () const;  // "celestial", "terrestrial", ...
       std::string        TypeName          () const;  // "starsystem", "star", ... (class-specific)
       int                Subtype           () const;  // raw subtype discriminator
-      MAP_OBJECT*        MapObject         () const;
+      MAP_OBJECT*        Map_Object        () const;
       FABRIC*            Fabric            () const;
       FABRIC*            Fabric_Attachment () const;
       NODE*              Parent            () const;

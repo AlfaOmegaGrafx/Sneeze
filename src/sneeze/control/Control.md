@@ -169,6 +169,22 @@ helpers. Skipping them also keeps a giant collider (e.g. DFW's multi-km "Sector
 Floor Collider") from dominating `dMaxReach` and shrinking every real building to
 sub-pixel size (the "DFW is one flat sheet" bug).
 
+**Panels.** Each `MAP_OBJECT_PANEL` node rasterizes its RmlUi document to CPU
+pixels during traversal (`UI_PANEL::Render` on this thread; cheap when unchanged)
+and emits a `PANEL_DATA` (transform + pixel buffer) the renderer draws as an
+unlit textured quad (see `Ui_Context.md`, `Scene.md`, `Viewport.md`). Panels are
+**chrome, not scene geometry**: they do **not** contribute to `dMaxReach`, so a
+panel never changes how the 3D content is framed. The production design is that a
+panel's world size lives in `Bound.d3Max[0,1]` (metres) and its placement in the
+node's TRS, riding `dRenderScale` exactly like a box. The current browser-internal
+**test** panel deviates: because one panel is injected into every fabric
+(`Scene::Panel_Inject_Test`), a single absolute metre size cannot suit both a
+planetary system and a city block, so the flatten seam sizes it as a fraction of
+`TARGET_EXTENT` and **billboards** it toward the camera (its `+Z` normal tracks
+the eye, recomputed each frame) anchored just above the scene centre. This is
+scaffolding for the future panel API; `Bound`/TRS carry through and would drive a
+real per-fabric panel.
+
 **Lighting.** `TraverseNode` collects one light per `STAR` node at its world
 position; positions are scaled by `dRenderScale` at the seam. See Viewport.md
 "Lighting" for the ANARI-side point/ambient+directional fallback.

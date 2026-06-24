@@ -17,7 +17,7 @@
 #include "wasm/Wasm.h"
 #include "spirv/SpvPipeline.h"
 #include "xr/XrRuntime.h"
-#include "ui/UiContext.h"
+#include "ui/Ui_Context.h"
 
 #include <curl/curl.h>
 
@@ -49,16 +49,16 @@ class SNEEZE::ENGINE::Impl
 public:
 
    Impl (IENGINE* pHost, SNEEZE::ENGINE* pEngine) :
-      m_pHost        (pHost),
-      m_pEngine      (pEngine),
-      m_bInitialized (false),
-      m_pWasmRuntime (nullptr),
-      m_pSpvPipeline (nullptr),
-      m_pXrRuntime   (nullptr),
-      m_pUiContext   (nullptr),
-      m_nCurlInit    (CURLE_FAILED_INIT),
-      m_pControl     (nullptr),
-      m_pPersona     (nullptr)
+      m_pHost         (pHost),
+      m_pEngine       (pEngine),
+      m_bInitialized  (false),
+      m_pWasm_Runtime (nullptr),
+      m_pSpvPipeline  (nullptr),
+      m_pXrRuntime    (nullptr),
+      m_pUi_Context   (nullptr),
+      m_nCurlInit     (CURLE_FAILED_INIT),
+      m_pControl      (nullptr),
+      m_pPersona      (nullptr)
    {
    }
 
@@ -72,9 +72,9 @@ m_pPersona = new persona::PERSONA (m_pEngine);
 
       if (m_pHost  &&  !m_pHost->sAppDataPath ().empty ())
       {
-         m_pWasmRuntime = new DEP::WASM_RUNTIME ();
+         m_pWasm_Runtime = new DEP::WASM_RUNTIME ();
 
-         if (m_pWasmRuntime->Initialize (m_pEngine))
+         if (m_pWasm_Runtime->Initialize (m_pEngine))
          {
             m_pSpvPipeline = new DEP::SPV_PIPELINE ();
 
@@ -84,9 +84,9 @@ m_pPersona = new persona::PERSONA (m_pEngine);
 
                if (m_pXrRuntime->Initialize (m_pEngine))
                {
-                  m_pUiContext = new DEP::UI_CONTEXT ();
+                  m_pUi_Context = new DEP::UI_CONTEXT ();
 
-                  if (m_pUiContext->Initialize (m_pEngine))
+                  if (m_pUi_Context->Initialize (m_pEngine))
                   {
                      m_nCurlInit = curl_global_init (CURL_GLOBAL_DEFAULT);
 
@@ -137,8 +137,8 @@ m_pPersona = new persona::PERSONA (m_pEngine);
       if (m_nCurlInit == CURLE_OK)
          curl_global_cleanup ();
 
-      delete m_pUiContext;
-      m_pUiContext = nullptr;
+      delete m_pUi_Context;
+      m_pUi_Context = nullptr;
 
       delete m_pXrRuntime;
       m_pXrRuntime = nullptr;
@@ -146,8 +146,8 @@ m_pPersona = new persona::PERSONA (m_pEngine);
       delete m_pSpvPipeline;
       m_pSpvPipeline = nullptr;
 
-      delete m_pWasmRuntime;
-      m_pWasmRuntime = nullptr;
+      delete m_pWasm_Runtime;
+      m_pWasm_Runtime = nullptr;
 
       delete m_pPersona;
       m_pPersona = nullptr;
@@ -418,10 +418,10 @@ public:
    // Subsystems
    IENGINE*                   m_pHost;
    persona::PERSONA*          m_pPersona;
-   SNEEZE::DEP::WASM_RUNTIME* m_pWasmRuntime;
+   SNEEZE::DEP::WASM_RUNTIME* m_pWasm_Runtime;
    SNEEZE::DEP::SPV_PIPELINE* m_pSpvPipeline;
    SNEEZE::DEP::XR_RUNTIME*   m_pXrRuntime;
-   SNEEZE::DEP::UI_CONTEXT*   m_pUiContext;
+   SNEEZE::DEP::UI_CONTEXT*   m_pUi_Context;
    CURLcode                   m_nCurlInit;
 
    // Control (owns engine thread, agents, metronome, cleanup queue)
@@ -475,7 +475,8 @@ const std::string&         SNEEZE::ENGINE::Path_Persistent () const { return m_p
 const std::string&         SNEEZE::ENGINE::Path_Session    () const { return m_pImpl->m_sPath_Transitory_Session; }
 
 SNEEZE::persona::PERSONA*  SNEEZE::ENGINE::Persona         () const { return m_pImpl->m_pPersona; }
-SNEEZE::DEP::WASM_RUNTIME* SNEEZE::ENGINE::WasmRuntime     () const { return m_pImpl->m_pWasmRuntime; }
+SNEEZE::DEP::WASM_RUNTIME* SNEEZE::ENGINE::Wasm_Runtime    () const { return m_pImpl->m_pWasm_Runtime; }
+SNEEZE::DEP::UI_CONTEXT*   SNEEZE::ENGINE::Ui_Context      () const { return m_pImpl->m_pUi_Context; }
 
 void SNEEZE::ENGINE::Queue_Post_Fetch (JOB_FETCH* pJob_Fetch)
 {

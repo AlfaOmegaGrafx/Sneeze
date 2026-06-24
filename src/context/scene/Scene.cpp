@@ -14,7 +14,7 @@
 
 #include <Sneeze.h>
 
-#include "MapObject.h"
+#include "Map_Object.h"
 #include <algorithm>
 #include <mutex>
 #include <unordered_map>
@@ -120,14 +120,18 @@ public:
 
          if ((twObjectIx = pContainer->Node_Root (m_pFabric_Root->FabricIx (), &RMCObject)) != OBJECTIX_ERROR)
          {
+            uint64_t twRootIx = twObjectIx;
+
             RmcObject_Init (RMCObject);
             RMCObject.Head.Self.qwComposed = OBJECTIX_COMPOSE (MAP_OBJECT::MAP_OBJECT_CLASS_ROOT, OBJECTIX_IDENTITY);
             RMCObject.Type.bSubtype = 255;
             strncpy (RMCObject.Resource.sReference, sUrl.c_str (), sizeof (RMCObject.Resource.sReference) - 1);
 
-            if ((twObjectIx = pContainer->Node_Open (twObjectIx, &RMCObject)) != OBJECTIX_ERROR)
+            if ((twObjectIx = pContainer->Node_Open (twRootIx, &RMCObject)) != OBJECTIX_ERROR)
             {
                m_pNode_Primary = pContainer->Node_Find (twObjectIx);
+
+               Panel_Inject_Test (pContainer, twRootIx);
 
                bResult = true;
             }
@@ -135,6 +139,32 @@ public:
       }
 
       return bResult;
+   }
+
+   // TEST SCAFFOLDING: inject a single browser-internal UI panel node as a child
+   // of the SOM root. This stands in for the future API (WASM/service-created
+   // panels with caller-supplied RML). The panel is a real MAP_OBJECT_PANEL, so
+   // it flows through the compositor's universal TRS + per-scene render scale and
+   // the renderer's generic panel path -- no renderer-side special casing. Its
+   // world size (metres) lives in Bound.d3Max and its placement in Transform,
+   // both authored here for the test; remove once the panel API lands.
+   void Panel_Inject_Test (CONTAINER* pContainer, uint64_t twParentIx)
+   {
+      RMCOBJECT RMCObject;
+      RmcObject_Init (RMCObject);
+
+      RMCObject.Head.Self.qwComposed = OBJECTIX_COMPOSE (MAP_OBJECT::MAP_OBJECT_CLASS_PANEL, 0x0000000000000901ull);
+
+      // For this test panel, Bound carries only the quad's aspect ratio; the
+      // compositor sizes and places it as a fraction of the framed scene so the
+      // single injected panel reads sensibly in any fabric (a planetary system
+      // or a city block alike). A real per-fabric panel would instead author its
+      // size in metres here and ride the per-scene render scale like any box.
+      RMCObject.Bound.d3Max[0] = 1.0;   // aspect numerator   (width)
+      RMCObject.Bound.d3Max[1] = 1.0;   // aspect denominator (height)
+      RMCObject.Bound.d3Max[2] = 0.0;
+
+      pContainer->Node_Open (twParentIx, &RMCObject);
    }
 
    void Fabric_Root_Destroy ()
