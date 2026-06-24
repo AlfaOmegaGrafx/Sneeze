@@ -75,9 +75,14 @@ set (_repo "${SNEEZE_DEP_REPO}/filament")
 if (EXISTS "${_repo}/.git")
    set (_git_args)
 else ()
+   # Track our fork's main -- the single source of truth (Google's stable
+   # release at fork time plus our patches). We deliberately follow OUR main,
+   # not Google's upstream; a fork never auto-pulls upstream, so this stays
+   # frozen to our line until we choose to advance it. GIT_SHALLOW keeps the
+   # clone to the latest snapshot (no upstream history needed to build).
    set (_git_args
       GIT_REPOSITORY https://github.com/MetaversalCorp/filament.git
-      GIT_TAG        v1.71.0
+      GIT_TAG        main
       GIT_SHALLOW    ON
    )
 endif ()
