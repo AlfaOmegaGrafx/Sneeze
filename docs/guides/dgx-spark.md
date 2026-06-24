@@ -31,7 +31,7 @@ Installs: clang, lld, libc++, Vulkan/X11 dev headers, Rust, Go, NASM.
 ./scripts/build-dgx-spark.sh
 ```
 
-The script fast-forwards `main` from `origin` (MetaversalCorp), then runs `./scripts/build-linux.sh --all` on a fresh tree or an incremental Sneeze-only build when `libSneeze.a` already exists.
+The script runs [`sync-with-upstream.sh`](../../scripts/sync-with-upstream.sh) before building (merge canonical when the fork is ahead — `git pull --ff-only` is not safe in that case). See [Fork sync with MetaversalCorp](fork-sync.md).
 
 Artifacts:
 

@@ -8,7 +8,8 @@ cd "$SNEEZE_DIR"
 
 source "$HOME/.cargo/env" 2>/dev/null || true
 
-git pull --ff-only origin main
+# Merge canonical when fork is ahead (ff-only would fail).
+bash ./scripts/sync-with-upstream.sh --no-build
 
 # Deps already built? Incremental Sneeze-only rebuild is enough after pull.
 if [[ -f builds/linux-arm64/install/release/lib/libSneeze.a ]]; then

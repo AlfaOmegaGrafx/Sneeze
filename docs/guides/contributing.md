@@ -118,6 +118,7 @@ When you add or substantially edit a page, follow [STYLE.md](../STYLE.md): the f
 
 ## See also
 
+- [Fork sync with MetaversalCorp](fork-sync.md) — merge canonical when the AlfaOmegaGrafx fork is ahead; safe sync script and PR flow.
 - [Coding Conventions](../architecture/conventions.md) — the code style and design principles.
 - [STYLE.md](../STYLE.md) — the documentation authoring contract.
 - [Building Sneeze](building.md) — the two-tree build and how to add a dependency.

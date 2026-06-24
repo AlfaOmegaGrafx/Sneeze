@@ -401,3 +401,17 @@ Build-time tools required: CMake 3.20+, C++17 compiler, Rust/Cargo (Wasmtime), P
 All suites compiled into a single `SneezeTest` executable. Suite flags: `--wasm`, `--spv`, `--xr`, `--net`, `--ui`, `--compute`, `--vox`, `--jws`, `--network`, `--storage`, `--console`. No flags = run all. `--help` lists suites.
 
 The JWS suite resolves its certs directory at build time via the `SNEEZE_TEST_CERTS_DIR` compile definition (CMake `target_compile_definitions`, default `tests/certs`, overridable by `argv[1]`), so `--jws` passes from any working directory. The CMake-generated `Sneeze.sln` carries the define; the hand-maintained `msvc/` project does not.
+
+## Git remotes and canonical sync
+
+| Remote | Repo | Role |
+|--------|------|------|
+| `origin` | MetaversalCorp/Sneeze | **Canonical** — fetch/merge target; PRs land here |
+| `alfa` | AlfaOmegaGrafx/Sneeze | **Publish fork** — agent/user pushes from DGX |
+
+**Flow:** commit locally → `git push alfa main` → open PR to MetaversalCorp. PRs may not merge; the fork can be **many commits ahead** while canonical moves.
+
+**Never** use `git pull --ff-only origin main` when ahead of canonical — it fails. Use `./scripts/sync-with-upstream.sh` instead (merge, not rebase, to preserve pushed fork commits). After merge, run continuity checks; use `--push-fork` to update alfa. See `docs/guides/fork-sync.md`.
+
+`build-dgx-spark.sh` calls `sync-with-upstream.sh` before building.
+
