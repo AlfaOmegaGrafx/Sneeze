@@ -85,7 +85,7 @@ else ()
    # build the wrong version.
    set (_git_args
       GIT_REPOSITORY https://github.com/MetaversalCorp/filament.git
-      GIT_TAG        v1.71.0.mv.1
+      GIT_TAG        v1.71.0.mv.2
       GIT_SHALLOW    ON
    )
 endif ()
