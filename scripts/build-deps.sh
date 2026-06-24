@@ -88,7 +88,7 @@ case "$CONFIG" in
    *) echo "--config must be Debug or Release (got '$CONFIG')" >&2; exit 1 ;;
 esac
 
-# Auto-detect platform if not provided (matches Artemis manifest slugs).
+# Auto-detect platform if not provided.
 if [[ -z "$PLATFORM" ]]; then
    case "$(uname -s)" in
       Linux)

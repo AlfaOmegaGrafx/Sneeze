@@ -25,11 +25,13 @@ namespace SNEEZE
    {
       class UI_RENDER;
 
-      // Shared RmlUi manager: owns the one-time global RmlUi lifecycle (init,
-      // system interface, fonts) for the engine. Individual panels (UI_PANEL,
-      // one per MAP_OBJECT_PANEL) drive their own contexts/canvases and call
-      // EnsureReady() before rendering. There is exactly one UI_CONTEXT per
-      // ENGINE, reachable via ENGINE::Ui_Context().
+      // Shared RmlUi manager: owns the one-time global RmlUi lifecycle (init
+      // and system interface) for the engine. Fonts are not owned here -- the
+      // host application loads its faces into RmlUi's process-global font
+      // registry, which this engine instance shares. Individual panels
+      // (UI_PANEL, one per MAP_OBJECT_PANEL) drive their own contexts/canvases.
+      // There is exactly one UI_CONTEXT per ENGINE, reachable via
+      // ENGINE::Ui_Context().
       class UI_CONTEXT
       {
       public:
@@ -38,26 +40,19 @@ namespace SNEEZE
 
          bool Initialize (ENGINE* pEngine);
 
-         // Idempotent: guarantees RmlUi is initialized and fonts are loaded.
-         // Safe to call once per frame from the render (compositor) thread.
-         bool EnsureReady ();
-
          ENGINE* Engine () const { return m_pEngine; }
 
          // The one render interface for all engine-side panels. RmlUi keeps a
          // process-global render-manager registry keyed by render interface; the
-         // host (Artemis) shares that registry and may release it. Every panel
+         // host application shares that registry and may release it. Every panel
          // therefore binds its context to this single, engine-lifetime interface
          // so RmlUi never holds a render manager for a freed interface.
          UI_RENDER* Render () const { return m_pRender; }
 
       private:
-         bool EnsureFont ();
-
          ENGINE*    m_pEngine;
          UI_RENDER* m_pRender;        // shared by every panel; outlives Rml::Shutdown
          bool       m_bInitialized;
-         bool       m_bFontLoaded;
       };
    } // namespace DEP
 }

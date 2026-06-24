@@ -1,5 +1,5 @@
 ---
-description: Sneeze project context — MBE engine (static lib) consumed by Artemis (metaverse browser application)
+description: Sneeze project context — MBE engine (static lib) consumed by a host metaverse browser application
 alwaysApply: true
 ---
 
@@ -71,9 +71,9 @@ verified: <commit-sha>
 
 The project produces two components:
 
-- **Sneeze** — the Metaverse Browser Engine (MBE). A standalone, reusable engine library (static `.lib`). Analogous to Blink in the web browser world. All code lives in namespace `SNEEZE`. Owns all third-party dependencies and the engine modules that wrap them. Public API headers live in `include/` (consumed by Artemis); private implementation headers live in `src/`. Another team could build a different metaverse browser on top of Sneeze without touching Artemis.
+- **Sneeze** — the Metaverse Browser Engine (MBE). A standalone, reusable engine library (static `.lib`). Analogous to Blink in the web browser world. All code lives in namespace `SNEEZE`. Owns all third-party dependencies and the engine modules that wrap them. Public API headers live in `include/` (consumed by the host application); private implementation headers live in `src/`. Another team could build a different metaverse browser on top of Sneeze without touching the host application.
 
-- **Artemis** — the metaverse browser application. The single `.exe`. Analogous to Chrome/Chromium. A thin application layer that consumes Sneeze: window management (`canvas/`), user chrome, and `main()`. Owns SDL3 (windowing/input is application-level, not engine-level). Artemis is a separate repo (sibling directory) that compiles Sneeze inline via `add_subdirectory`. Artemis is **not open source**.
+- **The host application** — the metaverse browser application built on Sneeze. The single `.exe`. Analogous to Chrome/Chromium. A thin application layer that consumes Sneeze: window management (`canvas/`), user chrome, and `main()`. Owns SDL3 (windowing/input is application-level, not engine-level). It is a separate repo (sibling directory) that compiles Sneeze inline via `add_subdirectory`. It is **not open source**.
 
 The OMB architecture is fully documented in `OMB_Architecture_4.md` (authoritative, version 4, 2026 Q2, maintained outside this repo).
 

@@ -155,7 +155,7 @@ render units). `MOUSE_SENSITIVITY` is `0.0025` and `SCROLL_FACTOR` is `1.075`
 ## INPUT
 
 POD struct accumulating raw input state per viewport: mouse deltas, scroll,
-button state, key state. Written by Artemis via `Input_Mouse()` / `Input_Key()`.
+button state, key state. Written by the host application via `Input_Mouse()` / `Input_Key()`.
 Consumed by `Input_Consume()` (resets accumulated deltas). Protected by
 `m_mxInput` (std::mutex).
 

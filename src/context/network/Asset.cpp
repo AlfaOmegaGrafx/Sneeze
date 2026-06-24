@@ -474,7 +474,7 @@ public:
 
             std::unordered_map<std::string, std::string> umsReqHeaders;
 
-            umsReqHeaders.insert ({ "User-Agent", "Artemis/1.0 Sneeze/1.0 (Windows NT 10.0; Win64; x64)" });
+            umsReqHeaders.insert ({ "User-Agent", "Sneeze/1.0 (Windows NT 10.0; Win64; x64)" });
          // umsReqHeaders.insert ({ "Accept-Encoding", "gzip, deflate, br, zstd" });
 
             auto* pJob = new ASSET_FETCH (m_pAsset, m_sUrl, Path (kASSET_EXT_TEMP), Path (kASSET_EXT_DATA), m_sHash, umsReqHeaders);

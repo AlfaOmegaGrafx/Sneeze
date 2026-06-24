@@ -28,10 +28,10 @@ The CPU path is built and proven end-to-end:
   into a premultiplied-alpha RGBA8 canvas (textured triangles, top-left fill
   rule, scissor clipping). Deterministic pixel-assert unit test in the `--ui`
   suite.
-- **UI context** — `Ui_Context.{h,cpp}` owns the `Rml::Context`, loads the Inter
-  font faces (currently from the Artemis `deps/fonts` path — temporary), renders
-  a default RML document, and exposes the live canvas via
-  `Width()/Height()/Pixels()`.
+- **UI context** — `Ui_Context.{h,cpp}` owns the `Rml::Context`, renders a
+  default RML document, and exposes the live canvas via
+  `Width()/Height()/Pixels()`. It loads no fonts: the host application supplies
+  its faces through RmlUi's process-global font registry.
 - **Engine hand-off** — `ENGINE::Ui_Context()` (in `Sneeze.h`) exposes the context
   so the renderer can pull the canvas.
 - **Unlit material** — `HALOGEN_MATERIAL_UNLIT` extension implemented in Halogen
@@ -44,9 +44,8 @@ The CPU path is built and proven end-to-end:
 
 ### This is all test scaffolding
 
-The `m_bTestQuad` path, the hard-coded RML document in `Ui_Context.cpp`, and the
-absolute Artemis font path are proofs, not the product. They prove the pipeline;
-they are not the API.
+The `m_bTestQuad` path and the hard-coded RML document in `Ui_Context.cpp` are
+proofs, not the product. They prove the pipeline; they are not the API.
 
 ## Status against each objective
 
@@ -67,8 +66,9 @@ panel is display-only.
    scene rather than hard-wired to the sun.
 2. Move the RML document out of `Ui_Context.cpp`: load from a fabric/service asset
    (or host-provided string) instead of `szDEFAULT_DOC`.
-3. Resolve fonts via an Artemis-provided hand-off (host owns presentation
-   assets), removing the absolute test path in `EnsureFont()`.
+3. **Done.** Fonts are host-owned: the engine loads none (`EnsureFont()` and its
+   absolute test path are gone). The host loads its faces into RmlUi's
+   process-global font registry, which the engine instance shares.
 4. Re-render the canvas on change (dirty flag) instead of once at build.
 
 ### B. Input routing (serves #1 and #2)

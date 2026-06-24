@@ -36,7 +36,7 @@
 //     pacing (the metronome already provides infrastructure for this).
 //
 //  2. OFFSCREEN READBACK PATH. Render to ANARI framebuffers instead of native swapchains. No Filament swapchain = no per-viewport vsync.
-//     The compositor reads pixels back and Artemis presents via SDL. This path already exists as the non-native-surface fallback.
+//     The compositor reads pixels back and the host application presents them. This path already exists as the non-native-surface fallback.
 //
 //  3. HYBRID. Foreground viewport gets native surface rendering (direct GPU-to-screen). Background viewports render offscreen at reduced
 //     priority. Only one viewport ever pays the vsync cost.

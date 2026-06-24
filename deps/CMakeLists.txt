@@ -73,7 +73,7 @@ if (NOT DEFINED SNEEZE_PLATFORM OR SNEEZE_PLATFORM STREQUAL "")
       message (FATAL_ERROR "Unknown platform; set -DSNEEZE_PLATFORM=<slug> explicitly.")
    endif ()
    set (SNEEZE_PLATFORM "${_plat}" CACHE STRING
-      "Platform slug matching Artemis manifest.json (windows-x64, linux-x64, macos-arm64, ...)")
+      "Platform slug (windows-x64, linux-x64, macos-arm64, ...)")
 endif ()
 
 string (TOLOWER "${SNEEZE_CONFIG}" _cfg_lower)

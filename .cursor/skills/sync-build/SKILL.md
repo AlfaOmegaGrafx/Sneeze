@@ -98,5 +98,5 @@ Source files use relative paths from `msvc/`: `../src/sneeze/Engine.cpp`
 - The `.vcxproj` is the source of truth for file lists on Windows. `CMakeLists.txt` is
   synced FROM it, not the other way around (except when pulling changes from other platforms).
 - Sneeze is a static library (`ConfigurationType = StaticLibrary`).
-- The Artemis repo has its own independent `sync-build` skill with the same pattern.
+- The host application's repo has its own independent `sync-build` skill with the same pattern.
 - `.vcxproj.user` files are gitignored (personal debug settings).

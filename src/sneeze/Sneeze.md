@@ -6,7 +6,7 @@ managed thread lifecycle, and the foundational types (VEC3, QUAT, constants).
 
 ## ENGINE
 
-ENGINE is the single entry point the host application (Artemis) instantiates.
+ENGINE is the single entry point the host application instantiates.
 Uses the pimpl idiom. Constructor takes `IENGINE*` (host interface).
 
 ```cpp

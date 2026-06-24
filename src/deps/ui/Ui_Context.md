@@ -21,14 +21,15 @@ One per `ENGINE`, created last among the dependency wrappers and reachable via
   single shared **render interface** (`UI_RENDER`), and calls `Rml::Initialise()`.
   The destructor mirrors it: `Rml::Shutdown()`, then deletes the render interface
   last (it must outlive shutdown, which releases geometry/textures back through it).
-- `EnsureFont()` loads the UI fonts (idempotent). **TEMP:** it currently reads
-  Inter `.ttf` files from a hard-coded Artemis path; presentation assets belong to
-  the host, so this is a placeholder for an Artemis-provided font hand-off.
-- `EnsureReady()` — idempotent guard (initialized + fonts) panels call each frame.
 - `Render()` — the one shared `UI_RENDER`. Every panel binds its context to this
   single, engine-lifetime interface (see "One render interface" below).
 
 `Rml::Initialise` brings up RmlUi's FreeType-backed font engine automatically.
+
+**Fonts are host-owned.** The engine bundles and loads no fonts. The host
+application loads its faces (e.g. Inter) into RmlUi's process-global font
+registry, which this engine instance shares, so panels render with the host's
+fonts without the engine touching the filesystem.
 
 ## UI_PANEL
 
@@ -38,9 +39,9 @@ a straight-alpha output buffer it owns. A scene may hold many; the owning
 
 - `Source(rml)` sets the RML+CSS document (a built-in default panel is used until
   then) and marks the canvas dirty.
-- `Render(ENGINE*, w, h)` rasterizes the document into the canvas. It calls
-  `UI_CONTEXT::EnsureReady()`, creates the context lazily **bound to the shared
-  `UI_RENDER`** (`Rml::CreateContext(name, dims, pRender)`), then on the dirty
+- `Render(ENGINE*, w, h)` rasterizes the document into the canvas. It resolves
+  the engine's `UI_CONTEXT` and shared `UI_RENDER`, creates the context lazily
+  **bound to the shared `UI_RENDER`** (`Rml::CreateContext(name, dims, pUi_Render)`), then on the dirty
   path resizes the shared canvas to this panel, `Update()`s, clears, `Render()`s,
   and `Straighten()`s the result into its own buffer. Cheap when unchanged. Must
   run on the render (compositor) thread.
@@ -63,8 +64,8 @@ no-op defaults, so soft-glow/blur effects are deferred to a future GPU path.
 ## One render interface (and the host split)
 
 RmlUi keeps a **process-global render-manager registry keyed by render
-interface**. The host (Artemis) shares that registry: it creates its own
-`Rml::Context` + its own SDL render interface for chrome, and its teardown calls
+interface**. The host application shares that registry: it creates its own
+`Rml::Context` + its own render interface for chrome, and its teardown calls
 the global `Rml::ReleaseRenderManagers()`. If the engine handed each panel its own
 render interface, tearing a panel down would leave RmlUi holding a render manager
 for a freed interface, and the host's `ReleaseRenderManagers()` would call into
@@ -75,9 +76,10 @@ compositor thread and reuse its canvas as scratch, copying each result out.
 Ownership contract with the host:
 
 - **Engine (Sneeze):** owns `Rml::Initialise`/`Shutdown`, the global system
-  interface, fonts, and the one engine-side render interface.
-- **Host (Artemis):** creates its own context(s) and render interface for chrome;
-  must tear those down before the engine shuts RmlUi down.
+  interface, and the one engine-side render interface. It loads no fonts.
+- **Host application:** loads its font faces into RmlUi's process-global registry
+  and creates its own context(s) and render interface for chrome; must tear those
+  down before the engine shuts RmlUi down.
 
 ## How a panel reaches the screen
 

@@ -145,10 +145,10 @@ bool UI_PANEL::Render (ENGINE* pEngine, int nWidth, int nHeight)
 
    m_pEngine = pEngine;
 
-   UI_CONTEXT* pManager = pEngine ? pEngine->Ui_Context () : nullptr;
-   UI_RENDER*  pRender  = pManager ? pManager->Render () : nullptr;
+   UI_CONTEXT* pUi_Context = pEngine ? pEngine->Ui_Context () : nullptr;
+   UI_RENDER*  pUi_Render  = pUi_Context ? pUi_Context->Render () : nullptr;
 
-   if (pManager  &&  pRender  &&  pManager->EnsureReady ()  &&  nWidth > 0  &&  nHeight > 0)
+   if (pUi_Context  &&  pUi_Render  &&  nWidth > 0  &&  nHeight > 0)
    {
       // Bind this panel's context to the one shared render interface. Many
       // contexts on one interface is the normal RmlUi arrangement; panels render
@@ -156,7 +156,7 @@ bool UI_PANEL::Render (ENGINE* pEngine, int nWidth, int nHeight)
       // is reused as scratch and the result is copied out per panel.
       if (!m_pRmlContext)
       {
-         m_pRmlContext = Rml::CreateContext (m_sName, Rml::Vector2i (nWidth, nHeight), pRender);
+         m_pRmlContext = Rml::CreateContext (m_sName, Rml::Vector2i (nWidth, nHeight), pUi_Render);
          if (m_pRmlContext)
             m_bDirty = true;
       }
@@ -172,11 +172,11 @@ bool UI_PANEL::Render (ENGINE* pEngine, int nWidth, int nHeight)
          {
             // The shared canvas may have been left at another panel's size, so
             // size it to this panel before rendering.
-            pRender->Resize (nWidth, nHeight);
+            pUi_Render->Resize (nWidth, nHeight);
             m_pRmlContext->Update ();
-            pRender->Clear ();
+            pUi_Render->Clear ();
             m_pRmlContext->Render ();
-            Straighten (pRender);
+            Straighten (pUi_Render);
             m_bDirty = false;
          }
          bResult = !m_aStraight.empty ();
@@ -186,15 +186,15 @@ bool UI_PANEL::Render (ENGINE* pEngine, int nWidth, int nHeight)
    return bResult;
 }
 
-void UI_PANEL::Straighten (UI_RENDER* pRender)
+void UI_PANEL::Straighten (UI_RENDER* pUi_Render)
 {
    // The UI canvas is premultiplied alpha; the renderer's unlit "blend" material
    // expects straight alpha, so convert here -- the panel owns the UI-format
    // knowledge so the renderer stays UI-agnostic.
-   m_nWidth  = pRender->Width ();
-   m_nHeight = pRender->Height ();
+   m_nWidth  = pUi_Render->Width ();
+   m_nHeight = pUi_Render->Height ();
 
-   const uint8_t* pSrc  = pRender->Pixels ();
+   const uint8_t* pSrc  = pUi_Render->Pixels ();
    const size_t   nPixel = static_cast<size_t> (m_nWidth) * m_nHeight;
 
    m_aStraight.resize (nPixel * 4);

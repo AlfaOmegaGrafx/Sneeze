@@ -2,7 +2,7 @@
 
 Sneeze is the engine behind the Open Metaverse Browser, developed by the Open Metaverse Browser Initiative (OMBI), a project under the Metaverse Standards Forum. It handles rendering (via ANARI and Halogen), sandboxed code execution (via WebAssembly/Wasmtime), SPIR-V shader validation (via SPIRV-Tools), GPU compute dispatch (via Vox), XR device access (via OpenXR), networking (via curl), UI (via RmlUi), cryptographic trust verification (via BoringSSL and jwt-cpp), and structured data interchange (via nlohmann/json).
 
-Sneeze builds as a **static library** (`Sneeze.lib` on Windows, `libSneeze.a` elsewhere). It is consumed by an application (such as [Artemis](../Artemis)) via CMake's `add_subdirectory`. The application provides windowing and input; the engine renders into a surface the application supplies.
+Sneeze builds as a **static library** (`Sneeze.lib` on Windows, `libSneeze.a` elsewhere). It is consumed by a host application via CMake's `add_subdirectory`. The application provides windowing and input; the engine renders into a surface the application supplies.
 
 Building Sneeze conceptually has two phases, keyed by `(platform, config)`:
 
@@ -11,7 +11,7 @@ Building Sneeze conceptually has two phases, keyed by `(platform, config)`:
 
 One script per platform drives both. By default it runs phase 2 — that's the 99% command. Pass `-All` / `--all` for both phases (first-time setup), or `-Deps` / `--deps` for phase 1 only (dep refresh). Details in [Quick Start](#quick-start).
 
-`<platform>` is the same slug Artemis uses in its `pkg/manifest.json` — `windows-x64`, `linux-x64`, `macos-arm64`, etc. `<config>` is `debug` or `release`. Debug and Release live in fully separate trees, so you can keep both populated side-by-side without rebuilding.
+`<platform>` is a platform slug — `windows-x64`, `linux-x64`, `macos-arm64`, etc. `<config>` is `debug` or `release`. Debug and Release live in fully separate trees, so you can keep both populated side-by-side without rebuilding.
 
 Dependency builds are **stamp-cached** — once a dep builds successfully, the script skips it on every later deps run until you explicitly tell it otherwise. Source clones are shared across configs via `deps/repos/`, so switching between Debug and Release does not re-clone anything.
 
@@ -500,7 +500,7 @@ Sneeze/
         └── bin/               test executables + CLI tools (SignMsf, ...)
 ```
 
-`<platform>` uses Artemis manifest slugs: `windows-x64`, `linux-x64`, `linux-arm64`, `macos-arm64`, `macos-x64`, `ios-arm64`, `android-arm64`. `<config>` is `debug` or `release`. The Sneeze build tree is single-multi-config: one `build/` at `builds/<platform>/` drives both configs; each config lands in its own `install/<config>/` sibling. The deps tree remains per-config under `deps/builds/<platform>/<config>/`.
+`<platform>` is a platform slug: `windows-x64`, `linux-x64`, `linux-arm64`, `macos-arm64`, `macos-x64`, `ios-arm64`, `android-arm64`. `<config>` is `debug` or `release`. The Sneeze build tree is single-multi-config: one `build/` at `builds/<platform>/` drives both configs; each config lands in its own `install/<config>/` sibling. The deps tree remains per-config under `deps/builds/<platform>/<config>/`.
 
 ---
 

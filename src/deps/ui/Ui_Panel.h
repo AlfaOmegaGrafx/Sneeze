@@ -62,7 +62,7 @@ namespace SNEEZE
 
       private:
          bool EnsureDocument ();
-         void Straighten (UI_RENDER* pRender);   // premultiplied canvas -> straight-alpha output
+         void Straighten (UI_RENDER* pUi_Render);   // premultiplied canvas -> straight-alpha output
 
          ENGINE*               m_pEngine;
          Rml::Context*         m_pRmlContext;

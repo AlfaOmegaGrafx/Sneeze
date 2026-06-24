@@ -9,7 +9,7 @@
 - Ran full test suite: 10/10 suites, 295/295 assertions all passing
 - Dean committed all changes
 - Updated `project.mdc`: console descriptions updated for `m_umpStream` (was `m_apStream`), removed stale `m_umpBlock`/`Block_Open`/`Block_Close` references, noted single-stream-per-CID enforcement, updated file listings (removed `Block.h`/`Stream.h`), added private header notes for Network and Console
-- Console module declared ~90% complete; next step is Inspector work in Artemis
+- Console module declared ~90% complete; next step is Inspector work in the host application
 
 ## 2026-06-02 (Mon) ~afternoon PDT
 
@@ -62,7 +62,7 @@
 - Synced msvc/Sneeze.vcxproj: CertChain.cpp -> Chain.cpp, removed stale Node.h/Fabric.h, updated Msf.h path
 - Removed stale Node.h and Fabric.h from src/CMakeLists.txt SOM_HEADERS
 - Updated subsystem documentation (Console.md, Storage.md, Network.md) for new CID fields
-- Builds and runs (both Sneeze and Artemis)
+- Builds and runs (both Sneeze and the host application)
 - Planned next step: create first official MSF file via SignMsf, then wire fetch/parse/verify pipeline in Fabric::Initialize
 
 ## June 3–4, 2026 — ~late evening through June 4 ~12:30 PM PDT
@@ -98,7 +98,7 @@
 - Updated `CONTAINER::Open()`/`Close()` to use `m_pContext->WasmRuntime()->Store_Open/Close()` instead of reaching through Engine
 - Fixed outdated Storage test assertions: `containerName` -> `container` (field rename), `m_nCreatedCount == 1` -> `>= 1` (root container now creates its own silo during Context_Open)
 - All tests pass: 44/44 storage, 40/40 WASM, full suite green
-- Artemis verified working
+- Host application verified working
 
 ## June 5, 2026 — ~11:30 AM – ~11:55 AM PDT
 
@@ -202,7 +202,7 @@
 - Discussed and documented fabric ownership modes (WASM-managed vs map-managed) and the duplicate index problem when same MSF is loaded into multiple fabrics sharing one container
 - Added "Fabric Ownership Modes" section to Scene.md with full discussion
 - Added REVISIT comment in Container.cpp at Scene Node Handle Table section
-- All 10 test suites pass (312 assertions, 0 failures), Artemis runs clean
+- All 10 test suites pass (312 assertions, 0 failures), host application runs clean
 - Updated project.mdc with fabric lifecycle, ownership modes, and duplicate index problem
 
 ## June 8, 2026 — Dean Abramson (morning session)
@@ -250,7 +250,7 @@
 - The scene's two built-in root-fabric nodes are now class `MAP_OBJECT_CLASS_ROOT`
 - Second change same session: the values formerly in `bSubtype` (celestial type) moved into `bType`; `bSubtype__` is now the poisoned reserved byte. Renamed enum to `MAP_OBJECT_TYPE_TYPE_CELESTIAL_*`. Updated all reads (MapObject.cpp, Compositor.cpp) and the `== 255` attachment marker (Node.cpp, Scene.cpp)
 - Rust producer (solar_system): removed the redundant index-1 ROOT node; "Solar System" (index 2, STARSYSTEM, CELESTIAL) is now created via `Node_Root` as the fabric root (star.rs line 5 commented out by Dean, count 3→2). Added `objectix_compose` helper + `MAP_OBJECT_CLASS_CELESTIAL`/celestial type consts (u8); pack class into Self/Parent; write type into `bType`, zero `bSubtype__`. wasm rebuilds clean; fresh `solar_system.wasm` ready for CDN
-- C++ builds (Dean confirmed); produced an Artemis hand-off note covering composed handles, the class enum, and the poisoned bytes
+- C++ builds (Dean confirmed); produced a host-application hand-off note covering composed handles, the class enum, and the poisoned bytes
 - Updated internal Scene.md (OBJECTIX/compose, composed-key handle table, Node_Create class switch, MAP_OBJECT class-derived model, bType celestial type). Wiki pages (docs/) deferred at Dean's request
 
 ## June 13, 2026 (Sat) ~9:37 AM – 11:02 AM PDT — Dean Abramson
@@ -264,7 +264,7 @@
 - **Zoom:** lowered `MIN_DISTANCE` from `0.1` to `0.0001` AU in Viewport.cpp (Earth's rendered radius ~0.002 AU; near plane 0.0001) so the camera can approach a surface
 - **Multi-fabric composition fix (the headline bug):** secondary fabric (earth-system attached under the solar system) loaded — nodes existed, textures loaded — but Earth/Moon didn't render. Cause: the compositor traversed a child's attachment with the **parent's** frame, not the child's accumulated frame. Worked one level deep only because the browser root attachment node is `ROOT` class (frame-neutral); the `earthsystem` attachment is `PLANETSYSTEM` and applies an orbital offset, so Earth/Moon were placed at the Sun (origin) and lost. Fix: each node traverses **its own** attachment at the end of its own `TraverseNode`, using its own `childFrame`. Result: "Touchdown! We have a multi-fabric scene!"
 - Side fixes confirmed earlier in the broader effort and still in play: `CHAIN::HashString` now emits the full 64-char SHA-256 (was truncated to 12); `MsfFile::Parse` detects plain JSON (`{`/`[` after optional BOM/whitespace) before the JWS dot-heuristic; generic `map.wasm` (tests/wasm/map) calls `Scene.Node_Map` so the host injects nodes from the MSF `data` block; `Submit_Surface` writes an identity quaternion
-- Deferred: empty persona hash in the container key (no persona logged in — Artemis lifecycle concern, not a key-logic bug); true-proportion scaling (sqrt size compression makes the Moon ~half an Earth); the ambient-light caveat above
+- Deferred: empty persona hash in the container key (no persona logged in — host-application lifecycle concern, not a key-logic bug); true-proportion scaling (sqrt size compression makes the Moon ~half an Earth); the ambient-light caveat above
 - Updated docs: Scene.md (node table now on CONTAINER, per-container identity, bSubtype attachment marker, threading split, duplicate-index scope narrowed, files table) and Viewport.md (SetLights/LIGHT_DATA lighting model + ambient caveat, zoom range). Wiki pages (docs/) not touched
 - Dean to commit this morning's work himself
 

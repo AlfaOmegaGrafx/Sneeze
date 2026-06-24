@@ -44,7 +44,7 @@ Choosing one shared toolkit solves the problem from both directions at once. A h
 - **The system interface** answers the two things RmlUi needs from its host: elapsed time, from a steady clock, and logging, mapped from RmlUi's log levels onto the engine's own `Log`.
 - **The render interface** is the one shared `UI_RENDER`.
 
-It then calls `Rml::Initialise()`, which also brings up RmlUi's FreeType-backed font engine. The destructor is the exact mirror — `Rml::Shutdown()` — after which the render interface is destroyed last, because shutdown releases geometry and textures back through it. Fonts are loaded on demand (`EnsureReady()` guards both initialization and font loading so a panel can call it every frame); the font hand-off from the host application is not yet finalized.
+It then calls `Rml::Initialise()`, which also brings up RmlUi's FreeType-backed font engine. The destructor is the exact mirror — `Rml::Shutdown()` — after which the render interface is destroyed last, because shutdown releases geometry and textures back through it. Fonts are not owned by the engine: the host application loads its faces into RmlUi's process-global font registry, which this engine instance shares, so panels render with the host's fonts without the engine touching the filesystem. Because the engine refuses to finish starting up unless `Rml::Initialise()` succeeded (the compositor that renders panels is created only after the UI context initializes), panels need no per-frame readiness guard.
 
 ---
 

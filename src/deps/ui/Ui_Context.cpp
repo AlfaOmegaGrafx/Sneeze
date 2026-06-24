@@ -69,7 +69,6 @@ UI_CONTEXT::UI_CONTEXT ()
    : m_pEngine (nullptr)
    , m_pRender (nullptr)
    , m_bInitialized (false)
-   , m_bFontLoaded (false)
 {
 }
 
@@ -107,36 +106,4 @@ bool UI_CONTEXT::Initialize (ENGINE* pEngine)
    }
 
    return m_bInitialized;
-}
-
-bool UI_CONTEXT::EnsureFont ()
-{
-   if (m_bFontLoaded)
-      return true;
-
-   // TEMP: test-only font path. Replace with an Artemis-provided font hand-off
-   // (the host owns presentation assets; the engine should not bundle fonts).
-   // RmlUi reads each face's weight from the file, so loading several weights
-   // lets font-weight in CSS select the right one.
-   const char* const aszFont[] =
-   {
-      "E:/Dev/OMB/Artemis/deps/fonts/Inter/Inter-Regular.ttf",
-      "E:/Dev/OMB/Artemis/deps/fonts/Inter/Inter-Medium.ttf",
-      "E:/Dev/OMB/Artemis/deps/fonts/Inter/Inter-SemiBold.ttf",
-      "E:/Dev/OMB/Artemis/deps/fonts/Inter/Inter-Bold.ttf",
-   };
-   for (const char* szFont : aszFont)
-   {
-      if (!Rml::LoadFontFace (szFont))
-         m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "UI_CONTEXT", std::string ("LoadFontFace failed: ") + szFont);
-      else
-         m_bFontLoaded = true;
-   }
-
-   return m_bFontLoaded;
-}
-
-bool UI_CONTEXT::EnsureReady ()
-{
-   return m_bInitialized  &&  EnsureFont ();
 }
