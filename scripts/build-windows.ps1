@@ -37,6 +37,14 @@
 #                   -Rebuild -Only <dep>      scrub + rebuild one dep
 #                   -Rebuild -All             scrub + rebuild deps, then Sneeze
 #                 Source clones in deps/repos/ are never scrubbed.
+#   -Sync         Modifier (implies deps-targeting): for the dep(s) in scope,
+#                 if a clone is checked out at the wrong commit for the
+#                 immutable tag its deps/<dep>.cmake pins, fetch that tag,
+#                 check it out, and force a rebuild. Without -Sync, a tag
+#                 mismatch is a hard error (the build refuses to silently
+#                 compile stale source after a GIT_TAG bump). Branch pins
+#                 (main/master/next_release) are "track latest" by design and
+#                 are never enforced or moved.
 #
 # HARD RULE: the deps folder (deps/builds/<platform>/<config>/) may only be
 # modified when -Deps, -Only, or -All is present on the command line. A
@@ -71,6 +79,7 @@
 #   .\scripts\build-windows.ps1 -Rebuild               # Full-scrub rebuild of Sneeze only
 #   .\scripts\build-windows.ps1 -Deps -Rebuild         # Full-scrub rebuild of all deps
 #   .\scripts\build-windows.ps1 -All -Rebuild          # Full-scrub rebuild of deps + Sneeze
+#   .\scripts\build-windows.ps1 -Only filament -Sync   # Move clone to the pinned tag, then rebuild
 #   .\scripts\build-windows.ps1 -List                  # Stamp cache state
 
 [CmdletBinding()]
@@ -84,6 +93,7 @@ param (
    [switch]   $Deps,
    [switch]   $All,
    [switch]   $Fresh,
+   [switch]   $Sync,
    [Parameter (ValueFromRemainingArguments = $true)]
    [string[]] $CMakeExtraArgs
 )
@@ -118,7 +128,7 @@ $StampDir = Join-Path $DepsBuildDir '.dep-stamps'
 # HARD RULE: if none of -Deps, -Only, or -All is set, the deps folder must
 # never be touched -- regardless of what -Rebuild / -Fresh are doing.
 # (-List is read-only and handled via its own early exit below.)
-$DepsMode   = [bool]($Deps -or $All -or $Only -or $List)
+$DepsMode   = [bool]($Deps -or $All -or $Only -or $List -or $Sync)
 $SneezeMode = [bool]((-not $DepsMode) -or $All)
 # Reconfigure the Sneeze tree before building. Implied by -All and -Fresh.
 # -Rebuild does NOT force reconfigure any more: it cleans via `cmake --build
@@ -206,6 +216,84 @@ function Show-DepList {
    }
 }
 
+# Parse deps/<dep>.cmake for the pinned ref (GIT_TAG) and the source-clone
+# folder (set (_repo "${SNEEZE_DEP_REPO}/<folder>")). Returns $null when the
+# recipe has no git pin (header-only deps).
+function Get-DepPin ([string] $Dep) {
+   $cmakeFile = Join-Path $DepsSourceDir "$Dep.cmake"
+   if (-not (Test-Path $cmakeFile)) { return $null }
+
+   $text = Get-Content -Raw -LiteralPath $cmakeFile
+
+   $mTag = [regex]::Match($text, 'GIT_TAG\s+(\S+)')
+   if (-not $mTag.Success) { return $null }
+
+   $mRepo  = [regex]::Match($text, 'SNEEZE_DEP_REPO\}/([^"]+)"')
+   $folder = if ($mRepo.Success) { $mRepo.Groups[1].Value } else { $Dep }
+
+   return [pscustomobject] @{
+      Ref  = $mTag.Groups[1].Value
+      Repo = Join-Path $DepRepo $folder
+   }
+}
+
+# Guard against the silent-stale-version trap: deps/<dep>.cmake's GIT_TAG only
+# governs the FIRST clone; bumping it never moves an existing clone, so a build
+# would otherwise recompile the old source with no warning. For deps pinned to
+# an immutable tag, verify the clone is actually on that tag. Branch pins
+# (main/master/next_release) are intentionally "track latest" and are skipped.
+# On mismatch: hard error by default, or auto-correct (fetch + checkout + force
+# rebuild) when -Sync is given.
+function Assert-DepCheckout ([string] $Dep, [switch] $AutoSync) {
+   $pin = Get-DepPin $Dep
+   if (-not $pin) { return }
+   if (-not (Test-Path (Join-Path $pin.Repo '.git'))) { return }   # not cloned yet; first clone honors the pin
+
+   $head = (& git -C $pin.Repo rev-parse HEAD 2>$null)
+   if ($LASTEXITCODE -ne 0) { return }
+   $head = $head.Trim()
+
+   # Cheap offline test: does the pinned ref resolve locally to HEAD? Covers
+   # both a tag checked out detached and a branch sitting on its tip.
+   $resolved = (& git -C $pin.Repo rev-parse --verify --quiet "$($pin.Ref)^{commit}" 2>$null)
+   if ($resolved -and $resolved.Trim() -eq $head) { return }
+
+   # Not on the pin. Classify the ref against the remote (only reached on a
+   # potential mismatch, so this network call is rare). Branch pins are exempt.
+   $isTag = [bool] (& git -C $pin.Repo ls-remote --tags origin "refs/tags/$($pin.Ref)" 2>$null)
+   if (-not $isTag) {
+      $isBranch = [bool] (& git -C $pin.Repo ls-remote --heads origin "refs/heads/$($pin.Ref)" 2>$null)
+      if ($isBranch) { return }   # branch pin -- track-latest by design, not enforced
+      Write-Warning "${Dep}: could not classify pinned ref '$($pin.Ref)' (offline?); skipping checkout verification."
+      return
+   }
+
+   $short = $head.Substring(0, [Math]::Min(8, $head.Length))
+   if ($AutoSync) {
+      Write-Host "  [sync] $Dep at $short -> pinned tag '$($pin.Ref)' (fetch + checkout + rebuild)"
+      & git -C $pin.Repo fetch --depth 1 origin tag $pin.Ref
+      if ($LASTEXITCODE -ne 0) { Write-Error "Could not fetch tag '$($pin.Ref)' for ${Dep}"; exit 1 }
+      & git -C $pin.Repo checkout --detach $pin.Ref
+      if ($LASTEXITCODE -ne 0) { Write-Error "Could not check out tag '$($pin.Ref)' for ${Dep}"; exit 1 }
+      Remove-DepState $Dep
+      Write-Host "  [sync] $Dep now at $($pin.Ref)"
+   } else {
+      Write-Error @"
+$Dep is not checked out at the tag its recipe pins.
+  pinned (deps/$Dep.cmake): $($pin.Ref)
+  checked out:              $short   ($($pin.Repo))
+
+GIT_TAG only governs the first clone; an existing clone is never moved when
+you bump it. Re-run with -Sync to fetch and check out the pin automatically:
+  .\scripts\build-windows.ps1 -Only $Dep -Sync
+or fix it by hand:
+  git -C "$($pin.Repo)" fetch --depth 1 origin tag $($pin.Ref)
+  git -C "$($pin.Repo)" checkout --detach $($pin.Ref)
+"@
+      exit 1
+   }
+}
+
 
 function Clear-SneezePrecompiledHeaders {
    param ([string] $BuildRoot)
@@ -256,6 +344,15 @@ if ($DepsMode) {
          Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $DepRoot
          Write-Host "Scrubbed: $DepRoot"
       }
+   }
+
+   # Verify each cloned dep's checkout matches the immutable tag its recipe
+   # pins before anything builds. Catches the case where GIT_TAG was bumped
+   # but the existing clone was never moved -- which would otherwise rebuild
+   # stale source silently. -Sync auto-corrects; otherwise this hard-errors.
+   $depsTargeted = if ($Only) { @($Only) } else { $DepsOrdered }
+   foreach ($dep in $depsTargeted) {
+      Assert-DepCheckout -Dep $dep -AutoSync:$Sync
    }
 
    $depsCMakeLists = Join-Path $DepsSourceDir 'CMakeLists.txt'

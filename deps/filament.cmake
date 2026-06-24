@@ -75,14 +75,17 @@ set (_repo "${SNEEZE_DEP_REPO}/filament")
 if (EXISTS "${_repo}/.git")
    set (_git_args)
 else ()
-   # Track our fork's main -- the single source of truth (Google's stable
-   # release at fork time plus our patches). We deliberately follow OUR main,
-   # not Google's upstream; a fork never auto-pulls upstream, so this stays
-   # frozen to our line until we choose to advance it. GIT_SHALLOW keeps the
-   # clone to the latest snapshot (no upstream history needed to build).
+   # Pin to a tag on our fork: the stable Filament release we forked plus our
+   # own patches (currently the CreateMergeReturnPass inliner patch). Like
+   # every other dep this is an immutable tag, never a branch -- a given Sneeze
+   # commit always builds the exact same Filament (reproducible), and we never
+   # pull Google's post-fork upstream. To advance to a newer fork tag, bump
+   # GIT_TAG here; an existing clone is NOT auto-updated by that edit, so the
+   # build script checks the checkout against this tag and refuses to silently
+   # build the wrong version.
    set (_git_args
       GIT_REPOSITORY https://github.com/MetaversalCorp/filament.git
-      GIT_TAG        main
+      GIT_TAG        v1.71.0.mv.1
       GIT_SHALLOW    ON
    )
 endif ()

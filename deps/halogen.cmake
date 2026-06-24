@@ -77,6 +77,12 @@ set (_repo "${SNEEZE_DEP_REPO}/Halogen")
 if (EXISTS "${_repo}/.git")
    set (_git_args)
 else ()
+   # Pin to an immutable Halogen release tag, never the master branch, so a
+   # given Sneeze commit always builds the same Halogen (reproducible) like
+   # every other dep. To advance, bump GIT_TAG to a newer release tag; an
+   # existing clone is NOT auto-moved by that edit, so the build script checks
+   # the checkout against this tag and refuses to silently build the wrong one.
+   #
    # Halogen has two submodules: external/corrade (required) and
    # external/anari-sdk (skipped because we pass ANARI_ROOT, which takes
    # the find_package branch and bypasses add_subdirectory(external/anari-sdk)).
@@ -84,7 +90,7 @@ else ()
    # anari-sdk we'd otherwise never use.
    set (_git_args
       GIT_REPOSITORY https://github.com/MetaversalCorp/Halogen.git
-      GIT_TAG        master
+      GIT_TAG        v1.1.0
       GIT_SHALLOW    ON
       GIT_SUBMODULES external/corrade
    )
