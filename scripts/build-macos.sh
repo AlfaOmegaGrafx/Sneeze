@@ -28,6 +28,9 @@
 #   --all          Build deps, then configure + build Sneeze.
 #   --only <dep>   Build a single dep (implies deps-targeting).
 #   --list         Show dep stamp cache.
+#   --sync         Modifier (implies deps-targeting): move the dep(s) in scope
+#                  to the immutable tag their deps/<dep>.cmake pins, then force a
+#                  rebuild. Without it, a tag mismatch is a hard error.
 #   --rebuild      Modifier: force a full rebuild of whatever target(s) are
 #                  selected by the other flags, regardless of prior build state.
 #                  NEVER crosses the src <-> deps wall on its own. Matrix:
@@ -86,6 +89,7 @@ while [[ $# -gt 0 ]]; do
       --config=*)     CONFIG="${1#--config=}" ;;
       --only|--list)  DEPS_FORWARD=1; EXTRA_ARGS+=("$1") ;;
       --only=*)       DEPS_FORWARD=1; EXTRA_ARGS+=("$1") ;;
+      --sync)         DEPS_FORWARD=1; EXTRA_ARGS+=("$1") ;;
       *)              EXTRA_ARGS+=("$1") ;;
    esac
    shift

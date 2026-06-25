@@ -10,6 +10,11 @@
 #   Source clones in deps/repos/ are preserved. With --only: scrubs one dep
 #   (script stamp + ExternalProject prefix + libs/<dep>/). Without --only:
 #   scrubs the entire per-config dep root.
+# --sync: for the dep(s) in scope, if a clone is checked out at the wrong commit
+#   for the immutable tag its deps/<dep>.cmake pins, fetch that tag, check it
+#   out, and force a rebuild. Without --sync, a tag mismatch is a hard error
+#   (the build refuses to silently compile stale source after a GIT_TAG bump).
+#   Branch pins (main/master/next_release) are track-latest and never enforced.
 #
 # Expected invocation is via build-linux.sh / build-macos.sh which pick the
 # per-config directories. To invoke directly, pass --config, --platform,
@@ -36,6 +41,7 @@ DEP_REPO="${DEP_REPO:-$SNEEZE_DIR/deps/repos}"
 REBUILD=0
 ONLY=""
 LIST_ONLY=0
+SYNC=0
 CMAKE_EXTRA_ARGS=()
 
 # ---------------------------------------------------------------------------
@@ -71,6 +77,7 @@ while [[ $# -gt 0 ]]; do
       --rebuild)      REBUILD=1 ;;
       --only)         shift; ONLY="$1" ;;
       --list)         LIST_ONLY=1 ;;
+      --sync)         SYNC=1 ;;
       --config)       shift; CONFIG="$1" ;;
       --platform)     shift; PLATFORM="$1" ;;
       --build-dir)    shift; BUILD_DIR="$1" ;;
@@ -157,6 +164,84 @@ list_deps() {
    done
 }
 
+# Parse deps/<dep>.cmake for the pinned ref (GIT_TAG). Matches the directive
+# only, never the word GIT_TAG inside a comment: the comment is stripped (from
+# '#' to end of line) before the line is tested. Echoes nothing when the recipe
+# has no git pin (header-only deps).
+dep_pin_ref() {
+   local f="$SNEEZE_DIR/deps/$1.cmake"
+   [[ -f "$f" ]] || return 0
+   awk '{ gsub(/\r$/, ""); sub(/#.*/, ""); if (match($0, /GIT_TAG[ \t]+[^ \t]+/)) { s = substr($0, RSTART, RLENGTH); sub(/^GIT_TAG[ \t]+/, "", s); print s; exit } }' "$f"
+}
+
+# Parse the source-clone folder from set (_repo "${SNEEZE_DEP_REPO}/<folder>").
+# Falls back to the dep name. Echoes the absolute clone path.
+dep_pin_repo() {
+   local f="$SNEEZE_DIR/deps/$1.cmake"
+   local folder=""
+   [[ -f "$f" ]] && folder="$(awk 'match($0, /SNEEZE_DEP_REPO\}\/[^"]+/) { s = substr($0, RSTART, RLENGTH); sub(/.*SNEEZE_DEP_REPO\}\//, "", s); print s; exit }' "$f")"
+   [[ -n "$folder" ]] || folder="$1"
+   echo "$DEP_REPO/$folder"
+}
+
+# Guard against the silent-stale-version trap: deps/<dep>.cmake's GIT_TAG only
+# governs the FIRST clone; bumping it never moves an existing clone, so a build
+# would otherwise recompile the old source with no warning. For deps pinned to
+# an immutable tag, verify the clone is on that tag. Branch pins (main/master/
+# next_release) are intentionally track-latest and are skipped. On mismatch:
+# hard error by default, or auto-correct (fetch + checkout + force rebuild)
+# when --sync is given.
+assert_dep_checkout() {
+   local dep="$1"
+   local ref repo head resolved short
+
+   ref="$(dep_pin_ref "$dep")"
+   [[ -n "$ref" ]] || return 0
+   repo="$(dep_pin_repo "$dep")"
+   [[ -d "$repo/.git" ]] || return 0          # not cloned yet; first clone honors the pin
+
+   head="$(git -C "$repo" rev-parse HEAD 2>/dev/null || true)"
+   [[ -n "$head" ]] || return 0
+
+   # Cheap offline test: does the pinned ref resolve locally to HEAD? Covers
+   # both a tag checked out detached and a branch sitting on its tip.
+   resolved="$(git -C "$repo" rev-parse --verify --quiet "${ref}^{commit}" 2>/dev/null || true)"
+   [[ -n "$resolved"  &&  "$resolved" == "$head" ]] && return 0
+
+   # Not on the pin. Classify the ref against the remote (only reached on a
+   # potential mismatch, so this network call is rare). Branch pins are exempt.
+   if [[ -z "$(git -C "$repo" ls-remote --tags origin "refs/tags/$ref" 2>/dev/null || true)" ]]; then
+      if [[ -n "$(git -C "$repo" ls-remote --heads origin "refs/heads/$ref" 2>/dev/null || true)" ]]; then
+         return 0   # branch pin -- track-latest by design, not enforced
+      fi
+      echo "WARNING: $dep: could not classify pinned ref '$ref' (offline?); skipping checkout verification." >&2
+      return 0
+   fi
+
+   short="${head:0:8}"
+   if [[ $SYNC -eq 1 ]]; then
+      echo "  [sync] $dep at $short -> pinned tag '$ref' (fetch + checkout + rebuild)"
+      git -C "$repo" fetch --depth 1 origin tag "$ref"
+      git -C "$repo" checkout --detach "$ref"
+      remove_dep_state "$dep"
+      echo "  [sync] $dep now at $ref"
+   else
+      cat >&2 <<EOF
+$dep is not checked out at the tag its recipe pins.
+  pinned (deps/$dep.cmake): $ref
+  checked out:              $short   ($repo)
+
+GIT_TAG only governs the first clone; an existing clone is never moved when you
+bump it. Re-run with --sync to fetch and check out the pin automatically:
+  ./scripts/build-deps.sh --only $dep --sync
+or fix it by hand:
+  git -C "$repo" fetch --depth 1 origin tag $ref
+  git -C "$repo" checkout --detach $ref
+EOF
+      exit 1
+   fi
+}
+
 # ---------------------------------------------------------------------------
 # List mode
 # ---------------------------------------------------------------------------
@@ -184,6 +269,24 @@ if [[ $REBUILD -eq 1 ]]; then
       echo "Scrubbed: $DEP_ROOT"
    fi
 fi
+
+# ---------------------------------------------------------------------------
+# Verify each targeted clone matches the immutable tag its recipe pins before
+# anything configures or builds. Catches the case where GIT_TAG was bumped but
+# the existing clone was never moved -- which would otherwise rebuild stale
+# source silently. --sync auto-corrects; otherwise this hard-errors. Branch
+# pins are track-latest by design and are skipped.
+# ---------------------------------------------------------------------------
+
+if [[ -n "$ONLY" ]]; then
+   DEPS_TO_CHECK=("$ONLY")
+else
+   DEPS_TO_CHECK=("${DEPS_ORDERED[@]}")
+fi
+
+for dep in "${DEPS_TO_CHECK[@]}"; do
+   assert_dep_checkout "$dep"
+done
 
 # ---------------------------------------------------------------------------
 # Configure (once -- idempotent via CMakeCache)
