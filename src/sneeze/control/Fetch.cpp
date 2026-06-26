@@ -19,6 +19,10 @@
 #include <curl/curl.h>
 #include <openssl/evp.h>
 
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
+
 using namespace SNEEZE;
 
 void JOB_FETCH::Result (const FETCH_RESULT& result)
@@ -379,7 +383,10 @@ void AGENT::FETCH::Execute (JOB_FETCH* pJob_Fetch)
                curl_easy_setopt (pCurl, CURLOPT_XFERINFODATA, &progress);
                curl_easy_setopt (pCurl, CURLOPT_NOPROGRESS, 0L);
 
-#if !defined(_WIN32) && !defined(__APPLE__)
+               // Win32 Schannel and iOS Secure Transport use the OS trust store.
+               // macOS desktop curl links BoringSSL (same as Linux/Android) and
+               // needs the embedded Mozilla CA bundle.
+#if !defined(_WIN32) && !(defined(__APPLE__) && TARGET_OS_IPHONE)
                extern const char*        const g_szCaCertPem;
                extern const unsigned long       g_nCaCertPemLen;
                curl_blob caBlob;

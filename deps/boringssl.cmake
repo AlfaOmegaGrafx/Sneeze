@@ -1,8 +1,6 @@
 # BoringSSL -- crypto primitives for src/jws/ on all platforms.
-# Also serves as curl's TLS backend on Android (replaces OpenSSL there).
-# On Windows, macOS, iOS, and Linux, curl uses the platform-native TLS
-# stack (Schannel, Secure Transport, or system OpenSSL); BoringSSL on
-# those platforms is used only by Sneeze's own crypto code.
+# Also serves as curl's TLS backend on Linux, Android, and macOS.
+# iOS curl uses Secure Transport; Windows curl uses Schannel.
 
 set (BORINGSSL_INSTALL_DIR "${LIBS_DIR}/boringssl/install")
 
