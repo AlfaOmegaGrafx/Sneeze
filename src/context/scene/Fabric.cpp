@@ -37,7 +37,7 @@ public:
 
    bool Initialize (CONTAINER* pContainer)
    {
-      m_pFile = m_pScene->Network ()->File_Open (pContainer, m_sUrl, m_sHash, 0, this);
+      m_pFile = pContainer->Cache ()->File_Open (m_sUrl, m_sHash, 0, this);
 
       return (m_pFile != nullptr);
    }

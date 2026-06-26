@@ -25,13 +25,18 @@ std::string CONTAINER::CID::DisplayName () const
    return ((eTrust >= kTRUST_EXPIRED) ? sOrganization : sOrganizationHash) + "/" + sContainer;
 }
 
-std::string CONTAINER::CID::Key () const
+std::string CONTAINER::CID::Key_Org () const
 {
    std::string sPersona = (sPersonaHash.size () >= 12) ? sPersonaHash.substr (0, 12) : sPersonaHash;
-   std::string sFp2     = (sFingerprint.size () >= 2)  ? sFingerprint.substr (0, 2)  : sFingerprint;
+   std::string sFp2     = (sFingerprint.size () >=  2) ? sFingerprint.substr (0,  2) : sFingerprint;
    std::string sFp22    = (sFingerprint.size () >= 24) ? sFingerprint.substr (2, 22) : std::string ();
 
-   return sPersona + "/" + sFp2 + "/" + sFp22 + "/" + sContainer;
+   return sPersona + "/" + sFp2 + "/" + sFp22;
+}
+
+std::string CONTAINER::CID::Key_All () const
+{
+   return Key_Org () + "/" + sContainer;
 }
 
 
@@ -44,15 +49,21 @@ class CONTAINER::Impl
 public:
 
    Impl (CONTAINER* pContainer, CONTEXT* pContext, const CID* pCID) :
-      m_pContainer        (pContainer),
-      m_pContext          (pContext),
-      m_CID               (*pCID),
-      m_sKey              (m_CID.Key ()),
-      m_nCount_Open       (0),
-      m_pStream           (nullptr),
-      m_pSilo             (nullptr),
-      m_pWasm_Store       (nullptr),
-      m_twObjectIx_Next   (0)
+      m_pContainer          (pContainer),
+      m_pContext            (pContext),
+      m_CID                 (*pCID),
+      m_sKey_Org            (m_CID.Key_Org ()),
+      m_sKey_All            (m_CID.Key_All ()),
+      m_sPath_Permanent_Org ((std::filesystem::path (pContext->Path_Permanent ()) / m_sKey_Org).generic_string ()),
+      m_sPath_Temporary_Org ((std::filesystem::path (pContext->Path_Temporary ()) / m_sKey_Org).generic_string ()),
+      m_sPath_Permanent_All ((std::filesystem::path (pContext->Path_Permanent ()) / m_sKey_All).generic_string ()),
+      m_sPath_Temporary_All ((std::filesystem::path (pContext->Path_Temporary ()) / m_sKey_All).generic_string ()),
+      m_nCount_Open         (0),
+      m_pCache              (nullptr),
+      m_pSilo               (nullptr),
+      m_pStream             (nullptr),
+      m_pWasm_Store         (nullptr),
+      m_twObjectIx_Next     (0)
    {
    }
 
@@ -78,20 +89,27 @@ public:
 
       if (m_nCount_Open++ == 0)
       {
-         if ((m_pStream = m_pContext->Console ()->Stream_Open (m_pContainer)))
+         std::error_code ec;
+         std::filesystem::create_directories (m_sPath_Permanent_All, ec);
+         std::filesystem::create_directories (m_sPath_Temporary_All, ec);
+
+         if ((m_pCache = m_pContext->Network ()->Cache_Open (m_pContainer)))
          {
-            if ((m_pSilo = m_pContext->Storage ()->Silo_Open (m_pContainer)))
+            if ((m_pStream = m_pContext->Console ()->Stream_Open (m_pContainer)))
             {
-               m_pSilo->Attach ();
-
-               if ((m_pWasm_Store = m_pContext->Wasm_Runtime ()->Store_Open ()))
+               if ((m_pSilo = m_pContext->Storage ()->Silo_Open (m_pContainer)))
                {
-                  m_pWasm_Store->HostData (static_cast<void*> (m_pContainer));
-                  m_pWasm_Store->Linker_Initialize ();
+                  m_pSilo->Attach ();
 
-                  m_pContext->Host ()->OnContainerCreated (m_pContainer);
+                  if ((m_pWasm_Store = m_pContext->Wasm_Runtime ()->Store_Open ()))
+                  {
+                     m_pWasm_Store->HostData (static_cast<void*> (m_pContainer));
+                     m_pWasm_Store->Linker_Initialize ();
 
-                  bResult = true;
+                     m_pContext->Host ()->OnContainerCreated (m_pContainer);
+
+                     bResult = true;
+                  }
                }
             }
          }
@@ -130,6 +148,12 @@ public:
          {
             m_pContext->Console ()->Stream_Close (m_pStream);
             m_pStream = nullptr;
+         }
+
+         if (m_pCache)
+         {
+            m_pContext->Network ()->Cache_Close (m_pCache);
+            m_pCache = nullptr;
          }
       }
 
@@ -313,13 +337,19 @@ public:
    CONTAINER*                            m_pContainer;
    CONTEXT*                              m_pContext;
    CID                                   m_CID;
-   std::string                           m_sKey;
+   std::string                           m_sKey_Org;
+   std::string                           m_sKey_All;
+   std::string                           m_sPath_Permanent_Org;
+   std::string                           m_sPath_Temporary_Org;
+   std::string                           m_sPath_Permanent_All;
+   std::string                           m_sPath_Temporary_All;
 
    uint32_t                              m_nCount_Open;
    std::recursive_mutex                  m_mxContainer;
 
    STREAM*                               m_pStream;
    SILO*                                 m_pSilo;
+   CACHE*                                m_pCache;
    DEP::WASM_STORE*                      m_pWasm_Store;
 
    uint64_t                              m_twObjectIx_Next;
@@ -342,14 +372,20 @@ CONTAINER::~CONTAINER ()
    delete m_pImpl;
 }
 
-bool                  CONTAINER::Open       ()                                                 { return  m_pImpl->Open  (); }
-size_t                CONTAINER::Close      ()                                                 { return  m_pImpl->Close (); }
+bool                  CONTAINER::Open       ()                                    { return  m_pImpl->Open  (); }
+size_t                CONTAINER::Close      ()                                    { return  m_pImpl->Close (); }
 
-SNEEZE::CONTEXT*      CONTAINER::Context    () const                                           { return  m_pImpl->m_pContext; }
-const CONTAINER::CID* CONTAINER::Identity   () const                                           { return &m_pImpl->m_CID; }
-const std::string&    CONTAINER::Key        () const                                           { return  m_pImpl->m_sKey; }
-STREAM*               CONTAINER::Stream     () const                                           { return  m_pImpl->m_pStream; }
-SILO*                 CONTAINER::Silo       () const                                           { return  m_pImpl->m_pSilo; }
+SNEEZE::CONTEXT*      CONTAINER::Context    () const                              { return  m_pImpl->m_pContext; }
+const CONTAINER::CID* CONTAINER::Identity   () const                              { return &m_pImpl->m_CID; }
+const std::string&    CONTAINER::Key        () const                              { return  m_pImpl->m_sKey_All; }
+STREAM*               CONTAINER::Stream     () const                              { return  m_pImpl->m_pStream; }
+SILO*                 CONTAINER::Silo       () const                              { return  m_pImpl->m_pSilo; }
+CACHE*                CONTAINER::Cache      () const                              { return  m_pImpl->m_pCache; }
+
+const std::string&    CONTAINER::Path_Permanent_Org () const                     { return  m_pImpl->m_sPath_Permanent_Org; }
+const std::string&    CONTAINER::Path_Temporary_Org () const                     { return  m_pImpl->m_sPath_Temporary_Org; }
+const std::string&    CONTAINER::Path_Permanent_All () const                     { return  m_pImpl->m_sPath_Permanent_All; }
+const std::string&    CONTAINER::Path_Temporary_All () const                     { return  m_pImpl->m_sPath_Temporary_All; }
 
 bool CONTAINER::Instance_Open (uint64_t twFabricIx, const std::string& sUrl, const std::string& sHash, const std::vector<uint8_t>& aWasmBytes)
 {
@@ -363,5 +399,5 @@ void CONTAINER::Instance_Close (uint64_t twFabricIx, const std::string& sUrl, co
 
 uint64_t CONTAINER::Node_Root  (uint64_t twFabricIx, const RMCOBJECT* pRMCObject) { return m_pImpl->Node_Root  (twFabricIx, pRMCObject); }
 uint64_t CONTAINER::Node_Open  (uint64_t twParentIx, const RMCOBJECT* pRMCObject) { return m_pImpl->Node_Open  (twParentIx, pRMCObject); }
-bool     CONTAINER::Node_Close (uint64_t twObjectIx)                                          { return m_pImpl->Node_Close (twObjectIx); }
-NODE*    CONTAINER::Node_Find  (uint64_t twObjectIx) const                                    { return m_pImpl->Node_Find  (twObjectIx); }
+bool     CONTAINER::Node_Close (uint64_t twObjectIx)                              { return m_pImpl->Node_Close (twObjectIx); }
+NODE*    CONTAINER::Node_Find  (uint64_t twObjectIx) const                        { return m_pImpl->Node_Find  (twObjectIx); }

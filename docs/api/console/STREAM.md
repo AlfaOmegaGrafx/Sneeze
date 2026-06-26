@@ -198,11 +198,11 @@ std::string Pathname (uint32_t nBlock, const std::string& sExt = "") const;
 | Accessor | Returns |
 |---|---|
 | `DisplayName()` | The bound container's human-readable display name. |
-| `Path(nBlock)` | The directory holding the stream's block files. Identity-derived (`<temp>/Console/<personaHash>/<fp[0:2]>/<fp[2:22]>`); the `nBlock` argument does not change it. |
-| `Filename(nBlock, sExt)` | The bare filename for a block: `<container>-NNNN` with the zero-padded four-digit block index, plus `.sExt` if given. |
+| `Path(nBlock)` | The directory holding the stream's block files: `CONTAINER::Path_Temporary_All()` + `"Console"` (`<temp>/<personaHash>/<fp[0:2]>/<fp[2:22]>/<container>/Console`); the `nBlock` argument does not change it. |
+| `Filename(nBlock, sExt)` | The bare filename for a block: `NNNN` with the zero-padded four-digit block index, plus `.sExt` if given. |
 | `Pathname(nBlock, sExt)` | The full path: `Path(nBlock)` joined with `Filename(nBlock, sExt)`. |
 
-- **Notes.** These compute paths from the container's `CID`; they do not require the stream to be attached. Block `.log` files are produced with `sExt = "log"`.
+- **Notes.** These build on `CONTAINER`'s path accessors (the identity prefix is not re-derived in the stream); they do not require the stream to be attached. Block `.log` files are produced with `sExt = "log"`.
 
 ---
 

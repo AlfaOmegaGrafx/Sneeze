@@ -48,26 +48,26 @@ namespace SNEEZE
    public:
       ENTRY (CONTAINER* pContainer, eENTRY_LEVEL eLevel, const std::string& sMessage, uint32_t nIndex, uint32_t nGroupDepth, bool bCollapsed, bool bSystem = false, const std::string& sStackTrace = "", const std::string& sSource = "");
 
-      eENTRY_LEVEL                                          Level       () const;
-      const std::string&                              Message     () const;
-      std::chrono::system_clock::time_point           tpStamp     () const;
-      CONTAINER*                                      Container   () const;
-      uint32_t                                        Index       () const;
-      uint32_t                                        GroupDepth  () const;
-      bool                                            IsCollapsed () const;
-      bool                                            IsSystem    () const;
-      const std::string&                              StackTrace  () const;
-      const std::string&                              Source      () const;
+      eENTRY_LEVEL                                    Level        () const;
+      const std::string&                              Message      () const;
+      std::chrono::system_clock::time_point           tpStamp      () const;
+      CONTAINER*                                      Container    () const;
+      uint32_t                                        Index        () const;
+      uint32_t                                        GroupDepth   () const;
+      bool                                            IsCollapsed  () const;
+      bool                                            IsSystem     () const;
+      const std::string&                              StackTrace   () const;
+      const std::string&                              Source       () const;
 
-      static void                                     LevelString (eENTRY_LEVEL eLevel, std::string& sLevel);
+      static void                                     LevelString  (eENTRY_LEVEL eLevel, std::string& sLevel);
 
-      std::string                                     FormatStamp () const;
+      std::string                                     FormatStamp  () const;
       void                                            MessageParts (std::vector<std::string>& aParts) const;
-      nlohmann::json                                  ToJson      () const;
-      static std::shared_ptr<const ENTRY>             FromJson    (const nlohmann::json& jEntry, CONTAINER* pContainer);
+      nlohmann::json                                  ToJson       () const;
+      static std::shared_ptr<const ENTRY>             FromJson     (const nlohmann::json& jEntry, CONTAINER* pContainer);
 
    private:
-      eENTRY_LEVEL                                          m_eLevel;
+      eENTRY_LEVEL                                    m_eLevel;
       std::string                                     m_sMessage;
       std::chrono::system_clock::time_point           m_tpStamp;
       CONTAINER*                                      m_pContainer;
@@ -125,7 +125,7 @@ namespace SNEEZE
 
       std::string DisplayName    () const;
 
-      std::string Path     (uint32_t nBlock)                               const;
+      std::string Path     ()                                              const;
       std::string Filename (uint32_t nBlock, const std::string& sExt = "") const;
       std::string Pathname (uint32_t nBlock, const std::string& sExt = "") const;
 

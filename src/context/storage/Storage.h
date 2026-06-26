@@ -23,13 +23,10 @@ namespace SNEEZE
       ISTORAGE_IMPL ();
       virtual ~ISTORAGE_IMPL ();
 
-      virtual UNIT*              Unit_Open  (eSILO_SCOPE eScope, const std::string& sPathname)                                 = 0;
+      virtual UNIT*              Unit_Open  (eSILO_SCOPE eScope, const std::string& sPathname)                            = 0;
       virtual void               Unit_Close (UNIT* pUnit)                                                                 = 0;
 
       virtual void               Log (IENGINE::eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage)  = 0;
-
-      virtual const std::string& Path_Permanent () const                                                                  = 0;
-      virtual const std::string& Path_Temporary () const                                                                  = 0;
 
       virtual ICONTEXT*          Host () const                                                                            = 0;
 
@@ -53,15 +50,15 @@ namespace SNEEZE
       // --- State ---
 
       bool                IsLoaded () const;
-      bool                IsDirty () const;
-      eSILO_SCOPE              GetScope () const;
+      bool                IsDirty  () const;
+      eSILO_SCOPE         GetScope () const;
 
       // --- JSON access ---
 
-      nlohmann::json      Get (const std::string& sPath) const;
-      void                Set (const std::string& sPath, const nlohmann::json& jValue);
+      nlohmann::json      Get    (const std::string& sPath) const;
+      void                Set    (const std::string& sPath, const nlohmann::json& jValue);
       void                Remove (const std::string& sPath);
-      bool                Has (const std::string& sPath) const;
+      bool                Has    (const std::string& sPath) const;
 
       // --- Bulk ---
 
@@ -70,21 +67,21 @@ namespace SNEEZE
 
       // --- Lifecycle ---
 
-      uint32_t            Open ();
-      uint32_t            Close ();
+      uint32_t            Open   ();
+      uint32_t            Close  ();
       void                Attach ();
       void                Detach (CONTAINER* pContainer);
-      void                Load ();
-      void                Save ();
-      void                Evict ();
+      void                Load   ();
+      void                Save   ();
+      void                Evict  ();
 
       // --- Meta sidecar ---
 
-      const std::string& Pathname () const;
-      uint64_t           SizeBytes () const;
-      const std::string& CreatedTime () const;
+      const std::string& Pathname       () const;
+      uint64_t           SizeBytes      () const;
+      const std::string& CreatedTime    () const;
       const std::string& LastAccessTime () const;
-      uint32_t           AccessCount () const;
+      uint32_t           AccessCount    () const;
 
       void  TouchAccess ();
       void  Meta_Save (CONTAINER* pContainer);

@@ -144,16 +144,20 @@ The sidecar records the owning container's identity (fingerprint, organization, 
 
 ### Disk layout
 
-Permanent and temporary scopes live under different roots; org and container units are distinguished by filename within an identity-keyed directory:
+Permanent and temporary scopes live under different roots. Org units live at the identity (fingerprint) tier so every container under that identity shares them; container units live one level deeper, under the container itself. `SILO` derives both from `CONTAINER`'s path accessors (`Path_*_Org` for org, `Path_*_All` for container) and appends only the `Storage` segment:
 
 ```text
-<PermanentPath>/Storage/<personaHash>/<fp[0:2]>/<fp[2:24]>/
+org scope:
+<PermanentPath>/<personaHash>/<fp[0:2]>/<fp[2:24]>/Storage/
     organization.json(.meta/.log)        org permanent (shared across the org)
-    container-<id>.json(.meta/.log)       this container, permanent
-
-<TemporaryPath>/Storage/<personaHash>/<fp[0:2]>/<fp[2:24]>/
+<TemporaryPath>/<personaHash>/<fp[0:2]>/<fp[2:24]>/Storage/
     organization.json                     org temporary
-    container-<id>.json                   this container, temporary
+
+container scope:
+<PermanentPath>/<personaHash>/<fp[0:2]>/<fp[2:24]>/<container>/Storage/
+    container.json(.meta/.log)            this container, permanent
+<TemporaryPath>/<personaHash>/<fp[0:2]>/<fp[2:24]>/<container>/Storage/
+    container.json                        this container, temporary
 ```
 
 Because org units share an identity-keyed path and filename, two containers from the same organization resolve to the same pathname — which is exactly the key `STORAGE` deduplicates on, giving them one shared `UNIT`.

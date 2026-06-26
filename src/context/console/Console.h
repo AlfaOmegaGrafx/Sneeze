@@ -23,8 +23,6 @@ namespace SNEEZE
       ICONSOLE_IMPL ();
       virtual ~ICONSOLE_IMPL ();
 
-      virtual const std::string& Path_Temporary () const                         = 0;
-
       virtual std::shared_ptr<const ENTRY> Entry_Create (CONTAINER* pContainer, eENTRY_LEVEL eLevel, const std::string& sMessage, uint32_t nGroupDepth, bool bCollapsed, bool bSystem) = 0;
       virtual std::shared_ptr<const ENTRY> Entry_Find   (uint32_t nIndex) = 0;
 

@@ -192,7 +192,7 @@ CID.eTrust = kTRUST_EXPIRED;
          CID.eTrust             = kTRUST_ROOT;
       }   
 
-      std::string sKey = CID.Key ();
+      std::string sKey = CID.Key_All ();
 
       auto it = m_umpContainer.find (sKey);
       if (it == m_umpContainer.end ())

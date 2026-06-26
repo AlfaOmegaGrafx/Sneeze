@@ -20,6 +20,8 @@ namespace SNEEZE
    class ASSET;
    class JOB_FETCH;
    class INETWORK_IMPL;
+   class ICACHE_IMPL;
+   class CONTAINER;
 
    // ---------------------------------------------------------------------------
    // Network enums and interfaces
@@ -69,7 +71,7 @@ namespace SNEEZE
    class FILE
    {
    public:
-      FILE (INETWORK_IMPL* pINetwork_Impl, CONTAINER* pContainer, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled);
+      FILE (ICACHE_IMPL* pICache_Impl, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled);
       ~FILE ();
 
       // --- Snapshot fields (always available, even after Close) ---
@@ -156,17 +158,67 @@ namespace SNEEZE
    };
 
    // ---------------------------------------------------------------------------
+   // CACHE — per-container handle to the network's file tier.
+   //
+   // Opened from NETWORK::Cache_Open() for a specific CONTAINER and held by
+   // that container for its lifetime. Owns the container's FILE handles and
+   // exposes File_Open(). Files persist across restarts; files with a
+   // cryptographic hash are additionally integrity-verified.
+   //
+   // The underlying deduplicated ASSET store (the disk cache itself) is owned
+   // by NETWORK and shared across every CACHE — a CACHE forwards asset
+   // operations to its NETWORK and contributes only the file-handle layer.
+   // ---------------------------------------------------------------------------
+
+   class CACHE
+   {
+   public:
+
+      CACHE (INETWORK_IMPL* pINetwork_Impl, CONTAINER* pContainer);
+      ~CACHE ();
+
+      void  Initialize ();
+
+      // --- Identity ---
+
+      std::string DisplayName () const;
+
+      // --- File operations ---
+
+      FILE* File_Open (const std::string& sUrl, IFILE* pListener);
+      FILE* File_Open (const std::string& sUrl, const std::string& sHash, uint32_t nAssetIx = 0, IFILE* pListener = nullptr);
+
+      void  File_Enum (IENUM_FILE* pEnum);
+
+      // --- Cache management ---
+
+      void  SetCacheEnabled (bool b);
+      bool  IsCacheEnabled () const;
+
+      void  Clear ();
+
+      // --- Paths ---
+
+      std::string Path     () const;
+      std::string Filename (const std::string& sExt = "") const;
+      std::string Pathname (const std::string& sExt = "") const;
+
+   private:
+      class Impl;
+      Impl* m_pImpl;
+   };
+
+   // ---------------------------------------------------------------------------
    // NETWORK — the network resource system.
    //
    // Fetches remote resources, caches them on disk, and serves them to callers
-   // via handle-based FILE objects. All files persist across restarts. Files
-   // with a cryptographic hash are additionally integrity-verified.
+   // through per-container CACHE handles. Owns the deduplicated ASSET store and
+   // the background fetch machinery. Each CONTAINER opens a CACHE via
+   // Cache_Open() and returns it via Cache_Close().
    //
-   // Callers open files via File_Open(), which returns a FILE* handle. When
-   // done, they must return it via File_Close(). Assets are loaded lazily on
-   // first File_Open(). Only assets with active FILE handles live in
-   // m_mapAssets. The .meta sidecar is flushed to disk when the last active
-   // handle closes.
+   // Assets are loaded lazily on first File_Open() (on a CACHE). Only assets
+   // with active FILE handles live in memory; the .meta sidecar is flushed to
+   // disk when the last active handle closes.
    //
    // Background fetches are capped at 16 concurrent threads. Overflow fetches
    // queue and are dispatched as threads complete.
@@ -185,19 +237,16 @@ namespace SNEEZE
 
       bool Initialize (bool bReset = false);
 
-      // --- Primary API ---
+      // --- Container lifecycle ---
 
-      FILE* File_Open (CONTAINER* pContainer, const std::string& sUrl, IFILE* pListener);
-      FILE* File_Open (CONTAINER* pContainer, const std::string& sUrl, const std::string& sHash, uint32_t nAssetIx = 0, IFILE* pListener = nullptr);
+      CACHE* Cache_Open  (CONTAINER* pContainer);
+      void   Cache_Close (CACHE* pCache);
 
       // --- Cache management ---
 
-      void SetCacheEnabled (bool b);
-      bool IsCacheEnabled () const;
-
       void Clear ();
+
       void Reset ();
-      void File_Enum (IENUM_FILE* pEnum);
 
       void Rules_Add (const std::string& sContentType, const std::string& sOlderThan);
 

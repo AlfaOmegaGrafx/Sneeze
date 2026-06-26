@@ -133,8 +133,14 @@ Called by a [`FABRIC`](../scene/FABRIC.md) as it loads and unloads the WASM modu
 CONTEXT*           Context  () const;
 const CID*         Identity () const;
 const std::string& Key      () const;
-STREAM*            Stream   () const;
+CACHE*             Cache    () const;
 SILO*              Silo     () const;
+STREAM*            Stream   () const;
+
+const std::string& Path_Permanent_All () const;
+const std::string& Path_Temporary_All () const;
+const std::string& Path_Permanent_Org () const;
+const std::string& Path_Temporary_Org () const;
 ```
 
 | Accessor | Returns | Notes |
@@ -142,8 +148,13 @@ SILO*              Silo     () const;
 | `Context()` | The owning context. | Never null for a live container. |
 | `Identity()` | The container's `CID` (by pointer to the internal copy). | Stable for the container's lifetime. |
 | `Key()` | The pooling key (by const reference). | The string the context's pool is keyed by. |
-| `Stream()` | The console stream, or null. | Null while the container is closed (count at zero). |
+| `Cache()` | The network cache, or null. | Null while the container is closed (count at zero). |
 | `Silo()` | The storage silo, or null. | Null while the container is closed. |
+| `Stream()` | The console stream, or null. | Null while the container is closed. |
+| `Path_Permanent_All()` | The container's folder under the permanent root: `<perm>/persona/fp2/fp22/container`. | The identity scaffold subsystems build on; cached at construction. Created at `Open()`. |
+| `Path_Temporary_All()` | The same under the temporary root. | Created at `Open()`. |
+| `Path_Permanent_Org()` | The organization-tier folder under the permanent root: `<perm>/persona/fp2/fp22` (no container segment). | Where org-scoped storage is filed, shared across containers of the same identity. |
+| `Path_Temporary_Org()` | The same under the temporary root. | |
 
 ---
 

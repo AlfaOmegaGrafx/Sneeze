@@ -84,7 +84,11 @@ int RunJwsTests (int nArgc, char** aArgv)
    setvbuf (stdout, nullptr, _IONBF, 0);
    setvbuf (stderr, nullptr, _IONBF, 0);
 
+#ifdef SNEEZE_TEST_CERTS_DIR
+   std::string sCertsDir = SNEEZE_TEST_CERTS_DIR;
+#else
    std::string sCertsDir = "tests/certs";
+#endif
    if (nArgc > 1)
       sCertsDir = aArgv[1];
 
@@ -316,9 +320,14 @@ int RunJwsTests (int nArgc, char** aArgv)
    ASSERT (reader.Container () == "my-container", "Composed container round-trips");
    ASSERT (!reader.Organization ().empty (), "Composed organization from cert");
    ASSERT (reader.Services ().size () == 1, "Composed service round-trips");
-   ASSERT (reader.Modules ().size () == 1, "Composed module round-trips");
-   ASSERT (reader.Modules ()[0].sUrl == "https://example.com/mod.wasm", "Composed module url round-trips");
-   ASSERT (reader.Modules ()[0].sHash == "sha256-abcdef123456", "Composed module hash round-trips");
+
+   auto aComposedModules = reader.Modules ();
+   ASSERT (aComposedModules.size () == 1, "Composed module round-trips");
+   if (!aComposedModules.empty ())
+   {
+      ASSERT (aComposedModules[0].sUrl == "https://example.com/mod.wasm", "Composed module url round-trips");
+      ASSERT (aComposedModules[0].sHash == "sha256-abcdef123456", "Composed module hash round-trips");
+   }
 
    // -----------------------------------------------------------------------
    // Summary

@@ -103,10 +103,10 @@ Every asset maps to three files on disk that share a base pathname:
 The base pathname fans out by identity and a per-URL key:
 
 ```text
-<PermanentPath>/Network/<personaHash>/<fp[0:2]>/<fp[2:24]>/<container>/<dk[0:2]>/<dk[2:]>
+<PermanentPath>/<personaHash>/<fp[0:2]>/<fp[2:24]>/<container>/Network/<dk[0:2]>/<dk[2:]>
 ```
 
-The `<fp...>` segments come from the owning [container](container.md)'s certificate fingerprint, and `<dk>` is the **disk key**: a SHA-1 of the URL, truncated to 12 bytes (24 hex characters), with its first two characters peeled off as a fan-out directory so no single directory accumulates too many entries. Keying the path by container means the same URL fetched under two different identities is cached separately — the metaverse browser identifies origins by certificate, not domain.
+The identity prefix `<personaHash>/<fp[0:2]>/<fp[2:24]>/<container>` is owned by `CONTAINER`; the `Network` segment is the cache's own, and `FILE` builds the leaf on top of `CACHE::Path()` rather than re-deriving identity. The `<fp...>` segments come from the owning [container](container.md)'s certificate fingerprint, and `<dk>` is the **disk key**: a SHA-1 of the URL, truncated to 12 bytes (24 hex characters), with its first two characters peeled off as a fan-out directory so no single directory accumulates too many entries. Keying the path by container means the same URL fetched under two different identities is cached separately — the metaverse browser identifies origins by certificate, not domain.
 
 The `.temp`-then-rename pattern is used everywhere a file is written (payloads, sidecars, `rules.json`): write to a temporary name, then atomically rename over the target, so a crash mid-write never leaves a half-written file in place.
 

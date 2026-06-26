@@ -554,11 +554,11 @@ set (SOM_HEADERS
    context/scene/AccessControl.h)
 
 # Embed Mozilla's CA bundle (cacert.pem) as a string blob so libcurl can
-# verify HTTPS certificates on platforms whose system has no libcurl-
-# readable CA store (Android NDK + BoringSSL, in particular). Win32 uses
-# SChannel + the Windows store; Apple uses SecureTransport + Keychain;
-# both ignore CAINFO_BLOB, but compiling the symbol unconditionally
-# avoids a per-platform link surface.
+# verify HTTPS certificates on platforms whose TLS stack has no OS trust
+# store wired into curl (Linux/Android/macOS desktop with BoringSSL, in
+# particular). Win32 uses SChannel + the Windows store; iOS uses
+# SecureTransport + Keychain; both ignore CAINFO_BLOB, but compiling the
+# symbol unconditionally avoids a per-platform link surface.
 set (SNEEZE_CACERT_PEM "${CMAKE_CURRENT_BINARY_DIR}/cacert.pem")
 if (NOT EXISTS "${SNEEZE_CACERT_PEM}")
    message (STATUS "Fetching cacert.pem from curl.se")
@@ -609,8 +609,8 @@ set (CONTAINER_HEADERS)
 set (CONSOLE_SOURCES  context/console/Console.cpp context/console/Entry.cpp context/console/Stream.cpp context/console/Block.cpp)
 set (CONSOLE_HEADERS  )
 
-set (NETWORK_SOURCES  context/network/Network.cpp context/network/File.cpp context/network/Asset.cpp)
-set (NETWORK_HEADERS)
+set (NETWORK_SOURCES  context/network/Network.cpp context/network/Cache.cpp context/network/File.cpp context/network/Asset.cpp)
+set (NETWORK_HEADERS  context/network/Network.h)
 
 set (STORAGE_SOURCES  context/storage/Storage.cpp context/storage/Silo.cpp context/storage/Unit.cpp)
 set (STORAGE_HEADERS)
