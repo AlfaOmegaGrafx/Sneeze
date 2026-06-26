@@ -88,6 +88,9 @@ namespace SNEEZE
       virtual void OnContainerCreated     (CONTAINER*) {}
       virtual void OnContainerDeleted     (CONTAINER*) {}
 
+      virtual void OnNetworkCacheCreated  (CACHE*) {}
+      virtual void OnNetworkCacheDeleted  (CACHE*) {}
+
       virtual bool OnNetworkFileCreated   (FILE*) { return true; }
       virtual void OnNetworkFileChanged   (FILE*) {}
       virtual void OnNetworkFileDeleted   (FILE*) {}

@@ -64,6 +64,7 @@ public:
       const std::string& sBasePath = m_pIConsole_Impl->Path_Temporary ();
 
       const CONTAINER::CID* pCID = m_pContainer->Identity ();
+      
       return (std::filesystem::path (sBasePath) / pCID->sPersonaHash / pCID->sFingerprint.substr (0, 2) / pCID->sFingerprint.substr (2, 22)).generic_string ();
    }
 

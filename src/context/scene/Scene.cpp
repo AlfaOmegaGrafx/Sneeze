@@ -49,9 +49,9 @@ public:
    {
    }
 
-   bool Initialize (CONTAINER* pContainer, NETWORK* pNetwork, const std::string& sUrl)
+   bool Initialize (CONTAINER* pContainer, const std::string& sUrl)
    {
-      m_pFile = pNetwork->File_Open (pContainer, sUrl, this);
+      m_pFile = pContainer->Cache ()->File_Open (sUrl, this);
 
       return (m_pFile != nullptr);
    }
@@ -202,7 +202,7 @@ public:
       {
          MSF_FETCH* pMsf_Fetch = new MSF_FETCH (m_pScene, pNode_Attach);
 
-         if (!pMsf_Fetch->Initialize (m_pFabric_Root->Container (), m_pContext->Network (), sUrl))
+         if (!pMsf_Fetch->Initialize (m_pFabric_Root->Container (), sUrl))
          {
             delete pMsf_Fetch;
 

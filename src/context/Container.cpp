@@ -49,8 +49,9 @@ public:
       m_CID               (*pCID),
       m_sKey              (m_CID.Key ()),
       m_nCount_Open       (0),
-      m_pStream           (nullptr),
+      m_pCache            (nullptr),
       m_pSilo             (nullptr),
+      m_pStream           (nullptr),
       m_pWasm_Store       (nullptr),
       m_twObjectIx_Next   (0)
    {
@@ -78,20 +79,23 @@ public:
 
       if (m_nCount_Open++ == 0)
       {
-         if ((m_pStream = m_pContext->Console ()->Stream_Open (m_pContainer)))
+         if ((m_pCache = m_pContext->Network ()->Cache_Open (m_pContainer)))
          {
-            if ((m_pSilo = m_pContext->Storage ()->Silo_Open (m_pContainer)))
+            if ((m_pStream = m_pContext->Console ()->Stream_Open (m_pContainer)))
             {
-               m_pSilo->Attach ();
-
-               if ((m_pWasm_Store = m_pContext->Wasm_Runtime ()->Store_Open ()))
+               if ((m_pSilo = m_pContext->Storage ()->Silo_Open (m_pContainer)))
                {
-                  m_pWasm_Store->HostData (static_cast<void*> (m_pContainer));
-                  m_pWasm_Store->Linker_Initialize ();
+                  m_pSilo->Attach ();
 
-                  m_pContext->Host ()->OnContainerCreated (m_pContainer);
+                  if ((m_pWasm_Store = m_pContext->Wasm_Runtime ()->Store_Open ()))
+                  {
+                     m_pWasm_Store->HostData (static_cast<void*> (m_pContainer));
+                     m_pWasm_Store->Linker_Initialize ();
 
-                  bResult = true;
+                     m_pContext->Host ()->OnContainerCreated (m_pContainer);
+
+                     bResult = true;
+                  }
                }
             }
          }
@@ -130,6 +134,12 @@ public:
          {
             m_pContext->Console ()->Stream_Close (m_pStream);
             m_pStream = nullptr;
+         }
+
+         if (m_pCache)
+         {
+            m_pContext->Network ()->Cache_Close (m_pCache);
+            m_pCache = nullptr;
          }
       }
 
@@ -320,6 +330,7 @@ public:
 
    STREAM*                               m_pStream;
    SILO*                                 m_pSilo;
+   CACHE*                                m_pCache;
    DEP::WASM_STORE*                      m_pWasm_Store;
 
    uint64_t                              m_twObjectIx_Next;
@@ -342,14 +353,15 @@ CONTAINER::~CONTAINER ()
    delete m_pImpl;
 }
 
-bool                  CONTAINER::Open       ()                                                 { return  m_pImpl->Open  (); }
-size_t                CONTAINER::Close      ()                                                 { return  m_pImpl->Close (); }
+bool                  CONTAINER::Open       ()                                    { return  m_pImpl->Open  (); }
+size_t                CONTAINER::Close      ()                                    { return  m_pImpl->Close (); }
 
-SNEEZE::CONTEXT*      CONTAINER::Context    () const                                           { return  m_pImpl->m_pContext; }
-const CONTAINER::CID* CONTAINER::Identity   () const                                           { return &m_pImpl->m_CID; }
-const std::string&    CONTAINER::Key        () const                                           { return  m_pImpl->m_sKey; }
-STREAM*               CONTAINER::Stream     () const                                           { return  m_pImpl->m_pStream; }
-SILO*                 CONTAINER::Silo       () const                                           { return  m_pImpl->m_pSilo; }
+SNEEZE::CONTEXT*      CONTAINER::Context    () const                              { return  m_pImpl->m_pContext; }
+const CONTAINER::CID* CONTAINER::Identity   () const                              { return &m_pImpl->m_CID; }
+const std::string&    CONTAINER::Key        () const                              { return  m_pImpl->m_sKey; }
+STREAM*               CONTAINER::Stream     () const                              { return  m_pImpl->m_pStream; }
+SILO*                 CONTAINER::Silo       () const                              { return  m_pImpl->m_pSilo; }
+CACHE*                CONTAINER::Cache      () const                              { return  m_pImpl->m_pCache; }
 
 bool CONTAINER::Instance_Open (uint64_t twFabricIx, const std::string& sUrl, const std::string& sHash, const std::vector<uint8_t>& aWasmBytes)
 {
@@ -363,5 +375,5 @@ void CONTAINER::Instance_Close (uint64_t twFabricIx, const std::string& sUrl, co
 
 uint64_t CONTAINER::Node_Root  (uint64_t twFabricIx, const RMCOBJECT* pRMCObject) { return m_pImpl->Node_Root  (twFabricIx, pRMCObject); }
 uint64_t CONTAINER::Node_Open  (uint64_t twParentIx, const RMCOBJECT* pRMCObject) { return m_pImpl->Node_Open  (twParentIx, pRMCObject); }
-bool     CONTAINER::Node_Close (uint64_t twObjectIx)                                          { return m_pImpl->Node_Close (twObjectIx); }
-NODE*    CONTAINER::Node_Find  (uint64_t twObjectIx) const                                    { return m_pImpl->Node_Find  (twObjectIx); }
+bool     CONTAINER::Node_Close (uint64_t twObjectIx)                              { return m_pImpl->Node_Close (twObjectIx); }
+NODE*    CONTAINER::Node_Find  (uint64_t twObjectIx) const                        { return m_pImpl->Node_Find  (twObjectIx); }

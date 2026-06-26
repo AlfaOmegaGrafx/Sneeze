@@ -24,10 +24,9 @@ using namespace SNEEZE;
 class SNEEZE::FILE::Impl
 {
 public:
-   Impl (FILE* pFile, INETWORK_IMPL* pINetwork_Impl, CONTAINER* pContainer, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
+   Impl (FILE* pFile, ICACHE_IMPL* pICache_Impl, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
       m_pFile            (pFile),
-      m_pINetwork_Impl   (pINetwork_Impl),
-      m_pContainer       (pContainer),
+      m_pICache_Impl     (pICache_Impl),
       m_nFileIx          (nFileIx),
       m_sUrl             (sUrl),
       m_sOpenHash        (sHash),
@@ -57,7 +56,7 @@ public:
 
       if (m_pAsset)
       {
-         m_pINetwork_Impl->Asset_Close (m_pFile, m_pAsset);
+         m_pICache_Impl->Asset_Close (m_pFile, m_pAsset);
 
          m_pAsset = nullptr;
       }
@@ -74,19 +73,19 @@ public:
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxFile);
 
-         if ((m_pAsset = m_pINetwork_Impl->Asset_Open (m_pFile)) != nullptr)
+         if ((m_pAsset = m_pICache_Impl->Asset_Open (m_pFile)) != nullptr)
          {
             m_pListener = pListener;
 
             if (m_pListener)
                Attach (true);
 
-            bClear = !m_pINetwork_Impl->Host ()->OnNetworkFileCreated (m_pFile);
+            bClear = !m_pICache_Impl->Host ()->OnNetworkFileCreated (m_pFile);
          }
       }
 
       if (bClear)
-         m_pINetwork_Impl->File_Clear (m_pFile);
+         m_pICache_Impl->File_Clear (m_pFile);
 
       return (m_pAsset != nullptr);
    }
@@ -116,17 +115,17 @@ public:
 
    void Clear ()
    {
-      m_pINetwork_Impl->File_Clear (m_pFile);
+      m_pICache_Impl->File_Clear (m_pFile);
    }
 
    void Close ()
    {
-      m_pINetwork_Impl->File_Close (m_pFile);
+      m_pICache_Impl->File_Close (m_pFile);
    }
 
    void Reset ()
    {
-      m_pINetwork_Impl->File_Reset (m_pFile);
+      m_pICache_Impl->File_Reset (m_pFile);
    }
 
    // ---------------------------------------------------------------------------
@@ -143,7 +142,7 @@ public:
       {
          m_bPending_Clear = true;
 
-         m_pINetwork_Impl->Host ()->OnNetworkFileDeleted (m_pFile);
+         m_pICache_Impl->Host ()->OnNetworkFileDeleted (m_pFile);
 
          bChanged = true;
       }
@@ -181,7 +180,7 @@ public:
       std::lock_guard<std::recursive_mutex> guard (m_mxFile);
 
       if (!m_bPending_Clear)
-         m_pINetwork_Impl->Host ()->OnNetworkFileChanged (m_pFile);
+         m_pICache_Impl->Host ()->OnNetworkFileChanged (m_pFile);
    }
 
    // ---------------------------------------------------------------------------
@@ -234,8 +233,9 @@ public:
 
    std::string Path () const
    {
-      const CONTAINER::CID* pCID = m_pContainer->Identity ();
-      return (std::filesystem::path (m_pINetwork_Impl->Path_Permanent ()) / pCID->sPersonaHash / pCID->sFingerprint.substr (0, 2) / pCID->sFingerprint.substr (2, 22) / pCID->sContainer / m_sDiskKey.substr (0, 2)).generic_string ();
+      const CONTAINER::CID* pCID = m_pICache_Impl->Container ()->Identity ();
+      
+      return (std::filesystem::path (m_pICache_Impl->Path_Permanent ()) / pCID->sPersonaHash / pCID->sFingerprint.substr (0, 2) / pCID->sFingerprint.substr (2, 22) / pCID->sContainer / m_sDiskKey.substr (0, 2)).generic_string ();
    }
 
    std::string Filename (const std::string& sExt) const
@@ -255,8 +255,7 @@ public:
 
 public:
    FILE*                          m_pFile;
-   INETWORK_IMPL*                 m_pINetwork_Impl;
-   CONTAINER*                     m_pContainer;
+   ICACHE_IMPL*                   m_pICache_Impl;
    ASSET*                         m_pAsset;
    IFILE*                         m_pListener;
    uint32_t                       m_nCount_Attach;
@@ -289,8 +288,8 @@ public:
 // Constructor / Destructor
 // ---------------------------------------------------------------------------
 
-SNEEZE::FILE::FILE (INETWORK_IMPL* pINetwork_Impl, CONTAINER* pContainer, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
-   m_pImpl (new Impl (this, pINetwork_Impl, pContainer, nFileIx, sUrl, sHash, bCacheEnabled))
+SNEEZE::FILE::FILE (ICACHE_IMPL* pICache_Impl, uint32_t nFileIx, const std::string& sUrl, const std::string& sHash, bool bCacheEnabled) :
+   m_pImpl (new Impl (this, pICache_Impl, nFileIx, sUrl, sHash, bCacheEnabled))
 {
 }
 
@@ -347,7 +346,7 @@ std::string                                         SNEEZE::FILE::LastAccessTime
 uint32_t                                            SNEEZE::FILE::AccessCount       () const { return m_pImpl->m_pAsset->AccessCount (); }
 const std::unordered_map<std::string, std::string>& SNEEZE::FILE::RspHeaders        () const { return m_pImpl->m_pAsset->RspHeaders (); }
 const std::unordered_map<std::string, std::string>& SNEEZE::FILE::ReqHeaders        () const { return m_pImpl->m_pAsset->ReqHeaders (); }
-std::string                                         SNEEZE::FILE::ContainerName     () const { return m_pImpl->m_pContainer->Identity ()->DisplayName (); }
+std::string                                         SNEEZE::FILE::ContainerName     () const { return m_pImpl->m_pICache_Impl->Container ()->Identity ()->DisplayName (); }
 eASSET_STATE                                        SNEEZE::FILE::State             () const { return m_pImpl->m_bState; }
 bool                                                SNEEZE::FILE::IsReady           () const { return m_pImpl->m_bState == kASSET_STATE_READY; }
 std::string                                         SNEEZE::FILE::Url               () const { return m_pImpl->m_sUrl; }
