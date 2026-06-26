@@ -235,9 +235,9 @@ else ()
    # the outer SNEEZE_CONFIG.
    add_dependencies (halogen anari-sdk filament)
 
-   # curl links BoringSSL as its TLS/crypto backend on Linux + Android.
-   # macOS/iOS use SecTransport, Windows uses Schannel — neither needs BoringSSL.
-   if (NOT WIN32 AND NOT APPLE)
+   # curl links BoringSSL as its TLS/crypto backend on Linux, Android, and
+   # macOS. iOS uses SecTransport, Windows uses Schannel.
+   if (NOT WIN32 AND NOT (APPLE AND CMAKE_SYSTEM_NAME STREQUAL "iOS"))
       add_dependencies (curl boringssl)
    endif ()
 endif ()

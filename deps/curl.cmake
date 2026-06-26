@@ -1,12 +1,26 @@
 if (WIN32)
    set (CURL_SSL_ARGS -DCURL_USE_SCHANNEL=ON -DCURL_USE_OPENSSL=OFF)
-elseif (APPLE)
-   # macOS + iOS: Apple's Secure Transport (no OpenSSL dep). The curl CMake
-   # option is CURL_USE_SECTRANSP (NOT ...SECTRANSPORT) -- an unknown -D var is
-   # silently ignored, leaving curl with no TLS backend, so https requests fail
-   # with CURLE_UNSUPPORTED_PROTOCOL (curl=1). Consumers must link the Security
-   # and CoreFoundation frameworks that the Secure Transport backend needs.
+elseif (APPLE AND CMAKE_SYSTEM_NAME STREQUAL "iOS")
+   # iOS: Apple's Secure Transport (no OpenSSL dep).
    set (CURL_SSL_ARGS -DCURL_USE_SECTRANSP=ON -DCURL_USE_OPENSSL=OFF -DCURL_USE_SCHANNEL=OFF)
+elseif (APPLE)
+   # macOS desktop: BoringSSL via the OpenSSL find interface (same as Linux).
+   # Secure Transport is easy to silently disable (CURL_USE_SECTRANSP is a
+   # dependent option; stale ExternalProject caches leave curl HTTP-only and
+   # https:// requests fail with CURLE_UNSUPPORTED_PROTOCOL). BoringSSL is
+   # already built for jwt/MSF crypto and produces universal static libs.
+   set (BORINGSSL_INSTALL_DIR "${LIBS_DIR}/boringssl/install")
+   set (CURL_SSL_ARGS
+      -DCURL_ENABLE_SSL=ON
+      -DCURL_USE_OPENSSL=ON
+      -DCURL_USE_SECTRANSP=OFF
+      -DCURL_USE_SCHANNEL=OFF
+      -DOPENSSL_ROOT_DIR=${BORINGSSL_INSTALL_DIR}
+      -DOPENSSL_USE_STATIC_LIBS=TRUE
+      -DOPENSSL_INCLUDE_DIR=${BORINGSSL_INSTALL_DIR}/include
+      -DOPENSSL_CRYPTO_LIBRARY=${BORINGSSL_INSTALL_DIR}/lib/libcrypto.a
+      -DOPENSSL_SSL_LIBRARY=${BORINGSSL_INSTALL_DIR}/lib/libssl.a
+   )
 else ()
    # Linux + Android: curl links against BoringSSL (built by deps/boringssl.cmake).
    # BoringSSL answers to the same FindOpenSSL interface as OpenSSL, so
