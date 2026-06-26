@@ -82,8 +82,13 @@ std::string Key         () const;
 
 ### `std::string Key () const`
 - **Purpose.** The pooling key — the string the context's container map is keyed by. Identical key means identical identity means one shared container.
-- **Returns.** A string of the form `persona/fp2/fp22/container`, composed from the first 12 characters of `sPersonaHash`, the first 2 characters of `sFingerprint`, the next 22 characters of `sFingerprint`, and `sContainer`. Pieces shorter than expected are taken as far as available.
+- **Returns.** A string of the form `persona/fp2/fp22/container`, composed from `Key_Org()` plus `"/" + sContainer`. Pieces shorter than expected are taken as far as available.
 - **Notes.** Built once and cached by the `CONTAINER` (returned by [`CONTAINER::Key()`](CONTAINER.md)). Note that `eTrust` is **not** part of the key — the same source at different trust levels still pools to one container.
+
+### `std::string Key_Org () const`
+- **Purpose.** The organization-tier identity prefix — the part of the path shared by every container under the same persona and fingerprint.
+- **Returns.** A string of the form `persona/fp2/fp22`, composed from the first 12 characters of `sPersonaHash`, the first 2 characters of `sFingerprint`, and the next 22 characters of `sFingerprint`. Pieces shorter than expected are taken as far as available.
+- **Notes.** Used by the org-scoped path accessors on `CONTAINER` (`Path_Permanent_Org` / `Path_Temporary_Org`), under which organization-scoped [storage](../storage/index.md) is filed.
 
 ---
 

@@ -25,13 +25,18 @@ std::string CONTAINER::CID::DisplayName () const
    return ((eTrust >= kTRUST_EXPIRED) ? sOrganization : sOrganizationHash) + "/" + sContainer;
 }
 
-std::string CONTAINER::CID::Key () const
+std::string CONTAINER::CID::Key_Org () const
 {
    std::string sPersona = (sPersonaHash.size () >= 12) ? sPersonaHash.substr (0, 12) : sPersonaHash;
-   std::string sFp2     = (sFingerprint.size () >= 2)  ? sFingerprint.substr (0, 2)  : sFingerprint;
+   std::string sFp2     = (sFingerprint.size () >=  2) ? sFingerprint.substr (0,  2) : sFingerprint;
    std::string sFp22    = (sFingerprint.size () >= 24) ? sFingerprint.substr (2, 22) : std::string ();
 
-   return sPersona + "/" + sFp2 + "/" + sFp22 + "/" + sContainer;
+   return sPersona + "/" + sFp2 + "/" + sFp22;
+}
+
+std::string CONTAINER::CID::Key_All () const
+{
+   return Key_Org () + "/" + sContainer;
 }
 
 
@@ -44,16 +49,21 @@ class CONTAINER::Impl
 public:
 
    Impl (CONTAINER* pContainer, CONTEXT* pContext, const CID* pCID) :
-      m_pContainer        (pContainer),
-      m_pContext          (pContext),
-      m_CID               (*pCID),
-      m_sKey              (m_CID.Key ()),
-      m_nCount_Open       (0),
-      m_pCache            (nullptr),
-      m_pSilo             (nullptr),
-      m_pStream           (nullptr),
-      m_pWasm_Store       (nullptr),
-      m_twObjectIx_Next   (0)
+      m_pContainer          (pContainer),
+      m_pContext            (pContext),
+      m_CID                 (*pCID),
+      m_sKey_Org            (m_CID.Key_Org ()),
+      m_sKey_All            (m_CID.Key_All ()),
+      m_sPath_Permanent_Org ((std::filesystem::path (pContext->Path_Permanent ()) / m_sKey_Org).generic_string ()),
+      m_sPath_Temporary_Org ((std::filesystem::path (pContext->Path_Temporary ()) / m_sKey_Org).generic_string ()),
+      m_sPath_Permanent_All ((std::filesystem::path (pContext->Path_Permanent ()) / m_sKey_All).generic_string ()),
+      m_sPath_Temporary_All ((std::filesystem::path (pContext->Path_Temporary ()) / m_sKey_All).generic_string ()),
+      m_nCount_Open         (0),
+      m_pCache              (nullptr),
+      m_pSilo               (nullptr),
+      m_pStream             (nullptr),
+      m_pWasm_Store         (nullptr),
+      m_twObjectIx_Next     (0)
    {
    }
 
@@ -79,6 +89,10 @@ public:
 
       if (m_nCount_Open++ == 0)
       {
+         std::error_code ec;
+         std::filesystem::create_directories (m_sPath_Permanent_All, ec);
+         std::filesystem::create_directories (m_sPath_Temporary_All, ec);
+
          if ((m_pCache = m_pContext->Network ()->Cache_Open (m_pContainer)))
          {
             if ((m_pStream = m_pContext->Console ()->Stream_Open (m_pContainer)))
@@ -323,7 +337,12 @@ public:
    CONTAINER*                            m_pContainer;
    CONTEXT*                              m_pContext;
    CID                                   m_CID;
-   std::string                           m_sKey;
+   std::string                           m_sKey_Org;
+   std::string                           m_sKey_All;
+   std::string                           m_sPath_Permanent_Org;
+   std::string                           m_sPath_Temporary_Org;
+   std::string                           m_sPath_Permanent_All;
+   std::string                           m_sPath_Temporary_All;
 
    uint32_t                              m_nCount_Open;
    std::recursive_mutex                  m_mxContainer;
@@ -358,10 +377,15 @@ size_t                CONTAINER::Close      ()                                  
 
 SNEEZE::CONTEXT*      CONTAINER::Context    () const                              { return  m_pImpl->m_pContext; }
 const CONTAINER::CID* CONTAINER::Identity   () const                              { return &m_pImpl->m_CID; }
-const std::string&    CONTAINER::Key        () const                              { return  m_pImpl->m_sKey; }
+const std::string&    CONTAINER::Key        () const                              { return  m_pImpl->m_sKey_All; }
 STREAM*               CONTAINER::Stream     () const                              { return  m_pImpl->m_pStream; }
 SILO*                 CONTAINER::Silo       () const                              { return  m_pImpl->m_pSilo; }
 CACHE*                CONTAINER::Cache      () const                              { return  m_pImpl->m_pCache; }
+
+const std::string&    CONTAINER::Path_Permanent_Org () const                     { return  m_pImpl->m_sPath_Permanent_Org; }
+const std::string&    CONTAINER::Path_Temporary_Org () const                     { return  m_pImpl->m_sPath_Temporary_Org; }
+const std::string&    CONTAINER::Path_Permanent_All () const                     { return  m_pImpl->m_sPath_Permanent_All; }
+const std::string&    CONTAINER::Path_Temporary_All () const                     { return  m_pImpl->m_sPath_Temporary_All; }
 
 bool CONTAINER::Instance_Open (uint64_t twFabricIx, const std::string& sUrl, const std::string& sHash, const std::vector<uint8_t>& aWasmBytes)
 {

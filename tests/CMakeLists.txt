@@ -40,6 +40,7 @@ endif ()
 
 add_executable (SneezeTest ${TEST_SOURCES})
 target_link_libraries (SneezeTest PRIVATE Sneeze)
+target_compile_definitions (SneezeTest PRIVATE SNEEZE_TEST_CERTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/certs")
 
 set (_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
 

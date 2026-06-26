@@ -344,24 +344,23 @@ static void TestCrashRecovery ()
    auto* pContainer = MakeTestContainer ("crash-test");
    const CONTAINER::CID* pCID = pContainer->Identity ();
 
-   // Compute the actual path that STORAGE will use
-   std::string sFp2  = pCID->sFingerprint.substr (0, 2);
-   std::string sFp22 = pCID->sFingerprint.substr (2, 22);
-   std::filesystem::path sDir = std::filesystem::path (s_pContext->Path_Permanent ()) / "Storage" / pCID->sPersonaHash / (sFp2 + "/" + sFp22);
-   std::filesystem::path sJsonPath = sDir / "container-crash-test.json";
-   std::filesystem::path sLogPath  = sDir / "container-crash-test.log";
+   // Compute the actual path that STORAGE will use (company scope: under the container)
+   std::filesystem::path sPath = std::filesystem::path (s_pContext->Path_Permanent ()) / pCID->Key_All () / "Storage";
 
-   std::filesystem::create_directories (sDir);
+   std::filesystem::create_directories (sPath);
+
+   std::filesystem::path sPathname_Json = sPath / "container.json";
+   std::filesystem::path sPathname_Log  = sPath / "container.log";
 
    // Write a base JSON file
    {
-      std::ofstream f (sJsonPath, std::ios::trunc);
+      std::ofstream f (sPathname_Json, std::ios::trunc);
       f << "{\"base\": 1, \"will-remove\": true}";
    }
 
    // Write a simulated .log file (as if we crashed mid-session)
    {
-      std::ofstream f (sLogPath, std::ios::trunc);
+      std::ofstream f (sPathname_Log, std::ios::trunc);
       f << "[\"Set\",\"recovered\",\"yes\"]\n";
       f << "[\"Set\",\"base\",99]\n";
       f << "[\"Remove\",\"will-remove\"]\n";
@@ -381,7 +380,7 @@ static void TestCrashRecovery ()
    Check (jRemoved.is_null (),
       "Log Remove replayed on recovery");
 
-   Check (!std::filesystem::exists (sLogPath), "Log file deleted after recovery");
+   Check (!std::filesystem::exists (sPathname_Log), "Log file deleted after recovery");
 
    pSilo->Detach ();
    pStorage->Silo_Close (pSilo);
@@ -435,16 +434,16 @@ static void TestMetaSidecar ()
    pSilo->Attach ();
    pSilo->Set (kSILO_SCOPE_PERMANENT_COMPANY, "data", "value");
 
-   std::string sMetaPath = pSilo->Pathname (kSILO_SCOPE_PERMANENT_COMPANY, "meta");
+   std::string sPathname_Meta = pSilo->Pathname (kSILO_SCOPE_PERMANENT_COMPANY, "meta");
 
    pSilo->Detach ();
    pStorage->Silo_Close (pSilo);
 
-   Check (std::filesystem::exists (sMetaPath), "Meta sidecar file created on Close");
+   Check (std::filesystem::exists (sPathname_Meta), "Meta sidecar file created on Close");
 
-   if (std::filesystem::exists (std::filesystem::path (sMetaPath)))
+   if (std::filesystem::exists (std::filesystem::path (sPathname_Meta)))
    {
-      std::ifstream f (sMetaPath);
+      std::ifstream f (sPathname_Meta);
       nlohmann::json jMeta = nlohmann::json::parse (f);
 
       Check (jMeta.value ("container", "") == "meta-test", "Meta contains container");

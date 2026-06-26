@@ -24,9 +24,7 @@ class STORAGE::Impl : public ISTORAGE_IMPL
 public:
    Impl (STORAGE* pStorage, CONTEXT* pContext) :
       m_pStorage (pStorage),
-      m_pContext (pContext),
-      m_sPath_Permanent ((std::filesystem::path (pContext->Path_Permanent ()) / "Storage").generic_string ()),
-      m_sPath_Temporary ((std::filesystem::path (pContext->Path_Temporary ()) / "Storage").generic_string ())
+      m_pContext (pContext)
    {
    }
 
@@ -132,16 +130,6 @@ public:
       }
    }
 
-   const std::string& Path_Permanent () const override
-   { 
-      return m_sPath_Permanent; 
-   }
-
-   const std::string& Path_Temporary () const override
-   { 
-      return m_sPath_Temporary; 
-   }
-
    ICONTEXT* Host () const override
    {
       return m_pContext->Host ();
@@ -154,8 +142,6 @@ public:
 
    STORAGE*                                m_pStorage;
    CONTEXT*                                m_pContext;
-   std::string                             m_sPath_Permanent;
-   std::string                             m_sPath_Temporary;
 
    std::recursive_mutex                    m_mxStorage;
    std::vector<SILO*>                      m_apSilo;

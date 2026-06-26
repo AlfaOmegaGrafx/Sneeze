@@ -51,7 +51,8 @@ namespace SNEEZE
          CID () : eTrust (kTRUST_NONE) {}
 
          std::string DisplayName () const;
-         std::string Key         () const;
+         std::string Key_Org     () const;
+         std::string Key_All     () const;
       };
 
       CONTAINER (CONTEXT* pContext, const CID* pCID);
@@ -79,6 +80,11 @@ namespace SNEEZE
       CACHE*             Cache    () const;
       SILO*              Silo     () const;
       STREAM*            Stream   () const;
+
+      const std::string& Path_Permanent_Org () const;
+      const std::string& Path_Temporary_Org () const;
+      const std::string& Path_Permanent_All () const;
+      const std::string& Path_Temporary_All () const;
 
    private:
       class Impl;

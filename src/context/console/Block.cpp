@@ -70,9 +70,6 @@ public:
 
       if (!m_bLoaded)
       {
-         std::error_code ec;
-         std::filesystem::create_directories (std::filesystem::path (m_sPathname).parent_path (), ec);
-
          m_aEntry.clear ();
 
          std::ifstream ifs (m_sPathname);
@@ -122,6 +119,7 @@ public:
       {
          std::error_code ec;
          std::filesystem::create_directories (std::filesystem::path (m_sPathname).parent_path (), ec);
+
          m_ofsBlock.open (m_sPathname, std::ios::app);
       }
 

@@ -218,7 +218,7 @@ bool               CacheEnabled () const;
 | Accessor | Returns | Notes |
 |---|---|---|
 | `ContainerName()` | The owning container's display name. | |
-| `Path()` | The fan-out directory the asset's files live in. | Built from the container identity and the URL's disk key. |
+| `Path()` | The fan-out directory the asset's files live in. | `CACHE::Path()` (via `ICACHE_IMPL::Path()`) joined with the URL disk key's fan-out prefix; the identity portion is not re-derived here. |
 | `Filename(sExt)` | The base filename, optionally with an extension. | The disk key with its fan-out prefix removed. |
 | `Pathname(sExt)` | `Path()` joined with `Filename(sExt)`. | The key the network deduplicates assets on. |
 | `Listener()` | The attached `IFILE`, or null. | Nulled when the close flag is set. |

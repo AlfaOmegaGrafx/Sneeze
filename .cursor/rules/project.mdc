@@ -267,7 +267,11 @@ Build-time tools required: CMake 3.20+, C++17 compiler, Rust/Cargo (Wasmtime), P
 - **BoringSSL requires Go + NASM on PATH.** NASM installs to `C:\Program Files\NASM\` but doesn't add itself to PATH.
 - **VS Dev Shell clobbers PATH.** Re-merge user PATH entries in PowerShell profile after dev-shell init.
 - **Orbit trail rendering.** ANARI `"curve"` geometry renders as thick PBR-lit tubes. Planned: unlit/emissive material, camera-distance radius scaling.
+- **NetworkTest cache-reload cluster (6 failing).** Tests like "Meta survived shutdown", "Hash matches after reload", "Second fetch IS served from cache" fail deterministically. Cache files DO write to the correct on-disk paths and reload works in the live app, so the suspect is the test harness (two `NETWORK` instances sharing one `CONTEXT`/`CONTAINER`), not the engine. Investigate the test before the engine. Reload load path: `ASSET::Meta_Load` marks READY only if `jMeta["url"]==m_sUrl && exists(<data>)`.
+- **On-disk cache layout.** `Root/<Persistent|Transitory/v<hex>>/<persona>/<fp2>/<fp22>/<container>/<Network|Storage|Console>/…`; org-scoped Storage sits at `<persona>/<fp2>/<fp22>/Storage`. Persona segment is never empty (defaults to `000000000000`). `Transitory/s<hex>` is the per-session permanent root used only by incognito contexts — empty under normal browsing, scrubbed on clean shutdown. `rules.json` currently lives at the shared context-level `Network/` folder; Phase 3 moves it into the primary fabric's container.
 
 ## Test Suites
 
 All suites compiled into a single `SneezeTest` executable. Suite flags: `--wasm`, `--spv`, `--xr`, `--net`, `--ui`, `--compute`, `--vox`, `--jws`, `--network`, `--storage`, `--console`. No flags = run all. `--help` lists suites.
+
+The JWS suite resolves its certs directory at build time via the `SNEEZE_TEST_CERTS_DIR` compile definition (CMake `target_compile_definitions`, default `tests/certs`, overridable by `argv[1]`), so `--jws` passes from any working directory. The CMake-generated `Sneeze.sln` carries the define; the hand-maintained `msvc/` project does not.

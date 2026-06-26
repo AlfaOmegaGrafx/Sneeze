@@ -35,7 +35,6 @@ namespace SNEEZE
       virtual void               Log (IENGINE::eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage)   = 0;
 
       virtual ICONTEXT*          Host              () const                                                                = 0;
-      virtual const std::string& Path_Permanent    () const                                                                = 0;
       virtual double             SecondsSinceEpoch () const                                                                = 0;
 
 
@@ -65,7 +64,7 @@ namespace SNEEZE
       virtual void               File_Reset  (FILE* pFile)                = 0;
 
       virtual ICONTEXT*          Host           () const                  = 0;
-      virtual const std::string& Path_Permanent () const                  = 0;
+      virtual std::string        Path           () const                  = 0;
       virtual CONTAINER*         Container      () const                  = 0;
 
    private:
@@ -114,7 +113,8 @@ namespace SNEEZE
       bool                 IsHashed          () const;
       std::string          DiskPath          () const;
       const std::string&   Pathname          () const;
-      std::string          Path              (eASSET_EXT eType) const;
+      std::string          Path              () const;
+      std::string          Pathname          (eASSET_EXT eType) const;
       long                 HttpStatus        () const;
       double               FetchStartTime    () const;
       double               FetchEndTime      () const;

@@ -10,7 +10,6 @@ browser but with native JSON documents instead of flat key-value pairs.
 STORAGE (per-context, constructor takes CONTEXT*)
  ├── m_umpUnit: pathname -> UNIT*      (one per JSON file, shared across SILOs)
  ├── m_apSilo: vector<SILO*>          (one per Silo_Open call)
- ├── m_sPath_Permanent / m_sPath_Temporary
  └── m_mxStorage (recursive_mutex)
 
 UNIT (one per JSON file on disk)
@@ -92,18 +91,31 @@ On clean save, the `.json` is written and `.log` deleted. On crash recovery,
 
 ## Disk Layout
 
+Organization-scoped data lives at the fingerprint (org) tier — shared by every
+container under that identity. Company-scoped data lives under the container.
+
 ```
-<PermanentPath>/Storage/<persona>/<fp-2>/<fp-22>/
+Org scope   (CONTAINER::Path_*_Org + "Storage"):
+<PermanentPath>/<persona>/<fp-2>/<fp-22>/Storage/
     ├── organization.json          (org permanent)
     ├── organization.json.meta
-    ├── organization.json.log
-    ├── container-poker.json       (container permanent)
-    └── ...
+    └── organization.json.log
+<TemporaryPath>/<persona>/<fp-2>/<fp-22>/Storage/
+    └── organization.json          (org temporary)
 
-<TemporaryPath>/Storage/<persona>/<fp-2>/<fp-22>/
-    ├── organization.json          (org temporary)
-    └── container-poker.json       (container temporary)
+Company scope (CONTAINER::Path_* + "Storage"):
+<PermanentPath>/<persona>/<fp-2>/<fp-22>/<container>/Storage/
+    ├── container.json             (container permanent)
+    ├── container.json.meta
+    └── container.json.log
+<TemporaryPath>/<persona>/<fp-2>/<fp-22>/<container>/Storage/
+    └── container.json             (container temporary)
 ```
+
+`SILO` builds these from `CONTAINER`'s path accessors and appends only the
+`Storage` segment; `SILO::Initialize` creates each scope's directory at open
+(parallel to `CACHE` and `STREAM`). The identity prefix is owned by
+`CONTAINER`, never re-derived in `SILO`.
 
 ## Notifications (ICONTEXT)
 

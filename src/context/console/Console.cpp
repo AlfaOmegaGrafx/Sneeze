@@ -29,7 +29,6 @@ class CONSOLE::Impl : public ICONSOLE_IMPL
 public:
    Impl (CONTEXT* pContext) :
       m_pContext          (pContext),
-      m_sPath_Temporary   ((std::filesystem::path (pContext->Path_Temporary ()) / "Console").generic_string ()),
       m_nIndex_Entry      (0),
       m_nEntries_Cache    (16384),
       m_nEntries_Block    (4096),
@@ -139,15 +138,6 @@ public:
    }
 
    // ---------------------------------------------------------------------------
-   // ICONSOLE_IMPL
-   // ---------------------------------------------------------------------------
-
-   const std::string& Path_Temporary () const override
-   {
-      return m_sPath_Temporary;
-   }
-
-   // ---------------------------------------------------------------------------
    // Entry creation — called by STREAM to create, timestamp, sequence,
    // and ring-buffer an entry. Returns the immutable shared_ptr.
    // ---------------------------------------------------------------------------
@@ -190,7 +180,6 @@ public:
    }
 
    CONTEXT*                                 m_pContext;
-   std::string                              m_sPath_Temporary;
 
    uint32_t                                 m_nEntries_Cache;
    uint32_t                                 m_nEntries_Block;

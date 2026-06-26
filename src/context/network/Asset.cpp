@@ -97,10 +97,10 @@ public:
 
    void Meta_Load ()
    {
-      std::string sMetaPath = Path (kASSET_EXT_META);
-      std::string sDataPath = Path (kASSET_EXT_DATA);
+      std::string sPathname_Meta = Pathname (kASSET_EXT_META);
+      std::string sPathname_Data = Pathname (kASSET_EXT_DATA);
 
-      std::ifstream file (sMetaPath);
+      std::ifstream file (sPathname_Meta);
       if (file.is_open ())
       {
          nlohmann::json jMeta;
@@ -113,13 +113,13 @@ public:
          }
          catch (...)
          {
-            m_pINetwork_Impl->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to parse sidecar: " + sMetaPath);
+            m_pINetwork_Impl->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to parse sidecar: " + sPathname_Meta);
          }
 
          if (bParsed)
          {
             std::string sMetaUrl = jMeta.value ("url", "");
-            if (sMetaUrl == m_sUrl  &&  std::filesystem::exists (sDataPath))
+            if (sMetaUrl == m_sUrl  &&  std::filesystem::exists (sPathname_Data))
             {
                m_sHash              = jMeta.value ("hash", "");
                m_nAssetIx           = jMeta.value ("nMetaIx", static_cast<uint32_t> (0));
@@ -149,9 +149,8 @@ public:
 
    void Meta_Save ()
    {
-      std::string sMetaPath = Path (kASSET_EXT_META);
-
-      std::filesystem::create_directories (std::filesystem::path (sMetaPath).parent_path ());
+      std::string sPathname_Meta      = Pathname (kASSET_EXT_META);
+      std::string sPathname_Meta_Temp = sPathname_Meta + ".temp";
 
       nlohmann::json jMeta;
       jMeta["url"]            = m_sUrl;
@@ -174,8 +173,10 @@ public:
          jReqHeaders[sKey] = sVal;
       jMeta["reqheaders"] = jReqHeaders;
 
-      std::string sTmpPath = sMetaPath + ".temp";
-      std::ofstream file (sTmpPath, std::ios::trunc);
+      std::error_code ec;
+      std::filesystem::create_directories (std::filesystem::path (sPathname_Meta).parent_path (), ec);
+
+      std::ofstream file (sPathname_Meta_Temp, std::ios::trunc);
       if (file.is_open ())
       {
          std::string sDump;
@@ -190,8 +191,7 @@ public:
          {
             m_pINetwork_Impl->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Meta_Save dump failed for " + m_sUrl + ": " + ex.what ());
             file.close ();
-            std::error_code ec;
-            std::filesystem::remove (sTmpPath, ec);
+            std::filesystem::remove (sPathname_Meta_Temp, ec);
          }
 
          if (bDumped)
@@ -199,8 +199,7 @@ public:
             file << sDump;
             file.close ();
 
-            std::error_code ec;
-            std::filesystem::rename (sTmpPath, sMetaPath, ec);
+            std::filesystem::rename (sPathname_Meta_Temp, sPathname_Meta, ec);
             if (ec)
                m_pINetwork_Impl->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to rename meta temp: " + ec.message ());
          }
@@ -211,9 +210,9 @@ public:
    {
       std::error_code ec;
 
-      std::filesystem::remove (Path (kASSET_EXT_DATA), ec);
-      std::filesystem::remove (Path (kASSET_EXT_META), ec);
-      std::filesystem::remove (Path (kASSET_EXT_TEMP), ec);
+      std::filesystem::remove (Pathname (kASSET_EXT_DATA), ec);
+      std::filesystem::remove (Pathname (kASSET_EXT_META), ec);
+      std::filesystem::remove (Pathname (kASSET_EXT_TEMP), ec);
 
       ResetState ();
 
@@ -253,7 +252,12 @@ public:
    // Disk path helpers
    // ---------------------------------------------------------------------------
 
-   std::string Path (eASSET_EXT eType) const
+   std::string Path () const
+   {
+      return std::filesystem::path (m_sPathname).parent_path ().generic_string ();
+   }
+
+   std::string Pathname (eASSET_EXT eType) const
    {
       static const char* aExt[] = { ".data", ".temp", ".meta" };
 
@@ -345,6 +349,12 @@ public:
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxAsset);
 
+      if (m_nCount_Open == 0)
+      {
+         std::error_code ec;
+         std::filesystem::create_directories (Path (), ec);
+      }
+
       m_apFiles.push_back (pFile);
 
       m_nCount_Open++;
@@ -402,7 +412,7 @@ public:
          else if (bState == kASSET_STATE_READY  &&  !sHash.empty ()  &&  m_sHash.empty ())
          {
             // Cached without hash — caller now requires integrity verification
-            if (VerifyHash (Path (kASSET_EXT_DATA), sHash))
+            if (VerifyHash (Pathname (kASSET_EXT_DATA), sHash))
             {
                m_sHash = sHash;
                TouchAccess ();
@@ -477,7 +487,7 @@ public:
             umsReqHeaders.insert ({ "User-Agent", "Sneeze/1.0 (Windows NT 10.0; Win64; x64)" });
          // umsReqHeaders.insert ({ "Accept-Encoding", "gzip, deflate, br, zstd" });
 
-            auto* pJob = new ASSET_FETCH (m_pAsset, m_sUrl, Path (kASSET_EXT_TEMP), Path (kASSET_EXT_DATA), m_sHash, umsReqHeaders);
+            auto* pJob = new ASSET_FETCH (m_pAsset, m_sUrl, Pathname (kASSET_EXT_TEMP), Pathname (kASSET_EXT_DATA), m_sHash, umsReqHeaders);
 
             m_pAsset_Fetch = pJob;
             m_pINetwork_Impl->Queue_Post_Fetch (pJob);
@@ -606,7 +616,7 @@ public:
 
       if (m_bState == kASSET_STATE_READY)
       {
-         std::ifstream file (Path (kASSET_EXT_DATA), std::ios::binary | std::ios::ate);
+         std::ifstream file (Pathname (kASSET_EXT_DATA), std::ios::binary | std::ios::ate);
          if (file.is_open ())
          {
             auto nSize = file.tellg ();
@@ -748,9 +758,10 @@ uint32_t             ASSET::AccessCount ()                  const { return m_pIm
 uint32_t             ASSET::AssetIx ()                      const { return m_pImpl->m_nAssetIx;          }
 const std::string&   ASSET::Hash ()                         const { return m_pImpl->m_sHash;             }
 bool                 ASSET::IsHashed ()                     const { return !m_pImpl->m_sHash.empty ();   }
-std::string          ASSET::DiskPath ()                     const { return m_pImpl->Path (kASSET_EXT_DATA); }
-const std::string&   ASSET::Pathname ()                     const { return m_pImpl->m_sPathname;         }
-std::string          ASSET::Path (eASSET_EXT eType)         const { return m_pImpl->Path (eType);        }
+std::string          ASSET::Path ()                         const { return m_pImpl->Path ();                }
+const std::string&   ASSET::Pathname ()                     const { return m_pImpl->m_sPathname;            }
+std::string          ASSET::Pathname (eASSET_EXT eType)     const { return m_pImpl->Pathname (eType);       }
+std::string          ASSET::DiskPath ()                     const { return m_pImpl->Pathname (kASSET_EXT_DATA); }
 long                 ASSET::HttpStatus ()                   const { return m_pImpl->m_nHttpStatus;       }
 double               ASSET::FetchStartTime ()               const { return m_pImpl->m_dFetchStartTime;   }
 double               ASSET::FetchEndTime ()                 const { return m_pImpl->m_dFetchEndTime;     }

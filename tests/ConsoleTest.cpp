@@ -97,7 +97,7 @@ int RunConsoleTests (int nArgc, char** aArgv)
    std::printf ("---------------------------------------------------------\n");
 
    // Clean test directory
-   std::string sTestPath = (std::filesystem::path (
+   std::string sPath_Test = (std::filesystem::path (
 #ifdef _WIN32
       std::getenv ("APPDATA")
 #else
@@ -106,11 +106,11 @@ int RunConsoleTests (int nArgc, char** aArgv)
    ) / "Metaversal" / "Sneeze" / "Test").string ();
 
    std::error_code ec;
-   std::filesystem::remove_all (sTestPath, ec);
-   std::filesystem::create_directories (sTestPath, ec);
+   std::filesystem::remove_all (sPath_Test, ec);
+   std::filesystem::create_directories (sPath_Test, ec);
 
    // Create engine
-   TEST_HOST host (sTestPath);
+   TEST_HOST host (sPath_Test);
    ENGINE engine (&host);
    bool bInit = engine.Initialize ();
    ASSERT (bInit, "Engine initialized");

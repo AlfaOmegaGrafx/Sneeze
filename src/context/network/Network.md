@@ -125,20 +125,27 @@ the fetch resolves.
 ## Disk Storage
 
 ```
-<PermanentPath>/Network/<persona>/<fp[0:2]>/<fp[2:24]>/<container>/<dk[0:2]>/
+<PermanentPath>/<persona>/<fp[0:2]>/<fp[2:24]>/<container>/Network/<dk[0:2]>/
     ├── <dk[2:]>.data    (cached payload)
     ├── <dk[2:]>.meta    (sidecar metadata JSON)
     └── <dk[2:]>.temp    (in-flight download)
 ```
+
+The identity prefix `<persona>/<fp[0:2]>/<fp[2:24]>/<container>` is owned by
+`CONTAINER` (`CONTAINER::Path_Permanent_All()`); subsystems append only their own
+segment. The `Network` folder is the `CACHE`'s segment.
 
 Disk key is truncated SHA-1 of URL (24 hex chars). First 2 chars form a
 fan-out directory.
 
 `CACHE` exposes the container-level path helpers (parallel to `SILO` and
 `FILE`): `CACHE::Path()` returns the container's cache root
-(`<PermanentPath>/Network/<persona>/<fp[0:2]>/<fp[2:24]>/<container>`),
-`CACHE::Filename(sExt)` returns `container-<id>[.ext]`, and `CACHE::Pathname`
-joins the two. `CACHE::DisplayName()` returns the container's display name.
+(`<container>/Network`, i.e. `CONTAINER::Path_Permanent_All()` + `"Network"`).
+`FILE` builds on `CACHE::Path()` via `ICACHE_IMPL::Path()`; assets never
+re-derive the identity prefix. `CACHE::DisplayName()` returns the container's
+display name. The `Network` directory is created once at `CACHE::Initialize()`;
+each `ASSET` creates its own `<dk[0:2]>` leaf at open. `rules.json` lives at
+`<PermanentPath>/Network/` (shared across the session — unchanged this phase).
 
 ## SRI Hash Format
 

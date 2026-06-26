@@ -19,6 +19,7 @@ using namespace SNEEZE::persona;
 PERSONA::PERSONA (ENGINE* pEngine)
    : m_pEngine (pEngine)
    , m_bLoggedIn (false)
+   , m_sHash ("000000000000")
 {
 }
 
@@ -41,7 +42,7 @@ void PERSONA::Logout ()
    m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "PERSONA", "Logged out \"" + m_sName + "\"");
    m_bLoggedIn = false;
    m_sName.clear ();
-   m_sHash.clear ();
+   m_sHash = "000000000000";
 }
 
 std::string PERSONA::ComputeHash (const std::string& sInput)

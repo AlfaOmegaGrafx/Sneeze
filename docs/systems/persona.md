@@ -55,8 +55,10 @@ identity = persona hash  +  source fingerprint  +  container name
 and persistent data is filed on disk under a path that begins with the persona hash:
 
 ```text
-.../Storage/<persona hash>/<fingerprint>/...
+.../<persona hash>/<fingerprint>/.../Storage/...
 ```
+
+The persona hash is always 12 hex characters; when no one is logged in it defaults to `000000000000` so the segment is never empty.
 
 So switching personas switches the entire tree of saved state: the same fabric loaded under two personas reads and writes two independent stores. This is the whole point of the system — it makes per-user isolation real without yet making identity real. See [Storage](storage.md) and [Container](container.md) for how the other two keys (fingerprint and container name) are derived.
 

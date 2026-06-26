@@ -85,12 +85,17 @@ Immutable, self-stamps with `system_clock::now()` in constructor.
 ## Disk Layout
 
 ```
-<TemporaryPath>/Console/<persona>/<fp-2>/<fp-22>/
-    ├── <containerName>.meta
-    ├── <containerName>-0000.log
-    ├── <containerName>-0001.log
+<TemporaryPath>/<persona>/<fp-2>/<fp-22>/<container>/Console/
+    ├── console.meta
+    ├── 0000.log
+    ├── 0001.log
     └── ...
 ```
+
+`STREAM` builds this from `CONTAINER::Path_Temporary_All()` and appends only the
+`Console` segment; the directory is created once at `STREAM::Initialize()`
+(blocks no longer create it per-write). The identity prefix is owned by
+`CONTAINER`, never re-derived in `STREAM`.
 
 ## Notifications (ICONTEXT)
 

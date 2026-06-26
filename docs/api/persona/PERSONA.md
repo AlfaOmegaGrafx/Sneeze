@@ -51,7 +51,7 @@ private:
 
 ## Lifecycle
 
-A persona is constructed logged-out (empty name, empty hash). `Login` populates the name and hash and sets the flag; `Logout` clears all three. The same instance is reused across logins — there is one persona per engine, not one per session.
+A persona is constructed logged-out: empty name, but the hash defaults to `000000000000` (12 zeros) so the persona path segment is never empty. `Login` populates the name and hash and sets the flag; `Logout` clears the name, drops the flag, and resets the hash back to the `000000000000` default. The same instance is reused across logins — there is one persona per engine, not one per session.
 
 ---
 
@@ -104,7 +104,7 @@ const std::string& Hash () const;
 - **Purpose / Returns.** The composed display name (`"First.Second"` or `"First"`), or empty when logged out. Returned **by reference** — see [pitfalls](#threading-and-pitfalls).
 
 ### `const std::string& Hash () const`
-- **Purpose / Returns.** The persona hash: the first 12 hex characters of the SHA-256 of the name. Empty when logged out. This is the value the storage and container layers use to scope per-user state. Returned **by reference**.
+- **Purpose / Returns.** The persona hash: the first 12 hex characters of the SHA-256 of the name, or the `000000000000` default when logged out (never empty). This is the value the storage and container layers use to scope per-user state. Returned **by reference**.
 
 ---
 

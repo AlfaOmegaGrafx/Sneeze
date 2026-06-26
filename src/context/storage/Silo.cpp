@@ -34,9 +34,13 @@ public:
 
    void Initialize ()
    {
+      std::error_code ec;
+
       for (int nScope = 0; nScope < kSILO_SCOPE_COUNT; nScope++)
       {
          eSILO_SCOPE eScope = static_cast<eSILO_SCOPE> (nScope);
+
+         std::filesystem::create_directories (Path (eScope), ec);
 
          m_apUnit[nScope] = m_pIStorage_Impl->Unit_Open (eScope, Pathname (eScope));
       }
@@ -63,15 +67,23 @@ public:
 
    std::string Path (eSILO_SCOPE eScope) const
    {
-      const std::string& sBasePath = (eScope == kSILO_SCOPE_TEMPORARY_ORG || eScope == kSILO_SCOPE_TEMPORARY_COMPANY) ? m_pIStorage_Impl->Path_Temporary () : m_pIStorage_Impl->Path_Permanent ();
+      const std::string* psBasePath = nullptr;
 
-      const CONTAINER::CID* pCID = m_pContainer->Identity ();
-      return (std::filesystem::path (sBasePath) / pCID->sPersonaHash / pCID->sFingerprint.substr (0, 2) / pCID->sFingerprint.substr (2, 22)).generic_string ();
+      switch (eScope)
+      {
+         case kSILO_SCOPE_PERMANENT_ORG:     psBasePath = &m_pContainer->Path_Permanent_Org (); break;
+         default:
+         case kSILO_SCOPE_PERMANENT_COMPANY: psBasePath = &m_pContainer->Path_Permanent_All (); break;
+         case kSILO_SCOPE_TEMPORARY_ORG:     psBasePath = &m_pContainer->Path_Temporary_Org (); break;
+         case kSILO_SCOPE_TEMPORARY_COMPANY: psBasePath = &m_pContainer->Path_Temporary_All (); break;
+      }
+
+      return (std::filesystem::path (*psBasePath) / "Storage").generic_string ();
    }
 
    std::string Filename (eSILO_SCOPE eScope, const std::string& sExt = "") const
    {
-      std::string sName = (eScope == kSILO_SCOPE_PERMANENT_ORG || eScope == kSILO_SCOPE_TEMPORARY_ORG) ? "organization" : "container-" + m_pContainer->Identity ()->sContainer;
+      std::string sName = (eScope == kSILO_SCOPE_PERMANENT_ORG || eScope == kSILO_SCOPE_TEMPORARY_ORG) ? "organization" : "container";
 
       if (!sExt.empty ())
          sName += "." + sExt;

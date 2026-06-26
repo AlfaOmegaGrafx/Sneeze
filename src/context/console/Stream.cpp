@@ -41,6 +41,9 @@ public:
       m_nBlocks        = nBlocks;
       m_nEntries_Block = nEntries_Block;
 
+      std::error_code ec;
+      std::filesystem::create_directories (Path (), ec);
+
       Meta_Load ();
    }
 
@@ -59,21 +62,17 @@ public:
    // Path helpers
    // ---------------------------------------------------------------------------
 
-   std::string Path (uint32_t nBlock) const
+   std::string Path () const
    {
-      const std::string& sBasePath = m_pIConsole_Impl->Path_Temporary ();
-
-      const CONTAINER::CID* pCID = m_pContainer->Identity ();
-      
-      return (std::filesystem::path (sBasePath) / pCID->sPersonaHash / pCID->sFingerprint.substr (0, 2) / pCID->sFingerprint.substr (2, 22)).generic_string ();
+      return (std::filesystem::path (m_pContainer->Path_Temporary_All ()) / "Console").generic_string ();
    }
 
    std::string Filename (uint32_t nBlock, const std::string& sExt = "") const
    {
-      char szBlock[5];
-      snprintf (szBlock, sizeof (szBlock), "%04u", nBlock);
+      char sBlock[5];
+      snprintf (sBlock, sizeof (sBlock), "%04u", nBlock);
 
-      std::string sName = m_pContainer->Identity ()->sContainer + "-" + szBlock;
+      std::string sName = sBlock;
 
       if (!sExt.empty ())
          sName += "." + sExt;
@@ -83,12 +82,12 @@ public:
 
    std::string Pathname (uint32_t nBlock, const std::string& sExt = "") const
    {
-      return (std::filesystem::path (Path (nBlock)) / Filename (nBlock, sExt)).generic_string ();
+      return (std::filesystem::path (Path ()) / Filename (nBlock, sExt)).generic_string ();
    }
 
    std::string Pathname_Meta () const
    {
-      return (std::filesystem::path (Path (0)) / (m_pContainer->Identity ()->sContainer + ".meta")).generic_string ();
+      return (std::filesystem::path (Path ()) / "console.meta").generic_string ();
    }
 
    // ---------------------------------------------------------------------------
@@ -127,10 +126,8 @@ public:
 
    void Meta_Save ()
    {
-      std::string sPathname_Meta = Pathname_Meta ();
-
-      std::error_code ec;
-      std::filesystem::create_directories (std::filesystem::path (sPathname_Meta).parent_path (), ec);
+      std::string sPathname_Meta      = Pathname_Meta ();
+      std::string sPathname_Meta_Temp = sPathname_Meta + ".temp";
 
       nlohmann::json jMeta;
 
@@ -144,14 +141,16 @@ public:
       jMeta["container"]         = pCID->sContainer;
       jMeta["personaHash"]       = pCID->sPersonaHash;
 
-      std::string sTmpPath = sPathname_Meta + ".temp";
-      std::ofstream ofs (sTmpPath, std::ios::trunc);
+      std::error_code ec;
+      std::filesystem::create_directories (std::filesystem::path (sPathname_Meta).parent_path (), ec);
+
+      std::ofstream ofs (sPathname_Meta_Temp, std::ios::trunc);
       if (ofs.is_open ())
       {
          ofs << jMeta.dump (2);
          ofs.close ();
 
-         std::filesystem::rename (sTmpPath, sPathname_Meta, ec);
+         std::filesystem::rename (sPathname_Meta_Temp, sPathname_Meta, ec);
       }
    }
 
@@ -362,7 +361,7 @@ STREAM::~STREAM ()
 
 std::string STREAM::DisplayName    ()                                         const { return m_pImpl->m_pContainer->Identity ()->DisplayName (); }
 
-std::string STREAM::Path          (uint32_t nBlock)                          const { return m_pImpl->Path     (nBlock); }
+std::string STREAM::Path          ()                                         const { return m_pImpl->Path     (); }
 std::string STREAM::Filename      (uint32_t nBlock, const std::string& sExt) const { return m_pImpl->Filename (nBlock, sExt); }
 std::string STREAM::Pathname      (uint32_t nBlock, const std::string& sExt) const { return m_pImpl->Pathname (nBlock, sExt); }
 

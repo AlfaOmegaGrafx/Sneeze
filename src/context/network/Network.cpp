@@ -37,7 +37,6 @@ public:
       INETWORK_IMPL     (),
       m_pNetwork        (pNetwork),
       m_pContext        (pContext),
-      m_sPath_Permanent ((std::filesystem::path (pContext->Path_Permanent ()) / "Network").generic_string ()),
       m_nNextAssetIx    (1),
       m_tpEpoch         (std::chrono::steady_clock::now ())
    {
@@ -49,15 +48,15 @@ public:
 
       m_tpEpoch = std::chrono::steady_clock::now ();
 
-      m_sCachePath = CachePath ();
+      std::string sPath_Cache = Path_Cache ();
 
-      std::filesystem::create_directories (m_sCachePath);
+      std::filesystem::create_directories (sPath_Cache);
 
       Rules_Load ();
 
       bResult = true;
 
-      m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "NETWORK", "Initialized (path: " + m_sCachePath + ", rules: " + std::to_string (m_aRules.size ()) + ", nAssetIx: " + std::to_string (m_nNextAssetIx) + ")");
+      m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "NETWORK", "Initialized (path: " + sPath_Cache + ", rules: " + std::to_string (m_aRules.size ()) + ", nAssetIx: " + std::to_string (m_nNextAssetIx) + ")");
 
       return bResult;
    }
@@ -86,8 +85,18 @@ public:
       // than to wait for the assets to drain naturally. If all [leaked or otherwise] files have been deleted, 
       // then all of the assets should eventually drain unless there is a bug in the asset code.
 
-      while (m_umpAsset.size() > 0)
+      size_t nSize;
+      do
+      {
          std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+         {
+            std::lock_guard<std::recursive_mutex> guard (m_mxAsset);
+
+            nSize = m_umpAsset.size ();
+         }
+      }
+      while (nSize > 0);
    }
 
    // ---------------------------------------------------------------------------
@@ -99,7 +108,7 @@ public:
    //
    // REVISIT: rules.json placement.
    //
-   // CachePath() currently returns m_sPath_Permanent, which is shared across
+   // Path_Cache () currently derives <context>/Network, which is shared across
    // all contexts of the same session type (persistent or transitory). This
    // means rules.json is shared too — but "clear cache" should be per-context.
    //
@@ -121,14 +130,9 @@ public:
    //     to become per-container as well.
    // ---------------------------------------------------------------------------
 
-   const std::string& CachePath () const
+   std::string Path_Cache () const
    {
-      return m_sPath_Permanent;
-   }
-
-   const std::string& Path_Permanent () const override
-   { 
-      return m_sPath_Permanent; 
+      return (std::filesystem::path (m_pContext->Path_Permanent ()) / "Network").generic_string ();
    }
 
    // ---------------------------------------------------------------------------
@@ -139,8 +143,8 @@ public:
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxRules);
 
-      std::string sRulesPath = (std::filesystem::path (m_sCachePath) / "rules.json").generic_string ();
-      std::ifstream file (sRulesPath);
+      std::string sPathname_Rules = (std::filesystem::path (Path_Cache ()) / "rules.json").generic_string ();
+      std::ifstream file (sPathname_Rules);
       if (file.is_open ())
       {
          nlohmann::json jDoc;
@@ -197,17 +201,18 @@ public:
       }
       jDoc["rules"] = jRules;
 
-      std::string sRulesPath = (std::filesystem::path (m_sCachePath) / "rules.json").generic_string ();
-      std::string sTmpPath = (std::filesystem::path (m_sCachePath) / "rules.json.temp").generic_string ();
+      std::string sPath_Cache     = Path_Cache ();
+      std::string sPathname_Rules = (std::filesystem::path (sPath_Cache) / "rules.json").generic_string ();
+      std::string sPathname_Temp  = (std::filesystem::path (sPath_Cache) / "rules.json.temp").generic_string ();
 
-      std::ofstream file (sTmpPath, std::ios::trunc);
+      std::ofstream file (sPathname_Temp, std::ios::trunc);
       if (file.is_open ())
       {
          file << jDoc.dump (2);
          file.close ();
 
          std::error_code ec;
-         std::filesystem::rename (sTmpPath, sRulesPath, ec);
+         std::filesystem::rename (sPathname_Temp, sPathname_Rules, ec);
       }
    }
 
@@ -218,7 +223,7 @@ public:
       bool bResult = false;
 
       std::string sContentType = pAsset->RspHeader ("content-type");
-      std::string sCreatedAt = pAsset->CreatedTime ();
+      std::string sCreatedAt   = pAsset->CreatedTime ();
 
       for (auto& rule : m_aRules)
       {
@@ -383,8 +388,6 @@ public:
 
    NETWORK*                                m_pNetwork;
    CONTEXT*                                m_pContext;
-   std::string                             m_sPath_Permanent;
-   std::string                             m_sCachePath;
 
    uint32_t                                m_nNextAssetIx;
    std::unordered_map<std::string, ASSET*> m_umpAsset;

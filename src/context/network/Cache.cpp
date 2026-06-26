@@ -38,12 +38,8 @@ public:
 
    void Initialize ()
    {
-      // REVISIT (Phase 3): create the container's cache directory here --
-      // std::filesystem::create_directories (Path ()). Deferred for now because
-      // directories are created lazily on first write (Asset.cpp), so eager
-      // creation would litter empty dirs for containers that never fetch.
-
-      // Path_Permanent (below) probably shouldn't be used by FILE
+      std::error_code ec;
+      std::filesystem::create_directories (Path (), ec);
    }
 
    ~Impl ()
@@ -73,18 +69,14 @@ public:
    // Path helpers
    // ---------------------------------------------------------------------------
 
-   std::string Path () const
+   std::string Path () const override
    {
-      const std::string& sBasePath = m_pINetwork_Impl->Path_Permanent ();
-
-      const CONTAINER::CID* pCID = m_pContainer->Identity ();
-
-      return (std::filesystem::path (sBasePath) / pCID->sPersonaHash / pCID->sFingerprint.substr (0, 2) / pCID->sFingerprint.substr (2, 22) / pCID->sContainer).generic_string ();
+      return (std::filesystem::path (m_pContainer->Path_Permanent_All ()) / "Network").generic_string ();
    }
 
    std::string Filename (const std::string& sExt = "") const
    {
-      std::string sName = "container-" + m_pContainer->Identity ()->sContainer;
+      std::string sName = "container"; // temporary, unused
 
       if (!sExt.empty ())
          sName += "." + sExt;
@@ -170,11 +162,6 @@ public:
    ICONTEXT* Host () const override
    {
       return m_pINetwork_Impl->Host ();
-   }
-
-   const std::string& Path_Permanent () const override
-   {
-      return m_pINetwork_Impl->Path_Permanent ();
    }
 
    CONTAINER* Container () const override

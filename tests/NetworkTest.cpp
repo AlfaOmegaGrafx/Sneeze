@@ -475,15 +475,15 @@ static void TestResetFlag ()
       bool bGot = listener.WaitFor (15000);
       if (bGot  &&  listener.Succeeded ())
       {
-         std::string sDiskPath = pFile->DiskPath ();
+         std::string sPathname_Disk = pFile->DiskPath ();
 
-         Check (!sDiskPath.empty (), "File had a disk path");
-         Check (std::filesystem::exists (sDiskPath), "Disk file exists before reset");
+         Check (!sPathname_Disk.empty (), "File had a disk path");
+         Check (std::filesystem::exists (sPathname_Disk), "Disk file exists before reset");
 
          pFile->Reset ();
          pFile->Close ();
 
-         Check (std::filesystem::exists (sDiskPath), "Disk file preserved (reset deferred to next load)");
+         Check (std::filesystem::exists (sPathname_Disk), "Disk file preserved (reset deferred to next load)");
       }
       else
       {
@@ -907,14 +907,14 @@ static void TestCloseWithoutReset ()
    {
       listener.WaitFor (15000);
 
-      std::string sDiskPath = pFile->DiskPath ();
-      bool bHadDisk = !sDiskPath.empty ()  &&  std::filesystem::exists (sDiskPath);
+      std::string sPathname_Disk = pFile->DiskPath ();
+      bool bHadDisk = !sPathname_Disk.empty ()  &&  std::filesystem::exists (sPathname_Disk);
 
       pFile->Close ();
 
       if (bHadDisk)
       {
-         Check (std::filesystem::exists (sDiskPath),
+         Check (std::filesystem::exists (sPathname_Disk),
             "Disk file survives close without reset");
       }
       else
@@ -950,15 +950,15 @@ static void TestDeferredReset ()
       listenerA.WaitFor (15000);
       listenerB.WaitFor (15000);
 
-      std::string sDiskPath = pFileA->DiskPath ();
-      bool bHadDisk = !sDiskPath.empty ()  &&  std::filesystem::exists (sDiskPath);
+      std::string sPathname_Disk = pFileA->DiskPath ();
+      bool bHadDisk = !sPathname_Disk.empty ()  &&  std::filesystem::exists (sPathname_Disk);
 
       pFileA->Reset ();
       pFileA->Close ();
 
       if (bHadDisk)
       {
-         Check (std::filesystem::exists (sDiskPath),
+         Check (std::filesystem::exists (sPathname_Disk),
             "Disk file survives while second handle is attached");
       }
 
@@ -966,7 +966,7 @@ static void TestDeferredReset ()
 
       if (bHadDisk)
       {
-         Check (std::filesystem::exists (sDiskPath),
+         Check (std::filesystem::exists (sPathname_Disk),
             "Disk file preserved (reset flag deferred to next load)");
       }
 

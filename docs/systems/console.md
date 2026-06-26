@@ -122,14 +122,14 @@ A stream remembers where it left off across sessions through a small `.meta` JSO
 Block files are laid out under the context's temporary path, partitioned by the container's cryptographic identity so that different sources never collide:
 
 ```text
-<TemporaryPath>/Console/<personaHash>/<fingerprint[0:2]>/<fingerprint[2:22]>/
-    <container>.meta
-    <container>-0000.log
-    <container>-0001.log
+<TemporaryPath>/<personaHash>/<fingerprint[0:2]>/<fingerprint[2:22]>/<container>/Console/
+    console.meta
+    0000.log
+    0001.log
     ...
 ```
 
-The four-digit suffix is the block index; `.log` files are JSONL. All of a stream's blocks live in the same directory (the path is derived from the container's identity, not from the block number).
+The four-digit name is the block index; `.log` files are JSONL. The identity prefix and container segment are owned by `CONTAINER`; `STREAM` appends only its `Console` segment. All of a stream's blocks live in that one directory (the path is derived from the container's identity, not from the block number), which `STREAM` creates once at initialization.
 
 ---
 

@@ -34,9 +34,9 @@ public:
       m_nSizeBytes (0),
       m_nAccessCount (0)
    {
-      std::string sMetaPath = m_sPathname + ".meta";
+      std::string sPathname_Meta = m_sPathname + ".meta";
 
-      std::ifstream file (sMetaPath);
+      std::ifstream file (sPathname_Meta);
       if (file.is_open ())
       {
          try
@@ -136,9 +136,9 @@ public:
 
    void Log_Append (const std::string& sOp, const std::string& sPath, const nlohmann::json& jValue)
    {
-      std::string sLogPath = m_sPathname + ".log";
+      std::string sPathname_Log = m_sPathname + ".log";
 
-      std::ofstream file (sLogPath, std::ios::app);
+      std::ofstream file (sPathname_Log, std::ios::app);
       if (file.is_open ())
       {
          nlohmann::json jEntry = nlohmann::json::array ();
@@ -152,9 +152,9 @@ public:
 
    void Log_Replay ()
    {
-      std::string sLogPath = m_sPathname + ".log";
+      std::string sPathname_Log = m_sPathname + ".log";
 
-      std::ifstream file (sLogPath);
+      std::ifstream file (sPathname_Log);
       if (file.is_open ())
       {
          std::string sLine;
@@ -228,9 +228,10 @@ public:
 
    void Log_Delete ()
    {
-      std::string sLogPath = m_sPathname + ".log";
+      std::string sPathname_Log = m_sPathname + ".log";
+      
       std::error_code ec;
-      std::filesystem::remove (sLogPath, ec);
+      std::filesystem::remove (sPathname_Log, ec);
    }
 
    void Attach () 
@@ -258,15 +259,12 @@ public:
 
       if (!m_bLoaded)
       {
-         std::error_code ec;
-         std::filesystem::create_directories (std::filesystem::path (m_sPathname).parent_path (), ec);
-
          m_jData = nlohmann::json::object ();
 
-         std::string sJsonFile = m_sPathname + ".json";
-         if (std::filesystem::exists (sJsonFile))
+         std::string sPathname_Json = m_sPathname + ".json";
+         if (std::filesystem::exists (sPathname_Json))
          {
-            std::ifstream file (sJsonFile);
+            std::ifstream file (sPathname_Json);
             if (file.is_open ())
             {
                try
@@ -298,20 +296,23 @@ public:
 
       if (m_bLoaded)
       {
-         std::string sJsonFile = m_sPathname + ".json";
-         std::string sTmpPath = sJsonFile + ".temp";
-         std::ofstream file (sTmpPath, std::ios::trunc);
+         std::string sPathname_Json      = m_sPathname + ".json";
+         std::string sPathname_Json_Temp = sPathname_Json + ".temp";
+
+         std::error_code ec;
+         std::filesystem::create_directories (std::filesystem::path (sPathname_Json).parent_path (), ec);
+
+         std::ofstream file (sPathname_Json_Temp, std::ios::trunc);
          if (file.is_open ())
          {
             file << m_jData.dump (2);
             file.close ();
 
-            std::error_code ec;
-            std::filesystem::rename (sTmpPath, sJsonFile, ec);
+            std::filesystem::rename (sPathname_Json_Temp, sPathname_Json, ec);
 
             if (!ec)
             {
-               auto nSize = std::filesystem::file_size (sJsonFile, ec);
+               auto nSize = std::filesystem::file_size (sPathname_Json, ec);
                if (!ec)
                   m_nSizeBytes = static_cast<uint64_t> (nSize);
             }
@@ -341,7 +342,8 @@ public:
 
    void Meta_Save (CONTAINER* pContainer)
    {
-      std::string sMetaPath = m_sPathname + ".meta";
+      std::string sPathname_Meta      = m_sPathname + ".meta";
+      std::string sPathname_Meta_Temp = sPathname_Meta + ".temp";
 
       const CONTAINER::CID* pCID = pContainer->Identity ();
       nlohmann::json jMeta;
@@ -359,15 +361,16 @@ public:
       jMeta["lastAccessedAt"]   = m_sLastAccessedAt;
       jMeta["accessCount"]      = m_nAccessCount;
 
-      std::string sTmpPath = sMetaPath + ".temp";
-      std::ofstream file (sTmpPath, std::ios::trunc);
+      std::error_code ec;
+      std::filesystem::create_directories (std::filesystem::path (sPathname_Meta).parent_path (), ec);
+
+      std::ofstream file (sPathname_Meta_Temp, std::ios::trunc);
       if (file.is_open ())
       {
          file << jMeta.dump (2);
          file.close ();
 
-         std::error_code ec;
-         std::filesystem::rename (sTmpPath, sMetaPath, ec);
+         std::filesystem::rename (sPathname_Meta_Temp, sPathname_Meta, ec);
       }
    }
 

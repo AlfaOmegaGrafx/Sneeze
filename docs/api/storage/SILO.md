@@ -183,10 +183,10 @@ std::string Pathname (eSILO_SCOPE eScope, const std::string& sExt = "") const;
 ```
 
 ### `std::string Path (eScope)`
-- **Purpose / Returns.** The directory a scope's files live in: an identity-keyed path under the permanent root (for permanent scopes) or temporary root (for temporary scopes).
+- **Purpose / Returns.** The directory a scope's files live in: `CONTAINER::Path_*_Org()` + `"Storage"` for the org scopes (the fingerprint tier, shared by all containers under that identity) or `CONTAINER::Path_*_All()` + `"Storage"` for the container scopes (one level deeper, under the container), choosing the permanent or temporary root by scope.
 
 ### `std::string Filename (eScope, sExt)`
-- **Purpose / Returns.** The base filename for a scope: `organization` for the org scopes, `container-<id>` for the container scopes, optionally suffixed with `sExt`.
+- **Purpose / Returns.** The base filename for a scope: `organization` for the org scopes, `container` for the container scopes, optionally suffixed with `sExt`.
 - **Notes.** The shared `organization` filename under an identity-keyed path is exactly what makes org units shared across containers of the same organization.
 
 ### `std::string Pathname (eScope, sExt)`
