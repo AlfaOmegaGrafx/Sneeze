@@ -554,11 +554,11 @@ set (SOM_HEADERS
    context/scene/AccessControl.h)
 
 # Embed Mozilla's CA bundle (cacert.pem) as a string blob so libcurl can
-# verify HTTPS certificates on platforms whose system has no libcurl-
-# readable CA store (Android NDK + BoringSSL, in particular). Win32 uses
-# SChannel + the Windows store; Apple uses SecureTransport + Keychain;
-# both ignore CAINFO_BLOB, but compiling the symbol unconditionally
-# avoids a per-platform link surface.
+# verify HTTPS certificates on platforms whose TLS stack has no OS trust
+# store wired into curl (Linux/Android/macOS desktop with BoringSSL, in
+# particular). Win32 uses SChannel + the Windows store; iOS uses
+# SecureTransport + Keychain; both ignore CAINFO_BLOB, but compiling the
+# symbol unconditionally avoids a per-platform link surface.
 set (SNEEZE_CACERT_PEM "${CMAKE_CURRENT_BINARY_DIR}/cacert.pem")
 if (NOT EXISTS "${SNEEZE_CACERT_PEM}")
    message (STATUS "Fetching cacert.pem from curl.se")
