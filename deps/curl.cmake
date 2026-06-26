@@ -2,7 +2,7 @@ if (WIN32)
    set (CURL_SSL_ARGS -DCURL_USE_SCHANNEL=ON -DCURL_USE_OPENSSL=OFF)
 elseif (APPLE)
    # macOS + iOS: Apple's Secure Transport (no OpenSSL dep)
-   set (CURL_SSL_ARGS -DCURL_USE_SECTRANSPORT=ON -DCURL_USE_OPENSSL=OFF -DCURL_USE_SCHANNEL=OFF)
+   set (CURL_SSL_ARGS -DCURL_USE_SECTRANSP=ON -DCURL_USE_OPENSSL=OFF -DCURL_USE_SCHANNEL=OFF)
 else ()
    # Linux + Android: curl links against BoringSSL (built by deps/boringssl.cmake).
    # BoringSSL answers to the same FindOpenSSL interface as OpenSSL, so
