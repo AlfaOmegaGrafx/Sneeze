@@ -609,8 +609,8 @@ set (CONTAINER_HEADERS)
 set (CONSOLE_SOURCES  context/console/Console.cpp context/console/Entry.cpp context/console/Stream.cpp context/console/Block.cpp)
 set (CONSOLE_HEADERS  )
 
-set (NETWORK_SOURCES  context/network/Network.cpp context/network/File.cpp context/network/Asset.cpp)
-set (NETWORK_HEADERS)
+set (NETWORK_SOURCES  context/network/Network.cpp context/network/Cache.cpp context/network/File.cpp context/network/Asset.cpp)
+set (NETWORK_HEADERS  context/network/Network.h)
 
 set (STORAGE_SOURCES  context/storage/Storage.cpp context/storage/Silo.cpp context/storage/Unit.cpp)
 set (STORAGE_HEADERS)

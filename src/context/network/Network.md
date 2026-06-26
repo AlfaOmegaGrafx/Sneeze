@@ -4,32 +4,60 @@ The `network` module provides handle-based, type-agnostic resource fetching and
 caching. All fetched files persist on disk across restarts. Files with a
 cryptographic hash are additionally integrity-verified.
 
+The module is split into two tiers, mirroring `STORAGE`/`SILO` and
+`CONSOLE`/`STREAM`:
+
+- **NETWORK** — the per-context subsystem. Owns the deduplicated **asset** tier
+  (one `ASSET` per cached URL) and the background fetch machinery.
+- **CACHE** — a per-container handle opened from `NETWORK::Cache_Open()`. Owns
+  the **file** tier (the `FILE` handles for one container) and forwards asset
+  operations to its `NETWORK`.
+
+Each `CONTAINER` opens exactly one `CACHE` for its lifetime; reach it via
+`CONTAINER::Cache()`.
+
 ## Architecture
 
 ```
 NETWORK (per-context, constructor takes CONTEXT*)
  ├── m_umpAsset: pathname -> ASSET*      (active assets with FILE handles)
- ├── m_apFile: vector<FILE*>             (history of all FILE handles)
- ├── m_nNextFileIx / m_nNextAssetIx      (monotonic counters)
+ ├── m_apCache: vector<CACHE*>           (open per-container handles)
+ ├── m_nNextAssetIx                      (monotonic asset counter)
  ├── rules.json                          (staleness rules + nNextMetaIx)
- └── m_mxNetwork (recursive_mutex)
+ ├── m_mxRules  (recursive, mutable)     (m_aRules + m_nNextAssetIx + rules.json)
+ ├── m_mxCache  (recursive)             (m_apCache registry)
+ └── m_mxAsset  (recursive)             (m_umpAsset)
 
-ASSET (internal, pImpl, one per URL)
+CACHE (per-container handle, ctor takes INETWORK_IMPL* + CONTAINER*)
+ ├── m_pINetwork_Impl                    (forwards Asset_Open/Close, Host, Path)
+ ├── m_pContainer                        (identity for disk paths)
+ ├── m_apFile: vector<FILE*>             (this container's FILE handles)
+ ├── m_nNextFileIx                       (monotonic file counter)
+ ├── m_bCacheEnabled                     (stamped onto each new FILE)
+ └── m_mxCache (recursive_mutex)
+
+ASSET (internal, pImpl, one per URL — owned by NETWORK)
  ├── STATE lifecycle: IDLE -> FETCHING -> VALIDATING -> READY / FAILED
  ├── m_nCount_Open (structural)
  ├── m_nCount_Attach (active listeners, triggers fetch)
  ├── m_pAsset_Fetch (IJOB*, current fetch job)
  └── Meta sidecar (.meta) per asset
 
-FILE (per-caller handle, pImpl)
- ├── CONTAINER* m_pContainer, IFILE* listener
+FILE (per-caller handle, pImpl — owned by CACHE)
+ ├── ICACHE_IMPL* m_pICache_Impl         (its single owner — cache + forwarders)
+ ├── IFILE* listener
  ├── Snapshot fields (three phases: Initial, Progress, Final)
  ├── m_bPending_Close / m_bPending_Clear (dual-flag deletion)
  └── Path computation (persona/fp/container/diskkey fan-out)
 ```
 
+`FILE` reaches everything through `ICACHE_IMPL`: its file lifecycle
+(`File_Clear`/`File_Close`/`File_Reset`) is implemented by `CACHE`, while asset
+operations, the host (`ICONTEXT`), the permanent cache path, and the owning
+`CONTAINER` are forwarded by `CACHE` to `NETWORK`.
+
 All public types (`eASSET_STATE`, `eASSET_EXT`, `FILE`, `IFILE`, `IENUM_FILE`,
-`NETWORK`) are peers in the `SNEEZE` namespace.
+`CACHE`, `NETWORK`) are peers in the `SNEEZE` namespace.
 
 ## Usage
 
@@ -43,38 +71,56 @@ class MY_LISTENER : public SNEEZE::IFILE
 };
 
 MY_LISTENER listener;
-SNEEZE::FILE* pFile = pNetwork->File_Open (pContainer, sUrl, &listener);
+SNEEZE::CACHE* pCache = pContainer->Cache ();
+SNEEZE::FILE* pFile = pCache->File_Open (sUrl, &listener);
 // ... later:
-pNetwork->File_Close (pFile);
+pFile->Close ();
 ```
 
 ### Hash-Verified Fetch
 
 ```cpp
-SNEEZE::FILE* pFile = pNetwork->File_Open (pContainer, sUrl, sSriHash, &listener);
+SNEEZE::FILE* pFile = pCache->File_Open (sUrl, sSriHash, 0, &listener);
 ```
 
 ### Passive Open (no fetch)
 
 ```cpp
-SNEEZE::FILE* pFile = pNetwork->File_Open (pContainer, sUrl);   // null listener
+SNEEZE::FILE* pFile = pCache->File_Open (sUrl, nullptr);   // null listener
 // Returns valid handle in IDLE state; no fetch triggered
 ```
 
+## Container Lifecycle
+
+- **NETWORK::Cache_Open (pContainer)** — creates a `CACHE`, registers it in
+  `m_apCache`, calls `CACHE::Initialize()` (registered-before-init, mirroring
+  `STORAGE::Silo_Open`), fires `OnNetworkCacheCreated`, and returns it. Called
+  by `CONTAINER::Open()`.
+- **NETWORK::Cache_Close (pCache)** — fires `OnNetworkCacheDeleted`, unregisters
+  and deletes the `CACHE` (which deletes its remaining `FILE`s). Called by
+  `CONTAINER::Close()`.
+- A leaked `CACHE` (container never closed it) is reaped by `~NETWORK`, which
+  closes all registered caches before draining the asset map.
+
 ## File Lifecycle
 
-- **File_Open** — creates FILE, finds-or-creates ASSET. With listener: implicit
-  Attach triggers fetch. Without: passive open.
-- **File_Close** — sets pending-close, calls Detach immediately. FILE stays in
-  history for inspector until also pending-clear.
-- **File_Clear** — inspector dismissal toggle. Fires OnNetworkFileDeleted.
-- **File_Reset** — marks ASSET for destruction on last detach.
+- **CACHE::File_Open** — creates FILE, finds-or-creates ASSET (via NETWORK).
+  With listener: implicit Attach triggers fetch. Without: passive open.
+- **FILE::Close** — sets pending-close, calls Detach immediately. FILE stays in
+  the cache's history for the inspector until also pending-clear.
+- **FILE::Clear** — inspector dismissal toggle. Fires OnNetworkFileDeleted.
+- **FILE::Reset** — marks ASSET for destruction on last detach.
 - **File deleted** only when BOTH `m_bPending_Close` AND `m_bPending_Clear`.
+- **CACHE::Clear** — sweeps one cache's files, clearing each.
+- **NETWORK::Clear** — context-wide clear: loops `m_apCache` under `m_mxCache`,
+  calling `CACHE::Clear` on each. `CONTEXT::Logout` uses it.
 
 ## Request Deduplication
 
-Multiple callers opening the same URL share a single ASSET. Each gets their
-own FILE handle. All listeners are notified when the fetch resolves.
+Multiple callers opening the same URL share a single ASSET — even across
+different `CACHE`s, because assets are keyed by disk pathname in the shared
+`NETWORK`. Each caller gets its own FILE handle. All listeners are notified when
+the fetch resolves.
 
 ## Disk Storage
 
@@ -87,6 +133,12 @@ own FILE handle. All listeners are notified when the fetch resolves.
 
 Disk key is truncated SHA-1 of URL (24 hex chars). First 2 chars form a
 fan-out directory.
+
+`CACHE` exposes the container-level path helpers (parallel to `SILO` and
+`FILE`): `CACHE::Path()` returns the container's cache root
+(`<PermanentPath>/Network/<persona>/<fp[0:2]>/<fp[2:24]>/<container>`),
+`CACHE::Filename(sExt)` returns `container-<id>[.ext]`, and `CACHE::Pathname`
+joins the two. `CACHE::DisplayName()` returns the container's display name.
 
 ## SRI Hash Format
 
@@ -104,6 +156,9 @@ cached files, delivered via notify-only JOB_FETCH jobs to prevent re-entrancy.
 ## Notifications (ICONTEXT)
 
 ```cpp
+OnNetworkCacheCreated (CACHE*)
+OnNetworkCacheDeleted (CACHE*)
+
 OnNetworkFileCreated (FILE*)    // returns bool (host-decides pattern)
 OnNetworkFileChanged (FILE*)
 OnNetworkFileDeleted (FILE*)
@@ -111,41 +166,60 @@ OnNetworkFileDeleted (FILE*)
 
 ## Thread Safety
 
-- `NETWORK` — `m_mxNetwork` (recursive_mutex)
-- `ASSET` — `m_mxAsset` (recursive_mutex per asset)
-- `FILE` — `m_mxFile` (recursive_mutex per file)
-- `FILE` — `m_bGuarded` (atomic bool, deadlock avoidance during fetch completion)
+`NETWORK` carries three independent locks rather than one. They guard unrelated
+state (rules, the cache registry, the asset map), are never needed together, and
+replaced a single coarse `m_mxNetwork` so cache work and asset work no longer
+serialize against each other.
 
-### Lock Ordering: m_mxNetwork -> m_mxAsset
+- `NETWORK::m_mxRules` — `m_aRules`, `rules.json`, and `m_nNextAssetIx`; locked
+  by every `Rules_*` and by `Asset_Index`. `mutable` (const `Rules_Stale` locks
+  it), recursive (`Rules_Add`/`Rules_Load` call `Rules_Save`).
+- `NETWORK::m_mxCache` — the cache registry `m_apCache`; locked by every
+  `Cache_*`. Recursive (`~NETWORK` holds it across `Cache_Close`).
+- `NETWORK::m_mxAsset` — the asset map `m_umpAsset`; locked by `Asset_Open` /
+  `Asset_Close`.
+- `CACHE::m_mxCache` — one cache's file list `m_apFile` (recursive, per cache).
+- `ASSET::m_mxAsset` — one asset's state (recursive, per asset).
+- `FILE::m_mxFile` — one file's state (recursive, per file).
+- `FILE::m_bGuarded` — atomic bool, deadlock avoidance during fetch completion
+  (see below).
 
-All code paths that acquire both `m_mxNetwork` and `m_mxAsset` must acquire
-`m_mxNetwork` first:
+### Lock Ordering
 
-- **Asset_Open** — called inside `m_mxNetwork` guard; `pAsset->Open()` acquires
-  `m_mxAsset`. Order: `m_mxNetwork` -> `m_mxAsset`.
-- **Asset_Close** — called inside `m_mxNetwork` guard; `pAsset->Close()` acquires
-  `m_mxAsset`. Order: `m_mxNetwork` -> `m_mxAsset`.
-- **File_Close** / **File_Clear** — `Pending_Close()` / `Pending_Clear()` acquire
-  `m_mxFile` then call `ASSET::Detach` which acquires `m_mxAsset`. After returning,
-  the deletion path acquires `m_mxNetwork`. The mutexes are sequential (never
-  nested), so no ordering conflict.
+Cross-lock nesting follows one order, outermost-first:
 
-Paths that acquire only `m_mxAsset` (without `m_mxNetwork`) are safe:
-- `FILE::Attach` / `FILE::Detach` — acquire `m_mxAsset` via the ASSET, do not
-  touch `m_mxNetwork`.
+`NETWORK::m_mxCache (registry) -> CACHE::m_mxCache (files) -> NETWORK::m_mxAsset (map) -> ASSET::m_mxAsset -> NETWORK::m_mxRules`
+
+- **Cache teardown** (`Cache_Close`, `~NETWORK`) holds the registry lock and
+  deletes a `CACHE`, taking that cache's `CACHE::m_mxCache`. `~CACHE` deletes its
+  `FILE`s, which re-enter `Asset_Close`; the recursive locks permit the same
+  thread to nest.
+- **File open/close** (`CACHE::File_Open`, `File_Close`, `Clear`, `~CACHE`)
+  holds a cache's `CACHE::m_mxCache`, then drives `Asset_Open` / `Asset_Close`
+  under `NETWORK::m_mxAsset`, then the per-asset `ASSET::m_mxAsset`.
+- **Rules come last**: `Asset_Open` stamps the index via `Asset_Index`
+  (`NETWORK::m_mxAsset` -> `NETWORK::m_mxRules`); `ASSET::Attach` / `Meta_Reset`
+  take the per-asset lock then the rules lock (`ASSET::m_mxAsset` ->
+  `NETWORK::m_mxRules`). `Rules_Stale` re-reads its own asset while holding the
+  rules lock — same thread, recursive per-asset lock, so no cross-thread wait.
+
+Splitting the old single `m_mxNetwork` removed two inversions: the
+cache-registry vs asset-map conflict (one lock, taken in both orders by
+`Cache_Close` and `File_Close`) and the rules vs asset conflict (`Rules_Stale`
+no longer shares a lock with the asset map).
 
 ### Fetch Completion and the Guard Flag
 
 `ASSET::Impl::Fetch_Complete` runs on an `AGENT::FETCH` worker thread. It holds
-`m_mxAsset` while iterating `m_apFiles` to snapshot and notify all attached
-FILEs. A listener callback (OnFileReady/OnFileFailed) typically calls
-`pFile->Close()`, which flows through `NETWORK::Impl::File_Close`. If both
+the asset's `ASSET::m_mxAsset` while iterating `m_apFiles` to snapshot and notify
+all attached FILEs. A listener callback (OnFileReady/OnFileFailed) typically
+calls `pFile->Close()`, which flows through `CACHE::Impl::File_Close`. If both
 pending flags are set (`m_bPending_Close` and `m_bPending_Clear`), `File_Close`
-acquires `m_mxNetwork` to erase and delete the file. If another thread
-simultaneously holds `m_mxNetwork` and is waiting on `m_mxAsset` (e.g., inside
-`File_Open` -> `Asset_Open`), the result is a deadlock: the fetch thread holds
-`m_mxAsset` and wants `m_mxNetwork`, the other thread holds `m_mxNetwork` and
-wants `m_mxAsset`.
+acquires that cache's `CACHE::m_mxCache` to erase and delete the file. If another
+thread simultaneously holds `CACHE::m_mxCache` and is waiting on
+`ASSET::m_mxAsset` (e.g., inside `File_Open` -> `Asset_Open`), the result is a
+deadlock: the fetch thread holds `ASSET::m_mxAsset` and wants `CACHE::m_mxCache`,
+the other thread holds `CACHE::m_mxCache` and wants `ASSET::m_mxAsset`.
 
 The solution is a per-FILE atomic guard flag (`m_bGuarded`) that defers file
 deletion during fetch completion:
@@ -154,11 +228,11 @@ deletion during fetch completion:
    FILE: `pFile->Guard(true)`.
 
 2. **During the loop**, if a listener callback calls `File_Close`, the deletion
-   path in `NETWORK::Impl::File_Close` checks the guard via
-   `pFile->Guard(false)` (atomic exchange). If the file was guarded, the
-   exchange returns `true`, and `File_Close` skips the entire close — no
-   `Pending_Close`, no `Detach`, no `m_mxNetwork` acquisition. The exchange
-   atomically clears the guard, signaling that a close was attempted.
+   path in `CACHE::Impl::File_Close` checks the guard via `pFile->Guard(false)`
+   (atomic exchange). If the file was guarded, the exchange returns `true`, and
+   `File_Close` skips the entire close — no `Pending_Close`, no `Detach`, no
+   `CACHE::m_mxCache` acquisition. The exchange atomically clears the guard,
+   signaling that a close was attempted.
 
 3. **After the loop**, `Fetch_Complete` checks each file's guard via
    `pFile->Guard(false)`. If the exchange returns `true`, the guard was still
@@ -166,10 +240,10 @@ deletion during fetch completion:
    guard was cleared by `File_Close` during the callback — the file is
    collected into a local `apDelete` vector.
 
-4. **After releasing `m_mxAsset`**, `Fetch_Complete` processes the deferred
-   closes by calling `pFile->Close()` on each collected file. At this point no
-   conflicting mutex is held, so the full close path (Pending_Close -> Detach
-   -> deletion under `m_mxNetwork`) proceeds without deadlock.
+4. **After releasing `ASSET::m_mxAsset`**, `Fetch_Complete` processes the
+   deferred closes by calling `pFile->Close()` on each collected file. At this
+   point no conflicting mutex is held, so the full close path (Pending_Close ->
+   Detach -> deletion under `CACHE::m_mxCache`) proceeds without deadlock.
 
 The guard flag is lightweight (one atomic bool per FILE), requires no changes
 to the mutex hierarchy, and confines the deadlock avoidance to the single code
@@ -197,8 +271,9 @@ reporting approximation — the data they receive is identical.
 
 | File | Contents |
 |------|----------|
-| `include/Network.h` | Public header — eASSET_STATE, FILE, IFILE, IENUM_FILE, NETWORK |
-| `Network.cpp` | NETWORK + Impl (File_Open/Close/Clear/Reset, rules, paths) |
+| `include/Network.h` | Public header — eASSET_STATE, FILE, IFILE, IENUM_FILE, CACHE, NETWORK |
+| `Network.cpp` | NETWORK + Impl (asset tier, Cache_Open/Close, Clear-all, rules, paths, fetch queue) |
+| `Cache.cpp` | CACHE + Impl (file tier — File_Open/Close/Clear/Reset/Enum; forwards assets) |
 | `Asset.cpp` | ASSET + Impl + ASSET_FETCH (fetch lifecycle, FetchComplete) |
 | `File.cpp` | FILE + Impl (snapshots, path computation, dual-flag deletion) |
-| `Network.h` | Private header — ASSET, INETWORK_IMPL |
+| `Network.h` | Private header — INETWORK_IMPL, ICACHE_IMPL (the FILE's single owner), ASSET |

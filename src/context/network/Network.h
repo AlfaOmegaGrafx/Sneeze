@@ -34,14 +34,39 @@ namespace SNEEZE
 
       virtual void               Log (IENGINE::eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage)   = 0;
 
+      virtual ICONTEXT*          Host              () const                                                                = 0;
+      virtual const std::string& Path_Permanent    () const                                                                = 0;
       virtual double             SecondsSinceEpoch () const                                                                = 0;
-      virtual const std::string& Path_Permanent () const                                                                   = 0;
 
-      virtual ICONTEXT*          Host () const                                                                             = 0;
 
-      virtual void               File_Clear (FILE* pFile)                                                                  = 0;
-      virtual void               File_Close (FILE* pFile)                                                                  = 0;
-      virtual void               File_Reset (FILE* pFile)                                                                  = 0;
+   private:
+   };
+
+   // -----------------------------------------------------------------------
+   // ICACHE_IMPL — the single owner a FILE talks to.
+   //
+   // A FILE reaches everything it needs through this interface: its file
+   // lifecycle (File_Clear / File_Close / File_Reset) lives in CACHE, while
+   // asset operations, the host, the permanent cache path, and the owning
+   // container are forwarded by CACHE to the shared NETWORK.
+   // -----------------------------------------------------------------------
+
+   class ICACHE_IMPL
+   {
+   public:
+      ICACHE_IMPL ();
+      virtual ~ICACHE_IMPL ();
+
+      virtual ASSET*             Asset_Open  (FILE* pFile)                = 0;
+      virtual void               Asset_Close (FILE* pFile, ASSET* pAsset) = 0;
+
+      virtual void               File_Clear  (FILE* pFile)                = 0;
+      virtual void               File_Close  (FILE* pFile)                = 0;
+      virtual void               File_Reset  (FILE* pFile)                = 0;
+
+      virtual ICONTEXT*          Host           () const                  = 0;
+      virtual const std::string& Path_Permanent () const                  = 0;
+      virtual CONTAINER*         Container      () const                  = 0;
 
    private:
    };

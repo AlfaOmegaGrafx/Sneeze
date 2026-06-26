@@ -151,6 +151,7 @@
     <ClCompile Include="..\src\context\console\Block.cpp" />
     <!-- network -->
     <ClCompile Include="..\src\context\network\Network.cpp" />
+    <ClCompile Include="..\src\context\network\Cache.cpp" />
     <ClCompile Include="..\src\context\network\File.cpp" />
     <ClCompile Include="..\src\context\network\Asset.cpp" />
     <!-- storage -->

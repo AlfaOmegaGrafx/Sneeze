@@ -18,8 +18,9 @@
 namespace SNEEZE
 {
    class CONTEXT;
-   class STREAM;
+   class CACHE;
    class SILO;
+   class STREAM;
    class FABRIC;
    class NODE;
 
@@ -75,8 +76,9 @@ namespace SNEEZE
       CONTEXT*           Context  () const;
       const CID*         Identity () const;
       const std::string& Key      () const;
-      STREAM*            Stream   () const;
+      CACHE*             Cache    () const;
       SILO*              Silo     () const;
+      STREAM*            Stream   () const;
 
    private:
       class Impl;

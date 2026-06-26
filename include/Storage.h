@@ -45,13 +45,13 @@ namespace SNEEZE
    {
    public:
       SILO (ISTORAGE_IMPL* pIStorage_Impl, CONTAINER* pContainer);
-     ~SILO ();
+      ~SILO ();
 
       void Initialize ();
 
       // --- Identity ---
 
-      std::string  DisplayName () const;
+      std::string DisplayName () const;
 
       // --- Path-based API ---
 
@@ -69,6 +69,7 @@ namespace SNEEZE
 
       void     Attach ();
       void     Detach ();
+
       // --- Paths ---
 
       std::string Path     (eSILO_SCOPE eScope) const;

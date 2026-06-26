@@ -127,6 +127,9 @@
     <ClCompile Include="..\src\context\network\Asset.cpp">
       <Filter>src\context\network</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\context\network\Cache.cpp">
+      <Filter>src\context\network</Filter>
+    </ClCompile>
     <ClCompile Include="..\src\context\network\File.cpp">
       <Filter>src\context\network</Filter>
     </ClCompile>
