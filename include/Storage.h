@@ -17,6 +17,7 @@
 
 namespace SNEEZE
 {
+   class ENGINE;
    class UNIT;
    class ISTORAGE_IMPL;
 
@@ -117,7 +118,7 @@ namespace SNEEZE
       // STORAGE public API
       // -----------------------------------------------------------------------
 
-      explicit STORAGE (CONTEXT* pContext);
+      explicit STORAGE (ENGINE* pEngine);
       ~STORAGE ();
 
       bool Initialize ();
@@ -125,7 +126,7 @@ namespace SNEEZE
       // --- Container lifecycle ---
 
       SILO*   Silo_Open  (CONTAINER* pContainer);
-      void    Silo_Close (SILO* pSilo);
+      void    Silo_Close (CONTAINER* pContainer, SILO* pSilo);
       void    Silo_Enum  (IENUM_SILO* pEnum);
 
    private:

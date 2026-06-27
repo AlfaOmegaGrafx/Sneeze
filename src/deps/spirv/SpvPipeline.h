@@ -24,10 +24,10 @@ namespace SNEEZE
       class SPV_PIPELINE
       {
       public:
-         SPV_PIPELINE ();
+         SPV_PIPELINE (ENGINE* pEngine);
          ~SPV_PIPELINE ();
 
-         bool Initialize (ENGINE* pEngine);
+         bool Initialize ();
 
          bool Validate (const std::vector<uint32_t>& aBinary, std::string& sError);
 

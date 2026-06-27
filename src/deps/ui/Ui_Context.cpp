@@ -65,8 +65,8 @@ namespace
    static UI_SYSTEM pUiSystem;
 } // anonymous namespace
 
-UI_CONTEXT::UI_CONTEXT ()
-   : m_pEngine (nullptr)
+UI_CONTEXT::UI_CONTEXT (ENGINE* pEngine)
+   : m_pEngine (pEngine)
    , m_pRender (nullptr)
    , m_bInitialized (false)
 {
@@ -85,12 +85,11 @@ UI_CONTEXT::~UI_CONTEXT ()
    m_pRender = nullptr;
 }
 
-bool UI_CONTEXT::Initialize (ENGINE* pEngine)
+bool UI_CONTEXT::Initialize ()
 {
-   m_pEngine = pEngine;
    m_pRender = new UI_RENDER ();
 
-   pUiSystem.SetSneeze (pEngine);
+   pUiSystem.SetSneeze (m_pEngine);
    Rml::SetSystemInterface (&pUiSystem);
    Rml::SetRenderInterface (m_pRender);
 

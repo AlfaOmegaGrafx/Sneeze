@@ -29,9 +29,6 @@ public:
       m_kSession        (kSession),
       m_sPath_Permanent (sPath_Permanent),
       m_sPath_Temporary (sPath_Temporary),
-      m_pConsole        (nullptr),
-      m_pNetwork        (nullptr),
-      m_pStorage        (nullptr),
       m_pScene          (nullptr),
       m_pViewport       (nullptr)
    {
@@ -41,39 +38,21 @@ public:
    {
       bool bResult = false;
 
-      m_pConsole = new CONSOLE (m_pContext);
+      m_pScene = new SCENE (m_pContext);
 
-      if (m_pConsole->Initialize ())
+      if (m_pScene->Initialize (sUrl))
       {
-         m_pNetwork = new NETWORK (m_pContext);
+         m_pViewport = new VIEWPORT (m_pContext);
 
-         if (m_pNetwork->Initialize (bReset))
+         if (m_pViewport->Initialize ())
          {
-            m_pStorage = new STORAGE (m_pContext);
+            bResult = true;
 
-            if (m_pStorage->Initialize ())
-            {
-               m_pScene = new SCENE (m_pContext);
-
-               if (m_pScene->Initialize (sUrl))
-               {
-                  m_pViewport = new VIEWPORT (m_pContext);
-
-                  if (m_pViewport->Initialize ())
-                  {
-                     bResult = true;
-
-                     m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "CONTEXT", "Initialized");
-                  }
-                  else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "CONTEXT", "Failed to initialize viewport");
-               }
-               else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "CONTEXT", "Failed to initialize scene");
-            }
-            else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "CONTEXT", "Failed to initialize storage");
+            m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "CONTEXT", "Initialized");
          }
-         else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "CONTEXT", "Failed to initialize network");
+         else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "CONTEXT", "Failed to initialize viewport");
       }
-      else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "CONTEXT", "Failed to initialize console");
+      else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "CONTEXT", "Failed to initialize scene");
 
       return bResult;
    }
@@ -95,15 +74,6 @@ public:
       for (auto& pair : m_umpContainer)
          delete pair.second;
       m_umpContainer.clear ();
-
-      delete m_pStorage;
-      m_pStorage = nullptr;
-
-      delete m_pNetwork;
-      m_pNetwork = nullptr;
-
-      delete m_pConsole;
-      m_pConsole = nullptr;
    }
 
    bool Reload (bool bReset)
@@ -154,10 +124,21 @@ public:
 
    void Logout ()
    {
-      if (m_pNetwork)
-         m_pNetwork->Clear ();
+      // Cache invalidation on logout is deferred to the per-container rules
+      // watermark work (end of Phase 3). NETWORK is now an engine singleton,
+      // so a blanket Clear() here would wipe the cache for every context.
    }
 
+   void Clear ()
+   {
+      // tbd
+   }
+   
+      void Reset ()
+   {
+      // tbd
+   }
+   
    CONTAINER* Container_Open (MSF* pMsf)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxContainer);
@@ -230,9 +211,6 @@ public:
    std::string                                     m_sPath_Permanent;
    std::string                                     m_sPath_Temporary;
 
-   CONSOLE*                                        m_pConsole;
-   NETWORK*                                        m_pNetwork;
-   STORAGE*                                        m_pStorage;
    SCENE*                                          m_pScene;
    VIEWPORT*                                       m_pViewport;
 
@@ -265,9 +243,9 @@ SNEEZE::CONTEXT::~CONTEXT ()
 
 SNEEZE::ENGINE*             SNEEZE::CONTEXT::Engine         () const { return m_pImpl->m_pEngine; }
 SNEEZE::ICONTEXT*           SNEEZE::CONTEXT::Host           () const { return m_pImpl->m_pHost; }
-SNEEZE::CONSOLE*            SNEEZE::CONTEXT::Console        () const { return m_pImpl->m_pConsole; }
-SNEEZE::NETWORK*            SNEEZE::CONTEXT::Network        () const { return m_pImpl->m_pNetwork; }
-SNEEZE::STORAGE*            SNEEZE::CONTEXT::Storage        () const { return m_pImpl->m_pStorage; }
+SNEEZE::CONSOLE*            SNEEZE::CONTEXT::Console        () const { return m_pImpl->m_pEngine->Console (); }
+SNEEZE::NETWORK*            SNEEZE::CONTEXT::Network        () const { return m_pImpl->m_pEngine->Network (); }
+SNEEZE::STORAGE*            SNEEZE::CONTEXT::Storage        () const { return m_pImpl->m_pEngine->Storage (); }
 SNEEZE::SCENE*              SNEEZE::CONTEXT::Scene          () const { return m_pImpl->m_pScene; }
 SNEEZE::VIEWPORT*           SNEEZE::CONTEXT::Viewport       () const { return m_pImpl->m_pViewport; }
 SNEEZE::DEP::WASM_RUNTIME*  SNEEZE::CONTEXT::Wasm_Runtime   () const { return m_pImpl->m_pEngine->Wasm_Runtime (); }
@@ -279,6 +257,8 @@ const std::string&          SNEEZE::CONTEXT::Path_Temporary () const { return m_
 // ---------------------------------------------------------------------------
 
 void                        SNEEZE::CONTEXT::Logout          ()                                       {        m_pImpl->Logout (); }
+void                        SNEEZE::CONTEXT::Clear           ()                                       {        m_pImpl->Clear (); }
+void                        SNEEZE::CONTEXT::Reset           ()                                       {        m_pImpl->Reset (); }
 
 // ---------------------------------------------------------------------------
 // Internal functions

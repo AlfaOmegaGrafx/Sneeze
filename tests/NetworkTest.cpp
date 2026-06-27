@@ -144,6 +144,23 @@ static std::string ComputeSha256Hex (const uint8_t* pData, size_t nLen)
    return sHex;
 }
 
+static std::string TestNowIso8601 ()
+{
+   auto tpNow  = std::chrono::system_clock::now ();
+   auto tmTime = std::chrono::system_clock::to_time_t (tpNow);
+
+   struct tm tmBuf = {};
+#ifdef _WIN32
+   gmtime_s (&tmBuf, &tmTime);
+#else
+   gmtime_r (&tmTime, &tmBuf);
+#endif
+
+   char szBuf[32];
+   std::strftime (szBuf, sizeof (szBuf), "%Y-%m-%dT%H:%M:%SZ", &tmBuf);
+   return std::string (szBuf);
+}
+
 // ---------------------------------------------------------------------------
 // Shared test state
 // ---------------------------------------------------------------------------
@@ -175,7 +192,7 @@ static void TestManagerInit ()
 {
    std::printf ("\n[Test 1] Manager initialization\n");
 
-   NETWORK* pNetwork = new NETWORK (s_pContext);
+   NETWORK* pNetwork = new NETWORK (s_pSneeze);
    bool bInit = pNetwork->Initialize ();
    Check (bInit, "Manager initialized successfully");
    delete pNetwork;
@@ -189,7 +206,7 @@ static void TestUnhashedFetch ()
 {
    std::printf ("\n[Test 2] Unhashed fetch (no hash, live network)\n");
 
-   NETWORK* pNetwork = new NETWORK (s_pContext);
+   NETWORK* pNetwork = new NETWORK (s_pSneeze);
    bool bInit = pNetwork->Initialize ();
    Check (bInit, "Network initialized");
 
@@ -251,7 +268,7 @@ static void TestDeduplication ()
 {
    std::printf ("\n[Test 3] File_Open deduplication\n");
 
-   NETWORK* pNetwork = new NETWORK (s_pContext);
+   NETWORK* pNetwork = new NETWORK (s_pSneeze);
    pNetwork->Initialize ();
 
    CACHE* pCache = pNetwork->Cache_Open (s_pTestContainer);
@@ -299,7 +316,7 @@ static void TestHashVerifiedFetch ()
 {
    std::printf ("\n[Test 4] Hash-verified persistent fetch\n");
 
-   NETWORK* pNetwork = new NETWORK (s_pContext);
+   NETWORK* pNetwork = new NETWORK (s_pSneeze);
    pNetwork->Initialize ();
 
    CACHE* pCache = pNetwork->Cache_Open (s_pTestContainer);
@@ -371,7 +388,7 @@ static void TestHashMismatch ()
 {
    std::printf ("\n[Test 5] Hash mismatch causes failure\n");
 
-   NETWORK* pNetwork = new NETWORK (s_pContext);
+   NETWORK* pNetwork = new NETWORK (s_pSneeze);
    pNetwork->Initialize ();
 
    CACHE* pCache = pNetwork->Cache_Open (s_pTestContainer);
@@ -409,7 +426,7 @@ static void TestReset ()
 {
    std::printf ("\n[Test 6] Reset\n");
 
-   NETWORK* pNetwork = new NETWORK (s_pContext);
+   NETWORK* pNetwork = new NETWORK (s_pSneeze);
    pNetwork->Initialize ();
 
    CACHE* pCache = pNetwork->Cache_Open (s_pTestContainer);
@@ -425,7 +442,7 @@ static void TestReset ()
          Check (pSession->IsReady (), "File is READY before reset");
          pSession->Close ();
 
-         pNetwork->Reset ();
+         pNetwork->Rules_Add ("", TestNowIso8601 ());
 
          TEST_FILE_LISTENER listenerAfter;
          SNEEZE::FILE* pAfter = pCache->File_Open ("https://httpbin.org/bytes/32", &listenerAfter);
@@ -462,7 +479,7 @@ static void TestResetFlag ()
 {
    std::printf ("\n[Test 7] Reset flag persisted in meta\n");
 
-   NETWORK* pNetwork = new NETWORK (s_pContext);
+   NETWORK* pNetwork = new NETWORK (s_pSneeze);
    pNetwork->Initialize ();
 
    CACHE* pCache = pNetwork->Cache_Open (s_pTestContainer);
@@ -504,7 +521,7 @@ static void TestFailedFetch ()
 {
    std::printf ("\n[Test 8] Failed fetch (invalid host)\n");
 
-   NETWORK* pNetwork = new NETWORK (s_pContext);
+   NETWORK* pNetwork = new NETWORK (s_pSneeze);
    pNetwork->Initialize ();
 
    CACHE* pCache = pNetwork->Cache_Open (s_pTestContainer);
@@ -545,7 +562,7 @@ static void TestSidecarPersistence ()
 
    // Phase 1: Fetch with hash, shutdown (saves .meta sidecar)
    {
-      NETWORK* pNetwork = new NETWORK (s_pContext);
+      NETWORK* pNetwork = new NETWORK (s_pSneeze);
       pNetwork->Initialize ();
 
       CACHE* pCache = pNetwork->Cache_Open (s_pTestContainer);
@@ -587,7 +604,7 @@ static void TestSidecarPersistence ()
    // Phase 2: Reinitialize and check if the meta survived via .meta sidecar
    if (!sSri.empty ())
    {
-      NETWORK* pNetwork2 = new NETWORK (s_pContext);
+      NETWORK* pNetwork2 = new NETWORK (s_pSneeze);
       pNetwork2->Initialize ();
 
       CACHE* pCache2 = pNetwork2->Cache_Open (s_pTestContainer);
@@ -609,7 +626,7 @@ static void TestSidecarPersistence ()
          pReload->Close ();
       }
 
-      pNetwork2->Reset ();
+      pNetwork2->Rules_Add ("", TestNowIso8601 ());
       delete pNetwork2;
    }
 }
@@ -622,7 +639,7 @@ static void TestHttpHeaders ()
 {
    std::printf ("\n[Test 10] HTTP response headers captured\n");
 
-   NETWORK* pNetwork = new NETWORK (s_pContext);
+   NETWORK* pNetwork = new NETWORK (s_pSneeze);
    pNetwork->Initialize ();
 
    CACHE* pCache = pNetwork->Cache_Open (s_pTestContainer);
@@ -663,7 +680,7 @@ static void TestFileHandleLifecycle ()
 {
    std::printf ("\n[Test 11] FILE handle lifecycle\n");
 
-   NETWORK* pNetwork = new NETWORK (s_pContext);
+   NETWORK* pNetwork = new NETWORK (s_pSneeze);
    pNetwork->Initialize ();
 
    CACHE* pCache = pNetwork->Cache_Open (s_pTestContainer);
@@ -694,7 +711,7 @@ static void TestHistoryAndFileIx ()
 {
    std::printf ("\n[Test 12] History list and file indexes\n");
 
-   NETWORK* pNetwork = new NETWORK (s_pContext);
+   NETWORK* pNetwork = new NETWORK (s_pSneeze);
    pNetwork->Initialize ();
 
    CACHE* pCache = pNetwork->Cache_Open (s_pTestContainer);
@@ -737,7 +754,7 @@ static void TestNotifications ()
 
    s_pContextHost->ResetCounters ();
 
-   NETWORK* pNetwork = new NETWORK (s_pContext);
+   NETWORK* pNetwork = new NETWORK (s_pSneeze);
    pNetwork->Initialize ();
 
    CACHE* pCache = pNetwork->Cache_Open (s_pTestContainer);
@@ -777,7 +794,7 @@ static void TestServedFromCache ()
    std::string sUrl = "https://httpbin.org/base64/Q2FjaGVkRGF0YQ==";
    std::string sSri;
 
-   NETWORK* pNetwork = new NETWORK (s_pContext);
+   NETWORK* pNetwork = new NETWORK (s_pSneeze);
    pNetwork->Initialize ();
 
    CACHE* pCache = pNetwork->Cache_Open (s_pTestContainer);
@@ -825,7 +842,7 @@ static void TestFailedFetchHttpStatus ()
 {
    std::printf ("\n[Test 15] Failed fetch records HTTP status\n");
 
-   NETWORK* pNetwork = new NETWORK (s_pContext);
+   NETWORK* pNetwork = new NETWORK (s_pSneeze);
    pNetwork->Initialize ();
 
    CACHE* pCache = pNetwork->Cache_Open (s_pTestContainer);
@@ -862,7 +879,7 @@ static void TestClearFlag ()
 {
    std::printf ("\n[Test 16] Clear flag\n");
 
-   NETWORK* pNetwork = new NETWORK (s_pContext);
+   NETWORK* pNetwork = new NETWORK (s_pSneeze);
    pNetwork->Initialize ();
 
    CACHE* pCache = pNetwork->Cache_Open (s_pTestContainer);
@@ -895,7 +912,7 @@ static void TestCloseWithoutReset ()
 {
    std::printf ("\n[Test 17] Close without reset preserves disk file\n");
 
-   NETWORK* pNetwork = new NETWORK (s_pContext);
+   NETWORK* pNetwork = new NETWORK (s_pSneeze);
    pNetwork->Initialize ();
 
    CACHE* pCache = pNetwork->Cache_Open (s_pTestContainer);
@@ -934,7 +951,7 @@ static void TestDeferredReset ()
 {
    std::printf ("\n[Test 18] Deferred reset (multiple handles)\n");
 
-   NETWORK* pNetwork = new NETWORK (s_pContext);
+   NETWORK* pNetwork = new NETWORK (s_pSneeze);
    pNetwork->Initialize ();
 
    CACHE* pCache = pNetwork->Cache_Open (s_pTestContainer);
@@ -990,7 +1007,7 @@ static void TestClear ()
 {
    std::printf ("\n[Test 19] Clear\n");
 
-   NETWORK* pNetwork = new NETWORK (s_pContext);
+   NETWORK* pNetwork = new NETWORK (s_pSneeze);
    pNetwork->Initialize ();
 
    CACHE* pCache = pNetwork->Cache_Open (s_pTestContainer);
@@ -1038,7 +1055,7 @@ static void TestClearAllCaches ()
 {
    std::printf ("\n[Test 20] Network-wide Clear (all caches)\n");
 
-   NETWORK* pNetwork = new NETWORK (s_pContext);
+   NETWORK* pNetwork = new NETWORK (s_pSneeze);
    pNetwork->Initialize ();
 
    CACHE* pCacheA = pNetwork->Cache_Open (s_pTestContainer);
@@ -1060,7 +1077,8 @@ static void TestClearAllCaches ()
       pFileA->Close ();
       pFileB->Close ();
 
-      pNetwork->Clear ();
+      pCacheA->Clear ();
+      pCacheB->Clear ();
    }
    else
    {
@@ -1070,8 +1088,8 @@ static void TestClearAllCaches ()
 
    Check (true, "Network-wide Clear completed without crash");
 
-   pNetwork->Cache_Close (pCacheA);
-   pNetwork->Cache_Close (pCacheB);
+   pNetwork->Cache_Close (s_pTestContainer, pCacheA);
+   pNetwork->Cache_Close (s_pTestContainer, pCacheB);
 
    delete pNetwork;
 }
@@ -1086,7 +1104,7 @@ static void TestDeletedNotification ()
 
    s_pContextHost->ResetCounters ();
 
-   NETWORK* pNetwork = new NETWORK (s_pContext);
+   NETWORK* pNetwork = new NETWORK (s_pSneeze);
    pNetwork->Initialize ();
 
    CACHE* pCache = pNetwork->Cache_Open (s_pTestContainer);
@@ -1124,7 +1142,7 @@ static void TestStalenessRules ()
 
    // Phase 1: Fetch a file and shut down
    {
-      NETWORK* pNetwork = new NETWORK (s_pContext);
+      NETWORK* pNetwork = new NETWORK (s_pSneeze);
       pNetwork->Initialize ();
 
       CACHE* pCache = pNetwork->Cache_Open (s_pTestContainer);
@@ -1153,7 +1171,7 @@ static void TestStalenessRules ()
 
    // Phase 2: Reinit with a staleness rule, verify re-fetch
    {
-      NETWORK* pNetwork2 = new NETWORK (s_pContext);
+      NETWORK* pNetwork2 = new NETWORK (s_pSneeze);
       pNetwork2->Initialize ();
 
       CACHE* pCache2 = pNetwork2->Cache_Open (s_pTestContainer);
@@ -1170,7 +1188,7 @@ static void TestStalenessRules ()
          pFile2->Close ();
       }
 
-      pNetwork2->Reset ();
+      pNetwork2->Rules_Add ("", TestNowIso8601 ());
       delete pNetwork2;
    }
 }
@@ -1183,7 +1201,7 @@ static void TestNoFetchOpen ()
 {
    std::printf ("\n[Test 23] File_Open without listener (passive open)\n");
 
-   NETWORK* pNetwork = new NETWORK (s_pContext);
+   NETWORK* pNetwork = new NETWORK (s_pSneeze);
    pNetwork->Initialize ();
 
    CACHE* pCache = pNetwork->Cache_Open (s_pTestContainer);

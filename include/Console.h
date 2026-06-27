@@ -182,11 +182,10 @@ namespace SNEEZE
       // CONSOLE public API
       // -----------------------------------------------------------------------
 
-      explicit CONSOLE (CONTEXT* pContext);
+      explicit CONSOLE (ENGINE* pEngine);
       ~CONSOLE ();
 
       bool     Initialize ();
-      CONTEXT* Context    () const;
 
       // --- Clear ---
 

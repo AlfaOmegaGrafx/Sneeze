@@ -16,16 +16,14 @@
 
 using namespace SNEEZE::DEP;
 
-WASM_RUNTIME::WASM_RUNTIME () : 
-   m_pEngine (nullptr),
+WASM_RUNTIME::WASM_RUNTIME (SNEEZE::ENGINE* pEngine) : 
+   m_pEngine (pEngine),
    m_pWsam_Engine (nullptr)
 {
 }
 
-bool WASM_RUNTIME::Initialize (SNEEZE::ENGINE* pEngine)
+bool WASM_RUNTIME::Initialize ()
 {
-   m_pEngine = pEngine;
-
    bool bResult = false;
 
    m_pWsam_Engine = wasm_engine_new ();

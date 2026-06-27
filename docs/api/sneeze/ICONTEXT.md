@@ -5,10 +5,10 @@ audience: [integrator, contributor]
 sources:
   - include/Sneeze.h
   - src/context/Container.cpp
-  - src/context/network/File.cpp
-  - src/context/storage/Silo.cpp
-  - src/context/storage/Storage.cpp
-  - src/context/console/Console.cpp
+  - src/sneeze/network/File.cpp
+  - src/sneeze/storage/Silo.cpp
+  - src/sneeze/storage/Storage.cpp
+  - src/sneeze/console/Console.cpp
 verified: 92fdc1c
 nav:
   prev: api/sneeze/IENGINE.md

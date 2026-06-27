@@ -186,10 +186,10 @@ namespace SNEEZE
       class WASM_RUNTIME
       {
       public:
-         WASM_RUNTIME ();
+         WASM_RUNTIME (SNEEZE::ENGINE* pEngine);
          ~WASM_RUNTIME ();
 
-         bool Initialize (SNEEZE::ENGINE* pEngine);
+         bool Initialize ();
 
          wasm_engine_t* WasmEngine () const { return m_pWsam_Engine; }
 

@@ -1,15 +1,16 @@
-# Console — Per-Context Developer Console
+# Console — Engine-Singleton Developer Console
 
-The `console` module provides a per-context developer console analogous to a
-web browser's `console` object. Structured logging, grouping, counting, and
-timing — all scoped per container via CONTAINER.
+The `console` module provides an engine-owned developer console analogous to a
+web browser's `console` object. There is one `CONSOLE` per `ENGINE`; logging is
+still scoped per container via `CONTAINER` (each gets its own `STREAM`).
+Structured logging, grouping, counting, and timing.
 
 ## Architecture
 
 ```
-CONSOLE (per-context, constructor takes CONTEXT*)
+CONSOLE (engine singleton, constructor takes ENGINE*)
  ├── m_apEntry: deque<shared_ptr<ENTRY>>     (global ring buffer, capped)
- ├── m_umpStream: CONTAINER* -> STREAM*      (one per container)
+ ├── m_umpStream: CONTAINER* -> STREAM*      (one per container, all contexts)
  ├── m_nIndex_Entry: monotonic entry counter
  └── m_mxConsole (recursive_mutex)
 
@@ -35,8 +36,10 @@ All public types (`eENTRY_LEVEL`, `ENTRY`, `STREAM`, `IENUM_ENTRY`,
 
 ## Two-Tier Storage
 
-1. **Global ring buffer** — all entries from all containers, capped at
-   `m_nEntries_Cache` (default 16384). Inspector reads via `Entry_Enum()`.
+1. **Global ring buffer** — all entries from all containers across all contexts,
+   capped at `m_nEntries_Cache` (default 16384). Inspector reads via
+   `Entry_Enum()`. Both `Entry_Enum` and `Stream_Enum` are now engine-wide, so a
+   per-context inspector must filter by container/context.
 
 2. **Per-container disk-backed STREAMs** — each container gets a STREAM.
    Entries are appended to JSONL block files. Rolling window of `m_nBlocks`
@@ -103,6 +106,10 @@ Immutable, self-stamps with `system_clock::now()` in constructor.
 OnConsoleEntryCreated (shared_ptr<const ENTRY>)
 OnConsoleEntryDeleted (shared_ptr<const ENTRY>)
 ```
+
+Because one `CONSOLE` serves every context, these callbacks self-resolve the
+host via the entry's container: `pEntry->Container()->Context()->Host()` (engine
+internal entries with no container are skipped).
 
 Container lifecycle (`OnContainerCreated` / `OnContainerDeleted`, also on
 `ICONTEXT`) fires when a container's resources open and close — the

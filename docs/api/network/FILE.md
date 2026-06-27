@@ -4,8 +4,8 @@ tier: API
 audience: [integrator, contributor]
 sources:
   - include/Network.h
-  - src/context/network/File.cpp
-  - src/context/network/Asset.cpp
+  - src/sneeze/network/File.cpp
+  - src/sneeze/network/Asset.cpp
 verified: 92fdc1c
 nav:
   prev: api/network/NETWORK.md

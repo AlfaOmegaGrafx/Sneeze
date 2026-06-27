@@ -4,8 +4,8 @@ tier: API
 audience: [integrator, contributor]
 sources:
   - include/Console.h
-  - src/context/console/Console.cpp
-  - src/context/console/Console.h
+  - src/sneeze/console/Console.cpp
+  - src/sneeze/console/Console.h
 verified: 92fdc1c
 nav:
   prev: api/console/index.md

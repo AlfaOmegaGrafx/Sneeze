@@ -4,11 +4,11 @@ tier: Systems
 audience: [evaluator, integrator, contributor]
 sources:
   - include/Console.h
-  - src/context/console/Console.h
-  - src/context/console/Console.cpp
-  - src/context/console/Stream.cpp
-  - src/context/console/Block.cpp
-  - src/context/console/Entry.cpp
+  - src/sneeze/console/Console.h
+  - src/sneeze/console/Console.cpp
+  - src/sneeze/console/Stream.cpp
+  - src/sneeze/console/Block.cpp
+  - src/sneeze/console/Entry.cpp
 verified: 92fdc1c
 nav:
   prev: systems/storage.md

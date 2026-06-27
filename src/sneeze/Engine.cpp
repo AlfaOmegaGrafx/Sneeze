@@ -58,6 +58,9 @@ public:
       m_pUi_Context   (nullptr),
       m_nCurlInit     (CURLE_FAILED_INIT),
       m_pControl      (nullptr),
+      m_pConsole      (nullptr),
+      m_pNetwork      (nullptr),
+      m_pStorage      (nullptr),
       m_pPersona      (nullptr)
    {
    }
@@ -72,21 +75,21 @@ m_pPersona = new persona::PERSONA (m_pEngine);
 
       if (m_pHost  &&  !m_pHost->sAppDataPath ().empty ())
       {
-         m_pWasm_Runtime = new DEP::WASM_RUNTIME ();
+         m_pWasm_Runtime = new DEP::WASM_RUNTIME (m_pEngine);
 
-         if (m_pWasm_Runtime->Initialize (m_pEngine))
+         if (m_pWasm_Runtime->Initialize ())
          {
-            m_pSpvPipeline = new DEP::SPV_PIPELINE ();
+            m_pSpvPipeline = new DEP::SPV_PIPELINE (m_pEngine);
 
-            if (m_pSpvPipeline->Initialize (m_pEngine))
+            if (m_pSpvPipeline->Initialize ())
             {
-               m_pXrRuntime = new DEP::XR_RUNTIME ();
+               m_pXrRuntime = new DEP::XR_RUNTIME (m_pEngine);
 
-               if (m_pXrRuntime->Initialize (m_pEngine))
+               if (m_pXrRuntime->Initialize ())
                {
-                  m_pUi_Context = new DEP::UI_CONTEXT ();
+                  m_pUi_Context = new DEP::UI_CONTEXT (m_pEngine);
 
-                  if (m_pUi_Context->Initialize (m_pEngine))
+                  if (m_pUi_Context->Initialize ())
                   {
                      m_nCurlInit = curl_global_init (CURL_GLOBAL_DEFAULT);
 
@@ -98,9 +101,27 @@ m_pPersona = new persona::PERSONA (m_pEngine);
                         {
                            if (InitializePaths ())
                            {
-                              m_bInitialized = true;
+                              m_pConsole  = new CONSOLE (m_pEngine);
 
-                              m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SNEEZE", "Initialized (1 engine thread + " + std::to_string (nAgentCount) + " agents)");
+                              if (m_pConsole->Initialize ())
+                              {
+                                 m_pNetwork = new NETWORK (m_pEngine);
+
+                                 if (m_pNetwork->Initialize ())
+                                 {
+                                    m_pStorage = new STORAGE (m_pEngine);
+
+                                    if (m_pStorage->Initialize ())
+                                    {
+                                       m_bInitialized = true;
+   
+                                       m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SNEEZE", "Initialized (1 engine thread + " + std::to_string (nAgentCount) + " agents)");
+                                    }
+                                    else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize storage");
+                                 }
+                                 else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize network");
+                              }
+                              else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize console");
                            }
                            else m_pEngine->Log (IENGINE::kLOGLEVEL_Error, "SNEEZE", "Failed to initialize paths");
                         }
@@ -130,6 +151,19 @@ m_pPersona = new persona::PERSONA (m_pEngine);
          if (!m_sPath_Transitory_Session.empty ())
             Scrub (m_sPath_Transitory_Session);
       }
+
+      // Network outlives the contexts that use it but is torn down before
+      // CONTROL, whose fetch agents must still be alive to drain in-flight
+      // assets in ~NETWORK.
+
+      delete m_pStorage;
+      m_pStorage = nullptr;
+
+      delete m_pNetwork;
+      m_pNetwork = nullptr;
+
+      delete m_pConsole;
+      m_pConsole = nullptr;
 
       delete m_pControl;
       m_pControl = nullptr;
@@ -427,6 +461,11 @@ public:
    // Control (owns engine thread, agents, metronome, cleanup queue)
    CONTROL*                   m_pControl;
 
+   // Network (engine-wide singleton, shared across all contexts)
+   CONSOLE*                   m_pConsole;
+   NETWORK*                   m_pNetwork;
+   STORAGE*                   m_pStorage;
+
    // Contexts
    std::mutex                 m_mxContext;
    std::vector<CONTEXT*>      m_apContext;
@@ -477,6 +516,9 @@ const std::string&         SNEEZE::ENGINE::Path_Session    () const { return m_p
 SNEEZE::persona::PERSONA*  SNEEZE::ENGINE::Persona         () const { return m_pImpl->m_pPersona; }
 SNEEZE::DEP::WASM_RUNTIME* SNEEZE::ENGINE::Wasm_Runtime    () const { return m_pImpl->m_pWasm_Runtime; }
 SNEEZE::DEP::UI_CONTEXT*   SNEEZE::ENGINE::Ui_Context      () const { return m_pImpl->m_pUi_Context; }
+SNEEZE::CONSOLE*           SNEEZE::ENGINE::Console         () const { return m_pImpl->m_pConsole; }
+SNEEZE::NETWORK*           SNEEZE::ENGINE::Network         () const { return m_pImpl->m_pNetwork; }
+SNEEZE::STORAGE*           SNEEZE::ENGINE::Storage         () const { return m_pImpl->m_pStorage; }
 
 void SNEEZE::ENGINE::Queue_Post_Fetch (JOB_FETCH* pJob_Fetch)
 {

@@ -3,8 +3,8 @@ title: UNIT (class reference)
 tier: API
 audience: [contributor]
 sources:
-  - src/context/storage/Storage.h
-  - src/context/storage/Unit.cpp
+  - src/sneeze/storage/Storage.h
+  - src/sneeze/storage/Unit.cpp
 verified: 92fdc1c
 nav:
   prev: api/storage/SILO.md
@@ -13,7 +13,7 @@ nav:
 
 # `UNIT`
 
-> **`UNIT` is an internal implementation class, not part of the public API.** It is > only forward-declared in `include/Storage.h`; its full declaration lives in the > module's private header `src/context/storage/Storage.h`, and an application embedding > the engine never calls it. It is documented here because the storage subsystem cannot > be understood without it — a [`SILO`](SILO.md) is little more than four units plus > routing. This page describes it from the source so contributors can reason about > `STORAGE` and `SILO` behavior.
+> **`UNIT` is an internal implementation class, not part of the public API.** It is > only forward-declared in `include/Storage.h`; its full declaration lives in the > module's private header `src/sneeze/storage/Storage.h`, and an application embedding > the engine never calls it. It is documented here because the storage subsystem cannot > be understood without it — a [`SILO`](SILO.md) is little more than four units plus > routing. This page describes it from the source so contributors can reason about > `STORAGE` and `SILO` behavior.
 
 A `UNIT` represents **one JSON file on disk**. It owns the in-memory `nlohmann::json` document, the dot/bracket path-navigation logic, the `.meta` sidecar, and the JSONL write-ahead changelog that gives the store its crash durability. It is the storage counterpart of the network subsystem's private `ASSET`: shared, deduplicated by pathname, and governed by two reference counts. For the conceptual picture see the [Storage system](../../systems/storage.md).
 

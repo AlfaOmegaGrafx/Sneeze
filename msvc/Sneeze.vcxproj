@@ -145,19 +145,19 @@
     <ClCompile Include="..\src\context\scene\Map_Object.cpp" />
     <ClCompile Include="..\src\context\scene\AccessControl.cpp" />
     <!-- console -->
-    <ClCompile Include="..\src\context\console\Console.cpp" />
-    <ClCompile Include="..\src\context\console\Entry.cpp" />
-    <ClCompile Include="..\src\context\console\Stream.cpp" />
-    <ClCompile Include="..\src\context\console\Block.cpp" />
+    <ClCompile Include="..\src\sneeze\console\Console.cpp" />
+    <ClCompile Include="..\src\sneeze\console\Entry.cpp" />
+    <ClCompile Include="..\src\sneeze\console\Stream.cpp" />
+    <ClCompile Include="..\src\sneeze\console\Block.cpp" />
     <!-- network -->
-    <ClCompile Include="..\src\context\network\Network.cpp" />
-    <ClCompile Include="..\src\context\network\Cache.cpp" />
-    <ClCompile Include="..\src\context\network\File.cpp" />
-    <ClCompile Include="..\src\context\network\Asset.cpp" />
+    <ClCompile Include="..\src\sneeze\network\Network.cpp" />
+    <ClCompile Include="..\src\sneeze\network\Cache.cpp" />
+    <ClCompile Include="..\src\sneeze\network\File.cpp" />
+    <ClCompile Include="..\src\sneeze\network\Asset.cpp" />
     <!-- storage -->
-    <ClCompile Include="..\src\context\storage\Storage.cpp" />
-    <ClCompile Include="..\src\context\storage\Silo.cpp" />
-    <ClCompile Include="..\src\context\storage\Unit.cpp" />
+    <ClCompile Include="..\src\sneeze\storage\Storage.cpp" />
+    <ClCompile Include="..\src\sneeze\storage\Silo.cpp" />
+    <ClCompile Include="..\src\sneeze\storage\Unit.cpp" />
     <!-- persona -->
     <ClCompile Include="..\src\persona\Persona.cpp" />
     <!-- renderer -->
@@ -191,10 +191,10 @@
   <!-- ===================================================================== -->
   <ItemGroup>
     <ClInclude Include="..\include\Map_Object.h" />
-    <ClInclude Include="..\src\context\console\Console.h" />
-    <ClInclude Include="..\src\context\network\Network.h" />
+    <ClInclude Include="..\src\sneeze\console\Console.h" />
+    <ClInclude Include="..\src\sneeze\network\Network.h" />
     <ClInclude Include="..\src\sneeze\Pch.h" />
-    <ClInclude Include="..\src\context\storage\Storage.h" />
+    <ClInclude Include="..\src\sneeze\storage\Storage.h" />
     <ClInclude Include="..\src\sneeze\Types.h" />
     <ClInclude Include="..\src\sneeze\Engine.h" />
     <ClInclude Include="..\src\sneeze\control\Control.h" />

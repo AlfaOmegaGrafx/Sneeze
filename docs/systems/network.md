@@ -4,10 +4,10 @@ tier: Systems
 audience: [evaluator, integrator, contributor]
 sources:
   - include/Network.h
-  - src/context/network/Network.cpp
-  - src/context/network/Asset.cpp
-  - src/context/network/File.cpp
-  - src/context/network/Network.h
+  - src/sneeze/network/Network.cpp
+  - src/sneeze/network/Asset.cpp
+  - src/sneeze/network/File.cpp
+  - src/sneeze/network/Network.h
 verified: 92fdc1c
 nav:
   prev: systems/scene.md

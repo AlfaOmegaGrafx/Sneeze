@@ -139,14 +139,14 @@ public:
    {
       m_apUnit[eScope]->Set (sPath, jValue);
 
-      m_pIStorage_Impl->Host ()->OnStorageSiloChanged (pSilo, eScope, sPath);
+      m_pContainer->Context ()->Host ()->OnStorageSiloChanged (pSilo, eScope, sPath);
    }
 
    void Remove (SILO* pSilo, eSILO_SCOPE eScope, const std::string& sPath)
    {
       m_apUnit[eScope]->Remove (sPath);
 
-      m_pIStorage_Impl->Host ()->OnStorageSiloChanged (pSilo, eScope, sPath);
+      m_pContainer->Context ()->Host ()->OnStorageSiloChanged (pSilo, eScope, sPath);
    }
 
    bool Has (eSILO_SCOPE eScope, const std::string& sPath) const
@@ -162,7 +162,7 @@ public:
    void Json (SILO* pSilo, eSILO_SCOPE eScope, const std::string& sJson)
    {
       m_apUnit[eScope]->Json (sJson);
-      m_pIStorage_Impl->Host ()->OnStorageSiloChanged (pSilo, eScope, "");
+      m_pContainer->Context ()->Host ()->OnStorageSiloChanged (pSilo, eScope, "");
    }
 
 public:

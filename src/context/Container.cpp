@@ -140,7 +140,7 @@ public:
          {
             m_pSilo->Detach ();
 
-            m_pContext->Storage ()->Silo_Close (m_pSilo);
+            m_pContext->Storage ()->Silo_Close (m_pContainer, m_pSilo);
             m_pSilo = nullptr;
          }
 
@@ -152,7 +152,7 @@ public:
 
          if (m_pCache)
          {
-            m_pContext->Network ()->Cache_Close (m_pCache);
+            m_pContext->Network ()->Cache_Close (m_pContainer, m_pCache);
             m_pCache = nullptr;
          }
       }

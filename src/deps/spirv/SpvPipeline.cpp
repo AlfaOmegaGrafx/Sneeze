@@ -18,8 +18,8 @@
 
 using namespace SNEEZE::DEP;
 
-SPV_PIPELINE::SPV_PIPELINE ()
-   : m_pEngine (nullptr)
+SPV_PIPELINE::SPV_PIPELINE (ENGINE* pEngine)
+   : m_pEngine (pEngine)
    , bInitialized (false)
 {
 }
@@ -29,9 +29,8 @@ SPV_PIPELINE::~SPV_PIPELINE ()
    bInitialized = false;
 }
 
-bool SPV_PIPELINE::Initialize (ENGINE* pEngine)
+bool SPV_PIPELINE::Initialize ()
 {
-   m_pEngine = pEngine;
    bInitialized = true;
    m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "SPV_PIPELINE",
       "SPIR-V validation pipeline initialized (SPIRV-Tools)");

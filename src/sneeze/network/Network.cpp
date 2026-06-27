@@ -33,16 +33,16 @@ public:
    };
 
 public:
-   Impl (NETWORK* pNetwork, CONTEXT* pContext) :
+   Impl (NETWORK* pNetwork, ENGINE* pEngine) :
       INETWORK_IMPL     (),
       m_pNetwork        (pNetwork),
-      m_pContext        (pContext),
+      m_pEngine         (pEngine),
       m_nNextAssetIx    (1),
       m_tpEpoch         (std::chrono::steady_clock::now ())
    {
    }
 
-   bool Initialize (bool bReset)
+   bool Initialize ()
    {
       bool bResult = false;
 
@@ -56,7 +56,7 @@ public:
 
       bResult = true;
 
-      m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "NETWORK", "Initialized (path: " + sPath_Cache + ", rules: " + std::to_string (m_aRules.size ()) + ", nAssetIx: " + std::to_string (m_nNextAssetIx) + ")");
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "NETWORK", "Initialized (path: " + sPath_Cache + ", rules: " + std::to_string (m_aRules.size ()) + ", nAssetIx: " + std::to_string (m_nNextAssetIx) + ")");
 
       return bResult;
    }
@@ -64,21 +64,26 @@ public:
    ~Impl ()
    {
       {
-         std::lock_guard<std::recursive_mutex> guard (m_mxCache);
+         std::lock_guard<std::recursive_mutex> guard (m_mxNetwork_Cache);
 
-         while (!m_apCache.empty ())
-            Cache_Close (m_apCache.front ());
+         // Engine-level teardown: every CONTAINER has already closed its CACHE,
+         // so this is a leak safety net. The owning contexts/containers are gone,
+         // so no OnNetworkCacheDeleted callback can be routed — delete directly.
 
-         // See note below
-         //
-         // for (auto& [sUrl, pAsset] : m_umpAsset)
-         // {
-         //    m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "NETWORK", "Leaked ASSET: " + pAsset->Url ());
-         //    delete pAsset;
-         // }
-         // m_umpAsset.clear ();
+         for (auto* pCache : m_apCache)
+            delete pCache;
 
+         m_apCache.clear ();
       }
+
+      // See note below
+      //
+      // for (auto& [sUrl, pAsset] : m_umpAsset)
+      // {
+      //    m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Error, "NETWORK", "Leaked ASSET: " + pAsset->Url ());
+      //    delete pAsset;
+      // }
+      // m_umpAsset.clear ();
 
       // There is a race condition in which fetch jobs in flight will set m_pAsset_Fetch to nullptr before
       // an asset being deleted has a chance to close it. There is no other known way to handle this, other 
@@ -91,7 +96,7 @@ public:
          std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
          {
-            std::lock_guard<std::recursive_mutex> guard (m_mxAsset);
+            std::lock_guard<std::recursive_mutex> guard (m_mxNetwork_Asset);
 
             nSize = m_umpAsset.size ();
          }
@@ -132,7 +137,7 @@ public:
 
    std::string Path_Cache () const
    {
-      return (std::filesystem::path (m_pContext->Path_Permanent ()) / "Network").generic_string ();
+      return (std::filesystem::path (m_pEngine->Path_Persistent ()) / "Network").generic_string ();
    }
 
    // ---------------------------------------------------------------------------
@@ -141,7 +146,7 @@ public:
 
    void Rules_Load ()
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mxRules);
+      std::lock_guard<std::recursive_mutex> guard (m_mxNetwork_Rules);
 
       std::string sPathname_Rules = (std::filesystem::path (Path_Cache ()) / "rules.json").generic_string ();
       std::ifstream file (sPathname_Rules);
@@ -157,7 +162,7 @@ public:
          }
          catch (...)
          {
-            m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to parse rules.json -- defaulting to stale");
+            m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to parse rules.json -- defaulting to stale");
          }
 
          if (bParsed)
@@ -178,7 +183,7 @@ public:
       }
       else
       {
-         m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "NETWORK", "No rules.json -- creating fresh");
+         m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "NETWORK", "No rules.json -- creating fresh");
 
          Rules_Save ();
       }
@@ -186,7 +191,7 @@ public:
 
    void Rules_Save ()
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mxRules);
+      std::lock_guard<std::recursive_mutex> guard (m_mxNetwork_Rules);
 
       nlohmann::json jDoc;
       jDoc["nNextMetaIx"] = m_nNextAssetIx;
@@ -218,7 +223,7 @@ public:
 
    bool Rules_Stale (ASSET* pAsset) const override
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mxRules);
+      std::lock_guard<std::recursive_mutex> guard (m_mxNetwork_Rules);
 
       bool bResult = false;
 
@@ -242,7 +247,7 @@ public:
 
    void Rules_Add (const std::string& sContentType, const std::string& sOlderThan)
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mxRules);
+      std::lock_guard<std::recursive_mutex> guard (m_mxNetwork_Rules);
 
       if (sContentType.empty ())
          m_aRules.clear ();
@@ -255,8 +260,13 @@ public:
       Rules_Save ();
    }
 
+   void Rules_Reset ()
+   {
+      Rules_Add ("", NowIso8601 ());
+   }
+
    // ---------------------------------------------------------------------------
-   // Container lifecycle
+   // Cache management
    // ---------------------------------------------------------------------------
 
    CACHE* Cache_Open (CONTAINER* pContainer)
@@ -265,7 +275,7 @@ public:
 
       if (pContainer)
       {
-         std::lock_guard<std::recursive_mutex> guard (m_mxCache);
+         std::lock_guard<std::recursive_mutex> guard (m_mxNetwork_Cache);
 
          pCache = new CACHE (this, pContainer);
 
@@ -273,19 +283,19 @@ public:
 
          pCache->Initialize ();
 
-         m_pContext->Host ()->OnNetworkCacheCreated (pCache);
+         pContainer->Context ()->Host ()->OnNetworkCacheCreated (pCache);
       }
 
       return pCache;
    }
 
-   void Cache_Close (CACHE* pCache)
+   void Cache_Close (CONTAINER* pContainer, CACHE* pCache)
    {
       if (pCache)
       {
-         std::lock_guard<std::recursive_mutex> guard (m_mxCache);
+         std::lock_guard<std::recursive_mutex> guard (m_mxNetwork_Cache);
 
-         m_pContext->Host ()->OnNetworkCacheDeleted (pCache);
+         pContainer->Context ()->Host ()->OnNetworkCacheDeleted (pCache);
 
          auto it = std::find (m_apCache.begin (), m_apCache.end (), pCache);
          if (it != m_apCache.end ())
@@ -295,21 +305,15 @@ public:
       }
    }
 
-   // ---------------------------------------------------------------------------
-   // Cache management
-   // ---------------------------------------------------------------------------
-
-   void Clear ()
+   void Cache_Enum (IENUM_CACHE* pEnum)
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mxCache);
+      if (pEnum)
+      {
+         std::lock_guard<std::recursive_mutex> guard (m_mxNetwork_Cache);
 
-      for (auto* pCache : m_apCache)
-         pCache->Clear ();
-   }
-
-   void Reset ()
-   {
-      Rules_Add ("", NowIso8601 ());
+         for (CACHE* pCache : m_apCache)
+            pEnum->OnCache (pCache);
+      }
    }
 
    // ---------------------------------------------------------------------------
@@ -329,7 +333,7 @@ public:
 
    ASSET* Asset_Open (FILE* pFile) override
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mxAsset);
+      std::lock_guard<std::recursive_mutex> guard (m_mxNetwork_Asset);
 
       ASSET* pAsset = nullptr;
 
@@ -352,7 +356,7 @@ public:
 
    void Asset_Close (FILE* pFile, ASSET* pAsset) override
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mxAsset);
+      std::lock_guard<std::recursive_mutex> guard (m_mxNetwork_Asset);
 
       if (pAsset->Close (pFile) == 0)
       {
@@ -362,32 +366,27 @@ public:
       }
    }
 
-   void Log (IENGINE::eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage) override
-   {
-      m_pContext->Engine ()->Log (Level, sModule, sMessage);
-   }
-
    uint32_t Asset_Index () override
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mxRules);
+      std::lock_guard<std::recursive_mutex> guard (m_mxNetwork_Rules);
 
       return m_nNextAssetIx++;
    }
 
    void Queue_Post_Fetch (JOB_FETCH* pJob_Fetch) override
    { 
-      m_pContext->Engine ()->Queue_Post_Fetch (pJob_Fetch); 
+      m_pEngine->Queue_Post_Fetch (pJob_Fetch); 
    }
 
-   ICONTEXT* Host () const override
+   void Log (IENGINE::eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage) override
    {
-      return m_pContext->Host ();
+      m_pEngine->Log (Level, sModule, sMessage);
    }
 
    // ---------------------------------------------------------------------------
 
    NETWORK*                                m_pNetwork;
-   CONTEXT*                                m_pContext;
+   ENGINE*                                 m_pEngine;
 
    uint32_t                                m_nNextAssetIx;
    std::unordered_map<std::string, ASSET*> m_umpAsset;
@@ -396,9 +395,9 @@ public:
 
    std::vector<RULE>                       m_aRules;
 
-   mutable std::recursive_mutex            m_mxRules;
-   mutable std::recursive_mutex            m_mxCache;
-   mutable std::recursive_mutex            m_mxAsset;
+   mutable std::recursive_mutex            m_mxNetwork_Rules;
+   mutable std::recursive_mutex            m_mxNetwork_Cache;
+   mutable std::recursive_mutex            m_mxNetwork_Asset;
 
    std::chrono::steady_clock::time_point   m_tpEpoch;
 };
@@ -407,14 +406,14 @@ public:
 // NETWORK
 // ---------------------------------------------------------------------------
 
-NETWORK::NETWORK (CONTEXT* pContext) :
-   m_pImpl (new Impl (this, pContext))
+NETWORK::NETWORK (ENGINE* pEngine) :
+   m_pImpl (new Impl (this, pEngine))
 {
 }
 
-bool NETWORK::Initialize (bool bReset)
+bool NETWORK::Initialize ()
 {
-   return m_pImpl->Initialize (bReset);
+   return m_pImpl->Initialize ();
 }
 
 NETWORK::~NETWORK ()
@@ -426,13 +425,12 @@ NETWORK::~NETWORK ()
 // Methods
 // ---------------------------------------------------------------------------
 
-CACHE* NETWORK::Cache_Open  (CONTAINER* pContainer) { return m_pImpl->Cache_Open  (pContainer); }
-void   NETWORK::Cache_Close (CACHE* pCache)         {        m_pImpl->Cache_Close (pCache); }
+CACHE* NETWORK::Cache_Open  (CONTAINER* pContainer)                { return m_pImpl->Cache_Open  (pContainer); }
+void   NETWORK::Cache_Close (CONTAINER* pContainer, CACHE* pCache) {        m_pImpl->Cache_Close (pContainer, pCache); }
+void   NETWORK::Cache_Enum  (IENUM_CACHE* pEnum)                   {        m_pImpl->Cache_Enum  (pEnum); }
 
 // ---------------------------------------------------------------------------
-// Cache management
+// DEPRECATED -- move with Rules
 // ---------------------------------------------------------------------------
 
-void NETWORK::Clear             ()                                                               { m_pImpl->Clear (); }
-void NETWORK::Reset             ()                                                               { m_pImpl->Reset (); }
 void NETWORK::Rules_Add         (const std::string& sContentType, const std::string& sOlderThan) { m_pImpl->Rules_Add (sContentType, sOlderThan); }

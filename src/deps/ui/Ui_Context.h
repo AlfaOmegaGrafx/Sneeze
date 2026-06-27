@@ -35,10 +35,10 @@ namespace SNEEZE
       class UI_CONTEXT
       {
       public:
-         UI_CONTEXT ();
+         UI_CONTEXT (ENGINE* pEngine);
          ~UI_CONTEXT ();
 
-         bool Initialize (ENGINE* pEngine);
+         bool Initialize ();
 
          ENGINE* Engine () const { return m_pEngine; }
 

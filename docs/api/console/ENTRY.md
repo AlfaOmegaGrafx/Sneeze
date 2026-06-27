@@ -4,7 +4,7 @@ tier: API
 audience: [integrator, contributor]
 sources:
   - include/Console.h
-  - src/context/console/Entry.cpp
+  - src/sneeze/console/Entry.cpp
 verified: 92fdc1c
 nav:
   prev: api/console/STREAM.md

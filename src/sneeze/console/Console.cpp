@@ -27,8 +27,8 @@ ICONSOLE_IMPL::~ICONSOLE_IMPL () {}
 class CONSOLE::Impl : public ICONSOLE_IMPL
 {
 public:
-   Impl (CONTEXT* pContext) :
-      m_pContext          (pContext),
+   Impl (ENGINE* pEngine) :
+      m_pEngine           (pEngine),
       m_nIndex_Entry      (0),
       m_nEntries_Cache    (16384),
       m_nEntries_Block    (4096),
@@ -38,19 +38,34 @@ public:
 
    bool Initialize ()
    {
-      m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "CONSOLE", "Initialized");
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "CONSOLE", "Initialized");
 
       return true;
    }
 
    ~Impl ()
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
+      {
+         std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
+   
+         // Engine-level teardown: every CONTAINER has already closed its STREAM,
+         // so this is a leak safety net. The owning contexts/containers are gone,
+         // so no OnConsoleStreamDeleted callback can be routed — delete directly.
 
-      while (!m_umpStream.empty ())
-         Stream_Close (m_umpStream.begin ()->second);
+         for (auto& pair : m_umpStream)
+            delete pair.second;
 
-      m_apEntry.clear ();
+         m_umpStream.clear ();
+      }
+   
+      {
+         std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
+
+         // m_apEntry holds shared_ptr<const ENTRY> -- clearing the deque
+         // releases the last reference and destroys each ENTRY automatically.
+
+         m_apEntry.clear ();
+      }
    }
 
    // ---------------------------------------------------------------------------
@@ -117,7 +132,8 @@ public:
       std::lock_guard<std::recursive_mutex> guard (m_mxConsole);
 
       for (const auto& pEntry : m_apEntry)
-         m_pContext->Host ()->OnConsoleEntryDeleted (pEntry);
+         if (pEntry->Container ())
+            pEntry->Container ()->Context ()->Host ()->OnConsoleEntryDeleted (pEntry);
 
       m_apEntry.clear ();
    }
@@ -170,16 +186,19 @@ public:
 
       while (m_apEntry.size () > m_nEntries_Cache)
       {
-         m_pContext->Host ()->OnConsoleEntryDeleted (m_apEntry.front ());
+         const auto& pFront = m_apEntry.front ();
+         if (pFront->Container ())
+            pFront->Container ()->Context ()->Host ()->OnConsoleEntryDeleted (pFront);
          m_apEntry.pop_front ();
       }
 
-      m_pContext->Host ()->OnConsoleEntryCreated (pEntry);
+      if (pContainer)
+         pContainer->Context ()->Host ()->OnConsoleEntryCreated (pEntry);
 
       return pEntry;
    }
 
-   CONTEXT*                                 m_pContext;
+   ENGINE*                                  m_pEngine;
 
    uint32_t                                 m_nEntries_Cache;
    uint32_t                                 m_nEntries_Block;
@@ -196,8 +215,8 @@ public:
 **  CONSOLE
 ***********************************************************************************************************************************/
 
-CONSOLE::CONSOLE (CONTEXT* pContext) :
-   m_pImpl (new Impl (pContext))
+CONSOLE::CONSOLE (ENGINE* pEngine) :
+   m_pImpl (new Impl (pEngine))
 {
 }
 
@@ -214,8 +233,6 @@ CONSOLE::~CONSOLE ()
 // ---------------------------------------------------------------------------
 // Accessors
 // ---------------------------------------------------------------------------
-
-SNEEZE::CONTEXT* CONSOLE::Context       () const                { return m_pImpl->m_pContext; }
 
 uint32_t         CONSOLE::Entries_Cache () const                { return m_pImpl->m_nEntries_Cache; }
 uint32_t         CONSOLE::Entries_Block () const                { return m_pImpl->m_nEntries_Block; }

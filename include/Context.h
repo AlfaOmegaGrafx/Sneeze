@@ -53,8 +53,10 @@ namespace SNEEZE
 
       bool Initialize (const std::string& sUrl, bool bReset = false);
 
-      void               Logout           ();
-
+      void  Logout ();
+      void  Clear  ();
+      void  Reset  ();
+      
       // Accessors
       ICONTEXT*           Host            () const;
       ENGINE*             Engine          () const;

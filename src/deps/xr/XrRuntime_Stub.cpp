@@ -23,14 +23,18 @@
 
 namespace SNEEZE { namespace DEP {
 
-class XR_RUNTIME::Impl {};
-
-XR_RUNTIME::XR_RUNTIME () : m_pImpl (nullptr)         {}
-XR_RUNTIME::~XR_RUNTIME ()                            {}
-
-bool XR_RUNTIME::Initialize (ENGINE* pEngine)
+class XR_RUNTIME::Impl
 {
-   pEngine->Log (IENGINE::kLOGLEVEL_Info, "XR_RUNTIME",
+public:
+   ENGINE* m_pEngine = nullptr;
+};
+
+XR_RUNTIME::XR_RUNTIME (ENGINE* pEngine) : m_pImpl (new Impl ()) { m_pImpl->m_pEngine = pEngine; }
+XR_RUNTIME::~XR_RUNTIME ()                                       { delete m_pImpl; }
+
+bool XR_RUNTIME::Initialize ()
+{
+   m_pImpl->m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "XR_RUNTIME",
       "OpenXR support disabled at build time (no headset / runtime expected on this platform).");
    return true;
 }

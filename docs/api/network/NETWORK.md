@@ -4,7 +4,7 @@ tier: API
 audience: [integrator, contributor]
 sources:
   - include/Network.h
-  - src/context/network/Network.cpp
+  - src/sneeze/network/Network.cpp
 verified: 92fdc1c
 nav:
   prev: api/network/index.md

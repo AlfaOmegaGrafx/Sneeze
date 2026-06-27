@@ -22,6 +22,7 @@ namespace SNEEZE
    class INETWORK_IMPL;
    class ICACHE_IMPL;
    class CONTAINER;
+   class ENGINE;
 
    // ---------------------------------------------------------------------------
    // Network enums and interfaces
@@ -209,6 +210,17 @@ namespace SNEEZE
    };
 
    // ---------------------------------------------------------------------------
+   // IENUM_CACHE — enumeration callback interface (caches).
+   // ---------------------------------------------------------------------------
+
+   class IENUM_CACHE
+   {
+   public:
+      virtual ~IENUM_CACHE () {}
+      virtual void OnCache (CACHE* pCache) = 0;
+   };
+
+   // ---------------------------------------------------------------------------
    // NETWORK — the network resource system.
    //
    // Fetches remote resources, caches them on disk, and serves them to callers
@@ -232,21 +244,18 @@ namespace SNEEZE
       // NETWORK public API
       // -----------------------------------------------------------------------
 
-      explicit NETWORK (CONTEXT* pContext);
+      explicit NETWORK (ENGINE* pEngine);
       ~NETWORK ();
 
-      bool Initialize (bool bReset = false);
+      bool Initialize ();
 
       // --- Container lifecycle ---
 
       CACHE* Cache_Open  (CONTAINER* pContainer);
-      void   Cache_Close (CACHE* pCache);
+      void   Cache_Close (CONTAINER* pContainer, CACHE* pCache);
+      void   Cache_Enum  (IENUM_CACHE* pEnum);
 
       // --- Cache management ---
-
-      void Clear ();
-
-      void Reset ();
 
       void Rules_Add (const std::string& sContentType, const std::string& sOlderThan);
 

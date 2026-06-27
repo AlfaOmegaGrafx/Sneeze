@@ -167,7 +167,9 @@ namespace SNEEZE
       persona::PERSONA*        Persona () const;
       DEP::WASM_RUNTIME*       Wasm_Runtime () const;
       DEP::UI_CONTEXT*         Ui_Context () const;
-
+      NETWORK*                 Network () const;
+      STORAGE*                 Storage () const;
+      CONSOLE*                 Console () const;
       void                     Queue_Post_Fetch      (JOB_FETCH* pJob_Fetch);
       void                     Queue_Post_Compositor (JOB_COMPOSITOR* pJob_Compositor);
 

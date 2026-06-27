@@ -7,7 +7,7 @@ browser but with native JSON documents instead of flat key-value pairs.
 ## Architecture
 
 ```
-STORAGE (per-context, constructor takes CONTEXT*)
+STORAGE (engine singleton, constructor takes ENGINE*)
  ├── m_umpUnit: pathname -> UNIT*      (one per JSON file, shared across SILOs)
  ├── m_apSilo: vector<SILO*>          (one per Silo_Open call)
  └── m_mxStorage (recursive_mutex)
@@ -48,7 +48,7 @@ std::string sJson = pSilo->Json (kSILO_SCOPE_PERMANENT_COMPANY);
 pSilo->Json (kSILO_SCOPE_TEMPORARY_COMPANY, "{\"session\": {\"start\": 12345}}");
 
 pSilo->Detach ();
-pContext->Storage ()->Silo_Close (pSilo);
+pContext->Storage ()->Silo_Close (pContainer, pSilo);
 ```
 
 ## Scope Enum
@@ -124,6 +124,15 @@ OnStorageSiloCreated (SILO*)
 OnStorageSiloChanged (SILO*, eSILO_SCOPE, const std::string& sPath)
 OnStorageSiloDeleted (SILO*)
 ```
+
+Because one `STORAGE` serves every context, these callbacks self-resolve the host
+via the silo's container (`pContainer->Context()->Host()` / `m_pContainer->...`).
+`Silo_Close` takes `(CONTAINER*, SILO*)` so the deleted-callback can be routed.
+
+**Known gap (deferred):** with `UNIT`s now deduplicated engine-wide by pathname,
+two contexts holding the same org/company file share one `UNIT`. A write through
+one silo fires `OnStorageSiloChanged` only to that silo's context — the other
+context's silo, backed by the same `UNIT`, is not notified. To be fixed later.
 
 ## Thread Safety
 

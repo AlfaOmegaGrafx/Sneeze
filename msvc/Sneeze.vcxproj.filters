@@ -10,13 +10,13 @@
     <Filter Include="src\sneeze\control">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000002}</UniqueIdentifier>
     </Filter>
-    <Filter Include="src\context\network">
+    <Filter Include="src\sneeze\network">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000003}</UniqueIdentifier>
     </Filter>
-    <Filter Include="src\context\storage">
+    <Filter Include="src\sneeze\storage">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000004}</UniqueIdentifier>
     </Filter>
-    <Filter Include="src\context\console">
+    <Filter Include="src\sneeze\console">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000012}</UniqueIdentifier>
     </Filter>
     <Filter Include="src\context">
@@ -124,38 +124,38 @@
     <ClCompile Include="..\src\sneeze\control\AgentC.cpp">
       <Filter>src\sneeze\control</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\context\network\Asset.cpp">
-      <Filter>src\context\network</Filter>
+    <ClCompile Include="..\src\sneeze\network\Asset.cpp">
+      <Filter>src\sneeze\network</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\context\network\Cache.cpp">
-      <Filter>src\context\network</Filter>
+    <ClCompile Include="..\src\sneeze\network\Cache.cpp">
+      <Filter>src\sneeze\network</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\context\network\File.cpp">
-      <Filter>src\context\network</Filter>
+    <ClCompile Include="..\src\sneeze\network\File.cpp">
+      <Filter>src\sneeze\network</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\context\network\Network.cpp">
-      <Filter>src\context\network</Filter>
+    <ClCompile Include="..\src\sneeze\network\Network.cpp">
+      <Filter>src\sneeze\network</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\context\storage\Storage.cpp">
-      <Filter>src\context\storage</Filter>
+    <ClCompile Include="..\src\sneeze\storage\Storage.cpp">
+      <Filter>src\sneeze\storage</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\context\storage\Unit.cpp">
-      <Filter>src\context\storage</Filter>
+    <ClCompile Include="..\src\sneeze\storage\Unit.cpp">
+      <Filter>src\sneeze\storage</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\context\storage\Silo.cpp">
-      <Filter>src\context\storage</Filter>
+    <ClCompile Include="..\src\sneeze\storage\Silo.cpp">
+      <Filter>src\sneeze\storage</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\context\console\Console.cpp">
-      <Filter>src\context\console</Filter>
+    <ClCompile Include="..\src\sneeze\console\Console.cpp">
+      <Filter>src\sneeze\console</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\context\console\Entry.cpp">
-      <Filter>src\context\console</Filter>
+    <ClCompile Include="..\src\sneeze\console\Entry.cpp">
+      <Filter>src\sneeze\console</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\context\console\Stream.cpp">
-      <Filter>src\context\console</Filter>
+    <ClCompile Include="..\src\sneeze\console\Stream.cpp">
+      <Filter>src\sneeze\console</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\context\console\Block.cpp">
-      <Filter>src\context\console</Filter>
+    <ClCompile Include="..\src\sneeze\console\Block.cpp">
+      <Filter>src\sneeze\console</Filter>
     </ClCompile>
     <ClCompile Include="..\src\context\viewport\Viewport.cpp">
       <Filter>src\context\viewport</Filter>
@@ -318,14 +318,14 @@
     <ClInclude Include="..\include\Image.h">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\context\network\Network.h">
-      <Filter>src\context\network</Filter>
+    <ClInclude Include="..\src\sneeze\network\Network.h">
+      <Filter>src\sneeze\network</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\context\storage\Storage.h">
-      <Filter>src\context\storage</Filter>
+    <ClInclude Include="..\src\sneeze\storage\Storage.h">
+      <Filter>src\sneeze\storage</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\context\console\Console.h">
-      <Filter>src\context\console</Filter>
+    <ClInclude Include="..\src\sneeze\console\Console.h">
+      <Filter>src\sneeze\console</Filter>
     </ClInclude>
     <ClInclude Include="..\include\Msf.h" />
     <ClInclude Include="..\include\Map_Object.h">

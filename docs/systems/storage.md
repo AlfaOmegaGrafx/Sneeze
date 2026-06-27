@@ -4,10 +4,10 @@ tier: Systems
 audience: [evaluator, integrator, contributor]
 sources:
   - include/Storage.h
-  - src/context/storage/Storage.cpp
-  - src/context/storage/Silo.cpp
-  - src/context/storage/Unit.cpp
-  - src/context/storage/Storage.h
+  - src/sneeze/storage/Storage.cpp
+  - src/sneeze/storage/Silo.cpp
+  - src/sneeze/storage/Unit.cpp
+  - src/sneeze/storage/Storage.h
 verified: 92fdc1c
 nav:
   prev: systems/network.md

@@ -28,8 +28,6 @@ namespace SNEEZE
 
       virtual void               Log (IENGINE::eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage)  = 0;
 
-      virtual ICONTEXT*          Host () const                                                                            = 0;
-
    private:
    };
 

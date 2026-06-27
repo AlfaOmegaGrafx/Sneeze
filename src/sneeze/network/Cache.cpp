@@ -161,7 +161,7 @@ public:
 
    ICONTEXT* Host () const override
    {
-      return m_pINetwork_Impl->Host ();
+      return m_pContainer->Context ()->Host ();
    }
 
    CONTAINER* Container () const override

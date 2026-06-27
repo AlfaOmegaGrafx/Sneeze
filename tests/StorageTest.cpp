@@ -125,7 +125,7 @@ static void TestInitializeAndOpenClose ()
    Check (s_pContextHost->m_nCreatedCount >= 1, "OnStorageSiloCreated fired");
 
    pSilo->Detach ();
-   pStorage->Silo_Close (pSilo);
+   pStorage->Silo_Close (pContainer, pSilo);
    delete pContainer;
 }
 
@@ -158,7 +158,7 @@ static void TestBasicOperations ()
    Check (!pSilo->Has (kSILO_SCOPE_PERMANENT_COMPANY, "player.name"), "Remove deletes key");
 
    pSilo->Detach ();
-   pStorage->Silo_Close (pSilo);
+   pStorage->Silo_Close (pContainer, pSilo);
    delete pContainer;
 }
 
@@ -188,7 +188,7 @@ static void TestPathNavigation ()
    Check (!pSilo->Has (kSILO_SCOPE_PERMANENT_COMPANY, "game.poker.table.missing"), "Has fails for missing deep path");
 
    pSilo->Detach ();
-   pStorage->Silo_Close (pSilo);
+   pStorage->Silo_Close (pContainer, pSilo);
    delete pContainer;
 }
 
@@ -227,7 +227,7 @@ static void TestArrayAccess ()
    Check (jBob.is_string ()  &&  jBob.get<std::string> () == "Bob", "Nested array object [1]");
 
    pSilo->Detach ();
-   pStorage->Silo_Close (pSilo);
+   pStorage->Silo_Close (pContainer, pSilo);
    delete pContainer;
 }
 
@@ -248,7 +248,7 @@ static void TestPersistence ()
       pSilo->Set (kSILO_SCOPE_PERMANENT_COMPANY, "saved.value", 42);
       pSilo->Set (kSILO_SCOPE_PERMANENT_COMPANY, "saved.text", "hello");
       pSilo->Detach ();
-      pStorage->Silo_Close (pSilo);
+      pStorage->Silo_Close (pContainer, pSilo);
    }
 
    {
@@ -261,7 +261,7 @@ static void TestPersistence ()
       Check (jText.is_string ()  &&  jText.get<std::string> () == "hello", "String persisted across Open/Close");
 
       pSilo->Detach ();
-      pStorage->Silo_Close (pSilo);
+      pStorage->Silo_Close (pContainer, pSilo);
    }
 
    delete pContainer;
@@ -292,9 +292,9 @@ static void TestOrgSharing ()
 
 
    pSiloA->Detach ();
-   pStorage->Silo_Close (pSiloA);
+   pStorage->Silo_Close (pContainerA, pSiloA);
    pSiloB->Detach ();
-   pStorage->Silo_Close (pSiloB);
+   pStorage->Silo_Close (pContainerB, pSiloB);
    delete pContainerA;
    delete pContainerB;
 }
@@ -328,7 +328,7 @@ static void TestScopeIsolation ()
    Check (j4.get<std::string> () == "org-temporary", "TEMPORARY_ORG isolated");
 
    pSilo->Detach ();
-   pStorage->Silo_Close (pSilo);
+   pStorage->Silo_Close (pContainer, pSilo);
    delete pContainer;
 }
 
@@ -383,7 +383,7 @@ static void TestCrashRecovery ()
    Check (!std::filesystem::exists (sPathname_Log), "Log file deleted after recovery");
 
    pSilo->Detach ();
-   pStorage->Silo_Close (pSilo);
+   pStorage->Silo_Close (pContainer, pSilo);
    delete pContainer;
 }
 
@@ -415,7 +415,7 @@ static void TestBulkJson ()
    Check (sJson.find ("\"bulk\"") != std::string::npos, "Json contains data");
 
    pSilo->Detach ();
-   pStorage->Silo_Close (pSilo);
+   pStorage->Silo_Close (pContainer, pSilo);
    delete pContainer;
 }
 
@@ -437,7 +437,7 @@ static void TestMetaSidecar ()
    std::string sPathname_Meta = pSilo->Pathname (kSILO_SCOPE_PERMANENT_COMPANY, "meta");
 
    pSilo->Detach ();
-   pStorage->Silo_Close (pSilo);
+   pStorage->Silo_Close (pContainer, pSilo);
 
    Check (std::filesystem::exists (sPathname_Meta), "Meta sidecar file created on Close");
 

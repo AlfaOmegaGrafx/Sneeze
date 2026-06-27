@@ -7,8 +7,9 @@ cryptographic hash are additionally integrity-verified.
 The module is split into two tiers, mirroring `STORAGE`/`SILO` and
 `CONSOLE`/`STREAM`:
 
-- **NETWORK** — the per-context subsystem. Owns the deduplicated **asset** tier
-  (one `ASSET` per cached URL) and the background fetch machinery.
+- **NETWORK** — an engine-owned singleton (one per `ENGINE`, constructed with
+  `ENGINE*`). Owns the deduplicated **asset** tier (one `ASSET` per cached URL,
+  now shared across every context) and the background fetch machinery.
 - **CACHE** — a per-container handle opened from `NETWORK::Cache_Open()`. Owns
   the **file** tier (the `FILE` handles for one container) and forwards asset
   operations to its `NETWORK`.
@@ -19,7 +20,7 @@ Each `CONTAINER` opens exactly one `CACHE` for its lifetime; reach it via
 ## Architecture
 
 ```
-NETWORK (per-context, constructor takes CONTEXT*)
+NETWORK (engine singleton, constructor takes ENGINE*)
  ├── m_umpAsset: pathname -> ASSET*      (active assets with FILE handles)
  ├── m_apCache: vector<CACHE*>           (open per-container handles)
  ├── m_nNextAssetIx                      (monotonic asset counter)
@@ -29,8 +30,8 @@ NETWORK (per-context, constructor takes CONTEXT*)
  └── m_mxAsset  (recursive)             (m_umpAsset)
 
 CACHE (per-container handle, ctor takes INETWORK_IMPL* + CONTAINER*)
- ├── m_pINetwork_Impl                    (forwards Asset_Open/Close, Host, Path)
- ├── m_pContainer                        (identity for disk paths)
+ ├── m_pINetwork_Impl                    (forwards Asset_Open/Close, Path)
+ ├── m_pContainer                        (identity for disk paths; resolves Host via Context)
  ├── m_apFile: vector<FILE*>             (this container's FILE handles)
  ├── m_nNextFileIx                       (monotonic file counter)
  ├── m_bCacheEnabled                     (stamped onto each new FILE)
@@ -53,8 +54,10 @@ FILE (per-caller handle, pImpl — owned by CACHE)
 
 `FILE` reaches everything through `ICACHE_IMPL`: its file lifecycle
 (`File_Clear`/`File_Close`/`File_Reset`) is implemented by `CACHE`, while asset
-operations, the host (`ICONTEXT`), the permanent cache path, and the owning
-`CONTAINER` are forwarded by `CACHE` to `NETWORK`.
+operations and the permanent cache path are forwarded by `CACHE` to `NETWORK`.
+The host (`ICONTEXT`) is no longer forwarded by `NETWORK`; `CACHE` resolves it
+itself via `m_pContainer->Context()->Host()`, since one engine-wide `NETWORK`
+serves many contexts.
 
 All public types (`eASSET_STATE`, `eASSET_EXT`, `FILE`, `IFILE`, `IENUM_FILE`,
 `CACHE`, `NETWORK`) are peers in the `SNEEZE` namespace.
@@ -96,11 +99,15 @@ SNEEZE::FILE* pFile = pCache->File_Open (sUrl, nullptr);   // null listener
   `m_apCache`, calls `CACHE::Initialize()` (registered-before-init, mirroring
   `STORAGE::Silo_Open`), fires `OnNetworkCacheCreated`, and returns it. Called
   by `CONTAINER::Open()`.
-- **NETWORK::Cache_Close (pCache)** — fires `OnNetworkCacheDeleted`, unregisters
-  and deletes the `CACHE` (which deletes its remaining `FILE`s). Called by
-  `CONTAINER::Close()`.
+- **NETWORK::Cache_Close (pContainer, pCache)** — fires `OnNetworkCacheDeleted`
+  (routed via `pContainer->Context()->Host()`), unregisters and deletes the
+  `CACHE` (which deletes its remaining `FILE`s). Called by `CONTAINER::Close()`.
+  The container is passed explicitly because `NETWORK` no longer stores one.
+- **NETWORK::Cache_Enum (IENUM_CACHE*)** — enumerates every registered `CACHE`.
+  Now engine-wide (spans all contexts), so a per-context inspector must filter.
 - A leaked `CACHE` (container never closed it) is reaped by `~NETWORK`, which
-  closes all registered caches before draining the asset map.
+  deletes all registered caches directly (no host callback — the owning contexts
+  are already gone) before draining the asset map.
 
 ## File Lifecycle
 
@@ -112,15 +119,19 @@ SNEEZE::FILE* pFile = pCache->File_Open (sUrl, nullptr);   // null listener
 - **FILE::Reset** — marks ASSET for destruction on last detach.
 - **File deleted** only when BOTH `m_bPending_Close` AND `m_bPending_Clear`.
 - **CACHE::Clear** — sweeps one cache's files, clearing each.
-- **NETWORK::Clear** — context-wide clear: loops `m_apCache` under `m_mxCache`,
-  calling `CACHE::Clear` on each. `CONTEXT::Logout` uses it.
+- `NETWORK::Clear`/`Reset` were removed in the singleton migration — a
+  network-wide clear no longer makes sense when one `NETWORK` serves every
+  context. Cache invalidation is now per-`CACHE` (and the per-container rules
+  watermark work is deferred to the end of Phase 3). `CONTEXT::Logout` is
+  currently a no-op for the same reason.
 
 ## Request Deduplication
 
 Multiple callers opening the same URL share a single ASSET — even across
-different `CACHE`s, because assets are keyed by disk pathname in the shared
-`NETWORK`. Each caller gets its own FILE handle. All listeners are notified when
-the fetch resolves.
+different `CACHE`s and now across different contexts, because assets are keyed by
+disk pathname in the single engine-wide `NETWORK`. Each caller gets its own FILE
+handle. All listeners are notified when the fetch resolves. (This global dedup is
+also what eliminates two tabs writing the same on-disk cache file concurrently.)
 
 ## Disk Storage
 
@@ -145,7 +156,8 @@ fan-out directory.
 re-derive the identity prefix. `CACHE::DisplayName()` returns the container's
 display name. The `Network` directory is created once at `CACHE::Initialize()`;
 each `ASSET` creates its own `<dk[0:2]>` leaf at open. `rules.json` lives at
-`<PermanentPath>/Network/` (shared across the session — unchanged this phase).
+`<EnginePersistentPath>/Network/` (now engine-wide — relocating it to the primary
+fabric's container is deferred to the end of Phase 3).
 
 ## SRI Hash Format
 
@@ -279,7 +291,7 @@ reporting approximation — the data they receive is identical.
 | File | Contents |
 |------|----------|
 | `include/Network.h` | Public header — eASSET_STATE, FILE, IFILE, IENUM_FILE, CACHE, NETWORK |
-| `Network.cpp` | NETWORK + Impl (asset tier, Cache_Open/Close, Clear-all, rules, paths, fetch queue) |
+| `Network.cpp` | NETWORK + Impl (asset tier, Cache_Open/Close/Enum, rules, paths, fetch queue) |
 | `Cache.cpp` | CACHE + Impl (file tier — File_Open/Close/Clear/Reset/Enum; forwards assets) |
 | `Asset.cpp` | ASSET + Impl + ASSET_FETCH (fetch lifecycle, FetchComplete) |
 | `File.cpp` | FILE + Impl (snapshots, path computation, dual-flag deletion) |

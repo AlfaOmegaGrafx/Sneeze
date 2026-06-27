@@ -4,7 +4,7 @@ tier: API
 audience: [integrator, contributor]
 sources:
   - include/Storage.h
-  - src/context/storage/Silo.cpp
+  - src/sneeze/storage/Silo.cpp
 verified: 92fdc1c
 nav:
   prev: api/storage/STORAGE.md

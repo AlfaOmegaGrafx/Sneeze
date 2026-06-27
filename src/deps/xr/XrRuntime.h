@@ -29,10 +29,10 @@ namespace SNEEZE
       class XR_RUNTIME
       {
       public:
-         XR_RUNTIME ();
+         XR_RUNTIME (ENGINE* pEngine);
          ~XR_RUNTIME ();
 
-         bool Initialize (ENGINE* pEngine);
+         bool Initialize ();
 
          bool        HasRuntime () const;
          std::string GetRuntimeName () const;

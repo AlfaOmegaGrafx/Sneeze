@@ -22,30 +22,44 @@ ISTORAGE_IMPL::~ISTORAGE_IMPL () {}
 class STORAGE::Impl : public ISTORAGE_IMPL
 {
 public:
-   Impl (STORAGE* pStorage, CONTEXT* pContext) :
+   Impl (STORAGE* pStorage, ENGINE* pEngine) :
       m_pStorage (pStorage),
-      m_pContext (pContext)
+      m_pEngine  (pEngine)
    {
    }
 
    bool Initialize ()
    {
-      m_pContext->Engine ()->Log (IENGINE::kLOGLEVEL_Info, "STORAGE", "Initialized");
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "STORAGE", "Initialized");
 
       return true;
    }
 
    ~Impl ()
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
+      {
+         std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
 
-      while (!m_apSilo.empty ())
-         Silo_Close (m_apSilo.front ());
+         // Engine-level teardown: every CONTAINER has already closed its SILO,
+         // so this is a leak safety net. The owning contexts/containers are gone,
+         // so no OnStorageSiloDeleted callback can be routed — delete directly.
 
-      for (auto& pair : m_umpUnit)
-         delete pair.second;
+         for (auto* pSilo : m_apSilo)
+            delete pSilo;
 
-      m_umpUnit.clear ();
+         m_apSilo.clear ();
+      }
+
+      {
+         std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
+
+         // not sure why we're doing this
+
+         for (auto& pair : m_umpUnit)
+            delete pair.second;
+
+         m_umpUnit.clear ();
+      }
    }
 
    // ---------------------------------------------------------------------------
@@ -66,19 +80,19 @@ public:
 
          pSilo->Initialize ();
 
-         m_pContext->Host ()->OnStorageSiloCreated (pSilo);
+         pContainer->Context ()->Host ()->OnStorageSiloCreated (pSilo);
       }
 
       return pSilo;
    }
 
-   void Silo_Close (SILO* pSilo)
+   void Silo_Close (CONTAINER* pContainer, SILO* pSilo)
    {
       if (pSilo)
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
 
-         m_pContext->Host ()->OnStorageSiloDeleted (pSilo);
+         pContainer->Context ()->Host ()->OnStorageSiloDeleted (pSilo);
 
          auto it = std::find (m_apSilo.begin (), m_apSilo.end (), pSilo);
          if (it != m_apSilo.end ())
@@ -130,18 +144,13 @@ public:
       }
    }
 
-   ICONTEXT* Host () const override
-   {
-      return m_pContext->Host ();
-   }
-
    void Log (IENGINE::eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage) override
    {
-      m_pContext->Engine ()->Log (Level, sModule, sMessage);
+      m_pEngine->Log (Level, sModule, sMessage);
    }
 
    STORAGE*                                m_pStorage;
-   CONTEXT*                                m_pContext;
+   ENGINE*                                 m_pEngine;
 
    std::recursive_mutex                    m_mxStorage;
    std::vector<SILO*>                      m_apSilo;
@@ -152,12 +161,15 @@ public:
 // STORAGE
 // ===========================================================================
 
-STORAGE::STORAGE (CONTEXT* pContext) :
-   m_pImpl (new Impl (this, pContext))
+STORAGE::STORAGE (ENGINE* pEngine) :
+   m_pImpl (new Impl (this, pEngine))
 {
 }
 
-bool              STORAGE::Initialize ()             { return m_pImpl->Initialize (); }
+bool STORAGE::Initialize ()
+{
+   return m_pImpl->Initialize ();
+}
 
 STORAGE::~STORAGE ()
 {
@@ -168,6 +180,6 @@ STORAGE::~STORAGE ()
 // Container lifecycle
 // ---------------------------------------------------------------------------
 
-SILO* STORAGE::Silo_Open  (CONTAINER* pContainer) { return m_pImpl->Silo_Open       (pContainer); }
-void  STORAGE::Silo_Close (SILO* pSilo)           {        m_pImpl->Silo_Close      (pSilo); }
-void  STORAGE::Silo_Enum  (IENUM_SILO* pEnum)     {        m_pImpl->Silo_Enum       (pEnum); }
+SILO* STORAGE::Silo_Open  (CONTAINER* pContainer)              { return m_pImpl->Silo_Open  (pContainer); }
+void  STORAGE::Silo_Close (CONTAINER* pContainer, SILO* pSilo) {        m_pImpl->Silo_Close (pContainer, pSilo); }
+void  STORAGE::Silo_Enum  (IENUM_SILO* pEnum)                  {        m_pImpl->Silo_Enum  (pEnum); }
