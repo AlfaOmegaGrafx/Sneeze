@@ -332,3 +332,16 @@ Deferred:
 - Discussed singleton consequences: engine-wide UNIT/ASSET dedup eliminates two-tabs-same-file write races but makes same-file state live-shared; enums now span all contexts (inspector must filter). **Dean flagged the cross-context change-notification fan-out gap as a real problem to fix later.**
 - Docs: updated `project.mdc` (directory structure, module table, new "Subsystem Ownership Model" section) and the per-module `src/sneeze/{network,console,storage}/*.md`. Wiki (`docs/`) front-matter `sources:` paths repointed to `src/sneeze/...`, but **wiki bodies left stale and flagged** — the `docs/` network pages are out of date back to before Phase 1 (no `CACHE` page; `NETWORK.md` still shows the monolithic class), so the wiki needs a full Phase 1+2+3 reconciliation, deferred.
 - Dean commits Phase 3 himself.
+
+## June 26, 2026 (evening, ~7:45–9:50 PM PT) — Dean Abramson
+
+**Post-Phase-3 Item 1 of 5 — Storage change-notification fan-out across contexts**
+
+- Fixed the cross-context gap flagged in the afternoon session. Old `OnStorageSiloChanged` fired only on the writing silo, so contexts sharing an org-scoped `UNIT` were never notified.
+- Replaced the single storage `Changed` callback with a two-tier set mirroring network's Cache/File tiers: kept `OnStorageSilo{Created,Deleted}` (handle, from `STORAGE`); removed `OnStorageSiloChanged`; added `OnStorageUnit{Created,Changed,Deleted}` (leaf, from `Unit.cpp`).
+- `UNIT::Impl` now holds `m_apSilo` (populated in `Open(pSilo)`/cleared in `Close(pSilo)`, mirror of `ASSET::m_apFile`) and an `m_pUnit` back-pointer. Dir creation moved from `SILO::Initialize` into `UNIT::Open`. `UNIT` makes all `OnStorageUnit*` calls via `pSilo->Container()->Context()->Host()`; added public `SILO::Container()` accessor (no `ISILO_IMPL` needed — `UNIT` holds `SILO*` directly, unlike network where `FILE` carries `ICACHE_IMPL*`). `Changed` fans out over `m_apSilo`; `Created`/`Deleted` fire for the one attaching/closing silo. `SILO::Set/Remove/Json` no longer call the host.
+- Bonus durability fix (Dean blessed): bulk `Json` setter now appends a root `["Set","",<doc>]` to the `.log`; `Log_Replay` handles the empty-path/root case.
+- `ISTORAGE_IMPL` on `UNIT` briefly removed (write-only) then restored at Dean's request as the parent back-pointer (it's the upcast `STORAGE::Impl` `this`).
+- Added `StorageTest.cpp` Test 11 proving fan-out (one write → 2 callbacks). Debug build clean; 45/45 storage tests pass.
+- Updated `Storage.md` + wiki `ICONTEXT.md`/`SILO.md`. Full detail in `project.mdc` "Post-Phase-3 Jobs" section.
+- Remaining jobs 2–5 (Reset/Clear cache, GLB files, Home page, Documentation) deferred to Saturday. Dean commits this himself.

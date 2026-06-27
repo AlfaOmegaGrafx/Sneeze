@@ -10,13 +10,15 @@ browser but with native JSON documents instead of flat key-value pairs.
 STORAGE (engine singleton, constructor takes ENGINE*)
  ├── m_umpUnit: pathname -> UNIT*      (one per JSON file, shared across SILOs)
  ├── m_apSilo: vector<SILO*>          (one per Silo_Open call)
- └── m_mxStorage (recursive_mutex)
+ ├── m_mxStorage_Silo (recursive_mutex)
+ └── m_mxStorage_Unit (recursive_mutex)
 
 UNIT (one per JSON file on disk)
  ├── nlohmann::json document (in-memory cache)
  ├── .meta sidecar, .log changelog (JSONL write-ahead)
+ ├── m_apSilo: vector<SILO*>          (the SILOs holding this UNIT; change fan-out)
  ├── m_nCount_Open (lifetime) / m_nCount_Load (cache)
- └── m_mutex (recursive_mutex)
+ └── m_mxUnit (recursive_mutex)
 
 SILO (groups four UNITs for a container)
  ├── CONTAINER* m_pContainer
@@ -113,31 +115,43 @@ Company scope (CONTAINER::Path_* + "Storage"):
 ```
 
 `SILO` builds these from `CONTAINER`'s path accessors and appends only the
-`Storage` segment; `SILO::Initialize` creates each scope's directory at open
-(parallel to `CACHE` and `STREAM`). The identity prefix is owned by
-`CONTAINER`, never re-derived in `SILO`.
+`Storage` segment; the identity prefix is owned by `CONTAINER`, never re-derived
+in `SILO`. Each scope's leaf directory is created by `UNIT::Open` on first open
+(the `UNIT` owns its own directory, parallel to how `ASSET` owns its cache dir).
 
 ## Notifications (ICONTEXT)
 
+Two tiers, mirroring `NETWORK` (`Cache` handle tier + `File` leaf tier):
+
 ```cpp
+// Handle tier — fired by STORAGE in Silo_Open / Silo_Close
 OnStorageSiloCreated (SILO*)
-OnStorageSiloChanged (SILO*, eSILO_SCOPE, const std::string& sPath)
 OnStorageSiloDeleted (SILO*)
+
+// Leaf tier — fired by UNIT (Unit.cpp)
+OnStorageUnitCreated (SILO*, eSILO_SCOPE)
+OnStorageUnitChanged (SILO*, eSILO_SCOPE, const std::string& sPath)
+OnStorageUnitDeleted (SILO*, eSILO_SCOPE)
 ```
 
-Because one `STORAGE` serves every context, these callbacks self-resolve the host
-via the silo's container (`pContainer->Context()->Host()` / `m_pContainer->...`).
-`Silo_Close` takes `(CONTAINER*, SILO*)` so the deleted-callback can be routed.
+Because one `STORAGE` serves every context, the host is self-resolved through the
+silo's container: `pSilo->Container()->Context()->Host()`. `Silo_Close` takes
+`(CONTAINER*, SILO*)` so the silo-deleted callback can be routed.
 
-**Known gap (deferred):** with `UNIT`s now deduplicated engine-wide by pathname,
-two contexts holding the same org/company file share one `UNIT`. A write through
-one silo fires `OnStorageSiloChanged` only to that silo's context — the other
-context's silo, backed by the same `UNIT`, is not notified. To be fixed later.
+**Cross-context fan-out.** A `UNIT` is deduplicated engine-wide by pathname, so two
+contexts holding the same org/company file share one `UNIT`. `UNIT::Open(pSilo)` /
+`Close(pSilo)` track the holding silos in `m_apSilo` and fire
+`OnStorageUnit{Created,Deleted}` for that one silo. A mutation (`Set`/`Remove`/the
+`Json` setter) calls `UNIT::Notify_Changed`, which loops `m_apSilo` and fires
+`OnStorageUnitChanged` to **every** holding silo — so all contexts sharing the
+`UNIT` are notified, not just the writer's. The `Json` setter passes an empty path.
+This is the structural analog of `ASSET` driving `FILE::Notify_Changed`, except a
+`UNIT` is both the shared object and the leaf, so it drives its own fan-out.
 
 ## Thread Safety
 
-- `STORAGE` — `m_mxStorage` (recursive_mutex)
-- `UNIT` — `m_mutex` (recursive_mutex per unit)
+- `STORAGE` — `m_mxStorage_Silo` + `m_mxStorage_Unit` (recursive_mutex; silo registry vs unit registry)
+- `UNIT` — `m_mxUnit` (recursive_mutex per unit)
 - `SILO` — `m_mxSilo` (mutex)
 
 ## Files

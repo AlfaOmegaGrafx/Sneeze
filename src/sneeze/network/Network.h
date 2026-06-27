@@ -84,7 +84,7 @@ namespace SNEEZE
 
       // Lifecycle
       void        Open   (FILE* pFile);
-      size_t      Close  (FILE* pFile);
+      uint32_t    Close  (FILE* pFile);
 
       bool        Attach (FILE* pFile, bool bFetch_Allowed);
       void        Detach (FILE* pFile);

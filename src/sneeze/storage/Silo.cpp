@@ -23,7 +23,8 @@ using namespace SNEEZE;
 class SILO::Impl
 {
 public:
-   Impl (ISTORAGE_IMPL* pIStorage_Impl, CONTAINER* pContainer) :
+   Impl (SILO* pSilo, ISTORAGE_IMPL* pIStorage_Impl, CONTAINER* pContainer) :
+      m_pSilo          (pSilo),
       m_pIStorage_Impl (pIStorage_Impl),
       m_pContainer     (pContainer),
       m_bAttached      (false)
@@ -34,15 +35,11 @@ public:
 
    void Initialize ()
    {
-      std::error_code ec;
-
       for (int nScope = 0; nScope < kSILO_SCOPE_COUNT; nScope++)
       {
          eSILO_SCOPE eScope = static_cast<eSILO_SCOPE> (nScope);
 
-         std::filesystem::create_directories (Path (eScope), ec);
-
-         m_apUnit[nScope] = m_pIStorage_Impl->Unit_Open (eScope, Pathname (eScope));
+         m_apUnit[nScope] = m_pIStorage_Impl->Unit_Open (m_pSilo, eScope);
       }
    }
 
@@ -55,7 +52,7 @@ public:
       {
          if (m_apUnit[nScope])
          {
-            m_pIStorage_Impl->Unit_Close (m_apUnit[nScope]);
+            m_pIStorage_Impl->Unit_Close (m_pSilo, m_apUnit[nScope]);
             m_apUnit[nScope] = nullptr;
          }
       }
@@ -135,18 +132,14 @@ public:
       return m_apUnit[eScope]->Get (sPath);
    }
 
-   void Set (SILO* pSilo, eSILO_SCOPE eScope, const std::string& sPath, const nlohmann::json& jValue)
+   void Set (eSILO_SCOPE eScope, const std::string& sPath, const nlohmann::json& jValue)
    {
       m_apUnit[eScope]->Set (sPath, jValue);
-
-      m_pContainer->Context ()->Host ()->OnStorageSiloChanged (pSilo, eScope, sPath);
    }
 
-   void Remove (SILO* pSilo, eSILO_SCOPE eScope, const std::string& sPath)
+   void Remove (eSILO_SCOPE eScope, const std::string& sPath)
    {
       m_apUnit[eScope]->Remove (sPath);
-
-      m_pContainer->Context ()->Host ()->OnStorageSiloChanged (pSilo, eScope, sPath);
    }
 
    bool Has (eSILO_SCOPE eScope, const std::string& sPath) const
@@ -159,13 +152,13 @@ public:
       return m_apUnit[eScope]->Json ();
    }
 
-   void Json (SILO* pSilo, eSILO_SCOPE eScope, const std::string& sJson)
+   void Json (eSILO_SCOPE eScope, const std::string& sJson)
    {
       m_apUnit[eScope]->Json (sJson);
-      m_pContainer->Context ()->Host ()->OnStorageSiloChanged (pSilo, eScope, "");
    }
 
 public:
+   SILO*                            m_pSilo;
    ISTORAGE_IMPL*                   m_pIStorage_Impl;
    CONTAINER*                       m_pContainer;
    UNIT*                            m_apUnit[kSILO_SCOPE_COUNT];
@@ -178,7 +171,7 @@ public:
 // ===========================================================================
 
 SILO::SILO (ISTORAGE_IMPL* pIStorage_Impl, CONTAINER* pContainer) :
-   m_pImpl (new Impl (pIStorage_Impl, pContainer))
+   m_pImpl (new Impl (this, pIStorage_Impl, pContainer))
 {
 }
 
@@ -197,6 +190,7 @@ SILO::~SILO ()
 // ---------------------------------------------------------------------------
 
 std::string SILO::DisplayName ()                                                                           const { return m_pImpl->m_pContainer->Identity ()->DisplayName (); }
+CONTAINER*  SILO::Container   ()                                                                           const { return m_pImpl->m_pContainer; }
 
 std::string SILO::Path        (eSILO_SCOPE eScope)                                                         const { return m_pImpl->Path     (eScope);       }
 std::string SILO::Filename    (eSILO_SCOPE eScope, const std::string& sExt)                                const { return m_pImpl->Filename (eScope, sExt); }
@@ -218,9 +212,9 @@ void        SILO::Detach      ()                                                
 // ---------------------------------------------------------------------------
 
 nlohmann::json SILO::Get      (eSILO_SCOPE eScope, const std::string& sPath)                               const { return m_pImpl->Get    (eScope, sPath); }
-void           SILO::Set      (eSILO_SCOPE eScope, const std::string& sPath, const nlohmann::json& jValue)       {        m_pImpl->Set    (this, eScope, sPath, jValue); }
-void           SILO::Remove   (eSILO_SCOPE eScope, const std::string& sPath)                                     {        m_pImpl->Remove (this, eScope, sPath); }
+void           SILO::Set      (eSILO_SCOPE eScope, const std::string& sPath, const nlohmann::json& jValue)       {        m_pImpl->Set    (eScope, sPath, jValue); }
+void           SILO::Remove   (eSILO_SCOPE eScope, const std::string& sPath)                                     {        m_pImpl->Remove (eScope, sPath); }
 bool           SILO::Has      (eSILO_SCOPE eScope, const std::string& sPath)                               const { return m_pImpl->Has    (eScope, sPath); }
 std::string    SILO::Json     (eSILO_SCOPE eScope)                                                         const { return m_pImpl->Json   (eScope); }
-void           SILO::Json     (eSILO_SCOPE eScope, const std::string& sJson)                                     {        m_pImpl->Json   (this, eScope, sJson); }
+void           SILO::Json     (eSILO_SCOPE eScope, const std::string& sJson)                                     {        m_pImpl->Json   (eScope, sJson); }
 

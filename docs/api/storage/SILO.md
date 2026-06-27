@@ -76,7 +76,7 @@ A silo is brought up in two steps and torn down by the storage:
 
 **`Attach`/`Detach` are idempotent at the silo level.** The `m_bAttached` flag means a second `Attach` without an intervening `Detach` does nothing; the underlying units use their own load counters, so shared org units stay loaded as long as any silo holds them.
 
-**Mutations notify the host.** `Set`, `Remove`, and the `Json` setter fire the host's `OnStorageSiloChanged` callback (the setter with an empty path). Reads do not.
+**Mutations notify the host.** `Set`, `Remove`, and the `Json` setter route to the underlying `UNIT`, which fires the host's `OnStorageUnitChanged` callback (the setter with an empty path). Because a `UNIT` is shared engine-wide by pathname, it fans the callback out to **every** silo holding it — so all contexts sharing the unit are notified, not just the writer's. Reads do not notify.
 
 **No lifetime guard on the handle.** Nothing prevents another thread from closing the silo while a call is in progress; the silo must outlive its calls.
 
@@ -107,10 +107,14 @@ void Initialize ();
 
 ```cpp
 std::string DisplayName () const;
+CONTAINER*  Container   () const;
 ```
 
 ### `std::string DisplayName () const`
 - **Purpose / Returns.** The owning container's display name (from its certificate identity) — a label for inspectors and logs.
+
+### `CONTAINER* Container () const`
+- **Purpose / Returns.** The owning container. Used to reach the host for notification routing (`pSilo->Container()->Context()->Host()`), which is how a shared `UNIT` fans change callbacks out to every holding silo's context.
 
 ---
 

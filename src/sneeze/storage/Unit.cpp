@@ -23,16 +23,17 @@ using namespace SNEEZE;
 class UNIT::Impl
 {
 public:
-   Impl (ISTORAGE_IMPL* pIStorage_Impl, eSILO_SCOPE eScope, const std::string& sPathname) :
+   Impl (UNIT* pUnit, ISTORAGE_IMPL* pIStorage_Impl, eSILO_SCOPE eScope, const std::string& sPathname) :
+      m_pUnit          (pUnit),
       m_pIStorage_Impl (pIStorage_Impl),
-      m_eScope (eScope),
-      m_sPathname (sPathname),
-      m_bLoaded (false),
-      m_bDirty (false),
-      m_nCount_Open (0),
-      m_nCount_Load (0),
-      m_nSizeBytes (0),
-      m_nAccessCount (0)
+      m_eScope         (eScope),
+      m_sPathname      (sPathname),
+      m_bLoaded        (false),
+      m_bDirty         (false),
+      m_nCount_Open    (0),
+      m_nCount_Load    (0),
+      m_nSizeBytes     (0),
+      m_nAccessCount   (0)
    {
       std::string sPathname_Meta = m_sPathname + ".meta";
 
@@ -178,7 +179,11 @@ public:
                   std::string sFinalKey;
                   NavigatePath (sPath, pParent, sFinalKey);
 
-                  if (pParent && !sFinalKey.empty ())
+                  if (pParent && sFinalKey.empty ())
+                  {
+                     *pParent = jEntry[2];
+                  }
+                  else if (pParent && !sFinalKey.empty ())
                   {
                      if (sFinalKey.size () > 2 && sFinalKey[0] == '[' && sFinalKey.back () == ']')
                      {
@@ -234,6 +239,46 @@ public:
       std::filesystem::remove (sPathname_Log, ec);
    }
 
+   void Open (SILO* pSilo)
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mxUnit);
+
+      if (m_nCount_Open == 0)
+      {
+         std::error_code ec;
+         std::filesystem::create_directories (std::filesystem::path (m_sPathname).parent_path (), ec);
+      }
+
+      m_apSilo.push_back (pSilo);
+
+      m_nCount_Open++;
+
+      pSilo->Container ()->Context ()->Host ()->OnStorageUnitCreated (pSilo, m_eScope);
+   }
+
+   uint32_t Close (SILO* pSilo)
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mxUnit);
+
+      pSilo->Container ()->Context ()->Host ()->OnStorageUnitDeleted (pSilo, m_eScope);
+
+      m_nCount_Open--;
+
+      auto it = std::find (m_apSilo.begin (), m_apSilo.end (), pSilo);
+      if (it != m_apSilo.end ())
+         m_apSilo.erase (it);
+
+      return m_nCount_Open;
+   }
+
+   void Notify_Changed (const std::string& sPath)
+   {
+      std::lock_guard<std::recursive_mutex> guard (m_mxUnit);
+
+      for (SILO* pSilo : m_apSilo)
+         pSilo->Container ()->Context ()->Host ()->OnStorageUnitChanged (pSilo, m_eScope, sPath);
+   }
+
    void Attach () 
    { 
       if (++m_nCount_Load == 1) 
@@ -255,7 +300,7 @@ public:
 
    void Load ()
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+      std::lock_guard<std::recursive_mutex> guard (m_mxUnit);
 
       if (!m_bLoaded)
       {
@@ -292,7 +337,7 @@ public:
 
    void Save ()
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+      std::lock_guard<std::recursive_mutex> guard (m_mxUnit);
 
       if (m_bLoaded)
       {
@@ -325,7 +370,7 @@ public:
 
    void Evict ()
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+      std::lock_guard<std::recursive_mutex> guard (m_mxUnit);
 
       if (m_bDirty)
          Save ();
@@ -380,7 +425,7 @@ public:
 
    nlohmann::json Get (const std::string& sPath) const
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+      std::lock_guard<std::recursive_mutex> guard (m_mxUnit);
 
       nlohmann::json* pParent = nullptr;
       std::string sFinalKey;
@@ -404,7 +449,7 @@ public:
 
    void Set (const std::string& sPath, const nlohmann::json& jValue)
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+      std::lock_guard<std::recursive_mutex> guard (m_mxUnit);
 
       nlohmann::json* pParent = nullptr;
       std::string sFinalKey;
@@ -431,12 +476,14 @@ public:
          m_bDirty = true;
          TouchAccess ();
          Log_Append ("Set", sPath, jValue);
+
+         Notify_Changed (sPath);
       }
    }
 
    void Remove (const std::string& sPath)
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+      std::lock_guard<std::recursive_mutex> guard (m_mxUnit);
 
       nlohmann::json* pParent = nullptr;
       std::string sFinalKey;
@@ -459,12 +506,14 @@ public:
          m_bDirty = true;
          TouchAccess ();
          Log_Append ("Remove", sPath, nlohmann::json ());
+
+         Notify_Changed (sPath);
       }
    }
 
    bool Has (const std::string& sPath) const
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+      std::lock_guard<std::recursive_mutex> guard (m_mxUnit);
 
       nlohmann::json* pParent = nullptr;
       std::string sFinalKey;
@@ -487,14 +536,14 @@ public:
 
    std::string Json () const
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+      std::lock_guard<std::recursive_mutex> guard (m_mxUnit);
 
       return m_jData.dump (2);
    }
 
    void Json (const std::string& sJson)
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mutex);
+      std::lock_guard<std::recursive_mutex> guard (m_mxUnit);
 
       try
       {
@@ -507,25 +556,30 @@ public:
 
       m_bDirty = true;
       TouchAccess ();
+      Log_Append ("Set", "", m_jData);
+
+      Notify_Changed ("");
    }
 
-   ISTORAGE_IMPL*       m_pIStorage_Impl;
-   eSILO_SCOPE      m_eScope;
-   std::string          m_sPathname;
+   UNIT*                         m_pUnit;
+   ISTORAGE_IMPL*                m_pIStorage_Impl;
+   eSILO_SCOPE                   m_eScope;
+   std::string                   m_sPathname;
 
-   nlohmann::json       m_jData;
-   bool                 m_bLoaded;
-   bool                 m_bDirty;
-   uint32_t             m_nCount_Open;
-   uint32_t             m_nCount_Load;
+   nlohmann::json                m_jData;
+   bool                          m_bLoaded;
+   bool                          m_bDirty;
+   uint32_t                      m_nCount_Open;
+   uint32_t                      m_nCount_Load;
+   std::vector<SILO*>            m_apSilo;
 
    // Meta sidecar fields
-   uint64_t             m_nSizeBytes;
-   std::string          m_sCreatedAt;
-   std::string          m_sLastAccessedAt;
-   uint32_t             m_nAccessCount;
+   uint64_t                      m_nSizeBytes;
+   std::string                   m_sCreatedAt;
+   std::string                   m_sLastAccessedAt;
+   uint32_t                      m_nAccessCount;
 
-   mutable std::recursive_mutex  m_mutex;
+   mutable std::recursive_mutex  m_mxUnit;
 };
 
 // ===========================================================================
@@ -533,7 +587,7 @@ public:
 // ===========================================================================
 
 UNIT::UNIT (ISTORAGE_IMPL* pIStorage_Impl, eSILO_SCOPE eScope, const std::string& sPathname) :
-   m_pImpl (new Impl (pIStorage_Impl, eScope, sPathname))
+   m_pImpl (new Impl (this, pIStorage_Impl, eScope, sPathname))
 {
 }
 
@@ -559,8 +613,8 @@ uint32_t                UNIT::AccessCount    () const { return m_pImpl->m_nAcces
 // Methods
 // ---------------------------------------------------------------------------
 
-uint32_t       UNIT::Open       ()                                                        { return ++m_pImpl->m_nCount_Open; }
-uint32_t       UNIT::Close      ()                                                        { return --m_pImpl->m_nCount_Open; }
+void           UNIT::Open       (SILO* pSilo)                                             {        m_pImpl->Open  (pSilo); }
+uint32_t       UNIT::Close      (SILO* pSilo)                                             { return m_pImpl->Close (pSilo); }
 
 void           UNIT::Attach     ()                                                        {        m_pImpl->Attach      (); }
 void           UNIT::Detach     (CONTAINER* pContainer)                                   {        m_pImpl->Detach      (pContainer); }

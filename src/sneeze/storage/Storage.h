@@ -23,8 +23,8 @@ namespace SNEEZE
       ISTORAGE_IMPL ();
       virtual ~ISTORAGE_IMPL ();
 
-      virtual UNIT*              Unit_Open  (eSILO_SCOPE eScope, const std::string& sPathname)                            = 0;
-      virtual void               Unit_Close (UNIT* pUnit)                                                                 = 0;
+      virtual UNIT*              Unit_Open  (SILO* pSilo, eSILO_SCOPE eScope)                                             = 0;
+      virtual void               Unit_Close (SILO* pSilo, UNIT* pUnit)                                                    = 0;
 
       virtual void               Log (IENGINE::eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage)  = 0;
 
@@ -65,8 +65,8 @@ namespace SNEEZE
 
       // --- Lifecycle ---
 
-      uint32_t            Open   ();
-      uint32_t            Close  ();
+      void                Open   (SILO* pSilo);
+      uint32_t            Close  (SILO* pSilo);
       void                Attach ();
       void                Detach (CONTAINER* pContainer);
       void                Load   ();

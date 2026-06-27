@@ -33,8 +33,11 @@ public:
    virtual void OnNetworkFileDeleted  (FILE*) {}
 
    virtual void OnStorageSiloCreated  (SILO*) {}
-   virtual void OnStorageSiloChanged  (SILO*, eSILO_SCOPE eScope, const std::string&) {}
    virtual void OnStorageSiloDeleted  (SILO*) {}
+
+   virtual void OnStorageUnitCreated  (SILO*, eSILO_SCOPE eScope) {}
+   virtual void OnStorageUnitChanged  (SILO*, eSILO_SCOPE eScope, const std::string&) {}
+   virtual void OnStorageUnitDeleted  (SILO*, eSILO_SCOPE eScope) {}
 
    virtual void OnConsoleEntryCreated (std::shared_ptr<const ENTRY>) {}
    virtual void OnConsoleEntryDeleted (std::shared_ptr<const ENTRY>) {}
@@ -100,7 +103,12 @@ public:
 
 ---
 
-## Storage silo callbacks
+## Storage callbacks
+
+Two tiers, mirroring the network `Cache` (handle) and `File` (leaf) callbacks. The
+silo tier reports handle lifetime; the unit tier reports the underlying JSON
+documents — which are shared engine-wide by pathname, so unit changes fan out to
+every silo holding that unit.
 
 ### `virtual void OnStorageSiloCreated (SILO*) {}`
 - **Implemented by.** The host (optional).
@@ -108,17 +116,29 @@ public:
 - **Parameters.** The new silo.
 - **Contract.** Observational. The silo carries the identity (display name / CID) of the source it belongs to.
 
-### `virtual void OnStorageSiloChanged (SILO*, eSILO_SCOPE eScope, const std::string&) {}`
-- **Implemented by.** The host (optional).
-- **Called by.** A `SILO`, on every mutation — `Set`, `Remove`, and bulk JSON replacement.
-- **Parameters.** The silo that changed; `eScope` — which storage scope was affected (for example a permanent company-wide scope); the key path that changed (empty for a bulk replacement).
-- **Contract.** Observational; fired while the storage layer holds its lock — do not re-enter storage from here.
-
 ### `virtual void OnStorageSiloDeleted (SILO*) {}`
 - **Implemented by.** The host (optional).
 - **Called by.** `STORAGE`, when a silo is removed.
 - **Parameters.** The silo being deleted.
 - **Contract.** Observational. Do not retain the pointer past this call.
+
+### `virtual void OnStorageUnitCreated (SILO*, eSILO_SCOPE eScope) {}`
+- **Implemented by.** The host (optional).
+- **Called by.** A `UNIT`, when a silo first attaches it (`UNIT::Open`).
+- **Parameters.** The silo whose view of the unit appeared; `eScope` — which of the four scopes.
+- **Contract.** Observational. Fired for the attaching silo only.
+
+### `virtual void OnStorageUnitChanged (SILO*, eSILO_SCOPE eScope, const std::string&) {}`
+- **Implemented by.** The host (optional).
+- **Called by.** A `UNIT`, on every mutation — `Set`, `Remove`, and bulk JSON replacement.
+- **Parameters.** A silo holding the changed unit; `eScope` — which scope; the key path that changed (empty for a bulk replacement).
+- **Contract.** Observational; fired once **per holding silo** so every context sharing the unit is notified. Fired while the unit holds its lock — do not re-enter storage from here.
+
+### `virtual void OnStorageUnitDeleted (SILO*, eSILO_SCOPE eScope) {}`
+- **Implemented by.** The host (optional).
+- **Called by.** A `UNIT`, when a silo detaches it (`UNIT::Close`).
+- **Parameters.** The silo whose view of the unit is going away; `eScope` — which scope.
+- **Contract.** Observational. Fired for the detaching silo only.
 
 ---
 

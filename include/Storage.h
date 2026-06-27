@@ -18,6 +18,7 @@
 namespace SNEEZE
 {
    class ENGINE;
+   class CONTAINER;
    class UNIT;
    class ISTORAGE_IMPL;
 
@@ -53,6 +54,7 @@ namespace SNEEZE
       // --- Identity ---
 
       std::string DisplayName () const;
+      CONTAINER*  Container   () const;
 
       // --- Path-based API ---
 

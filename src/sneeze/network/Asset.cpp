@@ -54,23 +54,23 @@ class ASSET::Impl
 {
 public:
    Impl (ASSET* pAsset, INETWORK_IMPL* pINetwork_Impl, const std::string& sUrl, const std::string& sPathname, uint32_t nAssetIx) :
-      m_pAsset (pAsset),
-      m_pINetwork_Impl (pINetwork_Impl),
-      m_sUrl (sUrl),
-      m_sPathname (sPathname),
-      m_bState (kASSET_STATE_IDLE),
-      m_nSizeBytes (0),
-      m_nAccessCount (0),
-      m_nAssetIx (nAssetIx),
-      m_nHttpStatus (0),
+      m_pAsset           (pAsset),
+      m_pINetwork_Impl   (pINetwork_Impl),
+      m_sUrl             (sUrl),
+      m_sPathname        (sPathname),
+      m_bState           (kASSET_STATE_IDLE),
+      m_nSizeBytes       (0),
+      m_nAccessCount     (0),
+      m_nAssetIx         (nAssetIx),
+      m_nHttpStatus      (0),
       m_dFetchQueuedTime (0.0),
-      m_dFetchStartTime (0.0),
-      m_dFetchEndTime (0.0),
+      m_dFetchStartTime  (0.0),
+      m_dFetchEndTime    (0.0),
       m_bServedFromCache (false),
-      m_bReset (false),
-      m_nCount_Open (0),
-      m_nCount_Attach (0),
-      m_pAsset_Fetch (nullptr)
+      m_bReset           (false),
+      m_nCount_Open      (0),
+      m_nCount_Attach    (0),
+      m_pAsset_Fetch     (nullptr)
    {
       m_sCreatedAt      = NowIso8601 ();
       m_sLastAccessedAt = m_sCreatedAt;
@@ -355,12 +355,12 @@ public:
          std::filesystem::create_directories (Path (), ec);
       }
 
-      m_apFiles.push_back (pFile);
+      m_apFile.push_back (pFile);
 
       m_nCount_Open++;
    }
 
-   size_t Close (FILE* pFile)
+   uint32_t Close (FILE* pFile)
    {
       // if pFile == nullptr, the fetch thread is releasing its implicit lock
 
@@ -370,9 +370,9 @@ public:
 
       if (pFile)
       {
-         auto it = std::find (m_apFiles.begin (), m_apFiles.end (), pFile);
-         if (it != m_apFiles.end ())
-            m_apFiles.erase (it);
+         auto it = std::find (m_apFile.begin (), m_apFile.end (), pFile);
+         if (it != m_apFile.end ())
+            m_apFile.erase (it);
       }
 
       return m_nCount_Open;
@@ -575,7 +575,7 @@ public:
 
          m_bState = bState;
 
-         for (auto* pFile : m_apFiles)
+         for (auto* pFile : m_apFile)
          {
             pFile->Guard (true); // the guard defers closure and deletion of a file in the middle of processing a fetch completion
 
@@ -692,7 +692,7 @@ public:
 
    IJOB*                         m_pAsset_Fetch;
 
-   std::vector<FILE*>   m_apFiles;
+   std::vector<FILE*>            m_apFile;
 
    mutable std::recursive_mutex  m_mxAsset;
 
@@ -719,7 +719,7 @@ ASSET::~ASSET ()
 // ---------------------------------------------------------------------------
 
 void        ASSET::Open          (FILE* pFile)                              {        m_pImpl->Open          (pFile); }
-size_t      ASSET::Close         (FILE* pFile)                              { return m_pImpl->Close         (pFile); }
+uint32_t    ASSET::Close         (FILE* pFile)                              { return m_pImpl->Close         (pFile); }
 bool        ASSET::Attach        (FILE* pFile, bool bFetch_Allowed)         { return m_pImpl->Attach        (pFile, bFetch_Allowed); }
 void        ASSET::Detach        (FILE* pFile)                              {        m_pImpl->Detach        (pFile); }
 void        ASSET::Reset         ()                                         {        m_pImpl->Reset         (); }
@@ -749,7 +749,7 @@ bool        ASSET::VerifyHash    (const std::string& sFilePath, const std::strin
 
 eASSET_STATE         ASSET::State ()                        const { return m_pImpl->m_bState;            }
 bool                 ASSET::IsReset ()                      const { return m_pImpl->m_bReset;            }
-size_t               ASSET::File_Count ()                   const { return m_pImpl->m_apFiles.size ();   }
+size_t               ASSET::File_Count ()                   const { return m_pImpl->m_apFile.size ();    }
 const std::string&   ASSET::Url ()                          const { return m_pImpl->m_sUrl;              }
 uint64_t             ASSET::SizeBytes ()                    const { return m_pImpl->m_nSizeBytes;        }
 std::string          ASSET::CreatedTime ()                  const { return m_pImpl->m_sCreatedAt;        }

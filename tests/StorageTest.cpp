@@ -74,8 +74,8 @@ public:
    int m_nDeletedCount = 0;
 
    void OnStorageSiloCreated (SILO*) override { m_nCreatedCount++; }
-   void OnStorageSiloChanged (SILO*, eSILO_SCOPE, const std::string&) override { m_nChangedCount++; }
    void OnStorageSiloDeleted (SILO*) override { m_nDeletedCount++; }
+   void OnStorageUnitChanged (SILO*, eSILO_SCOPE, const std::string&) override { m_nChangedCount++; }
 };
 
 static STORAGE_TEST_HOST*          s_pHost        = nullptr;
@@ -145,7 +145,7 @@ static void TestBasicOperations ()
    s_pContextHost->m_nChangedCount = 0;
 
    pSilo->Set (kSILO_SCOPE_PERMANENT_COMPANY, "player.name", "Dean");
-   Check (s_pContextHost->m_nChangedCount == 1, "OnStorageSiloChanged fired on Set");
+   Check (s_pContextHost->m_nChangedCount == 1, "OnStorageUnitChanged fired on Set");
 
    auto jValue = pSilo->Get (kSILO_SCOPE_PERMANENT_COMPANY, "player.name");
    Check (jValue.is_string (), "Get returns string type");
@@ -456,6 +456,37 @@ static void TestMetaSidecar ()
 }
 
 // ---------------------------------------------------------------------------
+// Test 11: Change notification fans out to all silos holding a shared UNIT
+// ---------------------------------------------------------------------------
+
+static void TestChangeFanOut ()
+{
+   std::printf ("\n[Test 11] Change notification fan-out\n");
+
+   STORAGE* pStorage = s_pStorage;
+   auto* pContainerA = MakeTestContainer ("fanout-a");
+   auto* pContainerB = MakeTestContainer ("fanout-b");
+
+   SILO* pSiloA = pStorage->Silo_Open (pContainerA);
+   pSiloA->Attach ();
+   SILO* pSiloB = pStorage->Silo_Open (pContainerB);
+   pSiloB->Attach ();
+
+   s_pContextHost->m_nChangedCount = 0;
+
+   pSiloA->Set (kSILO_SCOPE_PERMANENT_ORG, "org.broadcast", "ping");
+
+   Check (s_pContextHost->m_nChangedCount == 2, "One write to a shared org UNIT notifies both holding silos");
+
+   pSiloA->Detach ();
+   pStorage->Silo_Close (pContainerA, pSiloA);
+   pSiloB->Detach ();
+   pStorage->Silo_Close (pContainerB, pSiloB);
+   delete pContainerA;
+   delete pContainerB;
+}
+
+// ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
 
@@ -497,6 +528,7 @@ int RunStorageTests (int nArgc, char** aArgv)
       TestCrashRecovery ();
       TestBulkJson ();
       TestMetaSidecar ();
+      TestChangeFanOut ();
    }
 
    s_pStorage = nullptr;

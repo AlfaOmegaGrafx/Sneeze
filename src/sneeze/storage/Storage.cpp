@@ -38,7 +38,7 @@ public:
    ~Impl ()
    {
       {
-         std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
+         std::lock_guard<std::recursive_mutex> guard (m_mxStorage_Silo);
 
          // Engine-level teardown: every CONTAINER has already closed its SILO,
          // so this is a leak safety net. The owning contexts/containers are gone,
@@ -51,7 +51,7 @@ public:
       }
 
       {
-         std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
+         std::lock_guard<std::recursive_mutex> guard (m_mxStorage_Unit);
 
          // not sure why we're doing this
 
@@ -72,7 +72,7 @@ public:
 
       if (pContainer)
       {
-         std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
+         std::lock_guard<std::recursive_mutex> guard (m_mxStorage_Silo);
 
          pSilo = new SILO (this, pContainer);
 
@@ -90,7 +90,7 @@ public:
    {
       if (pSilo)
       {
-         std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
+         std::lock_guard<std::recursive_mutex> guard (m_mxStorage_Silo);
 
          pContainer->Context ()->Host ()->OnStorageSiloDeleted (pSilo);
 
@@ -106,7 +106,7 @@ public:
    {
       if (pEnum)
       {
-         std::lock_guard<std::recursive_mutex> guard (m_mxStorage);
+         std::lock_guard<std::recursive_mutex> guard (m_mxStorage_Silo);
 
          for (SILO* pSilo : m_apSilo)
             pEnum->OnSilo (pSilo);
@@ -117,28 +117,35 @@ public:
    // ISTORAGE_IMPL
    // ---------------------------------------------------------------------------
 
-   UNIT* Unit_Open (eSILO_SCOPE eScope, const std::string& sPathname) override
+   UNIT* Unit_Open (SILO* pSilo, eSILO_SCOPE eScope) override
    {
+      std::lock_guard<std::recursive_mutex> guard (m_mxStorage_Unit);
+
       UNIT* pUnit = nullptr;
+
+      std::string sPathname = pSilo->Pathname (eScope);
 
       auto it = m_umpUnit.find (sPathname);
       if (it == m_umpUnit.end ())
       {
          pUnit = new UNIT (this, eScope, sPathname);
+
          m_umpUnit[sPathname] = pUnit;
       }
       else pUnit = it->second;
 
-      pUnit->Open ();
+      pUnit->Open (pSilo);
 
       return pUnit;
    }
 
-   void Unit_Close (UNIT* pUnit) override
+   void Unit_Close (SILO* pSilo, UNIT* pUnit) override
    {
-      if (pUnit && pUnit->Close () == 0)
+      std::lock_guard<std::recursive_mutex> guard (m_mxStorage_Unit);
+
+      if (pUnit->Close (pSilo) == 0)
       {
-         m_umpUnit.erase (pUnit->Pathname ());
+         m_umpUnit.erase (pUnit->Pathname ()); // should be the same as pSilo->Pathname ()
 
          delete pUnit;
       }
@@ -152,7 +159,8 @@ public:
    STORAGE*                                m_pStorage;
    ENGINE*                                 m_pEngine;
 
-   std::recursive_mutex                    m_mxStorage;
+   mutable std::recursive_mutex            m_mxStorage_Silo;
+   mutable std::recursive_mutex            m_mxStorage_Unit;
    std::vector<SILO*>                      m_apSilo;
    std::unordered_map<std::string, UNIT*> m_umpUnit;
 };
