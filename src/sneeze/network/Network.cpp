@@ -14,7 +14,25 @@
 
 #include "Network.h"
 
+#include <ctime>
+#include <iomanip>
+
+#define RESERVE_BLOCK  1000
+
 using namespace SNEEZE;
+
+// Validates a stored timestamp is a well-formed ISO-8601 instant in the exact
+// format NowIso8601 emits. Anything else (empty, garbage, partial) is rejected.
+
+static bool IsIso8601 (const std::string& sTime)
+{
+   std::tm tm = {};
+   std::istringstream ss (sTime);
+
+   ss >> std::get_time (&tm, "%Y-%m-%dT%H:%M:%SZ");
+
+   return !ss.fail ()  &&  ss.peek () == std::char_traits<char>::eof ();
+}
 
 /***********************************************************************************************************************************
 **  Impl Class
@@ -26,43 +44,38 @@ INETWORK_IMPL::~INETWORK_IMPL () {}
 class NETWORK::Impl : public INETWORK_IMPL
 {
 public:
-   struct RULE
-   {
-      std::string                                  sContentType;
-      std::string                                  sOlderThan;
-   };
-
-public:
    Impl (NETWORK* pNetwork, ENGINE* pEngine) :
-      INETWORK_IMPL     (),
-      m_pNetwork        (pNetwork),
-      m_pEngine         (pEngine),
-      m_nNextAssetIx    (1),
-      m_tpEpoch         (std::chrono::steady_clock::now ())
+      INETWORK_IMPL      (),
+      m_pNetwork         (pNetwork),
+      m_pEngine          (pEngine),
+      m_nAssetIx_Next    (1),
+      m_nAssetIx_Reserve (1)
    {
    }
 
-   bool Initialize ()
+   bool Initialize (const std::string& sPath_Root)
    {
       bool bResult = false;
 
       m_tpEpoch = std::chrono::steady_clock::now ();
 
-      std::string sPath_Cache = Path_Cache ();
+      m_sPathname_Reset = (std::filesystem::path (sPath_Root) / "network_reset.json").generic_string ();
 
-      std::filesystem::create_directories (sPath_Cache);
-
-      Rules_Load ();
+      Reset_Load ();
 
       bResult = true;
 
-      m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "NETWORK", "Initialized (path: " + sPath_Cache + ", rules: " + std::to_string (m_aRules.size ()) + ", nAssetIx: " + std::to_string (m_nNextAssetIx) + ")");
+      m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "NETWORK", "Initialized (reset: " + m_sPathname_Reset + ", resets: " + std::to_string (m_umsReset.size ()) + ", nAssetIx_Next: " + std::to_string (m_nAssetIx_Next) + ")");
 
       return bResult;
    }
 
    ~Impl ()
    {
+      m_nAssetIx_Reserve = m_nAssetIx_Next; // persist the exact next index so a clean shutdown wastes no reserve
+
+      Reset_Save ();
+
       {
          std::lock_guard<std::recursive_mutex> guard (m_mxNetwork_Cache);
 
@@ -105,164 +118,109 @@ public:
    }
 
    // ---------------------------------------------------------------------------
-   // Accessors
+   // Reset management
    // ---------------------------------------------------------------------------
 
-   // ---------------------------------------------------------------------------
-   // Path helpers
-   //
-   // REVISIT: rules.json placement.
-   //
-   // Path_Cache () currently derives <context>/Network, which is shared across
-   // all contexts of the same session type (persistent or transitory). This
-   // means rules.json is shared too — but "clear cache" should be per-context.
-   //
-   // The metaverse browser identifies origins by certificate, not domain, so
-   // the natural per-identity boundary is the container (CID). Ideally each
-   // container would have its own rules file at the persona/fingerprint/container
-   // level. "Clear cache for this tab" would then iterate the live containers
-   // in the context and update each one's rules.
-   //
-   // Open issues:
-   //   - A container can appear in multiple contexts (different MSF files
-   //     referencing the same service), so there is no 1:1 context-to-container
-   //     mapping on disk.
-   //   - Containers not currently loaded are unreachable — "clear cache" can
-   //     only affect live containers. Whether this should be best-effort or a
-   //     guarantee that affects future loads is undecided.
-   //   - nNextAssetIx (monotonic ASSET index) is currently stored in rules.json.
-   //     If rules become per-container, the counter needs a new home or needs
-   //     to become per-container as well.
-   // ---------------------------------------------------------------------------
-
-   std::string Path_Cache () const
+   void Reset_Load ()
    {
-      return (std::filesystem::path (m_pEngine->Path_Persistent ()) / "Network").generic_string ();
-   }
+      std::lock_guard<std::recursive_mutex> guard (m_mxNetwork_Reset);
 
-   // ---------------------------------------------------------------------------
-   // Staleness rules (persisted in rules.json)
-   // ---------------------------------------------------------------------------
-
-   void Rules_Load ()
-   {
-      std::lock_guard<std::recursive_mutex> guard (m_mxNetwork_Rules);
-
-      std::string sPathname_Rules = (std::filesystem::path (Path_Cache ()) / "rules.json").generic_string ();
-      std::ifstream file (sPathname_Rules);
+      bool bValid = true;
+            
+      std::ifstream file (m_sPathname_Reset);
       if (file.is_open ())
       {
-         nlohmann::json jDoc;
-         bool bParsed = false;
-
          try
          {
-            file >> jDoc;
-            bParsed = true;
+            nlohmann::json jReset;
+            file >> jReset;
+
+            m_nAssetIx_Next = jReset.value ("nAssetIx_Next", static_cast<uint32_t> (0));
+            m_sTime_Stale   = jReset.at ("sTime_Stale").get<std::string> ();
+
+            bValid &= (m_nAssetIx_Next > 0);
+            bValid &= IsIso8601 (m_sTime_Stale);
+
+            for (auto& [sKey, jStale] : jReset.at ("resets").items ())
+            {
+               std::string sStale = jStale.get<std::string> ();
+
+               m_umsReset[sKey] = sStale;
+
+               bValid &= IsIso8601 (sStale);
+            }
+
+            m_nAssetIx_Reserve = m_nAssetIx_Next;
          }
          catch (...)
          {
-            m_pEngine->Log (IENGINE::kLOGLEVEL_Warning, "NETWORK", "Failed to parse rules.json -- defaulting to stale");
-         }
-
-         if (bParsed)
-         {
-            m_nNextAssetIx = jDoc.value ("nNextMetaIx", static_cast<uint32_t> (1));
-
-            if (jDoc.contains ("rules"))
-            {
-               for (auto& jRule : jDoc["rules"])
-               {
-                  RULE rule;
-                  rule.sContentType = jRule.value ("contentType", "");
-                  rule.sOlderThan = jRule.value ("olderThan", "");
-                  m_aRules.push_back (rule);
-               }
-            }
+            bValid = false;  // any glitch -- parse, map, or value -- forces the failure path
          }
       }
-      else
-      {
-         m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "NETWORK", "No rules.json -- creating fresh");
+      else bValid = false;
 
-         Rules_Save ();
+      if (!bValid)
+      {
+         // Missing, unparseable, or incomplete -- the counter cannot be trusted. Restart it and
+         // stale every asset created before this session so reused indices cannot pass as fresh.
+
+         m_nAssetIx_Reserve = m_nAssetIx_Next = 1;
+         m_umsReset.clear ();
+         m_sTime_Stale = NowIso8601 ();
+
+         m_pEngine->Log (IENGINE::kLOGLEVEL_Info, "NETWORK", "network_reset.json not loaded -- starting fresh");
       }
    }
 
-   void Rules_Save ()
+   void Reset_Save ()
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mxNetwork_Rules);
+      std::lock_guard<std::recursive_mutex> guard (m_mxNetwork_Reset);
 
-      nlohmann::json jDoc;
-      jDoc["nNextMetaIx"] = m_nNextAssetIx;
+      nlohmann::json jReset;
+      jReset["nAssetIx_Next"] = m_nAssetIx_Reserve;
+      jReset["sTime_Stale"]   = m_sTime_Stale;
 
-      nlohmann::json jRules = nlohmann::json::array ();
-      for (auto& rule : m_aRules)
-      {
-         nlohmann::json jRule;
-         jRule["contentType"] = rule.sContentType;
-         jRule["olderThan"] = rule.sOlderThan;
-         jRules.push_back (jRule);
-      }
-      jDoc["rules"] = jRules;
+      nlohmann::json jResets = nlohmann::json::object ();
+      for (auto& [sKey, sStale] : m_umsReset)
+         jResets[sKey] = sStale;
+      jReset["resets"] = jResets;
 
-      std::string sPath_Cache     = Path_Cache ();
-      std::string sPathname_Rules = (std::filesystem::path (sPath_Cache) / "rules.json").generic_string ();
-      std::string sPathname_Temp  = (std::filesystem::path (sPath_Cache) / "rules.json.temp").generic_string ();
+      std::string sPathname_Temp = m_sPathname_Reset + ".temp";
 
       std::ofstream file (sPathname_Temp, std::ios::trunc);
       if (file.is_open ())
       {
-         file << jDoc.dump (2);
+         file << jReset.dump (2);
          file.close ();
 
          std::error_code ec;
-         std::filesystem::rename (sPathname_Temp, sPathname_Rules, ec);
+         std::filesystem::rename (sPathname_Temp, m_sPathname_Reset, ec);
       }
    }
 
-   bool Rules_Stale (ASSET* pAsset) const override
+   std::string Reset_Stale (const std::string& sKey) const override
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mxNetwork_Rules);
+      std::lock_guard<std::recursive_mutex> guard (m_mxNetwork_Reset);
 
-      bool bResult = false;
+      std::string sResult = m_sTime_Stale;
 
-      std::string sContentType = pAsset->RspHeader ("content-type");
-      std::string sCreatedAt   = pAsset->CreatedTime ();
+      auto it = m_umsReset.find (sKey);
+      if (it != m_umsReset.end ()  &&  it->second > sResult)
+         sResult = it->second;
 
-      for (auto& rule : m_aRules)
+      return sResult;
+   }
+
+   void Reset (const std::string& sKey)
+   {
+      if (!sKey.empty ())
       {
-         bool bTypeMatch = rule.sContentType.empty () || rule.sContentType == sContentType;
-         bool bTimeMatch = !rule.sOlderThan.empty () && sCreatedAt < rule.sOlderThan;
+         std::lock_guard<std::recursive_mutex> guard (m_mxNetwork_Reset);
 
-         if (bTypeMatch && bTimeMatch)
-         {
-            bResult = true;
-            break;
-         }
+         m_umsReset[sKey] = NowIso8601 ();
+
+         Reset_Save ();
       }
-
-      return bResult;
-   }
-
-   void Rules_Add (const std::string& sContentType, const std::string& sOlderThan)
-   {
-      std::lock_guard<std::recursive_mutex> guard (m_mxNetwork_Rules);
-
-      if (sContentType.empty ())
-         m_aRules.clear ();
-
-      RULE rule;
-      rule.sContentType = sContentType;
-      rule.sOlderThan = sOlderThan;
-      m_aRules.push_back (rule);
-
-      Rules_Save ();
-   }
-
-   void Rules_Reset ()
-   {
-      Rules_Add ("", NowIso8601 ());
    }
 
    // ---------------------------------------------------------------------------
@@ -368,9 +326,16 @@ public:
 
    uint32_t Asset_Index () override
    {
-      std::lock_guard<std::recursive_mutex> guard (m_mxNetwork_Rules);
+      std::lock_guard<std::recursive_mutex> guard (m_mxNetwork_Reset); // yes, m_mxNetwork_Reset (not m_mxNetwork_Asset)
 
-      return m_nNextAssetIx++;
+      if (m_nAssetIx_Reserve <= m_nAssetIx_Next)
+      {
+         m_nAssetIx_Reserve = m_nAssetIx_Next + RESERVE_BLOCK;
+
+         Reset_Save ();
+      }
+
+      return m_nAssetIx_Next++;
    }
 
    void Queue_Post_Fetch (JOB_FETCH* pJob_Fetch) override
@@ -385,21 +350,23 @@ public:
 
    // ---------------------------------------------------------------------------
 
-   NETWORK*                                m_pNetwork;
-   ENGINE*                                 m_pEngine;
+   NETWORK*                                     m_pNetwork;
+   ENGINE*                                       m_pEngine;
 
-   uint32_t                                m_nNextAssetIx;
-   std::unordered_map<std::string, ASSET*> m_umpAsset;
+   uint32_t                                     m_nAssetIx_Next;
+   uint32_t                                     m_nAssetIx_Reserve;
+   std::string                                  m_sPathname_Reset;
+   std::string                                  m_sTime_Stale;
 
-   std::vector<CACHE*>                     m_apCache;
+   std::chrono::steady_clock::time_point        m_tpEpoch;
 
-   std::vector<RULE>                       m_aRules;
+   std::unordered_map<std::string, std::string> m_umsReset;
+   std::vector<CACHE*>                          m_apCache;
+   std::unordered_map<std::string, ASSET*>      m_umpAsset;
 
-   mutable std::recursive_mutex            m_mxNetwork_Rules;
-   mutable std::recursive_mutex            m_mxNetwork_Cache;
-   mutable std::recursive_mutex            m_mxNetwork_Asset;
-
-   std::chrono::steady_clock::time_point   m_tpEpoch;
+   mutable std::recursive_mutex                 m_mxNetwork_Reset;
+   mutable std::recursive_mutex                 m_mxNetwork_Cache;
+   mutable std::recursive_mutex                 m_mxNetwork_Asset;
 };
 
 // ---------------------------------------------------------------------------
@@ -411,9 +378,9 @@ NETWORK::NETWORK (ENGINE* pEngine) :
 {
 }
 
-bool NETWORK::Initialize ()
+bool NETWORK::Initialize (const std::string& sPath_Root)
 {
-   return m_pImpl->Initialize ();
+   return m_pImpl->Initialize (sPath_Root);
 }
 
 NETWORK::~NETWORK ()
@@ -429,8 +396,4 @@ CACHE* NETWORK::Cache_Open  (CONTAINER* pContainer)                { return m_pI
 void   NETWORK::Cache_Close (CONTAINER* pContainer, CACHE* pCache) {        m_pImpl->Cache_Close (pContainer, pCache); }
 void   NETWORK::Cache_Enum  (IENUM_CACHE* pEnum)                   {        m_pImpl->Cache_Enum  (pEnum); }
 
-// ---------------------------------------------------------------------------
-// DEPRECATED -- move with Rules
-// ---------------------------------------------------------------------------
-
-void NETWORK::Rules_Add         (const std::string& sContentType, const std::string& sOlderThan) { m_pImpl->Rules_Add (sContentType, sOlderThan); }
+void   NETWORK::Reset       (const std::string& sKey)              {        m_pImpl->Reset (sKey); }

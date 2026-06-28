@@ -159,6 +159,11 @@ public:
       m_pINetwork_Impl->Asset_Close (pFile, pAsset);
    }
 
+   std::string Reset_Stale () const override
+   {
+      return m_pINetwork_Impl->Reset_Stale (m_pContainer->Context ()->Key_Reset ());
+   }
+
    ICONTEXT* Host () const override
    {
       return m_pContainer->Context ()->Host ();

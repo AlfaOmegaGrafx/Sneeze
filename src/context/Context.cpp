@@ -22,19 +22,20 @@ class SNEEZE::CONTEXT::Impl
 {
 public:
 
-   Impl (CONTEXT* pContext, ENGINE* pEngine, ICONTEXT* pHost, eSESSION kSession, const std::string& sPath_Permanent, const std::string& sPath_Temporary) :
-      m_pContext        (pContext),
-      m_pEngine         (pEngine),
-      m_pHost           (pHost),
-      m_kSession        (kSession),
-      m_sPath_Permanent (sPath_Permanent),
-      m_sPath_Temporary (sPath_Temporary),
-      m_pScene          (nullptr),
-      m_pViewport       (nullptr)
+   Impl (CONTEXT* pContext, ENGINE* pEngine, ICONTEXT* pHost, eSESSION kSession, bool bReset, const std::string& sPath_Permanent, const std::string& sPath_Temporary) :
+      m_pContext           (pContext),
+      m_pEngine            (pEngine),
+      m_pHost              (pHost),
+      m_kSession           (kSession),
+      m_bReset             (bReset),
+      m_sPath_Permanent    (sPath_Permanent),
+      m_sPath_Temporary    (sPath_Temporary),
+      m_pScene             (nullptr),
+      m_pViewport          (nullptr)
    {
    }
 
-   bool Initialize (const std::string& sUrl, bool bReset)
+   bool Initialize (const std::string& sUrl)
    {
       bool bResult = false;
 
@@ -76,69 +77,22 @@ public:
       m_umpContainer.clear ();
    }
 
-   bool Reload (bool bReset)
-   {
-      bool bResult = false;
-      
-      if (m_pScene)
-      {
-         std::string sUrl = m_pScene->Fabric_Root ()->Url (); // a copy of the url must be saved because the pabric will be destroyed before we use this again.
-
-         bResult = Url (sUrl, bReset);
-      }
-
-      return bResult;
-   }
-
-   bool Url (const std::string& sUrl, bool bReset)
-   {
-      bool bResult = false;
-      
-      if (m_pScene)
-      {
-         IVIEWPORT* pHost = m_pViewport->Host ();
-
-         m_pViewport->Deactivate ();
-
-         delete m_pScene;
-         m_pScene = nullptr;
-   
-//         for (auto& pair : m_umpContainer)
-//            delete pair.second;
-//         m_umpContainer.clear ();
-      
-         if (bReset)
-         {
-            // reset the cache
-         }
-   
-         m_pScene = new SCENE (m_pContext);
-
-         bResult = m_pScene->Initialize (sUrl);
-
-         m_pViewport->Activate (pHost);
-      }
-
-      return bResult;
-   }
-
    void Logout ()
    {
-      // Cache invalidation on logout is deferred to the per-container rules
-      // watermark work (end of Phase 3). NETWORK is now an engine singleton,
-      // so a blanket Clear() here would wipe the cache for every context.
+      // NETWORK is now an engine singleton, so a blanket Clear() here would wipe the cache for every context.
    }
 
    void Clear ()
    {
       // tbd
    }
-   
-      void Reset ()
+
+   void Reset ()
    {
-      // tbd
+      if (!m_sKey_Reset.empty ())
+         m_pEngine->Network ()->Reset (m_sKey_Reset);
    }
-   
+
    CONTAINER* Container_Open (MSF* pMsf)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxContainer);
@@ -184,7 +138,19 @@ CID.eTrust = kTRUST_EXPIRED;
       }
       else pContainer = it->second;
 
-      if (!pContainer->Open ())
+      if (pContainer->Open ())
+      {
+         if (pMsf  &&  m_sKey_Reset.empty ())
+         {
+            // This first MSF-bearing container is the context's primary.
+
+            m_sKey_Reset = sKey;
+
+            if (m_bReset)
+               Reset ();
+         }
+      }
+      else
       {
          m_umpContainer.erase (sKey);
          delete pContainer;
@@ -208,8 +174,11 @@ public:
    ICONTEXT*                                       m_pHost;
 
    eSESSION                                        m_kSession;
+   bool                                            m_bReset;
+
    std::string                                     m_sPath_Permanent;
    std::string                                     m_sPath_Temporary;
+   std::string                                     m_sKey_Reset;
 
    SCENE*                                          m_pScene;
    VIEWPORT*                                       m_pViewport;
@@ -222,14 +191,14 @@ public:
 **  CONTEXT Class
 ***********************************************************************************************************************************/
 
-SNEEZE::CONTEXT::CONTEXT (ENGINE* pEngine, ICONTEXT* pHost, eSESSION kSession, const std::string& sPath_Permanent, const std::string& sPath_Temporary) :
-   m_pImpl (new Impl (this, pEngine, pHost, kSession, sPath_Permanent, sPath_Temporary))
+SNEEZE::CONTEXT::CONTEXT (ENGINE* pEngine, ICONTEXT* pHost, eSESSION kSession, bool bReset, const std::string& sPath_Permanent, const std::string& sPath_Temporary) :
+   m_pImpl (new Impl (this, pEngine, pHost, kSession, bReset, sPath_Permanent, sPath_Temporary))
 {
 }
 
-bool SNEEZE::CONTEXT::Initialize (const std::string& sUrl, bool bReset)
+bool SNEEZE::CONTEXT::Initialize (const std::string& sUrl)
 {
-   return m_pImpl->Initialize (sUrl, bReset);
+   return m_pImpl->Initialize (sUrl);
 }
 
 SNEEZE::CONTEXT::~CONTEXT ()
@@ -251,6 +220,7 @@ SNEEZE::VIEWPORT*           SNEEZE::CONTEXT::Viewport       () const { return m_
 SNEEZE::DEP::WASM_RUNTIME*  SNEEZE::CONTEXT::Wasm_Runtime   () const { return m_pImpl->m_pEngine->Wasm_Runtime (); }
 const std::string&          SNEEZE::CONTEXT::Path_Permanent () const { return m_pImpl->m_sPath_Permanent; }
 const std::string&          SNEEZE::CONTEXT::Path_Temporary () const { return m_pImpl->m_sPath_Temporary; }
+const std::string&          SNEEZE::CONTEXT::Key_Reset      () const { return m_pImpl->m_sKey_Reset; }
 
 // ---------------------------------------------------------------------------
 // Methods

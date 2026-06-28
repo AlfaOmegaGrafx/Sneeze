@@ -107,7 +107,7 @@ m_pPersona = new persona::PERSONA (m_pEngine);
                               {
                                  m_pNetwork = new NETWORK (m_pEngine);
 
-                                 if (m_pNetwork->Initialize ())
+                                 if (m_pNetwork->Initialize (m_sPath_Root))
                                  {
                                     m_pStorage = new STORAGE (m_pEngine);
 
@@ -267,10 +267,10 @@ m_pPersona = new persona::PERSONA (m_pEngine);
       bool bResult = false;
       std::error_code ec;
 
-      std::string sRoot = (std::filesystem::path (m_pHost->sAppDataPath ()) / "Sneeze" / "Cache").generic_string ();
+      m_sPath_Root = (std::filesystem::path (m_pHost->sAppDataPath ()) / "Sneeze" / "Cache").generic_string ();
 
-      m_sPath_Persistent  = (std::filesystem::path (sRoot) / ENGINE::sFOLDER_PERSISTENT).generic_string ();
-      m_sPath_Transitory  = (std::filesystem::path (sRoot) / ENGINE::sFOLDER_TRANSITORY).generic_string ();
+      m_sPath_Persistent  = (std::filesystem::path (m_sPath_Root) / ENGINE::sFOLDER_PERSISTENT).generic_string ();
+      m_sPath_Transitory  = (std::filesystem::path (m_sPath_Root) / ENGINE::sFOLDER_TRANSITORY).generic_string ();
 
       std::filesystem::create_directories (m_sPath_Persistent, ec);
 
@@ -343,7 +343,7 @@ m_pPersona = new persona::PERSONA (m_pEngine);
    // Context management
    // -----------------------------------------------------------------------
 
-   CONTEXT* Context_Open (ICONTEXT* pHost, const std::string& sUrl, CONTEXT::eSESSION kSession)
+   CONTEXT* Context_Open (ICONTEXT* pHost, const std::string& sUrl, CONTEXT::eSESSION kSession, bool bReset)
    {
       CONTEXT* pContext = nullptr;
       std::string sPath_Temporary;
@@ -354,7 +354,7 @@ m_pPersona = new persona::PERSONA (m_pEngine);
       {
          std::string sPath_Permanent = (kSession == CONTEXT::kSESSION_PERSISTENT) ? m_sPath_Persistent : m_sPath_Transitory_Session;
 
-         pContext = new CONTEXT (m_pEngine, pHost, kSession, sPath_Permanent, sPath_Temporary);
+         pContext = new CONTEXT (m_pEngine, pHost, kSession, bReset, sPath_Permanent, sPath_Temporary);
 
          {
             std::lock_guard<std::mutex> guard (m_mxContext);
@@ -445,6 +445,7 @@ public:
    bool                       m_bInitialized;
 
 // Paths
+   std::string                m_sPath_Root;
    std::string                m_sPath_Persistent;
    std::string                m_sPath_Transitory;
    std::string                m_sPath_Transitory_Session;
@@ -494,9 +495,9 @@ SNEEZE::ENGINE::~ENGINE ()
 // Context management
 // ---------------------------------------------------------------------------
 
-SNEEZE::CONTEXT* SNEEZE::ENGINE::Context_Open (ICONTEXT* pHost, const std::string& sUrl, CONTEXT::eSESSION kSession)
+SNEEZE::CONTEXT* SNEEZE::ENGINE::Context_Open (ICONTEXT* pHost, const std::string& sUrl, CONTEXT::eSESSION kSession, bool bReset)
 {
-   return m_pImpl->Context_Open (pHost, sUrl, kSession);
+   return m_pImpl->Context_Open (pHost, sUrl, kSession, bReset);
 }
 
 bool SNEEZE::ENGINE::Context_Close (CONTEXT* pContext)

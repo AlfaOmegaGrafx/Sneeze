@@ -94,7 +94,7 @@ public:
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxFile);
 
-      bool bResult = m_pAsset->Attach (m_pFile, bFetch);
+      bool bResult = m_pAsset->Attach (m_pFile, bFetch, m_pICache_Impl->Reset_Stale ());
 
       if (bResult)
          m_nCount_Attach++;

@@ -345,3 +345,15 @@ Deferred:
 - Added `StorageTest.cpp` Test 11 proving fan-out (one write → 2 callbacks). Debug build clean; 45/45 storage tests pass.
 - Updated `Storage.md` + wiki `ICONTEXT.md`/`SILO.md`. Full detail in `project.mdc` "Post-Phase-3 Jobs" section.
 - Remaining jobs 2–5 (Reset/Clear cache, GLB files, Home page, Documentation) deferred to Saturday. Dean commits this himself.
+
+## June 27, 2026 (Sat, ~8 hrs) — Dean Abramson
+
+**Post-Phase-3 Item 2 of 5 — Reset / Clear the cache**
+
+- Long design discussion first (Dean drove), then implementation. Cache-clear for the multi-origin browser: the clear applies to the whole context, but the record is keyed to the context's primary fabric's container; contexts sharing a primary share the clear, different-primary contexts do not (web-consistent).
+- **Key pivot:** staleness currency switched from the monotonic asset index to an ISO-8601 `createdAt` timestamp string (asset survives iff `createdAt >= staleTime`). The index was fragile — losing/corrupting the counter file forced a restart-at-1 that collides with scattered on-disk files and gives no cheap invalidation; a wall-clock floor makes invalidation implicit (no tree-walk/purge). `nAssetIx` kept for fetch identity only (Dean's correction — it's not retired).
+- Single engine-wide `network_reset.json` at the cache root holds `nAssetIx_Next`, the global stale floor `sTime_Stale`, and the per-primary-key `resets` map. Reserve-ahead counter (`RESERVE_BLOCK=1000`) keeps disk writes rare. Atomic temp+rename writes.
+- `Reset_Load` is all-or-nothing (`bValid` flag + `IsIso8601` validation of the floor and every map entry); any failure → fresh state (`nAssetIx=1`, map clear, floor = now). Dean caught a durability flaw: the floor must be persisted (else a clean shutdown after a corruption-recovery silently "unclears" the cache) — fixed, plus `Reset_Stale` returns `max(floor, per-key)`.
+- Wiring: `NETWORK::Reset(sKey)` stamps now; `CONTEXT::Key_Reset()`/`Reset()` + `m_sKey_Reset` (primary container's `Key_All`); `bReset` reload flag; staleness resolved through `FILE::Attach`→`CACHE::Reset_Stale`→`NETWORK::Reset_Stale(sKey)`→`ASSET::Attach(..., sStale)` (resolved before the asset lock). `m_mxNetwork_Rules`→`m_mxNetwork_Reset`; `Rules_*`→`Reset_*`; "watermark" purged from code/comments.
+- Tests: root-caused and fixed the long-standing 5-failure "cluster" as a test-harness timing bug (asserting `FILE` snapshot accessors before the async `Fetch_Complete`; added `listener.WaitFor`). **71/71 `--network` pass**, Debug build clean.
+- `src/sneeze/network/Network.md` fully reconciled. Wiki (`docs/`) left for Item 5. Full detail in `project.mdc` "Item 2 detail". Dean wiring F5 = Reload / Ctrl+Alt+F5 = Reload-with-Reset in Artemis; commits this himself.

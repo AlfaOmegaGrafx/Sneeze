@@ -29,7 +29,7 @@ namespace SNEEZE
       virtual void               Asset_Close  (FILE* pFile, ASSET* pAsset)                                                 = 0;
       virtual uint32_t           Asset_Index  ()                                                                           = 0;
 
-      virtual bool               Rules_Stale (ASSET* pAsset) const                                                         = 0;
+      virtual std::string        Reset_Stale (const std::string& sKey) const                                               = 0;
       virtual void               Queue_Post_Fetch (JOB_FETCH* pJob_Fetch)                                                  = 0;
 
       virtual void               Log (IENGINE::eLOGLEVEL Level, const std::string& sModule, const std::string& sMessage)   = 0;
@@ -62,9 +62,11 @@ namespace SNEEZE
       virtual void               File_Close  (FILE* pFile)                = 0;
       virtual void               File_Reset  (FILE* pFile)                = 0;
 
-      virtual ICONTEXT*          Host           () const                  = 0;
-      virtual std::string        Path           () const                  = 0;
-      virtual CONTAINER*         Container      () const                  = 0;
+      virtual std::string        Reset_Stale () const                     = 0;
+
+      virtual ICONTEXT*          Host        () const                     = 0;
+      virtual std::string        Path        () const                     = 0;
+      virtual CONTAINER*         Container   () const                     = 0;
 
    private:
    };
@@ -86,7 +88,7 @@ namespace SNEEZE
       void        Open   (FILE* pFile);
       uint32_t    Close  (FILE* pFile);
 
-      bool        Attach (FILE* pFile, bool bFetch_Allowed);
+      bool        Attach (FILE* pFile, bool bFetch_Allowed, const std::string& sStaleAt);
       void        Detach (FILE* pFile);
 
       // Fetch completion (called by FETCH thread)

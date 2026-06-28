@@ -43,7 +43,7 @@ namespace SNEEZE
          kSESSION_TRANSITORY,
       };
 
-      CONTEXT (ENGINE* pEngine, ICONTEXT* pHost, eSESSION kSession, const std::string& sPath_Permanent, const std::string& sPath_Temporary);
+      CONTEXT (ENGINE* pEngine, ICONTEXT* pHost, eSESSION kSession, bool bReset, const std::string& sPath_Permanent, const std::string& sPath_Temporary);
 
       CONTEXT & operator= (CONTEXT const  & rhs)   = delete;
       CONTEXT & operator= (CONTEXT       && rhs)   = delete;
@@ -51,7 +51,7 @@ namespace SNEEZE
       CONTEXT             (CONTEXT       && other) = delete;
       ~CONTEXT            ();
 
-      bool Initialize (const std::string& sUrl, bool bReset = false);
+      bool Initialize (const std::string& sUrl);
 
       void  Logout ();
       void  Clear  ();
@@ -69,6 +69,8 @@ namespace SNEEZE
 
       const std::string&  Path_Permanent  () const;
       const std::string&  Path_Temporary  () const;
+
+      const std::string&  Key_Reset       () const;
 
       // Internal functions
       CONTAINER*          Container_Open  (MSF* pMsf);

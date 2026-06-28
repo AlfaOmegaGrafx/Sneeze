@@ -247,17 +247,17 @@ namespace SNEEZE
       explicit NETWORK (ENGINE* pEngine);
       ~NETWORK ();
 
-      bool Initialize ();
+      bool Initialize (const std::string& sPath_Root);
 
-      // --- Container lifecycle ---
+      // --- Cache management ---
 
       CACHE* Cache_Open  (CONTAINER* pContainer);
       void   Cache_Close (CONTAINER* pContainer, CACHE* pCache);
       void   Cache_Enum  (IENUM_CACHE* pEnum);
 
-      // --- Cache management ---
+      // --- Reset ---
 
-      void Rules_Add (const std::string& sContentType, const std::string& sOlderThan);
+      void   Reset       (const std::string& sKey);
 
    private:
       class Impl;

@@ -224,6 +224,9 @@ public:
       m_bState = kASSET_STATE_IDLE;
       m_sHash.clear ();
       m_nSizeBytes = 0;
+      m_sCreatedAt.clear ();
+      m_sLastAccessedAt.clear ();
+      m_nAccessCount = 0;
       m_nHttpStatus = 0;
       m_dFetchQueuedTime = 0.0;
       m_dFetchStartTime = 0.0;
@@ -378,7 +381,7 @@ public:
       return m_nCount_Open;
    }
 
-   bool Attach (FILE* pFile, bool bFetch_Allowed)
+   bool Attach (FILE* pFile, bool bFetch_Allowed, const std::string& sStaleAt)
    {
       std::lock_guard<std::recursive_mutex> guard (m_mxAsset);
 
@@ -395,7 +398,7 @@ public:
 
          std::string sHash         = pFile->OpenHash ();
          bool        bCacheEnabled = pFile->CacheEnabled ();
-         bool        bStale        = m_bState == kASSET_STATE_READY  &&  m_pINetwork_Impl->Rules_Stale (m_pAsset);
+         bool        bStale        = m_bState == kASSET_STATE_READY  &&  m_sCreatedAt < sStaleAt;
 
          bool bFetch  = false;
          bool bReady  = false;
@@ -405,7 +408,7 @@ public:
 
          if (bState == kASSET_STATE_READY  &&  bStale)
          {
-            // Cached but stale per rules — discard and re-fetch
+            // Cached but stale per reset — discard and re-fetch
             Meta_Reset ();
             bFetch = true;
          }
@@ -566,7 +569,9 @@ public:
 
             if (Fetch_Result.bSuccess)
             {
-               m_nSizeBytes = Fetch_Result.nSizeBytes;
+               m_nSizeBytes      = Fetch_Result.nSizeBytes;
+               m_sCreatedAt      = NowIso8601 ();
+               m_sLastAccessedAt = m_sCreatedAt;
 
                bState = kASSET_STATE_READY;
             }
@@ -718,11 +723,11 @@ ASSET::~ASSET ()
 // Lifecycle
 // ---------------------------------------------------------------------------
 
-void        ASSET::Open          (FILE* pFile)                              {        m_pImpl->Open          (pFile); }
-uint32_t    ASSET::Close         (FILE* pFile)                              { return m_pImpl->Close         (pFile); }
-bool        ASSET::Attach        (FILE* pFile, bool bFetch_Allowed)         { return m_pImpl->Attach        (pFile, bFetch_Allowed); }
-void        ASSET::Detach        (FILE* pFile)                              {        m_pImpl->Detach        (pFile); }
-void        ASSET::Reset         ()                                         {        m_pImpl->Reset         (); }
+void        ASSET::Open          (FILE* pFile)                                                   {        m_pImpl->Open   (pFile); }
+uint32_t    ASSET::Close         (FILE* pFile)                                                   { return m_pImpl->Close  (pFile); }
+bool        ASSET::Attach        (FILE* pFile, bool bFetch_Allowed, const std::string& sStaleAt) { return m_pImpl->Attach (pFile, bFetch_Allowed, sStaleAt); }
+void        ASSET::Detach        (FILE* pFile)                                                   {        m_pImpl->Detach (pFile); }
+void        ASSET::Reset         ()                                                              {        m_pImpl->Reset  (); }
 
 // ---------------------------------------------------------------------------
 // Fetch
@@ -758,9 +763,9 @@ uint32_t             ASSET::AccessCount ()                  const { return m_pIm
 uint32_t             ASSET::AssetIx ()                      const { return m_pImpl->m_nAssetIx;          }
 const std::string&   ASSET::Hash ()                         const { return m_pImpl->m_sHash;             }
 bool                 ASSET::IsHashed ()                     const { return !m_pImpl->m_sHash.empty ();   }
-std::string          ASSET::Path ()                         const { return m_pImpl->Path ();                }
-const std::string&   ASSET::Pathname ()                     const { return m_pImpl->m_sPathname;            }
-std::string          ASSET::Pathname (eASSET_EXT eType)     const { return m_pImpl->Pathname (eType);       }
+std::string          ASSET::Path ()                         const { return m_pImpl->Path ();             }
+const std::string&   ASSET::Pathname ()                     const { return m_pImpl->m_sPathname;         }
+std::string          ASSET::Pathname (eASSET_EXT eType)     const { return m_pImpl->Pathname (eType);    }
 std::string          ASSET::DiskPath ()                     const { return m_pImpl->Pathname (kASSET_EXT_DATA); }
 long                 ASSET::HttpStatus ()                   const { return m_pImpl->m_nHttpStatus;       }
 double               ASSET::FetchStartTime ()               const { return m_pImpl->m_dFetchStartTime;   }
