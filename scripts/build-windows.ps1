@@ -158,6 +158,7 @@ $DepsOrdered = @(
    'freetype'        # no deps (RmlUi + FindSneezeFreeType)
    'rmlui'           # -> freetype
    'nlohmann-json'   # no deps
+   'fastgltf'        # no deps (vendors simdjson; glTF loader for src/deps/gltf)
    'jwt-cpp'         # header-only
    'spirv-cross'     # no deps (SPIR-V -> HLSL for Vox)
    'vox'             # -> spirv-cross

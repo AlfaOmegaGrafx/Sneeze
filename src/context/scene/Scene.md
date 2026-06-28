@@ -184,9 +184,17 @@ attachment point holds the orbit data and renders an orbit trail, while also
 spawning the child fabric. This lets the same system be either an attachment
 (orbiting its parent) or a standalone primary fabric (at the origin).
 
-When a MAP_OBJECT with a non-empty texture URL is assigned, NODE::Impl
-(which inherits `SNEEZE::IFILE`) automatically requests the texture from
-the network and decodes it via stb_image on completion.
+When a MAP_OBJECT carries a non-empty `Resource.sReference`, NODE::Impl (which
+inherits `SNEEZE::IFILE`) fetches it **by URL** and decides what it is **by
+content** on completion — there is one fetch path, not one per resource type.
+`Resource_Request()` opens the file; `OnFileReady` reads the bytes and calls
+`Resource_Load`, which sniffs them: a binary GLB (ASCII `glTF` magic) or glTF
+JSON (leading `{`) is parsed via `DEP::GLTF::Load` and built into a
+`GLTF_RENDER_MODEL` (`Gltf_Load`); anything else is decoded as an image texture
+via stb_image (`Texture_Load`). Both products are published to the **MAP_OBJECT**
+(`SetTexture` / `Gltf_Render_Model`), never stored on the node itself. (A
+`bSubtype == 255` resource is the exception — it is an attachment-point URL routed
+to `SCENE::Fabric_Spawn`, not a fetched asset.)
 
 ```cpp
 NODE* pNode = new NODE (pFabric, pParentNode, qwComposed);
@@ -245,6 +253,24 @@ see below), `bSubtype` (the object subtype), `bFiction`, and 5 reserved bytes.
 the node's celestial type (so an attachment point can also be a `PLANETSYSTEM`
 with orbit data).
 
+### Visual Appearance (texture + render model)
+
+A MAP_OBJECT owns the object's **visual products**, fetched by its NODE (see
+NODE above) and published here for the compositor to read:
+
+- **Base-color texture** — `SetTexture(pTex, w, h)` / `GetTexture(pTex, w, h)`.
+  Decoded RGBA8 pixels held under a mutex; `GetTexture` returns false until ready.
+- **glTF/GLB render model** — `Gltf_Render_Model(GLTF_RENDER_MODEL*)` (setter,
+  takes ownership) / `Gltf_Render_Model()` (getter, returns null until built).
+  The pointer is published write-once via an atomic acquire/release flag (the
+  built model is immutable, so no lock is needed to read it) and freed when the
+  MAP_OBJECT is destroyed. `GLTF_RENDER_MODEL` is defined in `Viewport.h` (see
+  `Viewport.md`); `Map_Object.h` forward-declares it.
+
+Both accessors live on the **base** MAP_OBJECT, so a model can sit at **any**
+class level — celestial, terrestrial, or physical. The compositor renders a
+node's model wherever it exists, independent of class (see `Control.md`).
+
 ### Derived Types
 
 The derived class is chosen by `Node_Create` switching on `Head.Self.Class()`,
@@ -282,10 +308,9 @@ the pixels to the renderer as an unlit, alpha-blended quad.
 
 By design a panel rides the universal TRS like any other node: its world size is
 authored in `Bound.d3Max[0,1]` (metres) and its placement in the node's
-transform. The current browser-internal **test** panel is the exception — it is
-injected by `Scene::Panel_Inject_Test` into every fabric, so the compositor sizes
-and billboards it relative to the framed scene rather than from absolute metres
-(see `Control.md`). This scaffolding stands in for the future panel API.
+transform. The compositor rasterizes the RmlUi document during traversal and
+hands the pixels to the renderer as an unlit, alpha-blended quad (see
+`Control.md`).
 
 ## Fabric Ownership Modes
 
@@ -413,8 +438,8 @@ their caller.
 |------|----------|
 | `Scene.cpp` | SCENE + Impl (pimpl, fabric map, root fabric + primary node, MSF_FETCH, Fabric_Spawn/Open/Close/Find, Url/Reload). `Fabric_Root_Create` drives the root node/primary attach node through `m_pFabric_Root->Container()`. |
 | `Fabric.cpp` | FABRIC + Impl (WASM module lifecycle, node linkage, child fabrics; closes its root node via `Container()->Node_Close`) |
-| `Node.cpp` | NODE + Impl (tree ops, texture loading via IFILE, delegates fabric ops to SCENE; closes child nodes via `Container()->Node_Close`) |
+| `Node.cpp` | NODE + Impl (tree ops; resource fetch via IFILE with content-sniff dispatch to texture/glTF load; delegates fabric ops to SCENE; closes child nodes via `Container()->Node_Close`) |
 | `../Container.cpp` | CONTAINER + Impl — owns the per-container node handle table and the `Node_Root/Open/Close/Find` + private `Node_Create` operations |
 | `Map_Object.h` | MAP_OBJECT hierarchy, ORBIT_POSITION struct, MAP_OBJECT_CLASS enum, celestial type enum, OBJECTIX (+ OBJECTIX_COMPOSE), RMCOBJECT wire structs |
-| `Map_Object.cpp` | MAP_OBJECT methods, SolveKepler, QuatMultiply, RotateByQuat |
+| `Map_Object.cpp` | MAP_OBJECT methods (incl. texture + glTF render-model accessors), SolveKepler, QuatMultiply, RotateByQuat |
 | `AccessControl.h/cpp` | CanRead/CanWrite enforcement |

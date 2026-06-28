@@ -21,6 +21,8 @@ namespace SNEEZE
 {
    class ENGINE;
 
+   struct GLTF_RENDER_MODEL;
+
    namespace DEP
    {
       class UI_PANEL;
@@ -145,6 +147,12 @@ namespace SNEEZE
 
       bool GetTexture (const uint8_t*& pTex, int& nTexW, int& nTexH); // WRONG, shouldn't return pointer to pTex
       void SetTexture (const uint8_t* pTex, int nTexW, int nTexH);
+
+      // The object's loaded glTF/GLB model (its drawable geometry), or null until
+      // the resource has been fetched and built. The map object takes ownership
+      // of the model handed to the setter and frees it on destruction.
+      const GLTF_RENDER_MODEL* Gltf_Render_Model () const;
+      void                     Gltf_Render_Model (GLTF_RENDER_MODEL* pModel);
 
       virtual void Position (int64_t tmNow, double& dX, double& dY, double& dZ)                 const;
       virtual void Rotation (int64_t tmNow, double& dQx, double& dQy, double& dQz, double& dQw) const;

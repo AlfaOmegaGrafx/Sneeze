@@ -14,6 +14,7 @@
 
 #include <Sneeze.h>
 #include "Map_Object.h"
+#include "context/viewport/Viewport.h"
 #include "ui/Ui_Panel.h"
 #include <cstring>
 
@@ -72,8 +73,15 @@ public:
       m_nTextureWidth (0),
       m_nTextureHeight (0),
       m_nTextureChannels (0),
-      m_bTextureReady (false)
+      m_bTextureReady (false),
+      m_pRenderModel (nullptr),
+      m_bRenderModelReady (false)
    {
+   }
+
+   ~Impl ()
+   {
+      delete m_pRenderModel;
    }
 
    bool GetTexture (const uint8_t*& pTex, int& nTexW, int& nTexH)
@@ -110,6 +118,27 @@ public:
       m_bTextureReady.store (true);
    }
 
+   // glTF/GLB model: built on the network thread, published write-once via
+   // m_bRenderModelReady, and read on the compositor thread. The model is
+   // immutable once published (its MESH_DATA borrows into its own storage), so
+   // the acquire/release pair alone makes it safe to read without a lock.
+   const GLTF_RENDER_MODEL* Gltf_Render_Model () const
+   {
+      const GLTF_RENDER_MODEL* pResult = nullptr;
+
+      if (m_bRenderModelReady.load (std::memory_order_acquire))
+         pResult = m_pRenderModel;
+
+      return pResult;
+   }
+
+   void Gltf_Render_Model (GLTF_RENDER_MODEL* pModel)
+   {
+      m_pRenderModel = pModel;
+
+      m_bRenderModelReady.store (true, std::memory_order_release);
+   }
+
 private:
    mutable std::mutex            m_CS;
    std::vector<uint8_t>          m_aTexturePixels;
@@ -117,6 +146,9 @@ private:
    int                           m_nTextureHeight;
    int                           m_nTextureChannels;
    std::atomic<bool>             m_bTextureReady;
+
+   GLTF_RENDER_MODEL*            m_pRenderModel;
+   std::atomic<bool>             m_bRenderModelReady;
 };
 
 // ---------------------------------------------------------------------------
@@ -200,6 +232,9 @@ void MAP_OBJECT::SetTexture (const uint8_t* pTex, int nTexW, int nTexH)
 {
    m_pImpl->SetTexture (pTex, nTexW, nTexH);
 }
+
+const GLTF_RENDER_MODEL* MAP_OBJECT::Gltf_Render_Model () const                    { return m_pImpl->Gltf_Render_Model (); }
+void                     MAP_OBJECT::Gltf_Render_Model (GLTF_RENDER_MODEL* pModel) {        m_pImpl->Gltf_Render_Model (pModel); }
 
 MAP_OBJECT::MAP_OBJECT_CLASS MAP_OBJECT::Class () const 
 { 

@@ -15,12 +15,45 @@
 #include <Sneeze.h>
 
 #include "Map_Object.h"
+#include "context/viewport/Viewport.h"
 #include "stb/stb_image.h"
 #include <algorithm>
+#include <atomic>
+#include <cctype>
+#include <cstring>
+#include <string>
 
 using namespace SNEEZE;
 
 using CONTAINER = SNEEZE::CONTAINER;
+
+// A fetched resource is identified by its content, not its URL: a binary GLB
+// begins with the ASCII magic "glTF", and a glTF JSON document begins (after any
+// leading whitespace) with '{'. Image textures are binary and match neither, so
+// anything else is decoded as a texture.
+static bool IsGltf (const std::vector<uint8_t>& aData)
+{
+   bool bGltf = false;
+
+   if (aData.size () >= 4  &&  aData[0] == 'g'  &&  aData[1] == 'l'  &&  aData[2] == 'T'  &&  aData[3] == 'F')
+      bGltf = true;
+   else
+   {
+      size_t nFirst = 0;
+      while (nFirst < aData.size ()  &&  std::isspace (static_cast<unsigned char> (aData[nFirst])))
+         nFirst++;
+
+      bGltf = (nFirst < aData.size ()  &&  aData[nFirst] == '{');
+   }
+
+   return bGltf;
+}
+
+static MAT4 Mat4_Identity ()
+{
+   MAT4 m = { { 1.0, 0.0, 0.0, 0.0,  0.0, 1.0, 0.0, 0.0,  0.0, 0.0, 1.0, 0.0,  0.0, 0.0, 0.0, 1.0, } };
+   return m;
+}
 
 // ---------------------------------------------------------------------------
 // SEQLOCK
@@ -118,7 +151,7 @@ public:
             }
          }
          else
-            Texture_Request ();
+            Resource_Request ();
       }
 
       return bResult;
@@ -135,7 +168,7 @@ public:
          m_pFabric_Attachment = nullptr;
       }
 
-      Texture_Release ();
+      Resource_Release ();
 
       if (m_pNode_Parent)
          m_pNode_Parent->Node_Remove (m_pNode);
@@ -143,23 +176,62 @@ public:
    }
 
 // -----------------------------------------------------------------------
-// Texture management
+// Resource management (fetch by URL, dispatch by content)
 // -----------------------------------------------------------------------
 
-   void Texture_Request ()
+   void Resource_Request ()
    {
       if (m_pMap_Object  &&  m_pMap_Object->Resource.sReference[0] != '\0')
-      {
          m_pFile = m_pFabric->Container ()->Cache ()->File_Open (m_pMap_Object->Resource.sReference, this);
-      }
    }
 
-   void Texture_Release ()
+   void Resource_Release ()
    {
       if (m_pFile)
       {
          m_pFile->Close ();
          m_pFile = nullptr;
+      }
+   }
+
+   // A fetched resource is sniffed by content: a glTF model (binary GLB or glTF
+   // JSON) becomes the map object's render model; anything else is decoded as an
+   // image texture. Both visual products live on MAP_OBJECT, never on the node.
+   void Resource_Load (const std::vector<uint8_t>& aData)
+   {
+      if (IsGltf (aData))
+         Gltf_Load (aData);
+      else Texture_Load (aData);
+   }
+
+   void Gltf_Load (const std::vector<uint8_t>& aData)
+   {
+      DEP::GLTF_MODEL model;
+      std::string     sError;
+
+      if (DEP::GLTF::Load (aData.data (), aData.size (), model, sError))
+      {
+         // The model is built in place and never moved -- its MESH_DATA borrows
+         // into its own storage -- then handed to the map object, which publishes
+         // it write-once for the compositor.
+         GLTF_RENDER_MODEL* pModel = new GLTF_RENDER_MODEL ();
+
+         if (Gltf_Render_Model_Build (std::move (model), Mat4_Identity (), *pModel))
+            m_pMap_Object->Gltf_Render_Model (pModel);
+         else delete pModel;
+      }
+   }
+
+   void Texture_Load (const std::vector<uint8_t>& aData)
+   {
+      int nW = 0, nH = 0, nChannels = 0;
+      unsigned char* pPixels = stbi_load_from_memory (aData.data (), static_cast<int> (aData.size ()), &nW, &nH, &nChannels, 4);
+
+      if (pPixels)
+      {
+         m_pMap_Object->SetTexture (pPixels, nW, nH);
+
+         stbi_image_free (pPixels);
       }
    }
 
@@ -174,17 +246,7 @@ public:
       m_pFile = nullptr;
 
       if (!aData.empty ()  &&  m_pMap_Object)
-      {
-         int nW = 0, nH = 0, nChannels = 0;
-         unsigned char* pPixels = stbi_load_from_memory (aData.data (), static_cast<int> (aData.size ()), &nW, &nH, &nChannels, 4);
-
-         if (pPixels)
-         {
-            m_pMap_Object->SetTexture (pPixels, nW, nH);
-
-            stbi_image_free (pPixels);
-         }
-      }
+         Resource_Load (aData);
    }
 
    void OnFileFailed (FILE* pFile) override

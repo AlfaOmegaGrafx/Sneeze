@@ -16,6 +16,7 @@
 #define SNEEZE_VIEWPORT_PRIVATE_H
 
 #include "Types.h"
+#include "gltf/Gltf.h"
 
 struct UV_SPHERE
 {
@@ -25,9 +26,7 @@ struct UV_SPHERE
    std::vector<uint32_t> aIndices;
 };
 
-void GenerateUVSphere (UV_SPHERE& sphere, float dRadius,
-                       int nStacks, int nSlices,
-                       float dCenterX, float dCenterY, float dCenterZ);
+void GenerateUVSphere (UV_SPHERE& sphere, float dRadius, int nStacks, int nSlices, float dCenterX, float dCenterY, float dCenterZ);
 
 // Centered unit cube spanning [-0.5, 0.5] on each axis, with per-face normals.
 // Callers supply a world transform that maps this canonical cube to the target
@@ -78,6 +77,53 @@ namespace SNEEZE
       int            nHeight  = 0;
    };
 
+   // One drawable surface extracted from a loaded glTF/GLB: an indexed triangle
+   // mesh with a baked world transform and a metallic-roughness material. Vertex
+   // streams and the optional decoded base-color texture are borrowed pointers --
+   // the caller owns the backing storage for the lifetime of the submission
+   // (mirrors PANEL_DATA). Normals/texcoords/indices/texture may be absent.
+   struct MESH_DATA
+   {
+      float           m16[16]        = {};        // column-major world transform (render space)
+      const float*    pPosition      = nullptr;   // xyz triples
+      const float*    pNormal        = nullptr;   // xyz triples, or null
+      const float*    pTexCoord      = nullptr;   // uv pairs, or null
+      uint32_t        nVertexCount   = 0;
+      const uint32_t* pIndex         = nullptr;
+      uint32_t        nIndexCount    = 0;         // total indices (multiple of 3)
+      float           baseColor[4]   = { 1.0f, 1.0f, 1.0f, 1.0f, };
+      float           dMetallic      = 1.0f;
+      float           dRoughness     = 1.0f;
+      float           emissive[3]    = { 0.0f, 0.0f, 0.0f, };
+      const uint8_t*  pTexturePixels = nullptr;   // decoded RGBA8 (straight alpha), or null
+      int             nTextureWidth  = 0;
+      int             nTextureHeight = 0;
+   };
+
+   // A loaded glTF model prepared for rendering. Owns all backing storage: the
+   // source CPU model (vertex/index/material data) and the decoded base-color
+   // textures. aMesh is the flattened, renderer-ready draw list -- one MESH_DATA
+   // per primitive, with the node hierarchy baked into each m16 transform. Each
+   // MESH_DATA holds borrowed pointers into model and aTexturePixel, so a
+   // GLTF_RENDER_MODEL must outlive any frame that submits aMesh to the renderer.
+   struct GLTF_RENDER_MODEL
+   {
+      DEP::GLTF_MODEL                    model;
+      std::vector<std::vector<uint8_t>> aTexturePixel;   // decoded RGBA8, one per source texture
+      std::vector<int>                  aTextureWidth;
+      std::vector<int>                  aTextureHeight;
+      std::vector<MESH_DATA>            aMesh;            // renderer-ready draw list
+      double                            aCenter[3] = { 0.0, 0.0, 0.0, };   // model-space AABB center (post-placement)
+      double                            dRadius    = 0.0;                  // bounding-sphere radius about aCenter
+   };
+
+   // Flattens model's default-scene node hierarchy (each node composed under
+   // matPlacement), decodes base-color textures to RGBA8, resolves materials,
+   // computes bounds, and fills out with a renderer-ready draw list. Takes
+   // ownership of model. Returns true when at least one drawable primitive was
+   // produced.
+   bool Gltf_Render_Model_Build (DEP::GLTF_MODEL model, const MAT4& matPlacement, GLTF_RENDER_MODEL& out);
+
    struct CAMERA_DATA
    {
       float dPosX, dPosY, dPosZ;
@@ -109,13 +155,14 @@ namespace SNEEZE
       virtual bool Initialize (int nWidth, int nHeight) = 0;
       virtual void Resize (int nWidth, int nHeight) = 0;
 
-      virtual void SetCamera (const CAMERA_DATA& pCamera) = 0;
-      virtual void SetLights (const std::vector<LIGHT_DATA>& aLight) { (void) aLight; }
-      virtual void BeginFrame () = 0;
-      virtual void SubmitSpheres (const std::vector<SPHERE_DATA>& aSpheres) = 0;
-      virtual void SubmitCurves (const std::vector<CURVE_DATA>& aCurves) = 0;
-      virtual void SubmitBoxes (const std::vector<BOX_DATA>& aBoxes) { (void) aBoxes; }
-      virtual void SubmitPanels (const std::vector<PANEL_DATA>& aPanels) { (void) aPanels; }
+      virtual void SetCamera     (const CAMERA_DATA& pCamera) = 0;
+      virtual void SetLights     (const std::vector<LIGHT_DATA>&  aLight_Data)  { (void) aLight_Data; }
+      virtual void BeginFrame    () = 0;
+      virtual void SubmitSpheres (const std::vector<SPHERE_DATA>& aSphere_Data) = 0;
+      virtual void SubmitCurves  (const std::vector<CURVE_DATA>&  aCurve_Data)  = 0;
+      virtual void SubmitBoxes   (const std::vector<BOX_DATA>&    aBox_Data)   { (void) aBox_Data; }
+      virtual void SubmitPanels  (const std::vector<PANEL_DATA>&  aPanel_Data) { (void) aPanel_Data; }
+      virtual void SubmitMeshes  (const std::vector<MESH_DATA>&   aMesh_Data)  { (void) aMesh_Data; }
       virtual void EndFrame () = 0;
 
       // Forces a full scene rebuild on the next frame (e.g. after a scene swap).

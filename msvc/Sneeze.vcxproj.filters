@@ -55,6 +55,9 @@
     <Filter Include="src\deps\stb">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000010}</UniqueIdentifier>
     </Filter>
+    <Filter Include="src\deps\gltf">
+      <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000011}</UniqueIdentifier>
+    </Filter>
     <Filter Include="include">
       <UniqueIdentifier>{A1B2C3D4-0001-0000-0000-000000000011}</UniqueIdentifier>
     </Filter>
@@ -181,6 +184,9 @@
     <ClCompile Include="..\src\context\viewport\UVSphere.cpp">
       <Filter>src\context\viewport</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\context\viewport\GltfMesh.cpp">
+      <Filter>src\context\viewport</Filter>
+    </ClCompile>
     <ClCompile Include="..\src\context\msf\MsfFile.cpp">
       <Filter>src\context\msf</Filter>
     </ClCompile>
@@ -225,6 +231,9 @@
     </ClCompile>
     <ClCompile Include="..\src\deps\stb\Image.cpp">
       <Filter>src\deps\stb</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\deps\gltf\Gltf.cpp">
+      <Filter>src\deps\gltf</Filter>
     </ClCompile>
     <ClCompile Include="..\src\sneeze\control\Fetch.cpp">
       <Filter>src\sneeze\control</Filter>
@@ -286,6 +295,9 @@
     </ClInclude>
     <ClInclude Include="..\src\deps\stb\stb_image.h">
       <Filter>src\deps\stb</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\deps\gltf\Gltf.h">
+      <Filter>src\deps\gltf</Filter>
     </ClInclude>
     <!-- public headers -->
     <ClInclude Include="..\include\Sneeze.h">

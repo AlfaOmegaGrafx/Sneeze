@@ -35,8 +35,8 @@ public:
 
    virtual void SetCamera (const CAMERA_DATA& Camera) = 0;
    virtual void BeginFrame () = 0;
-   virtual void SubmitSpheres (const std::vector<SPHERE_DATA>& aSpheres) = 0;
-   virtual void SubmitCurves (const std::vector<CURVE_DATA>& aCurves) = 0;
+   virtual void SubmitSpheres (const std::vector<SPHERE_DATA>& aSphere_Data) = 0;
+   virtual void SubmitCurves (const std::vector<CURVE_DATA>& aCurve_Data) = 0;
    virtual void EndFrame () = 0;
 
    virtual void InvalidateScene () {}
@@ -101,10 +101,10 @@ public:
 ### `virtual void BeginFrame () = 0`
 - **Purpose.** Start a frame; clears the pending geometry submission lists.
 
-### `virtual void SubmitSpheres (const std::vector<SPHERE_DATA>& aSpheres) = 0`
+### `virtual void SubmitSpheres (const std::vector<SPHERE_DATA>& aSphere_Data) = 0`
 - **Purpose.** Append spheres to the frame. A `SPHERE_DATA` carries position, radius, RGB color, an optional texture (pixels + dimensions), and an emissive flag.
 
-### `virtual void SubmitCurves (const std::vector<CURVE_DATA>& aCurves) = 0`
+### `virtual void SubmitCurves (const std::vector<CURVE_DATA>& aCurve_Data) = 0`
 - **Purpose.** Append curves (polylines) to the frame. A `CURVE_DATA` is a list of `CURVE_POINT`s (position + per-point radius) plus an RGB color, drawn as tubes (used for orbit trails).
 
 ### `virtual void EndFrame () = 0`

@@ -9,6 +9,7 @@
       "spirv-tools",
       "rmlui",
       "glslang",
-      "nlohmann-json"
+      "nlohmann-json",
+      "fastgltf"
    ]
 }

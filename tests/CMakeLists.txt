@@ -29,6 +29,7 @@ set (TEST_SOURCES
    NetworkTest.cpp
    StorageTest.cpp
    ConsoleTest.cpp
+   GltfTest.cpp
 )
 
 if (SNEEZE_ENABLE_WASM)
@@ -41,6 +42,7 @@ endif ()
 add_executable (SneezeTest ${TEST_SOURCES})
 target_link_libraries (SneezeTest PRIVATE Sneeze)
 target_compile_definitions (SneezeTest PRIVATE SNEEZE_TEST_CERTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/certs")
+target_compile_definitions (SneezeTest PRIVATE SNEEZE_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
 
 set (_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
 

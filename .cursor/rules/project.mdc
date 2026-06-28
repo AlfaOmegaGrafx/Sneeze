@@ -112,9 +112,9 @@ Sneeze/
 │   │   ├── Context.cpp CONTEXT (per-tab session; forwards Console/Network/Storage to ENGINE)
 │   │   ├── Container.cpp CONTAINER (runtime MSF manifestation, CID identity)
 │   │   ├── scene/      Scene Object Model (SCENE, FABRIC, NODE, MAP_OBJECT)
-│   │   ├── viewport/   Rendering + camera (VIEWPORT, RENDERER, ANARI, VIEW)
+│   │   ├── viewport/   Rendering + camera (VIEWPORT, RENDERER, ANARI, VIEW, GltfMesh glTF→renderer bridge)
 │   │   └── msf/        MSF/JWS signing + verification (MSF, CHAIN)
-│   ├── deps/           Dependency wrappers (wasm/, spirv/, xr/, ui/, compute/, stb/)
+│   ├── deps/           Dependency wrappers (wasm/, spirv/, xr/, ui/, compute/, gltf/, stb/)
 │   └── persona/        Local identity proxy (PERSONA)
 ├── tests/              Test source + test data + WASM test modules
 ├── tools/              SignMsf CLI, MsfViewer HTML viewer, HelloWasm
@@ -150,6 +150,7 @@ Each module has a `*.md` file with its own documentation. **Read these when you 
 | `src/deps/xr/` | `XrRuntime.md` | OpenXR device abstraction |
 | `src/deps/ui/` | `Ui_Context.md` | RmlUi HTML/CSS UI toolkit (UI_CONTEXT, UI_PANEL, UI_RENDER) |
 | `src/deps/compute/` | `ComputeDispatch.md` | SPIR-V kernel embedding + GPU dispatch via Vox |
+| `src/deps/gltf/` | `Gltf.md` | glTF/GLB loader (fastgltf wrapper) → CPU `GLTF_MODEL` |
 | `src/persona/` | `Persona.md` | Local identity proxy |
 | `src/cmake/` | `Cmake.md` | CMake find-modules and build configuration |
 
@@ -177,7 +178,7 @@ After Phase 3 landed, Dean enumerated five remaining jobs. Status:
 
 1. **Storage notifications fan out across contexts — DONE.** See detail below.
 2. **Reset/Clear the cache — DONE (code complete, 71/71 network tests pass; not yet committed).** See detail below. This job subsumed and resolved the previously-deferred "Rules relocation" and "`m_nNextAssetIx` rehoming" items.
-3. **GLB files — NOT STARTED.**
+3. **GLB files — DONE (code complete, Debug build clean, gltf tests pass; not yet committed).** See detail below.
 4. **Home page — NOT STARTED.**
 5. **Documentation — NOT STARTED** (includes the big wiki reconciliation below).
 
@@ -241,6 +242,37 @@ The "clear cache and reload" feature for the multi-origin browser. Code complete
 **Files touched (Item 2):** `src/sneeze/network/Network.{h,cpp}`, `Cache.cpp`, `Asset.cpp`, `File.cpp`; `include/Network.h` (`Reset(sKey)`, `Initialize(sPath_Root)`); `include/Context.h` + `src/context/Context.cpp` (`Key_Reset`, `Reset`, `m_sKey_Reset`, `bReset` wiring); `src/sneeze/Engine.cpp` (`m_sPath_Root`, pass to `NETWORK::Initialize`); `tests/NetworkTest.cpp` (timestamp-flow + the two async waits). `src/sneeze/network/Network.md` fully reconciled (architecture block, file-lifecycle, disk-storage, thread-safety/lock-ordering, files table, "Clearing the Cache" prose). `docs/` wiki NOT touched (Item 5).
 
 **Unrelated note:** `Context.cpp::Container_Open` has an intentional, temporary `CID.eTrust = kTRUST_EXPIRED;` line (Dean confirmed deliberate; `eTrust` is not part of `Key_All()` so it does not affect reset keying or the cache path).
+
+### Item 3 detail — GLB / glTF files (DONE)
+
+3D model loading for terrestrial/physical (and any) scenes. Code complete; Debug build clean; gltf test suite passes; DFW fabric renders its real models. **Not yet committed** (Dean commits himself).
+
+**Architectural decision — load glTF in Sneeze, not through ANARI.** Confirmed by Jonathan Hale (ANARI/Halogen author): ANARI is a *pure rendering-engine abstraction* ("in-memory scene data → pixels"). Asset loading is the framework's job (Sneeze), not the rendering engine's. Pushing glTF down through ANARI would make Halogen the only device that could ever render Artemis content — antithetical to ANARI's swappability. So Sneeze loads the glTF and feeds ANARI the decoded geometry. Jonathan's library recommendation: **fastgltf** (cgltf = ok; tinygltf = avoid; Magnum's importer = great but heavy deps).
+
+**The layering (four clean tiers):**
+1. **`src/deps/gltf/` (the dependency wrapper).** `DEP::GLTF::Load(bytes, model, sError)` (static) parses a GLB/glTF blob via fastgltf into a renderer-agnostic CPU `GLTF_MODEL` (meshes/materials/textures/node-hierarchy of the default scene). Flat, renderer-ready vertex streams; **textures kept encoded** (no image codec pulled into the loader). See `Gltf.md`.
+2. **`src/context/viewport/GltfMesh.cpp` (the bridge).** Free function `SNEEZE::Gltf_Render_Model_Build(DEP::GLTF_MODEL, matPlacement, GLTF_RENDER_MODEL& out)` flattens the node hierarchy (composing each node transform under `matPlacement`, baking the result into each `MESH_DATA::m16`), decodes base-color textures to RGBA8 via `IMAGE::Decode`, resolves materials, and computes a world-space AABB → `aCenter`/`dRadius`. `MESH_DATA` and `GLTF_RENDER_MODEL` are declared in `Viewport.h` (we folded the former `GltfMesh.h` into `Viewport.h` per the "one header per system" rule). `GLTF_RENDER_MODEL` owns its source model + decoded textures; `aMesh` entries **borrow** into that storage, so the model must outlive any submitted frame (same lifetime contract as `PANEL_DATA`).
+3. **`MAP_OBJECT` (storage).** The built `GLTF_RENDER_MODEL*` lives on the **base** `MAP_OBJECT` (not on NODE), via `Gltf_Render_Model()` getter / `Gltf_Render_Model(GLTF_RENDER_MODEL*)` setter — mirrors `Get/SetTexture`. Published write-once with an atomic acquire/release flag (immutable model → lockless read); freed in `MAP_OBJECT::Impl::~Impl`. Rationale (Dean): a model is *visual appearance*, which belongs on MAP_OBJECT; exposing it on NODE (which manages only relational/structural data) was a leak. And because it is on the base class, a model can sit at **any** level — celestial, terrestrial, or physical.
+4. **`Compositor.cpp` (render).** `TraverseNode` emits a node's model **independent of class**: a class-agnostic `pObj->Gltf_Render_Model()` block (gated only by skipping `action:` resources) emits one `MESH_BUILD` per `MESH_DATA` at the node's world frame and extends `dMaxReach` by the model's bounding sphere (so the single auto-frame render-scale frames it). The PHYSICAL branch's grounded-box is now only a **fallback when there is no model** (`!pModel`). `Execute_Render` applies the scene's `dRenderScale` to each mesh transform and calls `pRenderer->SubmitMeshes`.
+
+**Fetch is by URL, dispatch is by content (NODE refactor).** There is **one** resource path on `NODE::Impl`, not one per type. `Resource_Request()` opens the file; `OnFileReady` → `Resource_Load(bytes)` sniffs the bytes: binary GLB (ASCII `glTF` magic) or glTF JSON (leading `{`) → `Gltf_Load` (parse + `Gltf_Render_Model_Build` + hand to MAP_OBJECT); anything else → `Texture_Load` (stb_image). Removed the old URL-extension sniff (`IsGltfUrl`), the dual `Texture_Request`/`Gltf_Request` methods, and the `m_bGltf_Request` flag. (`bSubtype == 255` still routes to `SCENE::Fabric_Spawn` before any fetch.)
+
+**ANARI mesh path (`AnariRenderer.cpp`).** `SubmitMeshes` accumulates `MESH_DATA`; `BuildScene` makes one `"triangle"` geometry + `"physicallyBased"` material + instance per mesh, with a base-color `image2D` sampler when a texture is present (`MESH_ENTRY` holds the per-mesh ANARI handles + `pVertexKey`/`pTextureKey` rebuild keys). `UpdateScene` patches mesh instance transforms each frame; rebuild only when mesh **count**, a vertex pointer, or a texture pointer changes (`SceneNeedsRebuild`).
+
+**Naming.** For the type `GLTF_RENDER_MODEL`, the accessor/function is `Gltf_Render_Model` and the bridge is `Gltf_Render_Model_Build` (word breaks match the type).
+
+**Build wiring.** fastgltf 0.9.0 built from source as a static lib: `deps/fastgltf.cmake` (ExternalProject, source in `deps/repos/`), `src/cmake/FindFastgltf.cmake`, added to `src/CMakeLists.txt`, the MSVC `Sneeze.vcxproj`(+`.filters`), `vcpkg.json`, and CI `build-platform.yml` (tier0). **Static-lib gotcha:** because Sneeze is a static lib, the host exe (Artemis) had to add `fastgltf.lib` to its own `Artemis.vcxproj` `AdditionalDependencies` + include path — static libs don't propagate their dependencies.
+
+**Verified live.** DFW fabric (`https://cdn.rp1.com/test/dfw.msf.json`, physical nodes with `.glb` references) renders its buildings/roads as real geometry, replacing the placeholder boxes. Models render **grey** — confirmed correct: the test assets are untextured (grey in external glTF viewers too).
+
+**Open / deferred:**
+- **`.gltf` JSON with external buffers/images is not resolved.** `DEP::GLTF::Load` takes a byte buffer; external `.bin`/image URIs would need a base-path / custom data getter wired into fastgltf. **GLB (self-contained) is the working path**; embedded-data-URI `.gltf` would also work. Content-sniff accepts JSON glTF, but it won't fully load until URI resolution is added.
+- **Celestial double-render (latent, harmless).** The mesh-emit block is independent of the class chain, so a celestial node that *also* carried a GLB would render both its procedural sphere/star and the GLB. Not a real scenario today; if a model should *replace* the procedural celestial visual, add a `!pModel` guard to the celestial branch.
+- **A Cursor 3.5.x-on-Windows tooling bug** wrote new files as UTF-16LE (corrupting C++/CMake). Workaround in force: create/overwrite files via PowerShell `UTF8Encoding($false)` and byte-verify (no embedded `0x00`). Dean keeps a re-pasteable RULE block for this.
+
+### Item 5 (docs) note — what this session touched
+
+Per-module `src/**/*.md` reconciled for the GLB work: new `src/deps/gltf/Gltf.md`; `src/context/viewport/Viewport.md` (MESH_DATA/GLTF_RENDER_MODEL/SubmitMeshes/GltfMesh bridge); `src/context/scene/Scene.md` (NODE fetch-by-content, MAP_OBJECT visual-appearance accessors, removed the stale injected-test-panel prose). The curated **`docs/` wiki was NOT touched** for the GLB work — it remains part of the big Item 5 reconciliation (still `verified: 92fdc1c`, stale). `docs/api/viewport/RENDERER.md` in particular does not yet mention `SubmitMeshes`/meshes.
 
 Deferred / open items (still outstanding):
 - **Wiki (`docs/`) reconciliation (BIG, = Item 5, not started).** The curated wiki under `docs/` (systems + API pages for network/console/storage, `verified: 92fdc1c`) is stale all the way back to *before Phase 1*: there is no `CACHE` page; `api/network/NETWORK.md` still documents the monolithic pre-split per-`CONTEXT` `NETWORK` (`NETWORK(CONTEXT*)`, `File_Open`/`File_Enum`/`SetCacheEnabled`/`Clear`/`Reset()`/`Rules_Add`, single `m_mxNetwork`, `Initialize(bool bReset)`); `docs/systems/network.md` still describes the `rules.json`/staleness-rules model. Bringing the wiki current requires Phase 1+2+3 + the Item-2 reset rework reconciliation, not a touch-up. Done so far for docs: front-matter `sources:` paths repointed `src/context/{...}` → `src/sneeze/{...}` (so DocDrift still resolves), plus an earlier session's storage-callback fixes to `ICONTEXT.md`/`SILO.md` bodies; `verified:` left at `92fdc1c` and most bodies left stale (correctly flagged by DocDrift). The accurate, current references are the per-module `src/sneeze/**/*.md` docs and this file.
@@ -347,6 +379,7 @@ All built from source. `vcpkg.json` provided as an alternative.
 | Vox | main (Metaversal) | GPU compute dispatch (Vulkan/DX12/Metal) |
 | BoringSSL | main | Crypto backend (X.509, SHA-256, RSA/ECDSA) |
 | jwt-cpp | 0.7.0 | Header-only JWS/JWT |
+| fastgltf | 0.9.0 | glTF/GLB parser (C++17, static lib) |
 
 Build-time tools required: CMake 3.20+, C++17 compiler, Rust/Cargo (Wasmtime), Python 3 (glslang), Go + NASM (BoringSSL on Windows), Git.
 

@@ -49,14 +49,15 @@ namespace SNEEZE
       bool Initialize (int nWidth, int nHeight) override;
       void Resize (int nWidth, int nHeight) override;
 
-      void SetCamera (const CAMERA_DATA& pCamera) override;
-      void SetLights (const std::vector<LIGHT_DATA>& aLight) override;
-      void BeginFrame () override;
-      void SubmitSpheres (const std::vector<SPHERE_DATA>& aSpheres) override;
-      void SubmitCurves (const std::vector<CURVE_DATA>& aCurves) override;
-      void SubmitBoxes (const std::vector<BOX_DATA>& aBoxes) override;
-      void SubmitPanels (const std::vector<PANEL_DATA>& aPanels) override;
-      void EndFrame () override;
+      void SetCamera     (const CAMERA_DATA& pCamera) override;
+      void SetLights     (const std::vector<LIGHT_DATA>&  aLight_Data)  override;
+      void SubmitSpheres (const std::vector<SPHERE_DATA>& aSphere_Data) override;
+      void SubmitCurves  (const std::vector<CURVE_DATA>&  aCurve_Data)  override;
+      void SubmitBoxes   (const std::vector<BOX_DATA>&    aBox_Data)    override;
+      void SubmitPanels  (const std::vector<PANEL_DATA>&  aPanel_Data)  override;
+      void SubmitMeshes  (const std::vector<MESH_DATA>&   aMesh_Data)   override;
+      void BeginFrame    () override;
+      void EndFrame      () override;
 
       void InvalidateScene () override;
 
@@ -86,10 +87,11 @@ namespace SNEEZE
 
       std::vector<uint32_t> m_aPixels;
 
-      std::vector<SPHERE_DATA> m_aSpheres;
-      std::vector<CURVE_DATA>  m_aCurves;
-      std::vector<BOX_DATA>    m_aBoxes;
-      std::vector<PANEL_DATA>  m_aPanels;
+      std::vector<SPHERE_DATA> m_aSphere_Data;
+      std::vector<CURVE_DATA>  m_aCurve_Data;
+      std::vector<BOX_DATA>    m_aBox_Data;
+      std::vector<PANEL_DATA>  m_aPanel_Data;
+      std::vector<MESH_DATA>   m_aMesh_Data;
 
       UV_SPHERE m_pUnitSphere;
       bool      m_bUnitSphereReady;
@@ -105,10 +107,10 @@ namespace SNEEZE
 
       std::vector<LIGHT_DATA> m_aLight;
 
-      void ReleaseScene ();
-      void BuildScene (const std::vector<SPHERE_DATA>& aSpheres, const std::vector<CURVE_DATA>& aCurves, const std::vector<BOX_DATA>& aBoxes, const std::vector<PANEL_DATA>& aPanels);
-      void UpdateScene (const std::vector<SPHERE_DATA>& aSpheres, const std::vector<CURVE_DATA>& aCurves, const std::vector<BOX_DATA>& aBoxes, const std::vector<PANEL_DATA>& aPanels);
-      bool SceneNeedsRebuild (const std::vector<SPHERE_DATA>& aSpheres, const std::vector<CURVE_DATA>& aCurves, const std::vector<BOX_DATA>& aBoxes, const std::vector<PANEL_DATA>& aPanels) const;
+      void ReleaseScene      ();
+      void BuildScene        (const std::vector<SPHERE_DATA>& aSphere_Data, const std::vector<CURVE_DATA>& aCurve_Data, const std::vector<BOX_DATA>& aBox_Data, const std::vector<PANEL_DATA>& aPanel_Data, const std::vector<MESH_DATA>& aMesh_Data);
+      void UpdateScene       (const std::vector<SPHERE_DATA>& aSphere_Data, const std::vector<CURVE_DATA>& aCurve_Data, const std::vector<BOX_DATA>& aBox_Data, const std::vector<PANEL_DATA>& aPanel_Data, const std::vector<MESH_DATA>& aMesh_Data);
+      bool SceneNeedsRebuild (const std::vector<SPHERE_DATA>& aSphere_Data, const std::vector<CURVE_DATA>& aCurve_Data, const std::vector<BOX_DATA>& aBox_Data, const std::vector<PANEL_DATA>& aPanel_Data, const std::vector<MESH_DATA>& aMesh_Data) const;
 
       double m_dLastSubmitSeconds;
       double m_dLastRenderSeconds;

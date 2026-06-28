@@ -13,6 +13,7 @@ VIEWPORT (Viewport.cpp, pImpl)
 ├── VIEW (camera orbit state, declared in include/Viewport.h)
 ├── INPUT (accumulated mouse/key state, declared in include/Viewport.h)
 ├── UV_SPHERE (mesh generator, UVSphere.cpp)
+├── GLTF_RENDER_MODEL + Gltf_Render_Model_Build (glTF→renderer bridge, GltfMesh.cpp)
 └── JOB_COMPOSITOR (pool-cycle job, managed by CONTROL)
 ```
 
@@ -50,6 +51,7 @@ SubmitSpheres (vector<SPHERE_DATA>)
 SubmitCurves (vector<CURVE_DATA>)
 SubmitBoxes (vector<BOX_DATA>)
 SubmitPanels (vector<PANEL_DATA>)
+SubmitMeshes (vector<MESH_DATA>)
 EndFrame ()
 ```
 
@@ -70,6 +72,8 @@ framebuffer publish path is skipped entirely.
 | `CURVE_DATA` | Polyline (vector of CURVE_POINTs) with color |
 | `BOX_DATA` | Column-major world transform (`m16`) + color |
 | `PANEL_DATA` | Column-major world transform (`m16`, size baked in) + straight-alpha RGBA8 pixels + width/height |
+| `MESH_DATA` | One drawable glTF surface: column-major `m16`, borrowed vertex streams (position/normal/texcoord + uint32 indices), metallic-roughness PBR factors, and an optional borrowed decoded RGBA8 base-color texture |
+| `GLTF_RENDER_MODEL` | A loaded glTF prepared for rendering — owns the source `DEP::GLTF_MODEL`, the decoded textures, the flattened `aMesh` draw list, and a model-space bounding sphere (`aCenter`, `dRadius`) |
 | `CAMERA_DATA` | Eye, look direction, up, FOV, aspect, near/far |
 | `LIGHT_DATA` | World position of one star-driven point light |
 | `UV_SPHERE` | Generated mesh: positions, normals, texcoords, indices |
@@ -106,6 +110,35 @@ panel shows its true RGBA, lighting-independent, with per-texel alpha. Panel
 instance transforms are patched every frame in `UpdateScene`, so a billboarded
 panel tracks the camera without a rebuild; a rebuild is triggered only when the
 panel **count** or a panel's pixel pointer changes.
+
+### Meshes (glTF/GLB)
+
+`SubmitMeshes(vector<MESH_DATA>)` carries the geometry of loaded glTF/GLB models.
+Each `MESH_DATA` is one drawable surface: a column-major world transform plus
+**borrowed** pointers to flat vertex streams (position, optional normal/texcoord,
+uint32 indices), metallic-roughness PBR factors, and an optional decoded RGBA8
+base-color texture. The caller owns the backing storage for the lifetime of the
+submission (same contract as `PANEL_DATA`).
+
+The producer of that backing storage is the **glTF→renderer bridge**
+(`GltfMesh.cpp`): `Gltf_Render_Model_Build(DEP::GLTF_MODEL, matPlacement, out)`
+takes a CPU `DEP::GLTF_MODEL` (from `deps/gltf`, see `Gltf.md`) and fills a
+`GLTF_RENDER_MODEL`. It walks the default scene's node hierarchy, composing each
+node's local transform under `matPlacement` and baking the result into every
+emitted `MESH_DATA::m16`; decodes each base-color texture to RGBA8 via
+`IMAGE::Decode`; resolves materials; and computes a world-space AABB reduced to a
+center + bounding-sphere radius (`aCenter`/`dRadius`) so the compositor can frame
+the model. The `GLTF_RENDER_MODEL` owns the source model and the decoded
+textures; its `aMesh` entries borrow into that storage, so the model must outlive
+any frame that submits its meshes. A `GLTF_RENDER_MODEL` is stored on the
+`MAP_OBJECT` (any class — celestial, terrestrial, or physical — may carry one;
+see `Scene.md`), and the compositor emits its `aMesh` at the node's world frame.
+
+The ANARI backend builds one `"triangle"` geometry + `"physicallyBased"` material
++ instance per `MESH_DATA`. When a mesh has a base-color texture, the pixels feed
+an `image2D` sampler bound to the material. Mesh instance transforms are patched
+each frame in `UpdateScene`; a rebuild is triggered only when the mesh **count**,
+a mesh's vertex pointer, or its texture pointer changes.
 
 ## RENDERER::ANARI
 
@@ -170,7 +203,8 @@ ANARI renderer for textured planet rendering.
 | File | Contents |
 |------|----------|
 | `Viewport.cpp` | VIEWPORT::Impl (activate/deactivate, input, framebuffer, timing) |
-| `Viewport.h` | Private header — RENDERER base, SPHERE_DATA, CURVE_DATA, BOX_DATA, PANEL_DATA, CAMERA_DATA, UV_SPHERE |
+| `Viewport.h` | Private header — RENDERER base, SPHERE_DATA, CURVE_DATA, BOX_DATA, PANEL_DATA, MESH_DATA, GLTF_RENDER_MODEL, Gltf_Render_Model_Build, CAMERA_DATA, UV_SPHERE |
 | `AnariRenderer.h` | RENDERER::ANARI declaration |
-| `AnariRenderer.cpp` | ANARI implementation (device, scene retention, native surface) |
+| `AnariRenderer.cpp` | ANARI implementation (device, scene retention, native surface, mesh/sphere/box/curve/panel entries) |
+| `GltfMesh.cpp` | glTF→renderer bridge: `Gltf_Render_Model_Build` (hierarchy flatten, texture decode, bounds) |
 | `UVSphere.cpp` | GenerateUVSphere implementation |

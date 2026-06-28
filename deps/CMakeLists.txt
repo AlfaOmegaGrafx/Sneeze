@@ -189,6 +189,7 @@ set (SNEEZE_DEPS
    freetype
    rmlui
    nlohmann-json
+   fastgltf
    boringssl
    jwt-cpp
    filament

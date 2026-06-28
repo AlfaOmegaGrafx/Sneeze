@@ -59,6 +59,7 @@ DEPS_ORDERED=(
    freetype              # no deps (RmlUi + FindSneezeFreeType)
    rmlui                 # -> freetype
    nlohmann-json         # no deps
+   fastgltf              # no deps (vendors simdjson; glTF loader for src/deps/gltf)
    jwt-cpp               # header-only (JWS library used by src/jws/)
    spirv-cross           # no deps (SPIR-V -> HLSL / MSL for Vox)
    vox                   # -> spirv-cross (GPU compute dispatch)

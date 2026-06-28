@@ -407,7 +407,17 @@ struct PANEL_BUILD
    double         dAspect;       // panel width / height (quad shape only)
 };
 
-static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, SNEEZE::ENGINE* pEngine, std::vector<SPHERE_BUILD>& aSphere, std::vector<CURVE_BUILD>& aCurve, std::vector<LIGHT_BUILD>& aLight, std::vector<BOX_BUILD>& aBox, std::vector<PANEL_BUILD>& aPanel, double& dMaxReach)
+// One glTF/GLB draw gathered during traversal. mWorld is the draw's full world
+// transform in metres (node world * the model-internal draw transform); pSrc
+// borrows the node-owned MESH_DATA for its vertex streams and material, which
+// are copied through unchanged at the flatten seam (only m16 is rescaled).
+struct MESH_BUILD
+{
+   MAT4             mWorld;      // metres
+   const MESH_DATA* pSrc;
+};
+
+static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, SNEEZE::ENGINE* pEngine, std::vector<SPHERE_BUILD>& aSphere, std::vector<CURVE_BUILD>& aCurve, std::vector<LIGHT_BUILD>& aLight, std::vector<BOX_BUILD>& aBox, std::vector<PANEL_BUILD>& aPanel, std::vector<MESH_BUILD>& aMesh, double& dMaxReach)
 {
    MAP_OBJECT* pObj = pNode->Map_Object ();
    WORLD_FRAME childFrame = frame;
@@ -446,6 +456,43 @@ static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, 
       // the single render scale frames the whole thing.
       double dReach = std::sqrt (dWx * dWx + dWy * dWy + dWz * dWz);
       if (dReach > dMaxReach) dMaxReach = dReach;
+
+      // A loaded glTF/GLB renders its own geometry regardless of the node's class
+      // -- a model can sit at the celestial, terrestrial, or physical level. Nodes
+      // whose resource is an "action:" reference (e.g. colliders) are invisible
+      // logic volumes and never carry geometry.
+      const GLTF_RENDER_MODEL* pModel = nullptr;
+      if (std::strncmp (pObj->Resource.sReference, "action:", 7) != 0)
+         pModel = pObj->Gltf_Render_Model ();
+
+      if (pModel)
+      {
+         // Each draw's model-internal transform composes under this node's world
+         // frame; the streams/material ride through untouched.
+         for (const MESH_DATA& draw : pModel->aMesh)
+         {
+            MAT4 mLocal;
+            for (int j = 0; j < 16; j++)
+               mLocal.d[j] = draw.m16[j];
+
+            MESH_BUILD mesh;
+            mesh.mWorld = Mat4_Multiply (childFrame.mWorld, mLocal);
+            mesh.pSrc   = &draw;
+            aMesh.push_back (mesh);
+         }
+
+         // The model's bounding sphere (center carried through the node frame,
+         // radius scaled by the frame's average axis scale) extends the scene
+         // reach so the single render scale frames it like everything else.
+         double dCx, dCy, dCz;
+         Mat4_Point (childFrame.mWorld, pModel->aCenter[0], pModel->aCenter[1], pModel->aCenter[2], dCx, dCy, dCz);
+         double dCol0 = std::sqrt (childFrame.mWorld.d[0] * childFrame.mWorld.d[0] + childFrame.mWorld.d[1] * childFrame.mWorld.d[1] + childFrame.mWorld.d[2]  * childFrame.mWorld.d[2]);
+         double dCol1 = std::sqrt (childFrame.mWorld.d[4] * childFrame.mWorld.d[4] + childFrame.mWorld.d[5] * childFrame.mWorld.d[5] + childFrame.mWorld.d[6]  * childFrame.mWorld.d[6]);
+         double dCol2 = std::sqrt (childFrame.mWorld.d[8] * childFrame.mWorld.d[8] + childFrame.mWorld.d[9] * childFrame.mWorld.d[9] + childFrame.mWorld.d[10] * childFrame.mWorld.d[10]);
+         double dScale = (dCol0 + dCol1 + dCol2) / 3.0;
+         double dMeshReach = std::sqrt (dCx * dCx + dCy * dCy + dCz * dCz) + pModel->dRadius * dScale;
+         if (dMeshReach > dMaxReach) dMaxReach = dMeshReach;
+      }
 
       if (pObj->Class () == MAP_OBJECT_CELESTIAL::MAP_OBJECT_CLASS_CELESTIAL)
       {
@@ -554,11 +601,13 @@ static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, 
          }
       }
       else if (pObj->Class () == MAP_OBJECT::MAP_OBJECT_CLASS_PHYSICAL
-           &&  std::strncmp (pObj->Resource.sReference, "action:", 7) != 0)
+           &&  std::strncmp (pObj->Resource.sReference, "action:", 7) != 0
+           &&  !pModel)
       {
-         // Physical nodes manifest as a grounded box from their bound. Nodes whose
-         // resource is an "action://" reference (e.g. colliders) are invisible
-         // logic volumes, not geometry, so they never render.
+         // A model-less physical node falls back to a grounded box from its bound
+         // so it stays visible (any glTF/GLB it carries was already emitted above).
+         // Nodes whose resource is an "action:" reference (e.g. colliders) are
+         // invisible logic volumes, never geometry.
          double dW = pObj->Bound.d3Max[0];
          double dH = pObj->Bound.d3Max[1];
          double dD = pObj->Bound.d3Max[2];
@@ -618,14 +667,14 @@ static void TraverseNode (NODE* pNode, const WORLD_FRAME& frame, int64_t tmNow, 
    {
       NODE* pChild = pNode->Child (i);
       if (pChild)
-         TraverseNode (pChild, childFrame, tmNow, pEngine, aSphere, aCurve, aLight, aBox, aPanel, dMaxReach);
+         TraverseNode (pChild, childFrame, tmNow, pEngine, aSphere, aCurve, aLight, aBox, aPanel, aMesh, dMaxReach);
    }
 
    // An attachment point spawns a child fabric; traverse it in this node's own
    // accumulated frame so the secondary fabric inherits this node's transform.
    FABRIC* pAttached = pNode->Fabric_Attachment ();
    if (pAttached  &&  pAttached->Node_Root ())
-      TraverseNode (pAttached->Node_Root (), childFrame, tmNow, pEngine, aSphere, aCurve, aLight, aBox, aPanel, dMaxReach);
+      TraverseNode (pAttached->Node_Root (), childFrame, tmNow, pEngine, aSphere, aCurve, aLight, aBox, aPanel, aMesh, dMaxReach);
 }
 
 void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
@@ -693,6 +742,7 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
       std::vector<BOX_BUILD>    aBoxBuild;
       std::vector<LIGHT_BUILD>  aLightBuild;
       std::vector<PANEL_BUILD>  aPanelBuild;
+      std::vector<MESH_BUILD>   aMeshBuild;
 
       SCENE* pScene = pViewport->Scene ();
       FABRIC* pFabric_Root = pScene ? pScene->Fabric_Root () : nullptr;
@@ -704,7 +754,7 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
       if (pSomRoot)
       {
          WORLD_FRAME rootFrame;
-         TraverseNode (pSomRoot, rootFrame, tmNow, pEngine, aSphereBuild, aCurveBuild, aLightBuild, aBoxBuild, aPanelBuild, dMaxReach);
+         TraverseNode (pSomRoot, rootFrame, tmNow, pEngine, aSphereBuild, aCurveBuild, aLightBuild, aBoxBuild, aPanelBuild, aMeshBuild, dMaxReach);
       }
 
       // One uniform per-scene render scale, applied at this single flatten seam:
@@ -714,8 +764,8 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
       double dRenderScale = (dMaxReach > MIN_REACH) ? (TARGET_EXTENT / dMaxReach) : 1.0;
       pJob_Compositor->m_dRenderScale = static_cast<float> (dRenderScale);
 
-      std::vector<SPHERE_DATA> aSpheres;
-      aSpheres.reserve (aSphereBuild.size ());
+      std::vector<SPHERE_DATA> aSphere_Data;
+      aSphere_Data.reserve (aSphereBuild.size ());
       for (const auto& sb : aSphereBuild)
       {
          SPHERE_DATA sphere;
@@ -730,11 +780,11 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
          sphere.pTexturePixels = sb.pTex;
          sphere.nTextureWidth  = sb.nTexW;
          sphere.nTextureHeight = sb.nTexH;
-         aSpheres.push_back (sphere);
+         aSphere_Data.push_back (sphere);
       }
 
-      std::vector<CURVE_DATA> aCurves;
-      aCurves.reserve (aCurveBuild.size ());
+      std::vector<CURVE_DATA> aCurve_Data;
+      aCurve_Data.reserve (aCurveBuild.size ());
       for (const auto& cb : aCurveBuild)
       {
          CURVE_DATA curve;
@@ -751,7 +801,7 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
             cp.dRadius = p.dRadius;
             curve.aPoints.push_back (cp);
          }
-         aCurves.push_back (std::move (curve));
+         aCurve_Data.push_back (std::move (curve));
       }
 
       std::vector<LIGHT_DATA> aLight;
@@ -765,8 +815,8 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
          aLight.push_back (light);
       }
 
-      std::vector<BOX_DATA> aBoxes;
-      aBoxes.reserve (aBoxBuild.size ());
+      std::vector<BOX_DATA> aBox_Data;
+      aBox_Data.reserve (aBoxBuild.size ());
       for (const auto& bb : aBoxBuild)
       {
          BOX_DATA box;
@@ -780,22 +830,22 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
          box.r = bb.r;
          box.g = bb.g;
          box.b = bb.b;
-         aBoxes.push_back (box);
+         aBox_Data.push_back (box);
       }
 
-      // TEST: a single panel is injected into every fabric, so it is sized and
-      // placed as a fraction of the framed scene (render units) rather than in
-      // absolute metres -- one absolute size cannot suit both a planetary system
-      // and a city block. A real per-fabric panel would author metres in
-      // Bound/Transform and ride dRenderScale exactly like a box; that path is
-      // unchanged. The panel is billboarded toward the camera (its +Z normal
-      // tracks the eye) so it stays readable from any orbit angle instead of
-      // being seen edge-on. It is anchored just above the scene centre -- which
-      // is the camera's look-at point and, in a planetary fabric, the sun -- and
-      // lifted by a half-height so it floats above a y=0 ground rather than
-      // intersecting it. Billboarding per node is a future panel property.
-      std::vector<PANEL_DATA> aPanels;
-      aPanels.reserve (aPanelBuild.size ());
+      // A panel is chrome, not scene geometry: its Bound carries only the quad's
+      // aspect ratio, so it is sized and placed as a fraction of the framed scene
+      // (render units) rather than in absolute metres -- one absolute size cannot
+      // suit both a planetary system and a city block. A real per-fabric panel
+      // would author metres in Bound/Transform and ride dRenderScale exactly like
+      // a box. The panel is billboarded toward the camera (its +Z normal tracks
+      // the eye) so it stays readable from any orbit angle instead of being seen
+      // edge-on. It is anchored just above the scene centre -- the camera's
+      // look-at point -- and lifted by a half-height so it floats above a y=0
+      // ground rather than intersecting it. Billboarding per node is a future
+      // panel property.
+      std::vector<PANEL_DATA> aPanel_Data;
+      aPanel_Data.reserve (aPanelBuild.size ());
       for (const auto& pb : aPanelBuild)
       {
          double dHeight = 0.26 * TARGET_EXTENT;          // quad height, render units
@@ -843,7 +893,27 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
          panel.pPixels = pb.pPixels;
          panel.nWidth  = pb.nW;
          panel.nHeight = pb.nH;
-         aPanels.push_back (panel);
+         aPanel_Data.push_back (panel);
+      }
+
+      // glTF/GLB draws ride the same single render scale as boxes: the world
+      // transform's linear part and translation are scaled to render units while
+      // the homogeneous row is preserved. Vertex streams and the material (with
+      // any decoded base-color texture) are copied through from the node-owned
+      // source unchanged.
+      std::vector<MESH_DATA> aMesh_Data;
+      aMesh_Data.reserve (aMeshBuild.size ());
+      for (const auto& mb : aMeshBuild)
+      {
+         MESH_DATA mesh = *mb.pSrc;
+         for (int j = 0; j < 4; j++)
+         {
+            mesh.m16[j * 4 + 0] = static_cast<float> (mb.mWorld.d[j * 4 + 0] * dRenderScale);
+            mesh.m16[j * 4 + 1] = static_cast<float> (mb.mWorld.d[j * 4 + 1] * dRenderScale);
+            mesh.m16[j * 4 + 2] = static_cast<float> (mb.mWorld.d[j * 4 + 2] * dRenderScale);
+            mesh.m16[j * 4 + 3] = static_cast<float> (mb.mWorld.d[j * 4 + 3]);
+         }
+         aMesh_Data.push_back (mesh);
       }
 
       pRenderer->SetLights (aLight);
@@ -854,10 +924,11 @@ void AGENT::COMPOSITOR::Execute_Render (JOB_COMPOSITOR* pJob_Compositor)
          pRenderer->InvalidateScene ();
 
       pRenderer->BeginFrame ();
-      pRenderer->SubmitSpheres (aSpheres);
-      pRenderer->SubmitCurves (aCurves);
-      pRenderer->SubmitBoxes (aBoxes);
-      pRenderer->SubmitPanels (aPanels);
+      pRenderer->SubmitSpheres (aSphere_Data);
+      pRenderer->SubmitCurves (aCurve_Data);
+      pRenderer->SubmitBoxes (aBox_Data);
+      pRenderer->SubmitPanels (aPanel_Data);
+      pRenderer->SubmitMeshes (aMesh_Data);
       pRenderer->EndFrame ();
 
       pViewport->Accumulate (VIEWPORT::kACCUMULATE_SUBMIT, pRenderer->GetLastSubmitSeconds ());

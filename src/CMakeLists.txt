@@ -166,6 +166,7 @@ if (USE_LOCAL_DEPS)
    find_package (SneezeRmlUi REQUIRED)
    find_package (Glslang REQUIRED)
    find_package (NlohmannJson REQUIRED)
+   find_package (Fastgltf REQUIRED)
    find_package (BoringSSL REQUIRED)
    find_package (JwtCpp REQUIRED)
 
@@ -185,6 +186,8 @@ else ()
    find_package (RmlUi REQUIRED)
    find_program (GLSLANG_VALIDATOR glslang REQUIRED)
    find_package (nlohmann_json REQUIRED)
+   find_package (fastgltf CONFIG REQUIRED)
+   set (FASTGLTF_LIB fastgltf::fastgltf)
    # jwt-cpp and BoringSSL have no upstream vcpkg configs that match our
    # pinned layout; USE_LOCAL_DEPS=OFF requires them on the system include
    # path already. Users configuring without LOCAL_DEPS must provide
@@ -262,6 +265,7 @@ if (USE_LOCAL_DEPS)
       FREETYPE_INCLUDE     FREETYPE_LIB
       RMLUI_INCLUDE        RMLUI_CORE_LIB   RMLUI_DEBUGGER_LIB
       NLOHMANN_JSON_INCLUDE
+      FASTGLTF_INCLUDE     FASTGLTF_LIB
       BORINGSSL_INCLUDE    BORINGSSL_CRYPTO_LIB
       JWT_CPP_INCLUDE
       WASMTIME_INCLUDE     WASMTIME_LIB
@@ -618,7 +622,7 @@ set (STORAGE_HEADERS)
 set (PERSONA_SOURCES  persona/Persona.cpp)
 set (PERSONA_HEADERS)
 
-set (RENDERER_SOURCES  context/viewport/AnariRenderer.cpp  context/viewport/UVSphere.cpp)
+set (RENDERER_SOURCES  context/viewport/AnariRenderer.cpp  context/viewport/UVSphere.cpp  context/viewport/GltfMesh.cpp)
 set (RENDERER_HEADERS  context/viewport/Viewport.h  context/viewport/AnariRenderer.h)
 
 if (SNEEZE_ENABLE_WASM)
@@ -660,6 +664,9 @@ set (MSF_HEADERS)
 set (STB_SOURCES  deps/stb/stb_image_impl.cpp deps/stb/Image.cpp)
 set (STB_HEADERS  deps/stb/stb_image.h)
 
+set (GLTF_SOURCES  deps/gltf/Gltf.cpp)
+set (GLTF_HEADERS  deps/gltf/Gltf.h)
+
 set (INCLUDE_HEADERS
    ../include/Sneeze.h
    ../include/Context.h
@@ -694,6 +701,7 @@ add_library (Sneeze STATIC
    ${COMPUTE_SOURCES}   ${COMPUTE_HEADERS}
    ${MSF_SOURCES}       ${MSF_HEADERS}
    ${STB_SOURCES}       ${STB_HEADERS}
+   ${GLTF_SOURCES}      ${GLTF_HEADERS}
    ${INCLUDE_HEADERS}
    ${KERNEL_EMBED_FILES}
    ${NETWORK_GENERATED_SOURCES}
@@ -728,6 +736,7 @@ target_include_directories (Sneeze PUBLIC
    ${FREETYPE_INCLUDE}
    ${RMLUI_INCLUDE}
    ${NLOHMANN_JSON_INCLUDE}
+   ${FASTGLTF_INCLUDE}
    ${BORINGSSL_INCLUDE}
    ${JWT_CPP_INCLUDE}
 )
@@ -759,6 +768,7 @@ target_link_libraries (Sneeze PUBLIC
    ${FREETYPE_LIB}
    ${BORINGSSL_SSL_LIB}
    ${BORINGSSL_CRYPTO_LIB}
+   ${FASTGLTF_LIB}
    vox::vox
 )
 
@@ -813,6 +823,7 @@ source_group (TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
    ${COMPUTE_SOURCES}   ${COMPUTE_HEADERS}
    ${MSF_SOURCES}       ${MSF_HEADERS}
    ${STB_SOURCES}       ${STB_HEADERS}
+   ${GLTF_SOURCES}      ${GLTF_HEADERS}
 )
 source_group ("include" FILES ${INCLUDE_HEADERS})
 
