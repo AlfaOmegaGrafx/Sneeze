@@ -121,6 +121,10 @@ namespace SNEEZE
       virtual bool  FrameSize (int& nWidth, int& nHeight) = 0;
 
       virtual void  OnFrameReady (const uint32_t* pFB, int nFbW, int nFbH) = 0;
+
+      // Vertical field of view (radians) the host presents the frame with, e.g.
+      // an XR eye frustum. Return false to keep the height-scaled default.
+      virtual bool  FrameFovY (float& fFovY) { (void) fFovY; return false; }
    };
 
    // ------------------------------------------------------------------------
