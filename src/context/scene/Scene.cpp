@@ -543,6 +543,8 @@ public:
 
       delete pMsf;
 
+      Gltf_Render_Model_ClearCache ();
+
       return nullptr;
    }
 
